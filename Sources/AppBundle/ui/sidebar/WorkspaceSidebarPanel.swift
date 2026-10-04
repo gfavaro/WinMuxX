@@ -604,7 +604,7 @@ extension WorkspaceSidebarPanel {
             hasPinnedDraggedWindow: hasPinnedDraggedWindow(),
             isSidebarDragInProgress: getCurrentMouseManipulationKind() == .move && getCurrentMouseDragStartedInSidebar(),
             hasActiveEditor: isMenuTrackingOrInGracePeriod() || shouldKeepSidebarOpenForInlineTextEditing(),
-        ) || isMouseWindowDragInProgress()
+        ) || isMouseWindowDragInProgress() || overrideConfirmationLocksCollapse
     }
 
     func shouldKeepSidebarOpenForInlineTextEditing() -> Bool {
