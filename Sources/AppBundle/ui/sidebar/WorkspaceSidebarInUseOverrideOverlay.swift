@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkspaceSidebarInUseOverrideOverlay: View {
     let text: String
+    var isCompact = false
     let onOverride: () -> Void
     @State private var isOverrideHovered = false
 
@@ -21,21 +22,33 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
             shape.strokeBorder(Color(nsColor: .systemRed).opacity(0.45), lineWidth: 0.8)
 
             VStack(spacing: 8) {
-                Text(text)
-                    .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.88))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 12)
+                if !isCompact {
+                    Text(text)
+                        .font(.system(size: 10.5, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.88))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 12)
+                }
 
                 Button(action: onOverride) {
-                    Text("Override")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(Color.white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 4)
+                    Group {
+                        if isCompact {
+                            Image(systemName: "arrow.left.arrow.right")
+                                .frame(maxWidth: .infinity, minHeight: 28)
+                        } else {
+                            Text("Override")
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 4)
+                        }
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(Color.white)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Override")
+                .help(text + ". Swap workspaces between displays.")
                 .background {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(Color(nsColor: .systemRed).opacity(isOverrideHovered ? 1 : 0.88))
@@ -48,7 +61,7 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                     isOverrideHovered = hovering
                 }
             }
-            .padding(.vertical, 10)
+            .padding(isCompact ? 4 : 10)
         }
         .contentShape(Rectangle())
     }
