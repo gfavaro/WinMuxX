@@ -107,7 +107,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
             .background {
                 ZStack {
                     sectionBackground
-                if !isCompact && allowsWorkspaceActivation {
+                if !isCompact && allowsWorkspaceActivation && !isShowingInUseOverlay {
                     sectionActivationButton
                 }
                 }
@@ -281,10 +281,10 @@ extension WorkspaceSidebarWorkspaceSection {
     }
 
     var inUseOverrideOverlay: some View {
-        WorkspaceSidebarInUseOverrideOverlay(text: inUseOverrideText) {
+        WorkspaceSidebarInUseOverrideOverlay(text: inUseOverrideText, isCompact: isCompact, onOverride: {
             activeInUseOverrideWorkspaceName = nil
             actions.send(.overrideWorkspaceInUse(workspace.name))
-        }
+        }, onCancel: { activeInUseOverrideWorkspaceName = nil })
     }
 }
 extension WorkspaceSidebarWorkspaceSection {
