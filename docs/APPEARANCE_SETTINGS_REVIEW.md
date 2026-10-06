@@ -191,10 +191,10 @@ horizontal em larguras de 28 a 120 pt.
 
 Show menu bar background aparece em System + Menu bar style. O toggle local
 mostra material translúcido quando ligado e fundo transparente quando desligado,
-usando a chave `workspace-sidebar.menu-bar-background`. O padrão true preserva
-o comportamento das configurações anteriores. Reduce Transparency tem prioridade.
-O contraste acompanha o wallpaper quando o fundo está desligado, inclusive no
-modo expandido. Não há leitura periódica das preferências do macOS.
+usando a chave `workspace-sidebar.menu-bar-background`. O padrão é desligado
+para manter a barra recolhida transparente. Reduce Transparency tem prioridade.
+O texto usa cores semânticas do sistema. Não há leitura periódica das
+preferências do macOS.
 
 A preferência global foi investigada e o toggle do sistema restaurado ao estado
 original. Por escolha do usuário, o WinMuxX usa uma opção própria com reload

@@ -43,7 +43,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
     var isCompact: Bool { expansionProgress < workspaceSidebarRowsRevealProgress }
     var showsWindowRows: Bool { expansionProgress >= workspaceSidebarRowsRevealProgress }
     var sectionMinHeight: CGFloat? {
-        if !isCompact, allowsWorkspaceActivation, isInUseOnOtherDisplay, workspace.items.isEmpty {
+        if !isCompact, allowsWorkspaceActivation, isInUseOnOtherDisplay,
+           workspace.items.isEmpty || isShowingInUseOverlay {
             return workspaceSidebarInUseOverrideEmptySectionMinHeight
         }
         return nil
@@ -109,9 +110,9 @@ struct WorkspaceSidebarWorkspaceSection: View {
             .background {
                 ZStack {
                     sectionBackground
-                if !isCompact && allowsWorkspaceActivation {
-                    sectionActivationButton
-                }
+                    if !isCompact && allowsWorkspaceActivation && !isShowingInUseOverlay {
+                        sectionActivationButton
+                    }
                 }
             }
             .overlay(alignment: .center) {
@@ -287,21 +288,20 @@ extension WorkspaceSidebarWorkspaceSection {
         isCompact && !isOnFocusedMonitor ? 0.72 : 1
     }
 
-    var inUseOverrideOverlay: some View {
-        WorkspaceSidebarInUseOverrideOverlay(text: inUseOverrideText) {
+    var inUseOverrideOverlay: some View { overrideConfirmation }
+
+    var overrideConfirmation: WorkspaceSidebarInUseOverrideOverlay {
+        WorkspaceSidebarInUseOverrideOverlay(text: inUseOverrideText, isCompact: isCompact, onOverride: {
             activeInUseOverrideWorkspaceName = nil
             actions.send(.overrideWorkspaceInUse(workspace.name))
-        }
+        }, onCancel: { activeInUseOverrideWorkspaceName = nil })
     }
 }
 extension WorkspaceSidebarWorkspaceSection {
     var workspaceBadge: some View {
-        Text(workspaceBadgeText)
-            .font(.system(size: compactMetrics.fontSize, weight: isActiveOnTargetMonitor ? .bold : .semibold))
-            .monospacedDigit()
-            .foregroundStyle(workspaceBadgeForeground)
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
+        WorkspaceSidebarLabel(text: workspaceBadgeText, size: compactMetrics.fontSize,
+            weight: isActiveOnTargetMonitor ? .bold : .semibold, secondary: !isActiveOnTargetMonitor,
+            monospacedDigit: true, alignment: .center, customColor: workspaceBadgeForeground)
             .frame(width: compactMetrics.badgeSize, height: compactMetrics.badgeSize)
     }
 
@@ -339,6 +339,7 @@ extension WorkspaceSidebarWorkspaceSection {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isCompact ? workspaceBadgeText : workspace.displayName)
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -366,11 +367,9 @@ extension WorkspaceSidebarWorkspaceSection {
                     onCancel: onCancelRenameWorkspace,
                 )
             } else {
-                Text(workspace.displayName)
-                    .font(.system(size: 15, weight: isActiveOnTargetMonitor ? .bold : .semibold))
-                    .foregroundStyle(isActiveOnTargetMonitor ? sidebarColors.foreground : sidebarColors.text(opacity: 0.85))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                WorkspaceSidebarLabel(text: workspace.displayName, size: 15,
+                    weight: isActiveOnTargetMonitor ? .bold : .semibold,
+                    customColor: isActiveOnTargetMonitor ? sidebarColors.foreground : sidebarColors.text(opacity: 0.85))
             }
             if let projectContextLabel, let projectContextColor {
                 Text(projectContextLabel)

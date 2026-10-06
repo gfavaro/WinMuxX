@@ -161,6 +161,11 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(otherTilingManagers([]).isEmpty)
     }
 
+    func testProcessConflictsIncludeDaemonsAndIgnoreUnrelatedProcesses() {
+        XCTAssertEqual(otherTilingManagerProcesses(["AeroSpace", "aerospace", "yabai", "KiwiDesk", "Dinky", "WinMux", "Dock"]), ["AeroSpace", "Dinky", "KiwiDesk", "yabai"])
+        XCTAssertTrue(otherTilingManagerProcesses([]).isEmpty)
+    }
+
     func testDiagnosticsReportsLoadedConfigurationAndDoesNotChangeLayout() async {
         let originalConfig = config
         let originalUrl = configUrl

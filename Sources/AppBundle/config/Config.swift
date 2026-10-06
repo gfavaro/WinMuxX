@@ -99,7 +99,7 @@ struct WorkspaceSidebarConfig: ConvenienceCopyable, Equatable, Sendable {
     var showWeekday: Bool = true
     var appearance: WorkspaceSidebarAppearance = .system
     var background: WorkspaceSidebarBackground = .sidebar
-    var menuBarBackground = true
+    var menuBarBackground = false
     var frostedTint: WorkspaceSidebarFrostedTint = .automatic
     // Legacy appearance remains parseable; the style is the single runtime choice.
     var effectiveAppearance: WorkspaceSidebarAppearance { chromeStyle == .solid ? .custom : .system }

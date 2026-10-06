@@ -1,8 +1,8 @@
 @MainActor
 func automaticWorkspaceDisplayIndex(_ workspace: Workspace, focusedWorkspace: Workspace?) -> Int? {
-    orderedWorkspacesForPresentation()
-        .filter { $0.projectId == workspace.projectId }
-        .filter { userFacingWorkspaces([$0], focusedWorkspace: focusedWorkspace).contains($0) }
+    projectWorkspaces(projectId: workspace.projectId)
+        .filter { !$0.isArchived }
+        .filter { isUserFacingWorkspace($0, focusedWorkspace: focusedWorkspace) }
         .filter(\.usesAutomaticDisplayName)
         .firstIndex(of: workspace)
         .map { $0 + 1 }

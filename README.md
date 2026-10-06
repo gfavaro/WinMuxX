@@ -31,10 +31,14 @@ currently share the same safe geometry. Expanded and collapsed widths have
 Small, Medium and Large presets. Always expanded reserves window space on the
 chosen side.
 
+Tiled windows glide into place by default (150 ms). Set `animations.enabled = false`
+or `animations.duration-ms = 0` for immediate placement. Reduce Motion disables
+the glide. See [window motion](docs/WINDOW_MOTION.md) for configuration and limits.
+
 ```toml
 [workspace-sidebar]
     chrome-style = 'liquid-glass' # or 'solid'
-    menu-bar-background = true
+    menu-bar-background = false
     position = 'left'            # or 'right'
     height-mode = 'standard'     # or 'centered', 'full'
 ```

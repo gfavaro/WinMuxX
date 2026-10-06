@@ -18,6 +18,28 @@ struct WorkspaceNamingTestMonitor: Monitor {
 final class WorkspaceNamingTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testSidebarNumbersIncludeEmptyPersistentWorkspaces() {
+        config.persistentWorkspaces = ["1", "2"]
+        materializePersistedWorkspaces()
+        let first = Workspace.get(byName: "1")
+        let second = Workspace.get(byName: "2")
+        let third = Workspace.get(byName: "4")
+        for workspace in [first, second, third] { workspace.markAsAutomaticallyNamed() }
+        _ = TestWindow.new(id: 9001, parent: third.rootTilingContainer)
+        Workspace.reconcileWorkspaceState()
+
+        XCTAssertTrue(isUserFacingWorkspace(first, focusedWorkspace: focus.workspace))
+        XCTAssertTrue(isUserFacingWorkspace(second, focusedWorkspace: focus.workspace))
+        XCTAssertEqual([first, second, third].map {
+            sidebarWorkspaceDisplayName(
+                $0.name, labels: [:],
+                displayIndex: automaticWorkspaceDisplayIndex($0, focusedWorkspace: focus.workspace)
+            )
+        }, ["Workspace 1", "Workspace 2", "Workspace 3"])
+        XCTAssertTrue(first.isConfiguredPersistent)
+        XCTAssertTrue(second.isConfiguredPersistent)
+    }
+
     func testSanitizedWorkspaceSidebarHoveredWorkspaceNameClearsDeadWorkspaceReferences() {
         let sanitized = sanitizedWorkspaceSidebarHoveredWorkspaceName(
             visibleWorkspaceNames: ["live"],

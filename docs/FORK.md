@@ -64,11 +64,15 @@ screen have been removed; the tray is owned by `NativeActionMenu`.
 `chrome-style = 'liquid-glass'` chooses native glass on macOS 26+, with a native
 material fallback on older systems. `solid` uses opaque preset/custom colors.
 The expanded glass sidebar always uses a frosted surface. `menu-bar-background`
-controls compact glass; Reduce Transparency has priority and makes it opaque.
+adds regular glass to the compact rail; it defaults to transparent. Reduce
+Transparency has priority and makes it opaque.
 Legacy appearance/background/frosted-tint fields remain parseable, but the current
 style selector determines the runtime appearance. Solid text adapts to color
 luminance. Wallpaper contrast samples local files off the UI actor, using the
 selected edge of each monitor; no screen capture or network access is involved.
+Display, Space, wake and appearance events refresh the cached analysis without a
+permanent polling timer. A valid static wallpaper sample takes priority over the
+shared menu-bar appearance; unsupported dynamic variants use the native fallback.
 
 `position = 'left' | 'right'` selects the display edge. Expansion remains anchored
 to that edge; persistent width is reserved on the same side for tiled windows.

@@ -1,18 +1,59 @@
 @testable import AppBundle
 import AppKit
+import Combine
 import ImageIO
+import SwiftUI
 import XCTest
 
 final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
+    func testSystemPaletteUsesSemanticForegroundInsteadOfWallpaperHeuristics() {
+        let palette = WorkspaceSidebarPalette(appearance: .system, colorScheme: .light)
+        XCTAssertEqual(palette.foreground, Color(nsColor: .labelColor))
+        XCTAssertEqual(palette.text(opacity: 0.38), Color(nsColor: .labelColor).opacity(0.38))
+    }
+    func testDisplaySpaceAndWakeChangesAreCoalesced() {
+        let applicationCenter = NotificationCenter()
+        let workspaceCenter = NotificationCenter()
+        let refreshed = expectation(description: "One refresh for a burst of desktop events")
+        refreshed.assertForOverFulfill = true
+        let subscription = workspaceSidebarWallpaperChanges(
+            applicationCenter: applicationCenter, workspaceCenter: workspaceCenter
+        ).sink { _ in refreshed.fulfill() }
+        applicationCenter.post(name: NSApplication.didChangeScreenParametersNotification, object: nil)
+        workspaceCenter.post(name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
+        workspaceCenter.post(name: NSWorkspace.didWakeNotification, object: nil)
+        wait(for: [refreshed], timeout: 2)
+        withExtendedLifetime(subscription) {}
+    }
+
     func testLuminanceUsesLinearSRGB() {
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.luminance(red: 0, green: 0, blue: 0), 0)
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.luminance(red: 1, green: 1, blue: 1), 1, accuracy: 0.0001)
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.luminance(red: 0.5, green: 0.5, blue: 0.5), 0.214, accuracy: 0.001)
     }
 
+    func testEachDisplayPrefersItsWallpaperAndNativeAppearanceIsFallback() {
+        // Opposite wallpapers on two monitors must not inherit the same global status-item appearance.
+        XCTAssertEqual(workspaceSidebarResolvedColorScheme(
+            menuBarColorScheme: .light, wallpaperTone: .dark, systemColorScheme: .light
+        ), .dark)
+        XCTAssertEqual(workspaceSidebarResolvedColorScheme(
+            menuBarColorScheme: .dark, wallpaperTone: .light, systemColorScheme: .dark
+        ), .light)
+        XCTAssertEqual(workspaceSidebarResolvedColorScheme(
+            menuBarColorScheme: .light, wallpaperTone: nil, systemColorScheme: .dark
+        ), .light)
+        XCTAssertEqual(workspaceSidebarResolvedColorScheme(
+            menuBarColorScheme: nil, wallpaperTone: nil, systemColorScheme: .dark
+        ), .dark)
+    }
+
     func testLightDarkAndMixedClassification() {
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.classify(luminances: [0, 0.02, 0.05]), .dark)
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.classify(luminances: [0.6, 0.8, 1]), .light)
+        // A flat mid-tone can be just on the white-text side in raw pixels, while
+        // macOS's translucent menu-bar material resolves to dark labels.
+        XCTAssertEqual(WorkspaceSidebarWallpaperTone.classify(luminances: [0.17]), .light)
         XCTAssertEqual(WorkspaceSidebarWallpaperTone.classify(luminances: [0.18]), .light)
         XCTAssertNil(WorkspaceSidebarWallpaperTone.classify(luminances: []))
         XCTAssertNil(WorkspaceSidebarWallpaperTone.classify(luminances: [.nan, .infinity, -1]))
@@ -28,14 +69,10 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         XCTAssertEqual(request(scaling: .scaleAxesIndependently).imageRect(imageSize: image, canvas: canvas), CGRect(x: 0, y: 0, width: 100, height: 100))
     }
 
-    func testTransparentPaletteDoesNotFadeSecondaryText() {
-        let light = WorkspaceSidebarPalette(appearance: .system, transparentContrast: true, colorScheme: .light)
-        let dark = WorkspaceSidebarPalette(appearance: .system, transparentContrast: true, colorScheme: .dark)
-        XCTAssertEqual(light.foreground, .black)
-        XCTAssertEqual(dark.foreground, .white)
-        XCTAssertEqual(light.text(opacity: 0.38), .black.opacity(0.85))
-        XCTAssertEqual(dark.text(opacity: 0.38), .white.opacity(0.85))
-        XCTAssertEqual(dark.text(opacity: 0), .clear)
+    func testSystemPaletteKeepsRequestedSecondaryOpacity() {
+        let palette = WorkspaceSidebarPalette(appearance: .system, colorScheme: .dark)
+        XCTAssertEqual(palette.text(opacity: 0.38), Color(nsColor: .labelColor).opacity(0.38))
+        XCTAssertEqual(palette.text(opacity: 0), .clear)
     }
 
     func testSystemSidebarAdaptsContrastAtBothWidths() {
@@ -56,6 +93,8 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         configuration.appearance = .system
         configuration.background = .menuBar
         XCTAssertTrue(configuration.usesWallpaperContrast(visibleWidth: 50, reduceTransparency: false))
+        configuration.frostedTint = .white
+        XCTAssertFalse(configuration.usesWallpaperContrast(visibleWidth: 50, reduceTransparency: false))
     }
 
     func testAnalyzerRejectsNonFileAndMissingWallpapers() async {
@@ -64,6 +103,44 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         XCTAssertNil(remote)
         let missing = await analyzer.tone(for: request(url: URL(filePath: "/private/tmp/winmux-missing-\(UUID().uuidString).png")))
         XCTAssertNil(missing)
+    }
+
+    func testLegacyDesktopPlaceholderDoesNotOverrideSystemContrastOnEitherMonitor() async {
+        let analyzer = WorkspaceSidebarWallpaperAnalyzer()
+        for screen in [CGSize(width: 1710, height: 1112), CGSize(width: 3440, height: 1440)] {
+            for width in [44.0, 280.0] {
+                var placeholder = request(url: URL(filePath: "/System/Library/CoreServices/DefaultDesktop.heic"))
+                placeholder = WorkspaceSidebarWallpaperRequest(
+                    url: placeholder.url, screenWidth: screen.width, screenHeight: screen.height,
+                    sidebarWidth: width, scaling: placeholder.scaling, allowClipping: placeholder.allowClipping,
+                    fillRed: 0, fillGreen: 0, fillBlue: 0
+                )
+                let profile = await analyzer.profile(for: placeholder)
+                XCTAssertNil(profile, "Placeholder must not supply a foreground or expanded tint")
+            }
+        }
+    }
+
+    func testMultiImageWallpaperDoesNotGuessActiveVariant() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("winmux-wallpaper-variants-\(UUID().uuidString).tiff")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let context = try XCTUnwrap(CGContext(data: nil, width: 100, height: 100, bitsPerComponent: 8, bytesPerRow: 400,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let destination = try XCTUnwrap(CGImageDestinationCreateWithURL(url as CFURL, "public.tiff" as CFString, 2, nil))
+        for brightness: CGFloat in [1, 0] {
+            context.setFillColor(gray: brightness, alpha: 1)
+            context.fill(CGRect(x: 0, y: 0, width: 100, height: 100))
+            CGImageDestinationAddImage(destination, try XCTUnwrap(context.makeImage()), nil)
+        }
+        XCTAssertTrue(CGImageDestinationFinalize(destination))
+        let source = try XCTUnwrap(CGImageSourceCreateWithURL(url as CFURL, nil))
+        XCTAssertEqual(CGImageSourceGetCount(source), 2)
+        let analyzer = WorkspaceSidebarWallpaperAnalyzer()
+        let profile = await analyzer.profile(for: request(url: url))
+        XCTAssertNil(profile)
+        _ = await analyzer.profile(for: request(url: url))
+        let count = await analyzer.analysisCount
+        XCTAssertEqual(count, 1, "Unsupported variants must not be decoded again on every event")
     }
 
     func testAnalyzerSamplesSidebarStripNotWholeWallpaper() async throws {
@@ -89,6 +166,10 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         XCTAssertEqual(rightTone, .light)
         let cached = await analyzer.tone(for: request(url: url))
         XCTAssertEqual(cached, .dark)
+        let countBeforeRefresh = await analyzer.analysisCount
+        for _ in 0..<3 { _ = await analyzer.profile(for: request(url: url)) }
+        let countAfterRefresh = await analyzer.analysisCount
+        XCTAssertEqual(countAfterRefresh, countBeforeRefresh)
         let profile = await analyzer.profile(for: request(url: url))
         XCTAssertEqual(try XCTUnwrap(profile).red, 0, accuracy: 0.01)
         XCTAssertEqual(try XCTUnwrap(profile).green, 0, accuracy: 0.01)
@@ -123,6 +204,17 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         XCTAssertEqual(pink.red, 0.9, accuracy: 0.01)
         XCTAssertEqual(pink.green, 0.3, accuracy: 0.01)
         XCTAssertNotEqual(blue, pink)
+        let count = await analyzer.analysisCount
+        XCTAssertEqual(count, 2)
+    }
+
+    func testUnchangedWallpaperReusesAnalysisAcrossRefreshEvents() async throws {
+        let analyzer = WorkspaceSidebarWallpaperAnalyzer()
+        let file = URL(filePath: "/System/Library/CoreServices/DefaultDesktop.heic")
+        // The placeholder needs neither decoding nor metadata reads on any refresh.
+        for _ in 0..<3 { _ = await analyzer.profile(for: request(url: file)) }
+        let count = await analyzer.analysisCount
+        XCTAssertEqual(count, 0)
     }
 
     func testWallpaperFillFallbackAndGrayscaleProvideRGBComponents() {

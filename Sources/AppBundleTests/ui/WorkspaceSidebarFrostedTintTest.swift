@@ -44,8 +44,8 @@ final class WorkspaceSidebarFrostedTintTest: XCTestCase {
         XCTAssertEqual(after.frostedTint, .ice)
         XCTAssertEqual(after.background, before.background)
         XCTAssertEqual(after.chromeStyle, before.chromeStyle)
-        XCTAssertEqual(after.usesWallpaperContrast(visibleWidth: after.collapsedWidth, reduceTransparency: false),
-            before.usesWallpaperContrast(visibleWidth: before.collapsedWidth, reduceTransparency: false))
+        XCTAssertTrue(before.usesWallpaperContrast(visibleWidth: before.collapsedWidth, reduceTransparency: false))
+        XCTAssertFalse(after.usesWallpaperContrast(visibleWidth: after.collapsedWidth, reduceTransparency: false))
     }
 
     func testPaletteContainsAllPreviewColorsAndGradients() {

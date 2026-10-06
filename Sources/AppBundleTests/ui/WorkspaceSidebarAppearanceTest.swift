@@ -10,7 +10,7 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         for enabled in [false, true] {
             XCTAssertEqual(WorkspaceSidebarSystemBackground.resolve(showBackground: enabled, reduceTransparency: true), .opaque)
         }
-        XCTAssertEqual(WorkspaceSidebarSystemBackground.resolve(showBackground: false, reduceTransparency: false), .transparent)
+        XCTAssertEqual(WorkspaceSidebarSystemBackground.resolve(showBackground: false, reduceTransparency: false), .clear)
         XCTAssertEqual(WorkspaceSidebarSystemBackground.resolve(showBackground: true, reduceTransparency: false), .glass)
     }
 
@@ -21,6 +21,36 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         }
     }
 
+    func testBackgroundToggleOnlyControlsCollapsedSystemSidebar() {
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.collapsedWidth = 44
+        configuration.expandedWidth = 280
+
+        configuration.menuBarBackground = false
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertTrue(container.activeSurface === container.clearSurface)
+        container.configure(configuration: configuration, visibleWidth: 280)
+        XCTAssertTrue(container.activeSurface === container.effect)
+
+        configuration.menuBarBackground = true
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
+        container.configure(configuration: configuration, visibleWidth: 280)
+        XCTAssertTrue(container.activeSurface === container.effect)
+    }
+
+    func testEachSidebarCanApplyItsOwnWallpaperContrast() {
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.collapsedWidth = 44
+        configuration.menuBarBackground = false
+        container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .light)
+        XCTAssertEqual(container.appearance?.name, .aqua)
+        container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
+        XCTAssertEqual(container.appearance?.name, .darkAqua)
+    }
+
     func testSolidForegroundContrastForPresetsAndCustomColors() {
         XCTAssertEqual(workspaceSidebarSolidColorScheme(.white), .light)
         XCTAssertEqual(workspaceSidebarSolidColorScheme(.black), .dark)
@@ -28,10 +58,10 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertEqual(workspaceSidebarSolidColorScheme(ChromeSolidColor.midnight.color), .dark)
     }
 
-    func testMenuBarBackgroundParsesAndPreservesLegacyDefault() {
+    func testMenuBarBackgroundParsesAndDefaultsToTransparent() {
         let (legacy, errors) = parseConfig("[workspace-sidebar]\nbackground = 'menu-bar'\n")
         XCTAssertEqual(errors, [])
-        XCTAssertTrue(legacy.workspaceSidebar.menuBarBackground)
+        XCTAssertFalse(legacy.workspaceSidebar.menuBarBackground)
         for enabled in [true, false] {
             let (parsed, errors) = parseConfig("[workspace-sidebar]\nmenu-bar-background = \(enabled)\n")
             XCTAssertEqual(errors, [])
@@ -41,7 +71,7 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertFalse(invalid.isEmpty)
     }
 
-    func testSystemGlassUsesWallpaperContrastWithAndWithoutBackground() {
+    func testSystemGlassUsesWallpaperContrastIndependentlyOfBackgroundToggle() {
         var layout = WorkspaceSidebarConfiguration.empty
         layout.appearance = .system
         layout.background = .menuBar
@@ -164,6 +194,54 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertNil(view.appearance)
     }
 
+    func testMaterialOnlyCoversVisibleRailOnBothSidesAndPreservesContentCoordinates() {
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        let content = NSView()
+        container.install(content: content)
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.collapsedWidth = 44
+        configuration.expandedWidth = 280
+        for side in [WorkspaceSidebarPosition.left, .right] {
+            configuration.position = side
+            for width: CGFloat in [0, 44, 140, 280, 560] {
+                container.configure(configuration: configuration, visibleWidth: width)
+                let surface = container.activeSurface
+                XCTAssertEqual(surface.frame.width, width)
+                XCTAssertEqual(surface.isHidden, width == 0)
+                XCTAssertTrue(content.isDescendant(of: surface))
+                XCTAssertEqual(content.convert(CGPoint.zero, to: container), CGPoint.zero,
+                    "Drop-target coordinates must stay relative to the full panel")
+                XCTAssertEqual(surface.frame.minX, side == .left ? 0 : 560 - width)
+            }
+        }
+        configuration.appearance = .custom
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertTrue(container.effect.isHidden)
+        XCTAssertTrue(content.superview === container.customSurface)
+        XCTAssertFalse(container.customSurface.isHidden)
+    }
+
+    func testNativeLabelUpdatesTextWithoutLosingSemanticColorOrAddingBackground() {
+        let label = NSTextField(labelWithString: "1")
+        let effect = NSVisualEffectView(frame: CGRect(x: 0, y: 0, width: 200, height: 40))
+        effect.material = .sidebar
+        effect.state = .active
+        effect.addSubview(label)
+        let window = NSWindow(contentRect: effect.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        defer { window.close() }
+        window.contentView = effect
+        WorkspaceSidebarNativeLabel(text: "Workspace 12", size: 15, weight: .semibold).configure(label)
+        XCTAssertEqual(label.stringValue, "Workspace 12")
+        XCTAssertEqual(label.textColor, .labelColor)
+        XCTAssertFalse(label.drawsBackground)
+        XCTAssertFalse(label.isEditable)
+        XCTAssertTrue(label.superview === effect)
+        WorkspaceSidebarNativeLabel(text: "Workspace 13", size: 15, weight: .regular, secondary: true).configure(label)
+        XCTAssertEqual(label.stringValue, "Workspace 13")
+        XCTAssertEqual(label.textColor, .secondaryLabelColor)
+    }
+
     func testBackgroundDefaultsAndAllOptionsParse() {
         let (defaults, defaultErrors) = parseConfig("[workspace-sidebar]\n")
         XCTAssertEqual(defaultErrors, [])
@@ -194,10 +272,10 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertEqual(after.appearance, before.appearance)
     }
 
-    func testMenuBarApproximationUsesNativeHeaderMaterial() {
+    func testMenuBarApproximationUsesNativeSidebarMaterial() {
         let view = NSVisualEffectView()
         WorkspaceSidebarVisualEffect(background: .menuBar).configure(view)
-        XCTAssertEqual(view.material, .headerView)
+        XCTAssertEqual(view.material, .sidebar)
         XCTAssertEqual(view.blendingMode, .behindWindow)
         XCTAssertEqual(view.state, .active)
         WorkspaceSidebarVisualEffect(background: .sidebar).configure(view)
@@ -251,12 +329,13 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
 
     func testSemanticTextAndCustomPalette() {
         let system = WorkspaceSidebarPalette(appearance: .system)
-        XCTAssertEqual(system.foreground, .primary)
-        XCTAssertEqual(system.text(opacity: 0.9), .primary)
-        XCTAssertEqual(system.text(opacity: 0.4), .secondary)
+        let label = Color(nsColor: .labelColor)
+        XCTAssertEqual(system.foreground, label)
+        XCTAssertEqual(system.text(opacity: 0.9), label.opacity(0.9))
+        XCTAssertEqual(system.text(opacity: 0.4), label.opacity(0.4))
         XCTAssertEqual(system.text(opacity: 0), .clear)
         let highContrast = WorkspaceSidebarPalette(appearance: .system, increasedContrast: true)
-        XCTAssertEqual(highContrast.text(opacity: 0.4), .primary)
+        XCTAssertEqual(highContrast.text(opacity: 0.4), label.opacity(1))
         let custom = WorkspaceSidebarPalette(appearance: .custom)
         XCTAssertEqual(custom.foreground, .white)
         XCTAssertEqual(custom.text(opacity: 0.4), .white.opacity(0.4))

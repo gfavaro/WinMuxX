@@ -12,6 +12,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
     private var observation: AnyCancellable?
+    private var appearanceObservation: NSKeyValueObservation?
     private var checkForUpdates: (() -> Void)?
     private var bindings = ActionMenuBindings(mode: nil)
     private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
@@ -24,6 +25,15 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        if let button = item.button {
+            appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
+                Task { @MainActor in
+                    let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+                    WorkspaceSidebarPanel.menuBarColorScheme = match == .aqua ? .light : .dark
+                    WorkspaceSidebarPanel.refreshWallpaperContrast()
+                }
+            }
+        }
         updateIcon()
         observation = TrayMenuModel.shared.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateIcon() }
@@ -66,6 +76,11 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
         menu.addItem(NSMenuItem(title: "WinMux v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
+        let conflicts = runningOtherWindowManagers()
+        if !conflicts.isEmpty {
+            menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))
+            menu.addItem(callbackItem("Window management may conflict — view diagnostics…", #selector(openDiagnostics)))
+        }
         menu.addItem(.separator())
         for section in buildShortcutSections() where !section.actions.isEmpty {
             addSubmenu(section.title, to: menu) { submenu in

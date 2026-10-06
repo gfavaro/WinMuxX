@@ -32,11 +32,8 @@ struct WorkspaceSidebarWindowRow: View {
     var body: some View {
         HStack(spacing: workspaceSidebarAppIconTextSpacing) {
             appIconStack
-            Text(title)
-                .font(.system(size: isTabGroupHeader ? 13 : 12.5, weight: isActiveRow ? .semibold : .regular))
-                .foregroundStyle(rowTextColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            WorkspaceSidebarLabel(text: title, size: isTabGroupHeader ? 13 : 12.5,
+                weight: isActiveRow ? .semibold : .regular, secondary: !isActiveRow, customColor: rowTextColor)
             Spacer(minLength: 0)
             if let badge {
                 Text(badge)

@@ -1,12 +1,113 @@
 import AppKit
 import SwiftUI
 
-private struct WorkspaceSidebarAppearanceKey: EnvironmentKey {
-    static let defaultValue: WorkspaceSidebarAppearance = .custom
+/// SwiftUI supplies interpolated widths during expansion/collapse, including
+/// Reduce Motion. This keeps the native material in step without a timer.
+struct WorkspaceSidebarMaterialGeometry: NSViewRepresentable, Animatable {
+    let configuration: WorkspaceSidebarConfiguration
+    let wallpaperTone: WorkspaceSidebarWallpaperTone?
+    let contentColorScheme: ColorScheme
+    nonisolated var visibleWidth: CGFloat
+    nonisolated var animatableData: CGFloat {
+        get { visibleWidth }
+        set { visibleWidth = newValue }
+    }
+
+    func makeNSView(context: Context) -> WorkspaceSidebarMaterialGeometryView {
+        WorkspaceSidebarMaterialGeometryView()
+    }
+
+    func updateNSView(_ view: WorkspaceSidebarMaterialGeometryView, context: Context) {
+        view.configuration = configuration
+        view.visibleWidth = visibleWidth
+        view.wallpaperTone = wallpaperTone
+        view.contentColorScheme = contentColorScheme
+        view.updateMaterial()
+    }
 }
 
-private struct WorkspaceSidebarTransparentContrastKey: EnvironmentKey {
-    static let defaultValue = false
+final class WorkspaceSidebarMaterialGeometryView: NSView {
+    var configuration = WorkspaceSidebarConfiguration.empty
+    var visibleWidth: CGFloat = 0
+    var wallpaperTone: WorkspaceSidebarWallpaperTone?
+    var contentColorScheme: ColorScheme = .dark
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateMaterial()
+    }
+
+    func updateMaterial() {
+        (window as? WorkspaceSidebarPanel)?.materialContainer.configure(
+            configuration: configuration, visibleWidth: visibleWidth, wallpaperTone: wallpaperTone,
+            contentColorScheme: contentColorScheme
+        )
+    }
+}
+
+struct WorkspaceSidebarLabel: View {
+    @Environment(\.workspaceSidebarAppearance) private var appearance
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.workspaceSidebarPreviewAccessibility) private var previewAccessibility
+    let text: String
+    var size: CGFloat = 15
+    var weight: NSFont.Weight = .regular
+    var secondary = false
+    var monospacedDigit = false
+    var alignment: NSTextAlignment = .left
+    var customColor: Color = .primary
+
+    var body: some View {
+        if appearance == .system {
+            WorkspaceSidebarNativeLabel(text: text, size: size, weight: weight,
+                secondary: secondary && contrast != .increased && !previewAccessibility.increasedContrast,
+                monospacedDigit: monospacedDigit, alignment: alignment)
+                .allowsHitTesting(false)
+        } else {
+            Text(text)
+                .font(.system(size: size, weight: weight == .bold ? .bold : weight == .semibold ? .semibold : .regular))
+                .monospacedDigit()
+                .foregroundStyle(customColor)
+                .lineLimit(1)
+                .truncationMode(.tail)
+        }
+    }
+}
+
+struct WorkspaceSidebarNativeLabel: NSViewRepresentable {
+    let text: String
+    let size: CGFloat
+    let weight: NSFont.Weight
+    var secondary = false
+    var monospacedDigit = false
+    var alignment: NSTextAlignment = .left
+
+    func makeNSView(context: Context) -> NSTextField {
+        let label = NSTextField(labelWithString: text)
+        label.isSelectable = false
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        configure(label)
+        return label
+    }
+
+    func updateNSView(_ label: NSTextField, context: Context) { configure(label) }
+
+    func configure(_ label: NSTextField) {
+        label.stringValue = text
+        label.font = monospacedDigit ? .monospacedDigitSystemFont(ofSize: size, weight: weight) : .systemFont(ofSize: size, weight: weight)
+        label.textColor = secondary ? .secondaryLabelColor : .labelColor
+        label.alignment = alignment
+    }
+
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextField, context: Context) -> CGSize? {
+        let intrinsic = nsView.intrinsicContentSize
+        return CGSize(width: min(proposal.width ?? intrinsic.width, intrinsic.width), height: intrinsic.height)
+    }
+}
+
+private struct WorkspaceSidebarAppearanceKey: EnvironmentKey {
+    static let defaultValue: WorkspaceSidebarAppearance = .custom
 }
 
 private struct WorkspaceSidebarWallpaperSampleKey: EnvironmentKey {
@@ -28,10 +129,6 @@ extension EnvironmentValues {
         get { self[WorkspaceSidebarWallpaperSampleKey.self] }
         set { self[WorkspaceSidebarWallpaperSampleKey.self] = newValue }
     }
-    var workspaceSidebarTransparentContrast: Bool {
-        get { self[WorkspaceSidebarTransparentContrastKey.self] }
-        set { self[WorkspaceSidebarTransparentContrastKey.self] = newValue }
-    }
     var workspaceSidebarPreviewAccessibility: WorkspaceSidebarPreviewAccessibility {
         get { self[WorkspaceSidebarPreviewAccessibilityKey.self] }
         set { self[WorkspaceSidebarPreviewAccessibilityKey.self] = newValue }
@@ -50,25 +147,21 @@ struct SidebarColors: DynamicProperty {
     @Environment(\.colorSchemeContrast) var contrast
     @Environment(\.colorScheme) var colorScheme
     @Environment(\.workspaceSidebarPreviewAccessibility) var previewAccessibility
-    @Environment(\.workspaceSidebarTransparentContrast) var transparentContrast
 
     var wrappedValue: WorkspaceSidebarPalette {
         // Also redraw AppKit-generated menu swatches when the system theme changes.
         _ = colorScheme
-        return WorkspaceSidebarPalette(appearance: appearance, increasedContrast: contrast == .increased || previewAccessibility.increasedContrast, transparentContrast: transparentContrast, colorScheme: colorScheme)
+        return WorkspaceSidebarPalette(appearance: appearance, increasedContrast: contrast == .increased || previewAccessibility.increasedContrast, colorScheme: colorScheme)
     }
 }
 
 struct WorkspaceSidebarPalette {
     let appearance: WorkspaceSidebarAppearance
     var increasedContrast = false
-    var transparentContrast = false
     var colorScheme: ColorScheme = .dark
 
     var foreground: Color {
-        if appearance == .custom { return colorScheme == .light ? .black : .white }
-        if transparentContrast { return colorScheme == .light ? .black : .white }
-        return .primary
+        appearance == .custom ? (colorScheme == .light ? .black : .white) : Color(nsColor: .labelColor)
     }
     var separator: Color {
         appearance == .system
@@ -78,25 +171,23 @@ struct WorkspaceSidebarPalette {
 
     func text(opacity: Double) -> Color {
         guard opacity > 0 else { return .clear }
-        if appearance == .custom { return foreground.opacity(increasedContrast ? 1 : opacity) }
-        if transparentContrast { return foreground.opacity(increasedContrast ? 1 : max(opacity, 0.85)) }
-        return opacity < 0.8 && !increasedContrast ? .secondary : .primary
+        return foreground.opacity(increasedContrast ? 1 : opacity)
     }
 }
 
 enum WorkspaceSidebarSystemBackground {
-    case opaque, transparent, glass, frosted
+    case opaque, clear, glass, frosted
 
     static func resolve(showBackground: Bool, reduceTransparency: Bool, expanded: Bool = false) -> Self {
         if reduceTransparency { return .opaque }
         if expanded { return .frosted }
-        return showBackground ? .glass : .transparent
+        return showBackground ? .glass : .clear
     }
 }
 
 struct WorkspaceSidebarSystemSurface: View {
     var expanded = false
-    var menuBarBackground = true
+    var menuBarBackground = false
     @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.workspaceSidebarPreviewAccessibility) var previewAccessibility
 
@@ -108,7 +199,7 @@ struct WorkspaceSidebarSystemSurface: View {
         ) {
         case .opaque:
             Color(nsColor: .windowBackgroundColor)
-        case .transparent:
+        case .clear:
             Color.clear
         case .frosted:
             WorkspaceSidebarFrostedSurface()
@@ -124,7 +215,6 @@ struct WorkspaceSidebarSystemSurface: View {
 
 @available(macOS 26, *)
 private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
-    @Environment(\.colorScheme) private var colorScheme
 
     func makeNSView(context: Context) -> NSGlassEffectView {
         let view = NSGlassEffectView()
@@ -141,7 +231,7 @@ private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
         // The outer sidebar shape owns rounding: compact stays square.
         view.cornerRadius = 0
         view.tintColor = nil
-        view.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
+        view.appearance = nil
     }
 }
 
@@ -160,9 +250,7 @@ struct WorkspaceSidebarVisualEffect: NSViewRepresentable {
     }
 
     func configure(_ view: NSVisualEffectView) {
-        // AppKit has no public material for the actual system menu bar.
-        // Header material provides a native approximation without capturing wallpaper.
-        view.material = frosted ? .hudWindow : (background == .menuBar ? .headerView : .sidebar)
+        view.material = frosted ? .hudWindow : .sidebar
         // Keep the expanded transparent sidebar visibly translucent rather than the
         // near-opaque header material, while retaining the native behind-window blur.
         view.alphaValue = frosted ? 0.93 : 1
@@ -187,15 +275,31 @@ struct WorkspaceSidebarFrostedSurface: View {
         } else {
             ZStack {
                 WorkspaceSidebarVisualEffect(frosted: true)
-                // A stronger veil keeps expanded labels readable while preserving blur and wallpaper color.
-                LinearGradient(colors: resolvedColors, startPoint: .topLeading, endPoint: .bottomTrailing)
-                    .opacity(workspaceSidebarFrostedVeilOpacity(tint: tint, hasWallpaperSample: wallpaperSample != nil))
+                WorkspaceSidebarFrostedVeil(tint: tint)
             }
         }
     }
 
     var resolvedColors: [Color] {
         tint.colors(colorScheme: colorScheme, wallpaperSample: wallpaperSample)
+    }
+}
+
+/// A tint only: the panel already owns the single native blur surface.
+struct WorkspaceSidebarFrostedVeil: View {
+    var tint: WorkspaceSidebarFrostedTint = .automatic
+    @Environment(\.workspaceSidebarWallpaperSample) private var wallpaperSample
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.workspaceSidebarPreviewAccessibility) private var previewAccessibility
+
+    var body: some View {
+        if !reduceTransparency && !previewAccessibility.reduceTransparency {
+            LinearGradient(colors: tint.colors(colorScheme: colorScheme, wallpaperSample: wallpaperSample),
+                startPoint: .topLeading, endPoint: .bottomTrailing)
+                .opacity(workspaceSidebarFrostedVeilOpacity(tint: tint, hasWallpaperSample: wallpaperSample != nil))
+                .allowsHitTesting(false)
+        }
     }
 }
 

@@ -98,7 +98,7 @@ on-mode-changed = []
     # Compact Liquid Glass sidebar only: false shows wallpaper without glass.
     # Expanded Liquid Glass always uses a frosted background.
     # Reduce Transparency overrides this with an opaque system background.
-    menu-bar-background = true
+    menu-bar-background = false
     chrome-style = 'liquid-glass'
     # Used when chrome-style = 'solid'. Choose from the Appearance palette, or use 'custom'.
     solid-chrome-color = 'midnight'

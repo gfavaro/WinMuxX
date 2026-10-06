@@ -43,7 +43,7 @@ struct WorkspaceSidebarConfiguration: Equatable {
     var position: WorkspaceSidebarPosition = .left
     var heightMode: WorkspaceSidebarHeightMode? = nil
     var alwaysExpanded = false
-    var menuBarBackground = true
+    var menuBarBackground = false
     var frostedTint: WorkspaceSidebarFrostedTint = .automatic
     var chromeStyle: ChromeStyle
     var solidChromeColor: ChromeSolidColor
@@ -54,7 +54,10 @@ struct WorkspaceSidebarConfiguration: Equatable {
     }
 
     func usesWallpaperContrast(visibleWidth: CGFloat, reduceTransparency: Bool) -> Bool {
-        appearance == .system && !reduceTransparency
+        appearance == .system
+            && !reduceTransparency
+            && frostedTint == .automatic
+            && visibleWidth > 0
     }
 
     static let empty = WorkspaceSidebarConfiguration(

@@ -4,18 +4,15 @@ import SwiftUI
 
 struct WorkspaceSidebarView: View {
     @Environment(\.colorSchemeContrast) var sidebarContrast
+    @Environment(\.workspaceSidebarWallpaperSample) private var wallpaperSample
     @Environment(\.workspaceSidebarPreviewAccessibility) var previewAccessibility
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
     @Environment(\.accessibilityReduceMotion) var reduceMotion
     @Environment(\.colorScheme) var colorScheme
-    var usesTransparentContrast: Bool {
-        snapshot.configuration.usesWallpaperContrast(visibleWidth: snapshot.visibleWidth, reduceTransparency: reduceTransparency || previewAccessibility.reduceTransparency)
-    }
     var solidColorScheme: ColorScheme {
         workspaceSidebarSolidColorScheme(snapshot.configuration.resolvedSolidChromeColor)
     }
     var sidebarColors: WorkspaceSidebarPalette {
-        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, transparentContrast: usesTransparentContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : colorScheme)
+        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : colorScheme)
     }
     let snapshot: WorkspaceSidebarSnapshot
     let actions: WorkspaceSidebarActions
@@ -47,6 +44,26 @@ struct WorkspaceSidebarView: View {
 
     var sidebarAlignment: Alignment { snapshot.configuration.position == .left ? .leading : .trailing }
 
+    var overrideConfirmationState: WorkspaceSidebarOverrideConfirmationState {
+        workspaceSidebarOverrideConfirmationState(
+            snapshot: snapshot, browseMode: browseMode, query: searchText,
+            requestedWorkspaceName: activeInUseOverrideWorkspaceName
+        )
+    }
+
+    private func synchronizeOverrideConfirmation(_ state: WorkspaceSidebarOverrideConfirmationState) {
+        if activeInUseOverrideWorkspaceName != state.workspaceName {
+            activeInUseOverrideWorkspaceName = state.workspaceName
+        }
+        guard let panel = WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId) else { return }
+        panel.overrideConfirmationLocksCollapse = state.locksCollapse
+        if state.locksCollapse {
+            panel.cancelExpansionWork()
+        } else {
+            panel.scheduleHoverRecheckSoon()
+        }
+    }
+
     var body: some View {
         let collapsedWidth = snapshot.configuration.collapsedWidth
         let expandedWidth = snapshot.configuration.expandedWidth
@@ -65,6 +82,8 @@ struct WorkspaceSidebarView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: sidebarAlignment)
         .background(Color.clear)
+        .background(WorkspaceSidebarMaterialGeometry(configuration: snapshot.configuration, wallpaperTone: wallpaperSample?.tone, contentColorScheme: colorScheme, visibleWidth: snapshot.visibleWidth)
+            .allowsHitTesting(false))
         .overlay {
             if snapshot.configuration.heightMode == .centered {
                 centeredContentMeasurement
@@ -74,8 +93,6 @@ struct WorkspaceSidebarView: View {
             if reduceMotion { transaction.animation = nil }
         }
         .environment(\.workspaceSidebarAppearance, snapshot.configuration.appearance)
-        .environment(\.workspaceSidebarTransparentContrast, usesTransparentContrast)
-        .shadow(color: usesTransparentContrast ? (colorScheme == .dark ? Color.black : Color.white).opacity(0.85) : .clear, radius: 1, x: 0, y: 1)
         .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme))
         .onChange(of: snapshot.visibleWidth) { visibleWidth in
             if visibleWidth <= collapsedWidth + 0.5 {
@@ -99,6 +116,15 @@ struct WorkspaceSidebarView: View {
             finishProjectRename(cancelled: true)
             finishSidebarSearch(clearText: true)
             resetProjectSwipeWithoutAnimation()
+        }
+        .onChange(of: overrideConfirmationState) { state in
+            synchronizeOverrideConfirmation(state)
+        }
+        .onAppear {
+            synchronizeOverrideConfirmation(overrideConfirmationState)
+        }
+        .onDisappear {
+            WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)?.overrideConfirmationLocksCollapse = false
         }
         .onChange(of: browseMode) { mode in
             guard snapshot.visibleWidth > collapsedWidth + 0.5,
@@ -196,7 +222,10 @@ struct WorkspaceSidebarContainerView: View {
             snapshot: snapshot,
             actions: actions
         )
-        .modifier(WorkspaceSidebarWallpaperContrast(snapshot: snapshot))
+        .modifier(WorkspaceSidebarWallpaperContrast(
+            snapshot: snapshot,
+            refreshGeneration: viewModel.workspaceSidebarWallpaperRefreshGeneration
+        ))
     }
 }
 extension WorkspaceSidebarView {
@@ -625,10 +654,16 @@ extension WorkspaceSidebarView {
         // second, lighter panel behind the content. Keep the material flat and use only the
         // trailing separator to define its boundary.
         if snapshot.configuration.appearance == .system {
-            WorkspaceSidebarSystemSurface(
-                expanded: snapshot.configuration.alwaysExpanded || snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8,
-                menuBarBackground: snapshot.configuration.menuBarBackground
-            )
+            // The panel's NSVisualEffectView is the parent of this hosting
+            // hierarchy. Keeping this layer clear lets AppKit apply vibrancy
+            // to semantic SwiftUI foreground colors.
+            Color.clear
+                .overlay {
+                    if snapshot.configuration.frostedTint != .automatic,
+                       snapshot.configuration.alwaysExpanded || snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8 {
+                        WorkspaceSidebarFrostedVeil(tint: snapshot.configuration.frostedTint)
+                    }
+                }
                 .clipShape(shape)
         } else {
             GlassSurface(
@@ -665,7 +700,7 @@ extension WorkspaceSidebarView {
     }
 }
 
-private struct WorkspaceSidebarPanelShape: Shape {
+struct WorkspaceSidebarPanelShape: Shape {
     let rightCornerRadius: CGFloat
     var position: WorkspaceSidebarPosition = .left
 
@@ -761,13 +796,15 @@ extension WorkspaceSidebarView {
         allowsActivation: Bool? = nil, measuring: Bool = false
     ) -> some View {
             VStack(alignment: .leading, spacing: 6) {
-                if showsPinnedActiveWorkspace,
-                   let pinnedActiveWorkspace = pinnedActiveWorkspace(
+                let pinned = showsPinnedActiveWorkspace
+                    ? pinnedActiveWorkspace(
                     displayedProjectId: projectId,
                     pageWorkspaces: workspaces
-                ) {
+                )
+                    : nil
+                if let pinned {
                     workspaceSection(
-                        workspace: pinnedActiveWorkspace,
+                        workspace: pinned,
                         expansionProgress: expansionProgress,
                         emitsDropTarget: !measuring,
                         allowsWorkspaceActivation: false,
@@ -776,7 +813,7 @@ extension WorkspaceSidebarView {
                         projectContextColor: projectColor(snapshot.activeProjectId)
                     )
                 }
-                ForEach(workspaces) { workspace in
+                ForEach(workspaces.filter { $0.id != pinned?.id }) { workspace in
                     workspaceSection(
                         workspace: workspace,
                         expansionProgress: expansionProgress,

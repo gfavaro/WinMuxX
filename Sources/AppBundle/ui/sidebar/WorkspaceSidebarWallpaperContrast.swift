@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import ImageIO
 import SwiftUI
 
@@ -8,7 +9,9 @@ enum WorkspaceSidebarWallpaperTone: Sendable {
     var colorScheme: ColorScheme { self == .light ? .light : .dark }
 
     /// Compare the weaker contrast at each end of the sampled luminance distribution.
-    /// A mixed image still needs a contrasting text halo; no single color fits every pixel.
+    /// In near-ties, prefer dark text: macOS's menu-bar material lifts mid-tone wallpaper
+    /// enough that its labels commonly resolve dark even when the raw wallpaper barely
+    /// favors white. A mixed image still needs a contrasting text halo.
     static func classify(luminances: [Double]) -> Self? {
         let samples = luminances.filter { $0.isFinite && (0...1).contains($0) }.sorted()
         guard !samples.isEmpty else { return nil }
@@ -16,7 +19,7 @@ enum WorkspaceSidebarWallpaperTone: Sendable {
         let upper = samples[Int(Double(samples.count - 1) * 0.9)]
         let blackContrast = (lower + 0.05) / 0.05
         let whiteContrast = 1.05 / (upper + 0.05)
-        return blackContrast >= whiteContrast ? .light : .dark
+        return blackContrast * 1.1 >= whiteContrast ? .light : .dark
     }
 
     static func luminance(red: Double, green: Double, blue: Double) -> Double {
@@ -25,6 +28,16 @@ enum WorkspaceSidebarWallpaperTone: Sendable {
         }
         return 0.2126 * linear(red) + 0.7152 * linear(green) + 0.0722 * linear(blue)
     }
+}
+
+func workspaceSidebarResolvedColorScheme(
+    menuBarColorScheme: ColorScheme?,
+    wallpaperTone: WorkspaceSidebarWallpaperTone?,
+    systemColorScheme: ColorScheme
+) -> ColorScheme {
+    // A status item's appearance is not display-local. Prefer a reliable sample
+    // from this monitor; dynamic/unsupported wallpapers use the native fallback.
+    return wallpaperTone?.colorScheme ?? menuBarColorScheme ?? systemColorScheme
 }
 
 struct WorkspaceSidebarWallpaperRequest: Sendable, Hashable {
@@ -71,7 +84,8 @@ struct WorkspaceSidebarWallpaperSample: Sendable, Equatable {
 /// wallpaper copies, or persistent brightness history are used.
 actor WorkspaceSidebarWallpaperAnalyzer {
     static let shared = WorkspaceSidebarWallpaperAnalyzer()
-    private var cache: [WorkspaceSidebarWallpaperRequest: (Date?, WorkspaceSidebarWallpaperSample)] = [:]
+    private var cache: [WorkspaceSidebarWallpaperRequest: (Date?, UInt64?, WorkspaceSidebarWallpaperSample?)] = [:]
+    private(set) var analysisCount = 0
 
     func tone(for request: WorkspaceSidebarWallpaperRequest) -> WorkspaceSidebarWallpaperTone? {
         profile(for: request)?.tone
@@ -79,19 +93,30 @@ actor WorkspaceSidebarWallpaperAnalyzer {
 
     func profile(for request: WorkspaceSidebarWallpaperRequest) -> WorkspaceSidebarWallpaperSample? {
         guard request.url.isFileURL, request.screenWidth > 0, request.screenHeight > 0 else { return nil }
+        // NSWorkspace can return this legacy placeholder for modern/dynamic wallpapers.
+        // Its Golden Gate image is unrelated to the rendered desktop. Returning nil
+        // keeps both text contrast and the expanded tint on the system-theme fallback.
+        guard request.url.standardizedFileURL.path != "/System/Library/CoreServices/DefaultDesktop.heic" else { return nil }
         // URL resource values can retain a stale modification date for the same URL.
         // Read fresh filesystem metadata so replacing a wallpaper invalidates the cache.
-        let modified = (try? FileManager.default.attributesOfItem(atPath: request.url.path)[.modificationDate]) as? Date
-        if let cached = cache[request], cached.0 == modified { return cached.1 }
+        let attributes = try? FileManager.default.attributesOfItem(atPath: request.url.path)
+        let modified = attributes?[.modificationDate] as? Date
+        let size = (attributes?[.size] as? NSNumber)?.uint64Value
+        if let cached = cache[request], cached.0 == modified, cached.1 == size { return cached.2 }
+        analysisCount += 1
         let result = sample(request)
         if cache.count >= 8 { cache.removeAll() }
-        // Failed reads are retried, e.g. when a dynamic wallpaper becomes available.
-        if let result { cache[request] = (modified, result) }
+        // Cache unsupported multi-image files as well. A changed URL or file metadata
+        // retries them without repeatedly decoding a wallpaper we cannot interpret.
+        if attributes != nil { cache[request] = (modified, size, result) }
         return result
     }
 
     private func sample(_ request: WorkspaceSidebarWallpaperRequest) -> WorkspaceSidebarWallpaperSample? {
         guard let source = CGImageSourceCreateWithURL(request.url as CFURL, nil),
+              // ImageIO index zero does not identify the variant currently rendered by
+              // macOS. Do not guess contrast from a multi-image wallpaper.
+              CGImageSourceGetCount(source) == 1,
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                   kCGImageSourceCreateThumbnailFromImageAlways: true,
                   kCGImageSourceCreateThumbnailWithTransform: true,
@@ -143,51 +168,68 @@ actor WorkspaceSidebarWallpaperAnalyzer {
     }
 }
 
+/// Coalesce display/Space transitions before resolving each panel's wallpaper again.
+func workspaceSidebarWallpaperChanges(
+    applicationCenter: NotificationCenter,
+    workspaceCenter: NotificationCenter
+) -> AnyPublisher<Notification, Never> {
+    applicationCenter.publisher(for: NSApplication.didChangeScreenParametersNotification)
+        .merge(with:
+            workspaceCenter.publisher(for: NSWorkspace.activeSpaceDidChangeNotification),
+            workspaceCenter.publisher(for: NSWorkspace.didWakeNotification))
+        .debounce(for: .milliseconds(250), scheduler: RunLoop.main)
+        .eraseToAnyPublisher()
+}
+
 struct WorkspaceSidebarWallpaperContrast: ViewModifier {
     let snapshot: WorkspaceSidebarSnapshot
-    @State private var compactSample: WorkspaceSidebarWallpaperSample?
-    @State private var expandedSample: WorkspaceSidebarWallpaperSample?
+    let refreshGeneration: UInt64
+    @State private var wallpaperSample: WorkspaceSidebarWallpaperSample?
+    @State private var localRefreshGeneration = 0
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
-    private var enabled: Bool {
-        snapshot.configuration.usesWallpaperContrast(visibleWidth: snapshot.visibleWidth, reduceTransparency: reduceTransparency)
-    }
-
     private var samplingEnabled: Bool {
-        snapshot.configuration.appearance == .system && !reduceTransparency
+        snapshot.configuration.usesWallpaperContrast(
+            visibleWidth: snapshot.visibleWidth,
+            reduceTransparency: reduceTransparency
+        )
     }
 
     private var resolvedColorScheme: ColorScheme {
-        guard enabled else { return systemColorScheme }
-        let isCompact = snapshot.visibleWidth <= snapshot.configuration.collapsedWidth + 8
-        return (isCompact ? compactSample : expandedSample)?.tone.colorScheme ?? systemColorScheme
+        guard samplingEnabled else { return systemColorScheme }
+        return workspaceSidebarResolvedColorScheme(
+            menuBarColorScheme: WorkspaceSidebarPanel.menuBarColorScheme,
+            wallpaperTone: wallpaperSample?.tone,
+            systemColorScheme: systemColorScheme
+        )
+    }
+
+    private var sampledWidth: CGFloat {
+        snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8
+            ? snapshot.configuration.expandedWidth
+            : snapshot.configuration.collapsedWidth
     }
 
     func body(content: Content) -> some View {
         content
             .environment(\.colorScheme, resolvedColorScheme)
-            .environment(\.workspaceSidebarWallpaperSample, samplingEnabled ? expandedSample : nil)
-            .task(id: "\(samplingEnabled)-\(snapshot.targetMonitorScopeId)-\(snapshot.configuration.collapsedWidth)-\(snapshot.configuration.expandedWidth)-\(snapshot.configuration.position.rawValue)-\(snapshot.configuration.frostedTint == .automatic)") {
-                compactSample = nil
-                expandedSample = nil
+            .environment(\.workspaceSidebarWallpaperSample, samplingEnabled ? wallpaperSample : nil)
+            .onReceive(workspaceSidebarWallpaperChanges(
+                applicationCenter: .default, workspaceCenter: NSWorkspace.shared.notificationCenter
+            )) { _ in
+                guard snapshot.configuration.appearance == .system else { return }
+                localRefreshGeneration &+= 1
+            }
+            .task(id: "\(refreshGeneration)-\(localRefreshGeneration)-\(systemColorScheme)-\(samplingEnabled)-\(snapshot.targetMonitorScopeId)-\(snapshot.configuration.collapsedWidth)-\(snapshot.configuration.expandedWidth)-\(sampledWidth)-\(snapshot.configuration.position.rawValue)-\(snapshot.configuration.frostedTint == .automatic)") {
+                wallpaperSample = nil
                 guard samplingEnabled else { return }
-                while !Task.isCancelled {
-                    if let request = request(width: snapshot.configuration.collapsedWidth) {
-                        let result = await WorkspaceSidebarWallpaperAnalyzer.shared.profile(for: request)
-                        guard !Task.isCancelled else { return }
-                        compactSample = result
-                    } else {
-                        compactSample = nil
-                    }
-                    if let request = request(width: snapshot.configuration.expandedWidth) {
-                        let result = await WorkspaceSidebarWallpaperAnalyzer.shared.profile(for: request)
-                        guard !Task.isCancelled else { return }
-                        expandedSample = result
-                    } else {
-                        expandedSample = nil
-                    }
-                    do { try await Task.sleep(for: .seconds(15)) } catch { return }
+                // Resolve each sidebar from the wallpaper under its own monitor.
+                // The narrow rail is sampled while collapsed; the full panel while expanded.
+                if let request = request(width: sampledWidth) {
+                    let result = await WorkspaceSidebarWallpaperAnalyzer.shared.profile(for: request)
+                    guard !Task.isCancelled else { return }
+                    wallpaperSample = result
                 }
             }
     }
