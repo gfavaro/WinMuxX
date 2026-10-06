@@ -1,4 +1,5 @@
 import AppKit
+import PrivateApi
 import Common
 
 @MainActor
@@ -22,6 +23,15 @@ private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () asyn
 private func isAxGeometryRefreshEvent(_ event: RefreshSessionEvent) -> Bool {
     guard case .ax(let notif) = event else { return false }
     return notif == kAXMovedNotification as String || notif == kAXResizedNotification as String
+}
+
+func shouldRaiseActivatedWindow(
+    event: RefreshSessionEvent, previousWorkspace: String, currentWorkspace: String,
+    nativeWindowId: UInt32?, logicalWindowId: UInt32?
+) -> Bool {
+    guard case .globalObserver(let notification) = event,
+          notification == NSWorkspace.didActivateApplicationNotification.rawValue else { return false }
+    return previousWorkspace != currentWorkspace && nativeWindowId != nil && nativeWindowId == logicalWindowId
 }
 
 private func shouldDropScheduledRefresh(_ newEvent: RefreshSessionEvent, activeEvent: RefreshSessionEvent?) -> Bool {
@@ -174,6 +184,16 @@ func runRefreshSessionBlocking(
                             )
                             logicalFocused?.nativeFocus()
                         } else {
+                            // Cmd+Tab already reports the chosen AX window as focused, but
+                            // switching virtual workspaces can leave another window above it.
+                            if shouldRaiseActivatedWindow(
+                                event: event, previousWorkspace: focusSnapshot.focus.workspaceName,
+                                currentWorkspace: focus.workspace.name,
+                                nativeWindowId: nativeFocused?.windowId, logicalWindowId: logicalFocused?.windowId
+                            ), let window = logicalFocused as? MacWindow,
+                               NSWorkspace.shared.frontmostApplication?.processIdentifier == window.macApp.pid {
+                                window.macApp.nativeFocus(window.windowId, forceRaise: true)
+                            }
                             debugFocusLog(
                                 "runRefreshSessionBlocking skipSyncFocus event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocused=\(logicalFocused?.windowId.description ?? "nil")"
                             )
@@ -297,6 +317,17 @@ struct RunSessionGuard: Sendable {
 
 @MainActor
 func refreshModel() {
+    // Focus-only sessions skip AX enumeration, but must still free layout slots
+    // for closed native windows. Hidden/minimized windows remain valid here.
+    if !isUnitTest {
+        let windowIds = Array(Set(MacWindow.allWindowsMap.keys).union(WindowBorderController.shared.missionControlWindowIds))
+        windowIds.withUnsafeBufferPointer {
+            winmux_watch_windows($0.baseAddress, Int32($0.count))
+        }
+        for window in MacWindow.allWindows where !winmux_window_exists(window.windowId) {
+            window.garbageCollect(skipClosedWindowsCache: false)
+        }
+    }
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
@@ -348,8 +379,12 @@ private func refresh() async throws {
     Workspace.reconcileWorkspaceState()
 }
 
-func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _: UnsafeMutableRawPointer?) {
+func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: UnsafeMutableRawPointer?) {
     let notif = notif as String
+    let destroyedWindowId = notif == kAXUIElementDestroyedNotification as String
+        ? context?.assumingMemoryBound(to: UInt32.self).pointee ?? ax.containingWindowId()
+        : nil
+    let emittingAppPid = axTaskLocalAppThreadToken?.pid
     if notif == kAXFocusedWindowChangedNotification as String || notif == kAXUIElementDestroyedNotification as String {
         debugFocusLog("refreshObs notif=\(notif)")
     }
@@ -365,6 +400,13 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _: UnsafeMuta
     let invalidateNativeStateAppPid: pid_t? =
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
+        if let destroyedWindowId {
+            WindowBorderController.shared.remove(windowId: destroyedWindowId)
+            (Window.get(byId: destroyedWindowId) as? MacWindow)?.garbageCollect(skipClosedWindowsCache: false)
+            if let emittingAppPid, let app = MacApp.allAppsMap[emittingAppPid] {
+                try? await app.unregisterDestroyedWindow(destroyedWindowId)
+            }
+        }
         if let invalidateNativeStateWindowId {
             Window.get(byId: invalidateNativeStateWindowId)?.invalidateLastKnownNativeState()
         } else if let invalidateNativeStateAppPid {

@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import PrivateApi
 
 final class MacWindow: Window {
     let macApp: MacApp
@@ -44,19 +45,26 @@ final class MacWindow: Window {
     @MainActor
     @discardableResult
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
+        // Focus/main-window AX attributes can continue reporting a closed id.
+        // Never let the fast focus path recreate its layout node.
+        if !isUnitTest && !winmux_window_exists(windowId) {
+            allWindowsMap[windowId]?.garbageCollect(skipClosedWindowsCache: false)
+            return nil
+        }
         if let existing = allWindowsMap[windowId] {
             // No AX round-trip for known windows: this runs for every window on every refresh
             // barrier, and lastKnownActualRect stays correct without polling because moved /
             // resized AX events invalidate it and consumers re-fetch on demand.
             return existing
         }
+        let creationWorkspace = isStartup ? nil : focus.workspace
         let rect = try await macApp.getAxRect(windowId)
         let data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
             macApp,
             isStartup
                 ? (rect?.center.monitorApproximation ?? mainMonitor).activeWorkspace
-                : focus.workspace,
+                : creationWorkspace ?? focus.workspace,
             window: nil,
         )
 
@@ -71,6 +79,7 @@ final class MacWindow: Window {
         let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
         let didRestoreClosedWindowsCache = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
         if !didRestorePersistedFrozenWorld && !didRestoreClosedWindowsCache {
+            if !isStartup { WindowMotion.shared.noteNewWindow(windowId) }
             try await tryOnWindowDetected(window)
         }
         return window
@@ -112,6 +121,8 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
+        WindowMotion.shared.forget(windowId)
+        WindowBorderController.shared.remove(windowId: windowId)
         if MacWindow.allWindowsMap.removeValue(forKey: windowId) == nil {
             return
         }
@@ -262,6 +273,7 @@ final class MacWindow: Window {
 
     @MainActor
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
+        WindowMotion.shared.cancel(windowId)
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
         macApp.setAxFrame(windowId, topLeft, size)
@@ -280,7 +292,8 @@ final class MacWindow: Window {
                 guard let self, self.canObserveMinimum(generation) else { return }
                 let fullscreen = try await self.isMacosFullscreen
                 let minimized = try await self.isMacosMinimized
-                guard !fullscreen, !minimized,
+                guard shouldLearnWindowMinimum(nativeFullscreen: fullscreen, nativeMinimized: minimized,
+                                               animating: WindowMotion.shared.isAnimating(self.windowId)),
                       let first = try await self.macApp.getAxRect(self.windowId) else { return }
                 try await Task.sleep(nanoseconds: 150_000_000)
                 guard self.canObserveMinimum(generation),
@@ -290,6 +303,12 @@ final class MacWindow: Window {
                       abs(first.topLeftCorner.y - topLeft.y) <= 2,
                       abs(confirmed.topLeftCorner.x - topLeft.x) <= 2,
                       abs(confirmed.topLeftCorner.y - topLeft.y) <= 2 else { return }
+                // Native fullscreen/minimize can start between the two samples.
+                let confirmedFullscreen = try await self.isMacosFullscreen
+                let confirmedMinimized = try await self.isMacosMinimized
+                guard self.canObserveMinimum(generation),
+                      shouldLearnWindowMinimum(nativeFullscreen: confirmedFullscreen, nativeMinimized: confirmedMinimized,
+                                               animating: WindowMotion.shared.isAnimating(self.windowId)) else { return }
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
             } catch {
                 // Cancellation, closed windows and failed AX reads are not minimum-size evidence.
@@ -301,13 +320,22 @@ final class MacWindow: Window {
     private func canObserveMinimum(_ generation: UInt64) -> Bool {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
-            !isFullscreen && TrayMenuModel.shared.isEnabled &&
+            !isFullscreen && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites
     }
 
     @MainActor
+    func suspendMinimumObservationForMotion() {
+        frameRequestGeneration &+= 1
+        minimumObservation?.cancel()
+        minimumObservation = nil
+        minimumRequest = nil
+    }
+
+    @MainActor
     func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?) async throws {
+        WindowMotion.shared.cancel(windowId)
         frameRequestGeneration &+= 1
         minimumObservation?.cancel()
         minimumRequest = nil

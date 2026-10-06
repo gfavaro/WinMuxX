@@ -10,8 +10,6 @@ import Foundation
         var bootstrappedConfigUrl: URL? = nil
         if isDebug {
             await toggleReleaseServerIfDebug(.off)
-            interceptTermination(SIGINT)
-            interceptTermination(SIGKILL)
         }
         do {
             bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
@@ -49,11 +47,6 @@ import Foundation
             _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
         }
         isWinMuxRuntimeReady = true
-        if bootstrappedConfigUrl != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                ShortcutSettingsModel.shared.requestWindowOpen()
-            }
-        }
     }
 }
 

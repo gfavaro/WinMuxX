@@ -27,6 +27,7 @@ final class MonitorConfigurationObserver {
     }
 
     private func handleScreenParametersChanged() {
+        WindowMotion.shared.screensChanged()
         // AppKit can emit this notification while the display topology is still changing.
         // Refresh panels immediately, but wait for the settled pass before reconciling
         // workspace-to-monitor assignments. This avoids creating fallback workspaces for a
@@ -52,6 +53,7 @@ final class MonitorConfigurationObserver {
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 750_000_000)
             guard generation == screenChangeGeneration else { return }
+            WindowMotion.shared.screensSettled()
             refreshMonitorPolicy(refreshReason: "\(NSApplication.didChangeScreenParametersNotification.rawValue).settled")
         }
     }

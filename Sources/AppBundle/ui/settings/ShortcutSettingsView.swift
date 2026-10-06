@@ -17,6 +17,14 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
                    minHeight: settingsWindowMinimumHeight, maxHeight: .infinity)
             .onAppear {
                 NSApp.setActivationPolicy(.accessory)
+                // SwiftUI may materialize a Window scene during app launch even
+                // when no openWindow request was made. Settings is opt-in, so
+                // dismiss that implicit scene and keep explicit requests intact.
+                if model.openRequestId == 0 {
+                    DispatchQueue.main.async {
+                        shortcutSettingsWindow()?.close()
+                    }
+                }
             }
     }
     .defaultSize(width: settingsWindowWidth, height: 700)

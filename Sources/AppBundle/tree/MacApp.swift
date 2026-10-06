@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import PrivateApi
 
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
@@ -17,6 +18,9 @@ final class MacApp: AbstractApp {
     private let axAppFastTimeout: ThreadGuardedValue<AXUIElement>
     private let appAxSubscriptions: ThreadGuardedValue<[AxSubscription]> // keep subscriptions in memory
     private let windows: ThreadGuardedValue<[UInt32: AxWindow]> = .init([:])
+    // Retain the destroyed element only until AX stops enumerating it. This
+    // prevents a late/stale AXWindows response from resurrecting a closed node.
+    private let destroyedWindows: ThreadGuardedValue<[UInt32: AXUIElement]> = .init([:])
     private var windowsCount = 0
     var lastNativeFocusedWindowId: UInt32? = nil
     private var thread: Thread?
@@ -189,13 +193,13 @@ final class MacApp: AbstractApp {
         lastNativeFocusedWindowId.flatMap { Window.get(byId: $0) }
     }
 
-    @MainActor func nativeFocus(_ windowId: UInt32) {
+    @MainActor func nativeFocus(_ windowId: UInt32, forceRaise: Bool = false) {
         if serverArgs.isReadOnly { return }
         MacApp.focusJob?.cancel()
         // Performance optimization. If possible avoid doing AX requests
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
         // Beware of the macOS bug: https://github.com/nikitabobko/WinMux/issues/101
-        let useActivationOnly = (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
+        let useActivationOnly = !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
             shouldUseActivationOnlyForNativeFocus(
                 targetWindowId: windowId,
                 lastNativeFocusedWindowId: lastNativeFocusedWindowId,
@@ -218,10 +222,32 @@ final class MacApp: AbstractApp {
         }
     }
 
+    @MainActor
+    func cancelPendingFrameWrites() {
+        for job in setFrameJobs.values { job.cancel() }
+        setFrameJobs.removeAll()
+    }
+
+    @MainActor
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
+        guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp] window, job in
             try setFrame(window, app: axApp.threadGuarded, topLeft, size, job)
+        }
+    }
+
+    @MainActor
+    func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect) {
+        guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp] window, job in
+            // Intermediate steps need no readback or minimum-size confirmation.
+            // Finish both writes of a started step; cancellation drops queued steps.
+            try disableAnimations(app: axApp.threadGuarded, job) {
+                window.set(Ax.sizeAttr, frame.size)
+                window.set(Ax.topLeftCornerAttr, frame.origin)
+            }
         }
     }
 
@@ -399,13 +425,22 @@ final class MacApp: AbstractApp {
         }
     }
 
+    func unregisterDestroyedWindow(_ windowId: UInt32) async throws {
+        setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        try await thread?.runInLoop { [windows, destroyedWindows] _ in
+            if let removed = windows.threadGuarded.removeValue(forKey: windowId) {
+                destroyedWindows.threadGuarded[windowId] = removed.ax
+            }
+        }
+    }
+
     private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [UInt32] {
         if nsApp.isTerminated {
             await destroy()
             return []
         }
         guard let thread else { return [] }
-        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp] (job) -> ([UInt32], [UInt32]) in
+        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp, destroyedWindows] (job) -> ([UInt32], [UInt32]) in
             var alive: [UInt32: AxWindow] = windows.threadGuarded
             var dead = [UInt32: AxWindow]()
             // Second line of defence against lock screen. See the first line of defence: closedWindowsCache
@@ -413,6 +448,7 @@ final class MacApp: AbstractApp {
             if frontmostAppBundleId != lockScreenAppBundleId {
                 (alive, dead) = try alive.partition {
                     try job.checkCancellation()
+                    if !isUnitTest && !winmux_window_exists($0.key) { return false }
                     let (windowId, error) = $0.value.ax.containingWindowIdWithError()
                     if windowId != nil { return true }
                     // .cannotComplete means the app didn't answer (CPU-starved or briefly
@@ -424,9 +460,21 @@ final class MacApp: AbstractApp {
                 }
             }
 
-            for (id, window) in axApp.threadGuarded.discoverAxWindows() ?? [] {
+            let discovered = axApp.threadGuarded.discoverAxWindows()
+            for (id, window) in discovered ?? [] {
                 try job.checkCancellation()
+                if !isUnitTest && !winmux_window_exists(id) { continue }
+                if let destroyed = destroyedWindows.threadGuarded[id] {
+                    if isDestroyedWindowElement(destroyed, window.cast) { continue }
+                    destroyedWindows.threadGuarded.removeValue(forKey: id)
+                }
                 try alive.getOrRegisterAxWindow(windowId: id, window.cast, nsApp, job)
+            }
+            if let discovered {
+                let reportedIds = Set(discovered.map { $0.windowId })
+                for id in Array(destroyedWindows.threadGuarded.keys) where !reportedIds.contains(id) {
+                    destroyedWindows.threadGuarded.removeValue(forKey: id)
+                }
             }
 
             windows.threadGuarded = alive
@@ -445,9 +493,10 @@ final class MacApp: AbstractApp {
             job.cancel()
         }
         setFrameJobs = [:]
-        thread?.runInLoopAsync { [windows, appAxSubscriptions, axApp, axAppFastTimeout] job in
+        thread?.runInLoopAsync { [windows, destroyedWindows, appAxSubscriptions, axApp, axAppFastTimeout] job in
             appAxSubscriptions.destroy() // Destroy AX objects in reverse order of their creation
             windows.destroy()
+            destroyedWindows.destroy()
             axAppFastTimeout.destroy()
             axApp.destroy()
             CFRunLoopStop(CFRunLoopGetCurrent())
@@ -474,6 +523,10 @@ final class MacApp: AbstractApp {
             }
         } ?? .cancelled
     }
+}
+
+func isDestroyedWindowElement(_ destroyed: AXUIElement?, _ discovered: AXUIElement) -> Bool {
+    destroyed.map { CFEqual($0, discovered) } ?? false
 }
 
 func shouldUseActivationOnlyForNativeFocus(

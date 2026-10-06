@@ -80,6 +80,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
+    "animations": Parser(\.animations, parseAnimations),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
 

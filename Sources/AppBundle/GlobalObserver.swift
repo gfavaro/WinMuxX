@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import HotKey
+import PrivateApi
 
 enum GlobalObserver {
     @MainActor private static var isInitialized = false
@@ -65,6 +66,7 @@ enum GlobalObserver {
             noteTapBindingKeyDown()
         }
     }
+
 
     private static func onFlagsChanged(_ event: NSEvent) {
         let keyCode = event.keyCode
@@ -132,6 +134,22 @@ enum GlobalObserver {
     static func initObserver() {
         guard !isInitialized else { return }
         isInitialized = true
+        WindowBorderController.shared.startMissionControlMonitoring()
+        if !winmux_watch_window_closures({ windowId in
+            Task { @MainActor in
+                guard let window = MacWindow.allWindowsMap[windowId] else {
+                    invalidateClosedWindowsCacheForNativeClosure(windowId)
+                    return
+                }
+                let app = window.macApp
+                window.garbageCollect(skipClosedWindowsCache: false)
+                invalidateClosedWindowsCacheForNativeClosure(windowId)
+                try? await app.unregisterDestroyedWindow(windowId)
+                scheduleRefreshSession(.globalObserver("nativeWindowClosed"))
+            }
+        }) {
+            print("WinMuxX: WindowServer close notifications unavailable; using AX fallback")
+        }
         DoubleSidedWindowGesture.shared.install()
 
         let nc = NSWorkspace.shared.notificationCenter

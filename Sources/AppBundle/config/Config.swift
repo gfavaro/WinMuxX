@@ -65,6 +65,7 @@ struct Config: ConvenienceCopyable {
     var workspaceSidebar = WorkspaceSidebarConfig()
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
+    var animations = AnimationsConfig()
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []

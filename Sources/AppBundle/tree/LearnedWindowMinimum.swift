@@ -1,5 +1,9 @@
 import AppKit
 
+func shouldLearnWindowMinimum(nativeFullscreen: Bool, nativeMinimized: Bool, animating: Bool) -> Bool {
+    !nativeFullscreen && !nativeMinimized && !animating
+}
+
 /// Conservative, session-local evidence. A refused request is not proof of a minimum:
 /// apps may resize asynchronously, and terminal windows round to character cells.
 struct LearnedWindowMinimum {

@@ -81,7 +81,15 @@ func syncClosedWindowsCacheToCurrentWorld() {
 }
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {
-    try await restoreFrozenWorldIfNeeded(closedWindowsCache, newlyDetectedWindow: newlyDetectedWindow)
+    // An empty cache is not a restoration: new-window rules must still run.
+    guard !closedWindowsCache.workspaces.isEmpty else { return false }
+    return try await restoreFrozenWorldIfNeeded(closedWindowsCache, newlyDetectedWindow: newlyDetectedWindow)
+}
+
+/// AX disappearing during screen lock is recoverable; a native close is not.
+/// Invalidate old ID-only snapshots so a reused ID never inherits the closed window's state.
+@MainActor func invalidateClosedWindowsCacheForNativeClosure(_ windowId: UInt32) {
+    if closedWindowsCache.windowIds.contains(windowId) { resetClosedWindowsCache() }
 }
 
 @MainActor

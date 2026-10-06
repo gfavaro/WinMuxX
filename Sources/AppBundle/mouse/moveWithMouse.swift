@@ -14,6 +14,11 @@ func movedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutableR
 
 @MainActor
 private func handleMovedEvent(windowId: UInt32?, notif: String) async {
+    if let windowId, WindowMotion.shared.isAnimating(windowId), NSEvent.pressedMouseButtons & 1 == 0 {
+        Window.get(byId: windowId)?.invalidateLastKnownNativeState()
+        return
+    }
+    WindowBorderController.shared.refresh()
     if shouldIgnoreMovedObsForCurrentDragSession(windowId: windowId) ||
         WindowMouseInteractionOpacityController.shared.shouldSuppressObserverEvent(windowId: windowId) ||
         shouldIgnoreAxObserverEventForPostDragSuppression(windowId: windowId, notif: notif)

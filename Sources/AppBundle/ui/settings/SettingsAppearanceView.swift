@@ -20,6 +20,8 @@ struct ShortcutAppearanceSettingsView: View {
     @State private var collapsedWidth = config.workspaceSidebar.collapsedWidth
     @State private var tabEnabled = config.windowTabs.enabled
     @State private var tabHeight = max(36, config.windowTabs.height)
+    @State private var glideEnabled = config.animations.enabled
+    @State private var glideDurationMs = min(max(config.animations.durationMs, 50), 1000)
     @State private var sidebarPosition = config.workspaceSidebar.position
     @State private var sidebarHeightMode = config.workspaceSidebar.heightMode ?? .standard
     @State private var innerHorizontalGap = settingsConstantValue(config.gaps.inner.horizontal)
@@ -150,6 +152,17 @@ struct ShortcutAppearanceSettingsView: View {
                 SettingsStepper("Tab strip height", value: $tabHeight, range: 36...80, help: "Height of the window tab strip.") { persist("window-tabs", "height", "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
+            }
+            SettingsSection("Window motion") {
+                SettingsToggle("Glide windows", isOn: $glideEnabled,
+                               help: "Animate windows as they move into their layout tiles. Reduce Motion disables the glide.") {
+                    persist("animations", "enabled", glideEnabled ? "true" : "false")
+                }
+                SettingsStepper("Glide duration", value: $glideDurationMs, range: 50...1000,
+                                help: "Duration of the window glide. Lower values are faster.", unit: "ms") {
+                    persist("animations", "duration-ms", "\(glideDurationMs)")
+                }
+                .disabled(!glideEnabled)
             }
             SettingsSection("Window spacing") {
                 if hasPerMonitorGaps {

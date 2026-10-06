@@ -22,7 +22,7 @@ final class AxWindow {
             (movedObs, [kAXMovedNotification]),
             (resizedObs, [kAXResizedNotification]),
         ]
-        let subscriptions = try AxSubscription.bulkSubscribe(nsApp, ax, job, handlers)
+        let subscriptions = try AxSubscription.bulkSubscribe(nsApp, ax, job, handlers, windowId: windowId)
         return !subscriptions.isEmpty ? AxWindow(windowId: windowId, ax, subscriptions) : nil
     }
 }
