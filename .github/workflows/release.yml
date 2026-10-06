@@ -39,9 +39,16 @@ jobs:
           swiftly install
       - name: Test
         run: make check
+      - name: Import persistent signing identity
+        env:
+          SIGNING_P12: ${{ secrets.WINMUXX_SIGNING_P12 }}
+          SIGNING_PASSWORD: ${{ secrets.WINMUXX_SIGNING_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.WINMUXX_SIGNING_IDENTITY }}
+        run: bash script/import-signing-identity.sh
       - name: Build isolated personal app
         env:
           BUILD_NUMBER: ${{ github.run_number }}
+          CODESIGN_IDENTITY: ${{ secrets.WINMUXX_SIGNING_IDENTITY }}
         run: make fork-build BUILD_NUMBER="$BUILD_NUMBER"
       - name: Publish personal release
         env:
@@ -54,4 +61,11 @@ jobs:
           version="$(tr -d '[:space:]' < VERSION)"
           gh release create "$RELEASE_REF" ".release/WinMuxX-$version-$BUILD_NUMBER.zip" \
             --verify-tag --generate-notes --title "WinMuxX $version" \
-            --notes 'Personal fork build. Ad hoc signed, not notarized. Automatic updates are disabled.'
+            --notes 'Personal fork build. Signed with the persistent WinMuxX identity, not notarized. Automatic updates are disabled.'
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          certificate="$RUNNER_TEMP/winmuxx-signing.cer"
+          if test -f "$certificate"; then security remove-trusted-cert "$certificate"; rm -f "$certificate"; fi
+          keychain="$RUNNER_TEMP/winmuxx-signing.keychain-db"
+          if test -f "$keychain"; then security delete-keychain "$keychain"; fi

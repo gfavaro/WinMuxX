@@ -39,10 +39,18 @@ jobs:
       - name: Build and test
         run: make check
 
+      - name: Import persistent signing identity
+        if: github.event_name == 'push' && github.repository == 'gfavaro/WinMuxX'
+        env:
+          SIGNING_P12: ${{ secrets.WINMUXX_SIGNING_P12 }}
+          SIGNING_PASSWORD: ${{ secrets.WINMUXX_SIGNING_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.WINMUXX_SIGNING_IDENTITY }}
+        run: bash script/import-signing-identity.sh
       - name: Build personal app
         if: github.repository == 'gfavaro/WinMuxX'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
+          CODESIGN_IDENTITY: ${{ github.event_name == 'push' && secrets.WINMUXX_SIGNING_IDENTITY || '-' }}
         run: make fork-build BUILD_NUMBER="$BUILD_NUMBER"
 
       - name: Upload personal build
@@ -53,3 +61,10 @@ jobs:
           path: .release/WinMuxX-*.zip
           include-hidden-files: true
           if-no-files-found: error
+      - name: Remove signing keychain
+        if: always()
+        run: |
+          certificate="$RUNNER_TEMP/winmuxx-signing.cer"
+          if test -f "$certificate"; then security remove-trusted-cert "$certificate"; rm -f "$certificate"; fi
+          keychain="$RUNNER_TEMP/winmuxx-signing.keychain-db"
+          if test -f "$keychain"; then security delete-keychain "$keychain"; fi

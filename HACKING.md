@@ -29,6 +29,15 @@ For local releases, `script/fork-build.sh` reads the signing identity from
 `CODESIGN_IDENTITY` is supplied. Retain the identity and bundle ID across installs
 to preserve macOS permissions. Without a configured identity the build is ad hoc.
 
+GitHub releases and main-branch CI artifacts use that same persistent identity.
+The repository Secrets `WINMUXX_SIGNING_P12` (base64-encoded PKCS#12 containing
+the certificate and private key), `WINMUXX_SIGNING_PASSWORD`, and
+`WINMUXX_SIGNING_IDENTITY` (certificate SHA-1 fingerprint) must be configured.
+The workflows import it into a temporary keychain and delete the keychain after
+the build. Pull-request builds stay ad hoc and do not receive the signing key.
+Signing does not notarize the app; switching from an ad hoc build may require
+granting permissions once more.
+
 The build does not install. Quit the current fork, save a ZIP backup, copy the new
 bundle to `/Applications/WinMuxX.app`, verify it with
 `codesign --verify --deep --strict /Applications/WinMuxX.app`, then open it.
