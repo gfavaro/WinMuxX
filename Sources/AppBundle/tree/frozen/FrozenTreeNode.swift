@@ -13,6 +13,7 @@ struct FrozenContainer: Codable, Sendable {
     let weight: CGFloat
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
+    let dwindleChildRatios: [CGFloat]?
 
     @MainActor init(_ container: TilingContainer) {
         children = container.children.map {
@@ -32,6 +33,7 @@ struct FrozenContainer: Codable, Sendable {
         weight = getWeightOrNil(container) ?? 1
         dwindleSplitRatios = container.dwindleSplitRatios.isEmpty ? nil : container.dwindleSplitRatios
         dwindleOrientation = container.dwindleOrientation
+        dwindleChildRatios = container.dwindleChildRatios
     }
 }
 

@@ -24,6 +24,8 @@ final class MoveCommandTest: XCTestCase {
         let upperRight = TestWindow.new(id: 7202, parent: root)
         let lowerRight = TestWindow.new(id: 7203, parent: root)
         root.setDwindleSplitRatio(0.65, at: 0)
+        workspace.normalizeContainers()
+        let originalShares = root.dwindleChildRatios
         try await workspace.layoutWorkspace()
 
         let originalLeftRect = try XCTUnwrap(left.lastAppliedLayoutPhysicalRect)
@@ -36,7 +38,7 @@ final class MoveCommandTest: XCTestCase {
         XCTAssertEqual(left.lastAppliedLayoutPhysicalRect, originalUpperRightRect)
         XCTAssertEqual(upperRight.lastAppliedLayoutPhysicalRect, originalLeftRect)
         XCTAssertEqual(lowerRight.lastAppliedLayoutPhysicalRect, originalLowerRightRect)
-        XCTAssertEqual(root.dwindleSplitRatio(at: 0), 0.65)
+        XCTAssertEqual(root.dwindleChildRatios, originalShares)
     }
 
     func testMove_swapWithTabGroupTreatsTabGroupAsSingleNode() async throws {

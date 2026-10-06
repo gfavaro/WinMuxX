@@ -4,6 +4,13 @@ import Common
 extension TilingContainer {
     @MainActor
     func dwindleMinimumExtent(children: ArraySlice<TreeNode>, along axis: Orientation, rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil) -> CGFloat {
+        if isExplicitDwindle {
+            let splitAxis = dwindleAxis(width: rect.width, height: rect.height)
+            let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
+            return splitAxis == axis
+                ? minimums.reduce(0, +) + CGFloat(max(children.count - 1, 0)) * CGFloat(gaps.inner.get(axis).toDouble())
+                : minimums.max() ?? 0
+        }
         guard let child = children.first else { return 0 }
         guard children.count > 1 else { return child.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
         let splitAxis = dwindleAxis(width: rect.width, height: rect.height)
@@ -22,6 +29,32 @@ extension TilingContainer {
 
     @MainActor
     func dwindleChildFrames(in rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil, enforceMinimums: Bool = true) -> [Rect] {
+        if isExplicitDwindle {
+            let axis = dwindleAxis(width: rect.width, height: rect.height)
+            let gap = CGFloat(gaps.inner.get(axis).toDouble())
+            let available = max(rect.getDimension(axis) - CGFloat(max(children.count - 1, 0)) * gap, 0)
+            var shares = dwindleShares(count: children.count)
+            if let ratioAt, shares.count > 1 {
+                for index in 0..<(shares.count - 1) {
+                    let ratio = ratioAt(index)
+                    if ratio != dwindleSplitRatio(at: index) {
+                        let total = shares[index] + shares[index + 1]
+                        shares[index] = total * ratio
+                        shares[index + 1] = total - shares[index]
+                    }
+                }
+            }
+            let requested = shares.map { $0 * available }
+            let sizes = enforceMinimums ? fitLayoutSizes(requested, minimums: children.map {
+                $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect)
+            }, total: available) : requested
+            var point = rect.topLeftCorner
+            return sizes.map { size in
+                defer { point = point.addingOffset(axis, size + gap) }
+                return Rect(topLeftX: point.x, topLeftY: point.y,
+                    width: axis == .h ? size : rect.width, height: axis == .v ? size : rect.height)
+            }
+        }
         var point = rect.topLeftCorner
         var width = rect.width
         var height = rect.height

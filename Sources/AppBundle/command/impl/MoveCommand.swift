@@ -153,7 +153,12 @@ private let moveOutMacosUnconventionalWindow = "moving macOS fullscreen, minimiz
     let prevRoot = workspace.rootTilingContainer
     prevRoot.unbindFromParent()
     // Force tiles layout
-    _ = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, direction.orientation, .tiles, index: 0)
+    let nextRoot = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, direction.orientation,
+        prevRoot.layout == .dwindle ? .dwindle : .tiles, index: 0)
+    if prevRoot.layout == .dwindle {
+        nextRoot.dwindleOrientation = direction.orientation
+        nextRoot.dwindleChildRatios = []
+    }
     check(prevRoot != workspace.rootTilingContainer)
     prevRoot.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
     node.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: direction.insertionOffset)
@@ -211,17 +216,21 @@ private func moveDwindleNode(_ node: TreeNode, beside neighbor: TreeNode, direct
         swapNodes(node, neighbor)
         return true
     }
-    if parent.layout == .tiles, parent.navigationOrientation == direction.orientation {
+    if (parent.layout == .tiles || parent.isExplicitDwindle), parent.navigationOrientation == direction.orientation {
         node.unbindFromParent()
         node.bind(to: parent, adaptiveWeight: WEIGHT_AUTO,
             index: neighbor.ownIndex.orDie() + (direction.isPositive ? 0 : 1))
         return true
     }
     let ratios = parent.dwindleSplitRatios
+    let siblingRatios = parent.dwindleChildRatios
     let binding = neighbor.unbindFromParent()
     let split = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight,
-        direction.orientation, .tiles, index: binding.index)
+        direction.orientation, .dwindle, index: binding.index)
+    split.dwindleOrientation = direction.orientation
+    split.dwindleChildRatios = []
     parent.dwindleSplitRatios = ratios
+    parent.dwindleChildRatios = siblingRatios
     neighbor.bind(to: split, adaptiveWeight: 1, index: 0)
     node.bind(to: split, adaptiveWeight: 1, index: direction.isPositive ? 0 : 1)
     return true

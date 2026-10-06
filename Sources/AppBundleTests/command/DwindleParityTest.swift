@@ -16,7 +16,7 @@ final class DwindleParityTest: XCTestCase {
         return root
     }
 
-    func testClosingRedistributesSharesAndInsertionSplitsDonor() {
+    func testClosingCollapsesItsSplitAndInsertionSplitsDonor() {
         let root = root()
         let first = TestWindow.new(id: 18001, parent: root)
         let middle = TestWindow.new(id: 18002, parent: root)
@@ -24,12 +24,52 @@ final class DwindleParityTest: XCTestCase {
         root.setDwindleSplitRatio(0.6, at: 0)
         root.setDwindleSplitRatio(0.25, at: 1)
         middle.unbindFromParent()
-        XCTAssertEqual(root.dwindleSplitRatio(at: 0), 2.0 / 3.0, accuracy: 0.0001)
+        XCTAssertEqual(root.dwindleSplitRatio(at: 0), 0.6, accuracy: 0.0001)
         let inserted = TestWindow.new(id: 18004, parent: focus.workspace)
         inserted.bind(to: root, adaptiveWeight: 1, index: 1)
         XCTAssertEqual(root.children, [first, inserted, last])
         let shares = root.dwindleShares(count: 3)
-        for share in shares { XCTAssertEqual(share, 1.0 / 3.0, accuracy: 0.0001) }
+        for (share, expected) in zip(shares, [0.3, 0.3, 0.4]) {
+            XCTAssertEqual(share, expected, accuracy: 0.0001)
+        }
+    }
+
+    func testRemovingAnyOfThreeDefaultWindowsLeavesEqualTiles() async throws {
+        for removedIndex in 0..<3 {
+            setUpWorkspacesForTests()
+            config.defaultRootContainerOrientation = .auto
+            let workspace = focus.workspace
+            let root = root()
+            let windows = (0..<3).map { TestWindow.new(id: UInt32(18100 + $0), parent: root) }
+            windows[removedIndex].unbindFromParent()
+            workspace.normalizeContainers()
+            try await workspace.layoutWorkspace()
+            let remaining = windows.enumerated().filter { $0.offset != removedIndex }.map(\.element)
+            let a = remaining[0].lastAppliedLayoutPhysicalRect.orDie()
+            let b = remaining[1].lastAppliedLayoutPhysicalRect.orDie()
+            XCTAssertEqual(a.width, b.width, accuracy: 1)
+            XCTAssertEqual(a.height, b.height, accuracy: 1)
+            XCTAssertEqual(root.dwindleSplitRatio(at: 0), 0.5)
+        }
+    }
+
+    func testMovingWindowToAnotherWorkspaceCollapsesOnlyItsSplit() async throws {
+        let workspace = focus.workspace
+        let root = root()
+        let windows = (0..<4).map { TestWindow.new(id: UInt32(18110 + $0), parent: root) }
+        root.setDwindleSplitRatio(0.6, at: 0)
+        root.setDwindleSplitRatio(0.3, at: 1)
+        root.setDwindleSplitRatio(0.7, at: 2)
+        let destination = Workspace.get(byName: "destination")
+        windows[1].bind(to: destination.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        workspace.normalizeContainers()
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(root.dwindleShares(count: root.children.count), [0.6, 0.4])
+        let branch = root.children[1] as? TilingContainer
+        XCTAssertEqual(branch?.dwindleChildRatios?.first ?? 0, 0.7, accuracy: 0.000001)
+        XCTAssertEqual(branch?.dwindleChildRatios?.last ?? 0, 0.3, accuracy: 0.000001)
+        XCTAssertTrue(windows[1].nodeWorkspace === destination)
+        XCTAssertEqual(root.allLeafWindowsRecursive.count, 3)
     }
 
     func testWrappingAndNormalizingPreserveDwindleSlot() async throws {
@@ -144,12 +184,14 @@ final class DwindleParityTest: XCTestCase {
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertTrue(moving.parent === upper.parent)
         XCTAssertFalse(moving.parent === root)
-        XCTAssertTrue(lower.parent === tiles)
+        XCTAssertTrue(lower.parent === focus.workspace.rootTilingContainer)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.dwindleOrientation, .v)
         XCTAssertTrue(focus.windowOrNil === moving)
         try await focus.workspace.layoutWorkspace()
         let leaving = try await parseCommand("move left").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(leaving.exitCode, 0)
-        XCTAssertTrue(moving.parent === root)
+        XCTAssertTrue(moving.parent === focus.workspace.rootTilingContainer)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .dwindle)
     }
 
     func testFlattenResetsRatiosPreservesOrderFloatingAndFocus() async throws {

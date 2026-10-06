@@ -10,9 +10,41 @@ struct DwindleResizeTarget {
     let leadingLength: CGFloat
     let resizesLeadingChild: Bool
     let resizeEdge: CGFloat
+    var resizedChildIndex: Int? = nil
 
     @MainActor
     func resize(_ units: ResizeCmdArgs.Units) -> Bool {
+        if container.isExplicitDwindle, let index = resizedChildIndex,
+           let rect = container.lastAppliedLayoutPhysicalRect, let workspace = container.nodeWorkspace {
+            let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+            let extent = rect.getDimension(orientation) - CGFloat(gaps.inner.get(orientation).toDouble()) * CGFloat(container.children.count - 1)
+            guard extent > 0 else { return false }
+            let shares = container.dwindleShares(count: container.children.count)
+            let old = shares[index]
+            let current = container.children[index].lastAppliedLayoutPhysicalRect?.getDimension(orientation) ?? old * extent
+            let delta: CGFloat = switch units {
+                case .set(let value): CGFloat(value) - current
+                case .add(let value): CGFloat(value)
+                case .subtract(let value): -CGFloat(value)
+            }
+            let smallestOther = shares.enumerated().filter { $0.offset != index }.map(\.element).min() ?? 1
+            let minimum = container.children[index].minimumLayoutExtent(along: orientation, gaps: gaps, rect: rect)
+            let lower = max(0.1, min(minimum / extent, old))
+            let upper = 1 - 0.1 * (1 - old) / smallestOther
+            guard upper >= lower else { return false }
+            let next = min(max(old + delta / extent, lower), upper)
+            guard abs(next - old) > 0.000000001, old < 1 else { return false }
+            let before = container.dwindleChildFrames(in: rect, gaps: gaps)
+            let previous = container.dwindleChildRatios
+            container.dwindleChildRatios = shares.enumerated().map {
+                $0.offset == index ? next : $0.element * (1 - next) / (1 - old)
+            }
+            if before[index] == container.dwindleChildFrames(in: rect, gaps: gaps)[index] {
+                container.dwindleChildRatios = previous
+                return false
+            }
+            return true
+        }
         guard availableLength > 0 else { return false }
         let currentLength = resizesLeadingChild ? leadingLength : availableLength - leadingLength
         let requestedLength: CGFloat = switch units {
@@ -37,7 +69,8 @@ struct DwindleResizeTarget {
     func ratio(forLength length: CGFloat) -> CGFloat {
         guard availableLength > 0 else { return 0.5 }
         let leading = resizesLeadingChild ? length : availableLength - length
-        return min(max(leading / availableLength, 0.1), 0.9)
+        let bounds = container.dwindlePairRatioBounds(at: splitIndex)
+        return min(max(leading / availableLength, bounds.lowerBound), bounds.upperBound)
     }
 }
 
@@ -48,6 +81,19 @@ extension TreeNode {
               let ownIndex, let rect = geometry?[ObjectIdentifier(container)] ?? container.lastAppliedLayoutPhysicalRect,
               let workspace = nodeWorkspace else { return [] }
         let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+        if container.isExplicitDwindle {
+            let axis = container.dwindleAxis(width: rect.width, height: rect.height)
+            let gap = CGFloat(gaps.inner.get(axis).toDouble())
+            return [ownIndex, ownIndex - 1].compactMap { index in
+                guard index >= 0, index + 1 < container.children.count,
+                      let a = geometry?[ObjectIdentifier(container.children[index])] ?? container.children[index].lastAppliedLayoutPhysicalRect,
+                      let b = geometry?[ObjectIdentifier(container.children[index + 1])] ?? container.children[index + 1].lastAppliedLayoutPhysicalRect else { return nil }
+                return DwindleResizeTarget(container: container, splitIndex: index, orientation: axis,
+                    availableLength: a.getDimension(axis) + b.getDimension(axis),
+                    leadingLength: a.getDimension(axis), resizesLeadingChild: index == ownIndex,
+                    resizeEdge: (axis == .h ? a.maxX : a.maxY) + (index == ownIndex ? 0 : gap), resizedChildIndex: ownIndex)
+            }
+        }
         var width = rect.width
         var height = rect.height
         var targets: [DwindleResizeTarget] = []

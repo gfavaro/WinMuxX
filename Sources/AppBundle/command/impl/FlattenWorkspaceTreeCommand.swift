@@ -15,6 +15,9 @@ struct FlattenWorkspaceTreeCommand: Command {
         }
         workspace.normalizeContainers()
         workspace.rootTilingContainer.dwindleSplitRatios = []
+        if workspace.rootTilingContainer.isExplicitDwindle {
+            workspace.rootTilingContainer.dwindleChildRatios = Array(repeating: 1, count: windows.count)
+        }
         workspace.rootTilingContainer.dwindleOrientation = switch config.defaultRootContainerOrientation {
             case .auto: nil
             case .horizontal: .h

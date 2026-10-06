@@ -15,7 +15,10 @@ struct BalanceSizesCommand: Command {
 
 @MainActor
 private func balance(_ parent: TilingContainer) {
-    if parent.layout == .dwindle { parent.dwindleSplitRatios = [] }
+    if parent.layout == .dwindle {
+        parent.dwindleSplitRatios = []
+        if parent.isExplicitDwindle { parent.dwindleChildRatios = Array(repeating: 1, count: parent.children.count) }
+    }
     for child in parent.children {
         switch parent.layout {
             case .tiles: child.setWeight(parent.orientation, 1)

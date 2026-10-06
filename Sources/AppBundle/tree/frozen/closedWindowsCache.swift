@@ -172,6 +172,7 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
         }
     }
     container.dwindleSplitRatios = frozenContainer.dwindleSplitRatios ?? []
+    container.dwindleChildRatios = frozenContainer.dwindleChildRatios
     return true
 }
 
