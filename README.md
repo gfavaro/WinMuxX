@@ -171,7 +171,10 @@ Apps may reopen later: pending assignments survive subsequent WinMuxX restarts.
 Changed titles can still match by document/identifier. Apps with delayed metadata
 are retried for up to 30 seconds, stopping if window placement changes. WinMuxX
 does not reopen apps or documents itself. During startup, available windows recover their saved layout;
-later arrivals recover their workspace without replaying old layouts over current
+Tiled sizes follow saved layout proportions on the current monitor. Floating sizes
+and the manual width of a single tiled window are saved too; oversized floating
+windows fit the available screen, and fullscreen/minimized windows are not resized.
+Later arrivals recover their workspace without replaying old layouts over current
 user changes. State lives in `window-state.json` in the fork's Application Support
 directory, with a previous valid snapshot as backup. Monitor matching uses display
 UUIDs when available, with coordinates as fallback for older snapshots. Deleted

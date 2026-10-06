@@ -245,10 +245,14 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertTrue(workspaceHasPendingRestartWindows("3"))
     }
 
-    private func prepareDelayedWindow() -> TestWindow {
+    private func prepareDelayedWindow(floating: Bool = false) -> TestWindow {
         let workspace = Workspace.get(byName: "5")
         let original = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
         original.restartIdentity = identity("Report", document: "file:///report.txt")
+        if floating {
+            original.bindAsFloatingWindow(to: workspace)
+            original.recordAuthoritativeActualRect(Rect(topLeftX: 0, topLeftY: 0, width: 640, height: 480))
+        }
         let world = snapshotCurrentFrozenWorld()
         original.unbindFromParent()
         preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: world, pending: nil))
@@ -258,11 +262,14 @@ final class RestartWorkspaceTest: XCTestCase {
         return current
     }
 
-    func testRetryRestoresWindowWhenDocumentBecomesAvailable() async throws {
-        let current = prepareDelayedWindow()
+    func testRetryRestoresWindowAndFloatingSizeWhenDocumentBecomesAvailable() async throws {
+        let current = prepareDelayedWindow(floating: true)
         current.restartIdentity = identity("Changed title", pid: 20, launch: 20, document: "file:///report.txt")
         try await retryPendingRestartWindows()
         XCTAssertEqual(current.nodeWorkspace?.name, "5")
+        XCTAssertTrue(current.parent is Workspace)
+        let rect = try await current.getAxRect()
+        XCTAssertEqual(rect?.size, CGSize(width: 640, height: 480))
     }
 
     func testRetryDoesNotOverrideUserPlacement() async throws {
@@ -336,5 +343,80 @@ final class RestartWorkspaceTest: XCTestCase {
         preparePersistedFrozenWorldForStartup(saved)
         XCTAssertNil(Workspace.existing(byName: "3"))
         XCTAssertTrue(workspaceHasPendingRestartWindows("5"))
+    }
+
+    func testFloatingSizeAndManualTileWidthSurvivePersistenceAndNewWindowIds() async throws {
+        let workspace = Workspace.get(byName: "5")
+        let original = TestWindow.new(id: 1, parent: workspace,
+            rect: Rect(topLeftX: 50, topLeftY: 80, width: 640, height: 480))
+        original.restartIdentity = identity("Report")
+        original.lastFloatingSize = CGSize(width: 200, height: 100) // Older remembered size.
+        original.singleWindowManualWidth = 900
+        let encoded = try JSONEncoder().encode(makeRestartEnvelope())
+        let saved = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self, from: encoded)
+        original.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(saved)
+        let reopened = TestWindow.new(id: 99, parent: focus.workspace.rootTilingContainer,
+            rect: Rect(topLeftX: 100, topLeftY: 120, width: 300, height: 200))
+        reopened.restartIdentity = identity("Report", pid: 20, launch: 20)
+        let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: reopened)
+        XCTAssertTrue(restored)
+        XCTAssertTrue(workspace.floatingWindows.contains(reopened))
+        let rect = try await reopened.getAxRect()
+        XCTAssertEqual(rect?.size, CGSize(width: 640, height: 480))
+        XCTAssertEqual(reopened.lastFloatingSize, CGSize(width: 640, height: 480))
+        XCTAssertEqual(reopened.singleWindowManualWidth, 900)
+    }
+
+    func testRememberedFloatingSizeOfTiledWindowIsNotReplacedByTileSize() {
+        let workspace = Workspace.get(byName: "5")
+        let original = TestWindow.new(id: 1, parent: workspace.rootTilingContainer,
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080))
+        original.lastFloatingSize = CGSize(width: 640, height: 480)
+        let frozen = FrozenWindow(original)
+        XCTAssertEqual(frozen.lastFloatingSize, CGSize(width: 640, height: 480))
+        original.lastFloatingSize = nil
+        applyFrozenWindowState(original, frozen)
+        XCTAssertEqual(original.lastFloatingSize, CGSize(width: 640, height: 480))
+    }
+
+    func testFloatingSizeFitsAvailableMonitorAndSkipsFullscreenOrMinimizedWindows() async throws {
+        let workspace = Workspace.get(byName: "5")
+        let original = TestWindow.new(id: 1, parent: workspace,
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 5000, height: 4000))
+        let frozen = FrozenWindow(original)
+        await restoreFrozenFloatingSize(original, frozen, on: workspace)
+        let resized = try await original.getAxRect()
+        XCTAssertEqual(resized?.size, workspace.workspaceMonitor.visibleRect.size)
+        for state in 0..<3 {
+            original.nativeIsMacosFullscreen = state == 0
+            original.nativeIsMacosMinimized = state == 1
+            original.isFullscreen = state == 2
+            original.setAxFrame(nil, CGSize(width: 100, height: 100))
+            await restoreFrozenFloatingSize(original, frozen, on: workspace)
+            let unchanged = try await original.getAxRect()
+            XCTAssertEqual(unchanged?.size, CGSize(width: 100, height: 100))
+        }
+    }
+
+    func testOldSnapshotWithoutSizesPreservesCurrentDefaults() throws {
+        let workspace = Workspace.get(byName: "5")
+        let original = TestWindow.new(id: 1, parent: workspace)
+        var old = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(FrozenWindow(original))) as? [String: Any])
+        old.removeValue(forKey: "lastFloatingSize")
+        old.removeValue(forKey: "singleWindowManualWidth")
+        let decoded = try JSONDecoder().decode(FrozenWindow.self, from: JSONSerialization.data(withJSONObject: old))
+        original.lastFloatingSize = CGSize(width: 640, height: 480)
+        applyFrozenWindowState(original, decoded)
+        XCTAssertEqual(original.lastFloatingSize, CGSize(width: 640, height: 480))
+        XCTAssertNil(decoded.singleWindowManualWidth)
+        old["lastFloatingSize"] = [-1, 100]
+        old["singleWindowManualWidth"] = -100
+        let malformed = try JSONDecoder().decode(FrozenWindow.self, from: JSONSerialization.data(withJSONObject: old))
+        original.singleWindowManualWidth = 900
+        applyFrozenWindowState(original, malformed)
+        XCTAssertEqual(original.lastFloatingSize, CGSize(width: 640, height: 480))
+        XCTAssertEqual(original.singleWindowManualWidth, 900)
+        XCTAssertFalse(validRestoredWindowSize(CGSize(width: CGFloat.infinity, height: 100)))
     }
 }

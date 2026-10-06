@@ -132,6 +132,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
             if let window = windowsById[frozenWindow.id] {
                 applyFrozenWindowState(window, frozenWindow)
                 window.bindAsFloatingWindow(to: workspace)
+                await restoreFrozenFloatingSize(window, frozenWindow, on: workspace)
             }
         }
         for frozenWindow in frozenWorkspace.macosUnconventionalWindows {
@@ -209,6 +210,33 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
     window.noOuterGapsInFullscreen = frozenWindow.noOuterGapsInFullscreen
     window.layoutReason = frozenWindow.layoutReason
     (window as? MacWindow)?.restoreLearnedMinimum(frozenWindow.learnedMinimumSize)
+    if let size = frozenWindow.lastFloatingSize, validRestoredWindowSize(size) {
+        window.lastFloatingSize = size
+    }
+    if let width = frozenWindow.singleWindowManualWidth, width.isFinite, width > 0 {
+        window.singleWindowManualWidth = width
+    }
+}
+
+func validRestoredWindowSize(_ size: CGSize) -> Bool {
+    size.width.isFinite && size.height.isFinite && size.width > 0 && size.height > 0
+}
+
+@MainActor
+func restoreFrozenFloatingSize(_ window: Window, _ frozen: FrozenWindow, on workspace: Workspace) async {
+    guard let saved = frozen.lastFloatingSize, validRestoredWindowSize(saved),
+          !window.isFullscreen,
+          (try? await window.isMacosFullscreen) == false,
+          (try? await window.isMacosMinimized) == false else { return }
+    let available = workspace.workspaceMonitor.visibleRect.size
+    guard validRestoredWindowSize(available) else { return }
+    let fitted = CGSize(width: min(saved.width, available.width), height: min(saved.height, available.height))
+    window.lastFloatingSize = fitted
+    if let macWindow = window as? MacWindow {
+        try? await macWindow.setAxFrameBlocking(nil, fitted)
+    } else {
+        window.setAxFrame(nil, fitted)
+    }
 }
 
 @MainActor

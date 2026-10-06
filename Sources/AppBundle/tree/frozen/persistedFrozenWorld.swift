@@ -280,6 +280,7 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
     applyFrozenWindowState(window, frozen)
     if savedWorkspace.floatingWindows.contains(where: { $0.id == savedId }) {
         window.bindAsFloatingWindow(to: workspace)
+        await restoreFrozenFloatingSize(window, frozen, on: workspace)
     } else if savedWorkspace.macosUnconventionalWindows.contains(where: { $0.id == savedId }) {
         try await restoreFrozenUnconventionalWindow(window, frozen, on: workspace)
     } else {

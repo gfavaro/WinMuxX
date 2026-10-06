@@ -45,6 +45,8 @@ struct FrozenWindow: Codable, Sendable {
     let noOuterGapsInFullscreen: Bool
     let layoutReason: LayoutReason
     let learnedMinimumSize: CGSize?
+    let lastFloatingSize: CGSize?
+    let singleWindowManualWidth: CGFloat?
 
     @MainActor init(_ window: Window) {
         id = window.windowId
@@ -53,6 +55,9 @@ struct FrozenWindow: Codable, Sendable {
         isFullscreen = window.isFullscreen
         noOuterGapsInFullscreen = window.noOuterGapsInFullscreen
         layoutReason = window.layoutReason
+        lastFloatingSize = window.parent is Workspace && !window.isFullscreen
+            ? window.lastKnownActualRect?.size ?? window.lastFloatingSize : window.lastFloatingSize
+        singleWindowManualWidth = window.singleWindowManualWidth
         learnedMinimumSize = (window as? MacWindow)?.learnedMinimum.size == .zero ? nil : (window as? MacWindow)?.learnedMinimum.size
     }
 
@@ -64,6 +69,8 @@ struct FrozenWindow: Codable, Sendable {
         case noOuterGapsInFullscreen
         case layoutReason
         case learnedMinimumSize
+        case lastFloatingSize
+        case singleWindowManualWidth
     }
 
     init(from decoder: any Decoder) throws {
@@ -75,6 +82,8 @@ struct FrozenWindow: Codable, Sendable {
         noOuterGapsInFullscreen = try container.decode(Bool.self, forKey: .noOuterGapsInFullscreen)
         layoutReason = try container.decodeIfPresent(LayoutReason.self, forKey: .layoutReason) ?? .standard
         learnedMinimumSize = try container.decodeIfPresent(CGSize.self, forKey: .learnedMinimumSize)
+        lastFloatingSize = try container.decodeIfPresent(CGSize.self, forKey: .lastFloatingSize)
+        singleWindowManualWidth = try container.decodeIfPresent(CGFloat.self, forKey: .singleWindowManualWidth)
     }
 }
 
