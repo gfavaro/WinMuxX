@@ -6,6 +6,7 @@ import Common
 func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeightMap = .init(), physical: Bool = false) -> [ObjectIdentifier: Rect] {
     var result: [ObjectIdentifier: Rect] = [:]
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+    @MainActor
     func visit(_ node: TreeNode, _ rect: Rect) {
         result[ObjectIdentifier(node)] = rect
         if node is Window { return }
