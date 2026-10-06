@@ -14,7 +14,8 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
         switch container.layout {
             case .tabGroup:
                 if let active = container.mostRecentChild {
-                    let content = physical && container.showsWindowTabs
+                    let showsWindowTabs = container.showsWindowTabs
+                    let content = physical && showsWindowTabs
                         ? Rect(topLeftX: rect.topLeftX + windowTabGroupShellHorizontalInset(),
                             topLeftY: rect.topLeftY + resolvedWindowTabBarHeight() + windowTabGroupShellTopInset(),
                             width: max(rect.width - 2 * windowTabGroupShellHorizontalInset(), 0),
@@ -22,11 +23,23 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                     visit(active, content)
                 }
             case .dwindle:
-                let frames = container.dwindleChildFrames(in: rect, gaps: gaps, ratioAt: { weightMap.dwindleRatio(for: container, at: $0) }, enforceMinimums: physical)
+                var ratios: [CGFloat] = []
+                for index in container.children.indices {
+                    ratios.append(weightMap.dwindleRatio(for: container, at: index))
+                }
+                let frames = container.dwindleChildFrames(in: rect, gaps: gaps,
+                    ratioAt: { ratios[$0] }, enforceMinimums: physical)
                 for (child, frame) in zip(container.children, frames) { visit(child, frame) }
             case .tiles:
+                var weights: [ObjectIdentifier: CGFloat] = [:]
+                for child in container.children {
+                    weights[ObjectIdentifier(child)] = weightMap.weight(for: child, orientation: container.orientation)
+                }
                 let frames = container.tileChildFrames(in: rect, gaps: gaps) {
-                    weightMap.weight(for: $0, orientation: container.orientation)
+                    guard let weight = weights[ObjectIdentifier($0)] else {
+                        preconditionFailure("Tile frame requested for a child outside the container")
+                    }
+                    return weight
                 }
                 for (child, frame) in zip(container.children, frames) {
                     visit(child, physical ? frame.physical : frame.virtual)

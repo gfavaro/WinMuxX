@@ -39,8 +39,8 @@ jobs:
       - name: Build and test
         run: make check
 
-      - name: Build personal app on main
-        if: github.event_name == 'push' && github.repository == 'gfavaro/WinMuxX'
+      - name: Build personal app
+        if: github.repository == 'gfavaro/WinMuxX'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
         run: make fork-build BUILD_NUMBER="$BUILD_NUMBER"
