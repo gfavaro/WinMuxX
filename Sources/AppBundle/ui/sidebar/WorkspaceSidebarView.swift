@@ -72,14 +72,11 @@ struct WorkspaceSidebarView: View {
             finishSidebarSearch(clearText: true)
             resetProjectSwipeWithoutAnimation()
         }
-        .onChange(of: activeInUseOverrideWorkspaceName) { name in
-            guard let panel = WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId) else { return }
-            panel.overrideConfirmationLocksCollapse = name != nil && snapshot.visibleWidth > collapsedWidth + 0.5
-            if panel.overrideConfirmationLocksCollapse {
-                panel.cancelExpansionWork()
-            } else {
-                panel.scheduleHoverRecheckSoon()
-            }
+        .onChange(of: overrideConfirmationState) { state in
+            synchronizeOverrideConfirmation(state)
+        }
+        .onAppear {
+            synchronizeOverrideConfirmation(overrideConfirmationState)
         }
         .onDisappear {
             WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)?.overrideConfirmationLocksCollapse = false
@@ -151,6 +148,26 @@ struct WorkspaceSidebarView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: workspaceSidebarDragPointerEndedNotification)) { _ in
             resetProjectEdgeDrag()
+        }
+    }
+
+    var overrideConfirmationState: WorkspaceSidebarOverrideConfirmationState {
+        workspaceSidebarOverrideConfirmationState(
+            snapshot: snapshot, browseMode: browseMode, query: searchText,
+            requestedWorkspaceName: activeInUseOverrideWorkspaceName
+        )
+    }
+
+    private func synchronizeOverrideConfirmation(_ state: WorkspaceSidebarOverrideConfirmationState) {
+        if activeInUseOverrideWorkspaceName != state.workspaceName {
+            activeInUseOverrideWorkspaceName = state.workspaceName
+        }
+        guard let panel = WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId) else { return }
+        panel.overrideConfirmationLocksCollapse = state.locksCollapse
+        if state.locksCollapse {
+            panel.cancelExpansionWork()
+        } else {
+            panel.scheduleHoverRecheckSoon()
         }
     }
 
