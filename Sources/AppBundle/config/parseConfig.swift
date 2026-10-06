@@ -21,7 +21,10 @@ func readConfig(forceConfigUrl: URL? = nil) -> Result<(Config, URL), String> {
                 return .failure(msg)
         }
     }
-    let (parsedConfig, errors) = (try? String(contentsOf: configUrl, encoding: .utf8)).map { parseConfig($0) } ?? (defaultConfig, [])
+    let text: String
+    do { text = try String(contentsOf: configUrl, encoding: .utf8) }
+    catch { return .failure("Failed to read \(configUrl.path): \(error.localizedDescription)") }
+    let (parsedConfig, errors) = parseConfig(text)
 
     if errors.isEmpty {
         return .success((parsedConfig, configUrl))

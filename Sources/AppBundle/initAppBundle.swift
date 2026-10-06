@@ -47,6 +47,7 @@ import Foundation
             _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
         }
         isWinMuxRuntimeReady = true
+        reloadConfigIfSavedDuringStartup()
         schedulePersistedFrozenWorldSave()
     }
 }
