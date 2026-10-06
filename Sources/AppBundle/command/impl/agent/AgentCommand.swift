@@ -72,16 +72,16 @@ private func describeAgentJsonError(_ error: Error) -> String {
 private let agentSkillText = """
     ---
     name: winmux-agent
-    description: Use when arranging WinMux windows through the agent JSON interface. Query to a file, read that exact file, edit it, then apply that exact file.
+    description: Use when arranging WinMuxX windows through the agent JSON interface. Query to a file, read that exact file, edit it, then apply that exact file.
     ---
 
-    # WinMux Agent
+    # WinMuxX Agent
 
     You MUST use the file workflow. Do not guess operation names. Do not search the repository for docs. This skill is the command reference.
 
     Required workflow for every user request:
     1. Query the current state into a JSON file:
-       `winmux agent query --path /tmp/winmux-agent.json`
+       `winmuxx agent query --path /tmp/winmux-agent.json`
     2. Read the file you just wrote:
        `/tmp/winmux-agent.json`
        Important: `query --path` writes the JSON to the path. It does not print the JSON to stdout. Running `ls /tmp/winmux-agent.json` is not enough; you must read the file contents.
@@ -90,15 +90,15 @@ private let agentSkillText = """
     4. For a small change, replace the entire `edit.operations` array with only the operations for the current user request. Do not append to operations left by an earlier request.
     5. For a full workspace redesign, edit `edit.layout.workspaces` instead of `edit.operations`.
     6. Apply the same file:
-       `winmux agent apply --path /tmp/winmux-agent.json`
+       `winmuxx agent apply --path /tmp/winmux-agent.json`
     7. If apply says the JSON is stale or the `worldId` does not match, discard `/tmp/winmux-agent.json`, run the query command again, read the new file, redo the edit, and apply again.
     8. Return a short summary of what changed.
 
-    Usually skip the separate check command. `apply` validates before changing anything. Use `winmux agent check --path /tmp/winmux-agent.json` only for complex edits or after a failed apply.
+    Usually skip the separate check command. `apply` validates before changing anything. Use `winmuxx agent check --path /tmp/winmux-agent.json` only for complex edits or after a failed apply.
 
     The file includes a `worldId` freshness guard. If windows move, close, change fullscreen state, or the user manually changes the layout, discard the file and query again.
 
-    For small changes, replace the entire `edit.operations` array. Do not append to old operations unless the user asked for one multi-step batch. Prefer operations for focus, moving one window, moving one tab group, swapping, placing one pane, setting WinMux fullscreen, closing, or parking windows.
+    For small changes, replace the entire `edit.operations` array. Do not append to old operations unless the user asked for one multi-step batch. Prefer operations for focus, moving one window, moving one tab group, swapping, placing one pane, setting WinMuxX fullscreen, closing, or parking windows.
 
     For full workspace setup, edit `edit.layout.workspaces`. Use layout mode for requests like "set up my coding workspace" or "organize all windows into workspaces".
 
@@ -157,7 +157,7 @@ private let agentSkillText = """
 
     Relations for `placePane`: `leftOf`, `rightOf`, `above`, `below`.
 
-    WinMux fullscreen is not macOS native fullscreen. Use `setWinMuxFullscreen`.
+    WinMuxX fullscreen is not macOS native fullscreen. Use `setWinMuxFullscreen`.
 
     If the user wants a window not to show in the current workspace but does not ask to close it, use `parkWindow` or `moveWindowToWorkspace`, not native minimize.
 
@@ -172,7 +172,7 @@ private let agentSkillText = """
     - Tab group node: `{ "kind": "tabGroup", "tabs": [123, 456], "activeWindowId": 123, "size": 0.5 }`
     - Directions: `horizontal`, `vertical`.
     - `size` is a proportional share of the parent split. Use `0.8` for 80%. `80` and `sizePercent: 80` are also accepted. If a sibling omits `size`, it receives an equal share of the remaining space.
-    - For `setPaneSize`, add `"axis": "vertical"` when resizing a top/bottom split and `"axis": "horizontal"` when resizing a left/right split. Without `axis`, WinMux uses the nearest split containing the pane.
+    - For `setPaneSize`, add `"axis": "vertical"` when resizing a top/bottom split and `"axis": "horizontal"` when resizing a left/right split. Without `axis`, WinMuxX uses the nearest split containing the pane.
     - For "Chrome 80%, IDE column 20%, terminal below IDE", use a horizontal root split with Chrome tab group `size: 0.8` and a vertical split `size: 0.2` containing the IDE tab group and terminal.
 
     For a full layout redesign, the `edit` object in the queried file should look like this. Keep the rest of the queried file unchanged:

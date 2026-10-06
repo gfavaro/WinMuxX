@@ -55,6 +55,12 @@ when the target workspace is visible on another display.
 Hidden workspaces still activate on the requested/focused monitor, respecting
 forced assignments. Explicit move/summon commands retain their own behavior.
 
+### Border compatibility
+
+Borders use the private WindowServer renderer when available. If border creation
+is unavailable, the app uses a nonactivating, click-through AppKit panel and
+keeps updating its geometry without repeatedly retrying the private renderer.
+
 ### Sidebar appearance
 
 The active Settings screen is `ShortcutSettingsView`, whose Appearance destination

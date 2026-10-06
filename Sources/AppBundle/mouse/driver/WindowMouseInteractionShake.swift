@@ -63,4 +63,3 @@ extension WindowMouseInteractionDriver {
         window.lastAppliedLayoutPhysicalRect = nil
     }
 }
-

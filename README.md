@@ -207,7 +207,7 @@ Clicking a sidebar activates hidden workspaces on that sidebar's display. A work
 already visible on another display offers override confirmation before being brought here.
 
 ### Multi-Monitors
-Monitors share the global project/workspace state. Each monitor can be treated as *independent* from each other. They each just use the sidebar to browse through projects and 'select' a workspace to view. 
+Monitors share the global project/workspace state. Each monitor can be treated as *independent* from each other. They each just use the sidebar to browse through projects and 'select' a workspace to view.
 
 Monitors can not be attached to the same workspace at the same time. They can be on the same project at the same time.
 

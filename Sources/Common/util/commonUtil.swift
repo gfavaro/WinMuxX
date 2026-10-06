@@ -50,7 +50,7 @@ public func dieT<T>(
             filenameIfConsoleApp: recursionDetectorDuringTermination
                 ? "winmux-runtime-error-recursion.txt"
                 : "winmux-runtime-error.txt",
-            title: "WinMux Runtime Error",
+            title: "WinMuxX Runtime Error",
             message: message,
         )
     }

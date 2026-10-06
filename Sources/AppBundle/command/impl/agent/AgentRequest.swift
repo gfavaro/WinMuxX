@@ -39,10 +39,10 @@ struct AgentRequest: Decodable {
         if let worldId {
             let currentWorldId = currentAgentWorldId()
             if worldId != currentWorldId {
-                errors.append("Agent JSON is stale: worldId '\(worldId)' does not match current worldId '\(currentWorldId)'. Run 'winmux agent query --path <path>' again before applying.")
+                errors.append("Agent JSON is stale: worldId '\(worldId)' does not match current worldId '\(currentWorldId)'. Run 'winmuxx agent query --path <path>' again before applying.")
             }
         } else if snapshotId != nil {
-            errors.append("Agent JSON is missing worldId. Run 'winmux agent query --path <path>' again before applying.")
+                errors.append("Agent JSON is missing worldId. Run 'winmuxx agent query --path <path>' again before applying.")
         }
     }
 
@@ -90,4 +90,3 @@ struct AgentLayoutEdit: Codable {
         }
     }
 }
-

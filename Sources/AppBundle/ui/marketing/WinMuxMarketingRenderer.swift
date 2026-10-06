@@ -59,11 +59,7 @@ public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
         snapshot.configuration.menuBarBackground = !name.hasPrefix("no-background-")
         snapshot.configuration.chromeStyle = chrome
         snapshot.visibleWidth = collapsed ? snapshot.configuration.collapsedWidth : snapshot.configuration.expandedWidth
-        let wallpaperSample: WorkspaceSidebarWallpaperSample? = name == "wallpaper-tint-blue"
-            ? WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.1, green: 0.2, blue: 0.8)
-            : name == "wallpaper-tint-pink"
-            ? WorkspaceSidebarWallpaperSample(tone: .light, red: 0.9, green: 0.6, blue: 0.7)
-            : name.hasPrefix("wallpaper-brown-")
+        let wallpaperSample: WorkspaceSidebarWallpaperSample? = name.hasPrefix("wallpaper-brown-")
             ? WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.32, green: 0.28, blue: 0.21)
             : (name.hasPrefix("wallpaper-white-") ? WorkspaceSidebarWallpaperSample(tone: .light, red: 0.92, green: 0.92, blue: 0.92) : nil)
         if name.hasPrefix("wallpaper-brown-") || name.hasPrefix("wallpaper-white-") {
@@ -454,7 +450,7 @@ private struct WinMuxMarketingCanvas: View {
                     .shadow(color: .black.opacity(0.42), radius: 14, y: 8)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("WinMux")
+                    Text("WinMuxX")
                         .font(.system(size: 19, weight: .bold, design: .rounded))
                     Text("A sidebar-first window manager for macOS")
                         .font(.system(size: 13, weight: .medium))
@@ -553,7 +549,7 @@ private struct MarketingMenuBar: View {
         HStack(spacing: 21) {
             Image(systemName: "apple.logo")
                 .font(.system(size: 15, weight: .semibold))
-            Text("WinMux").fontWeight(.semibold)
+            Text("WinMuxX").fontWeight(.semibold)
             Text("File")
             Text("Edit")
             Text("View")
@@ -900,7 +896,7 @@ private struct MarketingCodeContent: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Label("winmux", systemImage: "folder.fill")
+                Label("WinMuxX", systemImage: "folder.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.72))
                 ForEach(["AppBundle", "ui", "sidebar", "tabs", "MarketingRenderer.swift"], id: \.self) { item in
@@ -1003,7 +999,7 @@ private struct MarketingBrowserContent: View {
 private struct MarketingTerminalWindow: View {
     var body: some View {
         VStack(spacing: 0) {
-            MarketingPlainTitleBar(title: "Terminal — winmux")
+            MarketingPlainTitleBar(title: "Terminal — winmuxx")
             VStack(alignment: .leading, spacing: 8) {
                 Text("$ swift run winmux-marketing-renderer")
                     .foregroundStyle(Color.white.opacity(0.74))
@@ -1175,7 +1171,7 @@ private enum MarketingFixtures {
             ),
         ],
         projects: [
-            WorkspaceSidebarProjectViewModel(id: defaultProject, displayName: "WinMux", colorHex: "#7C6CF2"),
+            WorkspaceSidebarProjectViewModel(id: defaultProject, displayName: "WinMuxX", colorHex: "#7C6CF2"),
             WorkspaceSidebarProjectViewModel(id: "personal", displayName: "Personal", colorHex: "#58A6FF"),
         ],
         activeProjectId: defaultProject,
@@ -1216,7 +1212,7 @@ private enum MarketingFixtures {
         activeWindowId: 101,
         tabs: [
             tab(101, workspace: "code", app: "Xcode", bundle: "com.apple.dt.Xcode", title: "WorkspaceSidebarView.swift", active: true),
-            tab(102, workspace: "code", app: "Terminal", bundle: "com.apple.Terminal", title: "winmux — swift run"),
+            tab(102, workspace: "code", app: "Terminal", bundle: "com.apple.Terminal", title: "winmuxx — swift run"),
         ]
     )
 
@@ -1236,8 +1232,8 @@ private enum MarketingFixtures {
         activeWindowId: 301,
         tabs: [
             tab(301, workspace: "work", app: "Helium", bundle: "net.imput.helium", title: "alpaca engineering", active: true),
-            tab(302, workspace: "work", app: "Ghostty", bundle: "com.mitchellh.ghostty", title: "WinMux"),
-            tab(303, workspace: "work", app: "Finder", bundle: "com.apple.finder", title: "winmux"),
+            tab(302, workspace: "work", app: "Ghostty", bundle: "com.mitchellh.ghostty", title: "WinMuxX"),
+            tab(303, workspace: "work", app: "Finder", bundle: "com.apple.finder", title: "WinMuxX"),
         ]
     )
 

@@ -171,4 +171,3 @@ extension WindowMouseInteractionDriver {
         WindowResizePreviewPanel.shared.hide(reason: "moveStart.clearMovePreview")
     }
 }
-

@@ -198,7 +198,7 @@ final class ActionMenuTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = false
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        for title in ["Enable", "Reload Config", "Settings…", "Diagnostics…", "Quit WinMux"] {
+        for title in ["Enable", "Reload Config", "Settings…", "Diagnostics…", "Quit WinMuxX"] {
             XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == title }).isEnabled, title)
         }
         let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)

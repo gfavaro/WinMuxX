@@ -63,18 +63,18 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
             image?.isTemplate = monochrome
         } else {
-            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMux disabled")
+            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuxX disabled")
         }
         image?.size = NSSize(width: 18, height: 18)
         statusItem?.button?.image = image
-        statusItem?.button?.toolTip = "WinMux"
+        statusItem?.button?.toolTip = "WinMuxX"
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.autoenablesItems = false
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
-        menu.addItem(NSMenuItem(title: "WinMux v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "WinMuxX v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
         let conflicts = runningOtherWindowManagers()
         if !conflicts.isEmpty {
@@ -172,7 +172,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if checkForUpdates != nil { menu.addItem(callbackItem("Check for Updates…", #selector(checkUpdates))) }
         menu.addItem(callbackItem("GitHub Repository", #selector(openRepository)))
         menu.addItem(callbackItem("File an Issue…", #selector(openIssue)))
-        menu.addItem(callbackItem("Quit WinMux", #selector(quit)))
+        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
     }
 
     private func addSubmenu(_ title: String, to menu: NSMenu, build: (NSMenu) -> Void) {

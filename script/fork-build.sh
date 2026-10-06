@@ -26,11 +26,11 @@ xcodebuild -project WinMux.xcodeproj -scheme WinMux -configuration Release \
 fork_app="$PWD/.release/fork-derived/Build/Products/Release/WinMuxX.app"
 test -d "$fork_app"
 source ./script/setup.sh
-swift build -c release --product winmux
+swift build -c release --product winmuxx
 fork_bin="$(swift build -c release --show-bin-path | tail -n 1)"
 test -d "$fork_bin"
 # macOS normally uses case-insensitive volumes: winmuxx would overwrite WinMuxX.
-ditto "$fork_bin/winmux" "$fork_app/Contents/MacOS/winmuxx-cli"
+ditto "$fork_bin/winmuxx" "$fork_app/Contents/MacOS/winmuxx-cli"
 codesign --force --deep --sign "$fork_signing_identity" "$fork_app"
 codesign --verify --deep --strict "$fork_app"
 "$fork_app/Contents/MacOS/WinMuxX" --help | grep -q -- '--config-path'

@@ -46,7 +46,6 @@ extension WorkspaceSidebarPanel {
 
         let sidebarConfig = config.workspaceSidebar
         let expandedWidth = CGFloat(sidebarConfig.width)
-        let maximumExpandedWidth = expandedWidth * 2
         let collapsedWidth = workspaceSidebarRestingWidth(sidebarConfig)
         guard expandedWidth > 0, collapsedWidth >= 0 else { return nil }
 

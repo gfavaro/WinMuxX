@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   release:
-    if: github.repository == 'gfavaro/WinMux'
+    if: github.repository == 'gfavaro/WinMuxX'
     runs-on: macos-26
     timeout-minutes: 60
     permissions:

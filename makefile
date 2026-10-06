@@ -39,7 +39,7 @@ build:
 	swift build --target AppBundleTests && \
 	rm -rf .debug && \
 	mkdir .debug && \
-	cp -r .build/debug/winmux .debug && \
+	cp -r .build/debug/winmuxx .debug && \
 	cp -r .build/debug/WinMuxApp .debug'
 
 build-clean:
@@ -80,7 +80,7 @@ run-clean:
 
 cli:
 	$(MAKE) build VERSION="$(VERSION)"
-	/bin/bash -lc 'cd "$(CURDIR)" && exec ./.debug/winmux $(ARGS)'
+	/bin/bash -lc 'cd "$(CURDIR)" && exec ./.debug/winmuxx $(ARGS)'
 
 check:
 	/bin/bash -lc 'cd "$(CURDIR)" && \

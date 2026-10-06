@@ -118,4 +118,3 @@ private func confirmWorkspaceSidebarProjectDeletion(_ project: WorkspaceSidebarP
     alert.alertStyle = .warning
     return alert.runModal() == .alertFirstButtonReturn
 }
-
