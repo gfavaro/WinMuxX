@@ -214,8 +214,16 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     private var visibleWidth: CGFloat = 0
     private let clippingLayer = CAShapeLayer()
     private var wallpaperTone: WorkspaceSidebarWallpaperTone?
+    private let reduceTransparency: () -> Bool
 
-    override init(frame frameRect: NSRect) {
+    override convenience init(frame frameRect: NSRect) {
+        self.init(frame: frameRect, reduceTransparency: {
+            NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency
+        })
+    }
+
+    init(frame frameRect: NSRect, reduceTransparency: @escaping () -> Bool) {
+        self.reduceTransparency = reduceTransparency
         if #available(macOS 26, *) {
             let glass = NSGlassEffectView()
             glass.style = .regular
@@ -259,7 +267,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         let expanded = configuration.alwaysExpanded || visibleWidth > configuration.collapsedWidth + 8
         let background = WorkspaceSidebarSystemBackground.resolve(
             showBackground: configuration.menuBarBackground,
-            reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,
+            reduceTransparency: reduceTransparency(),
             expanded: expanded
         )
         let surface: NSView
@@ -284,7 +292,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
             // Only an explicit tint choice sets an appearance. Automatic tint
             // and custom chrome continue inheriting the system appearance.
             appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        } else if system, !NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,
+        } else if system, !reduceTransparency(),
                   let scheme = contentColorScheme ?? wallpaperTone?.colorScheme {
             appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
         } else {
@@ -298,7 +306,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         let expanded = configuration.alwaysExpanded || visibleWidth > configuration.collapsedWidth + 8
         switch WorkspaceSidebarSystemBackground.resolve(
             showBackground: configuration.menuBarBackground,
-            reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,
+            reduceTransparency: reduceTransparency(),
             expanded: expanded
         ) {
         case .clear: return clearSurface

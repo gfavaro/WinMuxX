@@ -22,7 +22,7 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
     }
 
     func testBackgroundToggleOnlyControlsCollapsedSystemSidebar() {
-        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200), reduceTransparency: { false })
         var configuration = WorkspaceSidebarConfiguration.empty
         configuration.collapsedWidth = 44
         configuration.expandedWidth = 280
@@ -41,13 +41,32 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
     }
 
     func testEachSidebarCanApplyItsOwnWallpaperContrast() {
-        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200), reduceTransparency: { false })
         var configuration = WorkspaceSidebarConfiguration.empty
         configuration.collapsedWidth = 44
         configuration.menuBarBackground = false
         container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .light)
         XCTAssertEqual(container.appearance?.name, .aqua)
         container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
+        XCTAssertEqual(container.appearance?.name, .darkAqua)
+    }
+
+    func testMaterialContainerRespondsToReduceTransparencyChanges() {
+        var reduceTransparency = true
+        let container = WorkspaceSidebarMaterialContainer(
+            frame: .init(x: 0, y: 0, width: 560, height: 200),
+            reduceTransparency: { reduceTransparency }
+        )
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.collapsedWidth = 44
+        configuration.menuBarBackground = false
+        container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
+        XCTAssertTrue(container.activeSurface === container.effect)
+        XCTAssertNil(container.appearance)
+
+        reduceTransparency = false
+        container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
+        XCTAssertTrue(container.activeSurface === container.clearSurface)
         XCTAssertEqual(container.appearance?.name, .darkAqua)
     }
 
@@ -195,7 +214,7 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
     }
 
     func testMaterialOnlyCoversVisibleRailOnBothSidesAndPreservesContentCoordinates() {
-        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200))
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200), reduceTransparency: { false })
         let content = NSView()
         container.install(content: content)
         var configuration = WorkspaceSidebarConfiguration.empty
