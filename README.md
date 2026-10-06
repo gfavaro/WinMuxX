@@ -14,11 +14,91 @@ Automatic upstream updates are disabled. Build with `make fork-build`.
 
 https://github.com/user-attachments/assets/51983568-a168-494f-8ae3-5f50ca1efce1
 
+## What is different in this fork
+
+WinMuxX keeps the upstream sidebar, projects, tab groups and window commands, and
+adds personal defaults and behavior:
+
+- Dwindle is the default layout, with built-in window borders enabled.
+- A single tiled window has a configurable width limit and alignment on ultrawide
+  displays; manual width resizing is respected.
+- A global minimum keeps workspaces available without maintaining a list of names.
+- Settings has separate Sidebar and Appearance pages, accessible controls, and
+  animated spacing previews.
+- Sidebar, tab groups and the switcher share glass or solid styling. Expanded glass
+  surfaces use a frosted background.
+- Selecting a workspace already visible on another display focuses it there.
+  Sidebar clicks offer an explicit override; an unused override dismisses when
+  the pointer or focus leaves the workspace button.
+- Learned application minimum sizes constrain layouts. Borders use an AppKit
+  fallback when the private renderer is unavailable.
+- The native menu includes diagnostics and recovery of original window frames
+  after an interrupted session.
+
+The fork has its own app identity, CLI, configuration and recovery state. Original
+WinMux configuration is copied only on first launch and is not edited in place.
+Automatic upstream updates are disabled. Releases use `gf-v` tags in this repository.
+
+## Settings
+
+Open Settings from the WinMuxX menu. The window is resizable, and the controls
+support keyboard navigation, accessible labels and values, Reduce Motion, Reduce
+Transparency, and increased contrast.
+
+| Page | Options |
+| --- | --- |
+| General | Start at login and automatic configuration reload |
+| Workspaces | Minimum quantity, project deletion behavior and workspace shortcuts |
+| Windows | New-window behavior, layout, ultrawide ratio/alignment, pointer focus and tab strips |
+| Sidebar | Visibility, placement, widths, display mode, clock and status content |
+| Appearance | Shared glass/solid style, menu-bar indicator, motion, spacing and borders |
+| Shortcuts | Presets and editable window-management shortcuts |
+| Automation | Startup and event commands |
+| Configuration | Complete TOML editor, validation and advanced reference |
+
+Changes use the normal configuration reload. Drafts survive reloads and page
+changes; failed saves keep the edit and offer a retry. TOML edits preserve dotted
+properties, conventional table sections, comments and multiline monitor rules.
+Menu-bar and double-sided window preferences are stored locally in UserDefaults.
+
 ## Highlights
+
+### Single window on ultrawide
+
+A lone tiled window is centered at a maximum 3:2 ratio on ultrawide screens
+(screen width/height at least 2.3). Floating windows, tab groups and WinMuxX
+fullscreen bypass this limit. The available area accounts for the sidebar and
+outer gaps; known application minimum widths take priority.
+Set `single-window-aspect-ratio = 0` to disable, or choose a different ratio in
+Settings → Windows. Per-monitor rules use the same syntax as gaps:
+
+```toml
+single-window-aspect-ratio = [{ monitor."S34CG50" = 1.5 }, 0]
+```
+
+Settings → Windows exposes the default ratio and alignment. Per-monitor ratio
+overrides remain available in TOML and are preserved when changing the default.
+Changes take effect on configuration reload. Monitor overrides still require an
+ultrawide screen.
+
+Manually resizing a lone ultrawide tile overrides its default aspect-ratio width
+for the current session. The window keeps the configured alignment and layout height; the
+chosen width may exceed 3:2 and is clamped to the available area and application
+minimum. Mouse resizing and `resize width`/`resize smart` both support this.
+The preference returns when the window becomes a lone tile again.
+
+Use `single-window-alignment = 'center'`, `'left'` or `'right'` to choose its
+horizontal position, also available in Settings → Windows. Center is the default.
+
+For a lone ultrawide tile, a mouse resize that changes height switches the window
+to floating and preserves the resulting size and position. Width-only resizing
+keeps it tiled with the selected alignment. Small native frame rounding changes
+are ignored.
 
 ### Native sidebar appearance
 
-Settings → Appearance controls the sidebar. Choose Liquid Glass for native glass
+Settings → Appearance controls the shared visual style; Settings → Sidebar controls
+placement, sizing and content. Choose Liquid Glass for native glass
 on macOS 26 and later, or Solid color for an opaque preset/custom color. Earlier
 macOS versions use a native material fallback. Reduce Transparency forces an
 opaque system background in Liquid Glass. Expanded Liquid Glass always uses a
@@ -74,6 +154,25 @@ the windows. It validates the owning app's process and launch identity, skips di
 and native fullscreen/minimized windows, and retains failed entries for another attempt. Choose
 **Enable** to resume tiling. The recovery journal is separate from the saved managed layout.
 
+### Workspaces to keep
+
+Settings → Workspaces → Workspaces to keep sets a minimum total across all
+projects. The default is **1**; **0** disables the configured minimum:
+
+```toml
+minimum-workspace-count = 1
+```
+
+Occupied workspaces count. Each project and active display retains its required
+workspace even with a minimum of zero. Existing empty slots are reused; missing
+slots are created in the default project without changing focus. Reducing the
+minimum allows excess empty slots to be collected.
+
+Older configurations retain their named `persistent-workspaces` behavior until
+the quantity is saved in Settings. Saving replaces that list with
+`minimum-workspace-count`; an explicit count takes precedence over named and
+shortcut-inferred persistence.
+
 ### Projects
 Projects are collection of workspaces. Think of it like a parent/child hiearchy, you can switch between projects. Each project has it's own set of workspaces.
 
@@ -115,8 +214,9 @@ The sidebar clock can be configured independently:
     show-weekday = true
 ```
 
-`show-clock` hides the entire clock card. The other settings independently control seconds,
-the month and day, and the weekday; for example, `show-date = false` with
+`show-clock = false` hides the entire clock card. Seconds can appear in both
+compact and expanded modes. Date and weekday appear only in the expanded sidebar
+and are independently controlled; for example, `show-date = false` with
 `show-weekday = true` leaves a weekday-only calendar label in the expanded sidebar.
 
 ### Window borders
@@ -140,10 +240,19 @@ process to avoid drawing two sets of borders.
 
 ### Window and sidebar spacing
 
+Settings → Appearance → Window spacing offers six sliders and numeric fields:
+space between windows horizontally/vertically, plus the four display edges. The
+four-window preview animates as values change; dragging updates the preview and
+applies the layout when the gesture ends. Numeric fields apply on Enter or focus
+loss. Reduce Motion disables the preview animation. Existing values outside the
+slider's usual range remain editable, and disconnected monitor overrides are
+preserved.
+
+
 The `[gaps]` settings control the visible borders around tiled windows. `inner.horizontal`
 and `inner.vertical` set the space between neighboring windows. The outer gaps set the space
 at each display edge; when the sidebar is enabled, `outer.left` is the space between the
-sidebar and the tiled windows. Any of these values can be reduced or set to zero independently.
+sidebar and the tiled windows on the selected sidebar edge. Any of these values can be reduced or set to zero independently.
 
 For borderless tiling, including no border beside the sidebar:
 
@@ -161,6 +270,13 @@ For borderless tiling, including no border beside the sidebar:
 Tab groups allow you to have many windows occupy the same footprint, similar to Yabai stacks but with browser-like tab behavior. This is useful when you want to have multiple pieces of reference information next to an editor, multiple tabs in different browser profiles, or, when you simply want multiple fullscreen views without the additional friction and overhead of creating a new workspace.
 
 Unlike stack-only layouts, WinMux tab groups behave more intuitively like you would expect tabs to in browsers, and don't need a keyboard shortcut to activate. You can drag tabs from tab groups into another window's [intent zone](#managed-tiling-mode), or in between workspaces. You can also rearrange tab order within a tab group, and navigate through them with relative and absolute keybindings.
+
+Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
+keeps the group as overlapping windows with offsets. Double-sided windows replaces
+the strip for two-window groups when enabled; three or more windows continue to
+use tabs. Option-click or Option-Tab flips between the two sides. This preference
+requires Show tab strips and Screen Recording access, and respects Reduce Motion.
+Tab chrome follows the sidebar's glass or solid style.
 
 ### Philosophy
 
@@ -256,7 +372,9 @@ end tell
 
 ## Installation
 
-Build this fork with `make fork-build BUILD_NUMBER=<new-number>`, then install
+Download a ZIP from [WinMuxX releases](https://github.com/gfavaro/WinMuxX/releases)
+and extract `WinMuxX.app`, or build this fork with
+`make fork-build BUILD_NUMBER=<new-number>`, then install
 `.release/WinMuxX.app` as described in [HACKING.md](HACKING.md). Fork builds retain
 the configured local signing identity, are not notarized, and have automatic
 upstream updates disabled. The upstream Homebrew cask installs WinMux, not WinMuxX.
@@ -271,59 +389,3 @@ starter config. `--config-path` selects an explicit file. See
 
 ## Credits
 [Aerospace](https://github.com/nikitabobko/AeroSpace)
-
-A lone tiled window is centered at a maximum 3:2 ratio on ultrawide screens
-(screen width/height at least 2.3). Floating windows, tab groups and WinMuxX
-fullscreen bypass this limit. The available area accounts for the sidebar and
-outer gaps; known application minimum widths take priority.
-Set `single-window-aspect-ratio = 0` to disable, or choose a different ratio in
-Settings → Windows. Per-monitor rules use the same syntax as gaps:
-
-```toml
-single-window-aspect-ratio = [{ monitor."S34CG50" = 1.5 }, 0]
-```
-
-Settings → Windows exposes the default ratio and alignment. Per-monitor ratio
-overrides remain available in TOML and are preserved when changing the default.
-Changes take effect on configuration reload. Monitor overrides still require an
-ultrawide screen.
-
-Manually resizing a lone ultrawide tile overrides its default aspect-ratio width
-for the current session. The window keeps the configured alignment and layout height; the
-chosen width may exceed 3:2 and is clamped to the available area and application
-minimum. Mouse resizing and `resize width`/`resize smart` both support this.
-The preference returns when the window becomes a lone tile again.
-
-Use `single-window-alignment = 'center'`, `'left'` or `'right'` to choose its
-horizontal position, also available in Settings → Windows. Center is the default.
-
-For a lone ultrawide tile, a mouse resize that changes height switches the window
-to floating and preserves the resulting size and position. Width-only resizing
-keeps it tiled with the selected alignment. Small native frame rounding changes
-are ignored.
-
-Settings groups everyday options into General, Workspaces, Windows, Sidebar,
-Appearance and Shortcuts. Automation and the Configuration editor/reference hold
-advanced settings. The window can be widened; controls support keyboard access,
-accessible names and values, and system accessibility preferences.
-
-`minimum-workspace-count = 1` keeps a minimum total across all projects. Set it to
-`0` to disable the configured minimum. Occupied workspaces count; each project
-and active display still retains its required workspace. Missing slots are
-created in the default project without changing focus. Reducing the minimum
-allows only excess empty slots to be collected.
-
-Older configs keep their named `persistent-workspaces` behavior until the
-quantity is saved in Settings → Workspaces. Saving replaces the old list with
-`minimum-workspace-count`; an explicit count takes precedence over named or
-shortcut-inferred persistence.
-
-Appearance → Window spacing has sliders and numeric fields. The four-window
-preview updates while dragging; finishing the gesture applies the final value to
-the real layout. Per-monitor spacing overrides are preserved. Reduce Motion
-turns off preview animation.
-
-Windows → Show tab strips retains the overlapping layout with offsets when off.
-Double-sided windows replaces the strip for two-window groups when enabled.
-Settings edits preserve dotted TOML properties such as `window-tabs.enabled`,
-as well as conventional table sections, comments and multiline monitor rules.
