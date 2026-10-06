@@ -1,23 +1,28 @@
-
-<p align="left">
-  <img src="resources/winmux-logo.svg" width="80" alt="WinMux logo">
+<p align="center">
+  <img src="resources/winmux-logo.svg" width="96" alt="WinMuxX logo">
 </p>
 
-# WinMuxX
+<h1 align="center">WinMuxX</h1>
 
-Personal fork by gfavaro, based on ZimengXiong/WinMux.
-See [fork maintenance, builds and releases](docs/FORK.md),
-[development guide](HACKING.md), and [documentation index](docs/README.md).
-Automatic upstream updates are disabled. Build with `make fork-build`.
+<p align="center">A sidebar window manager for macOS, with Dwindle tiling and room to work on ultrawide displays.</p>
 
-<p align="left">A powerful sidebar-first window manager for macOS.</p>
+<p align="center">
+  <a href="https://github.com/gfavaro/WinMuxX/releases">Download</a> ·
+  <a href="#settings">Settings</a> ·
+  <a href="docs/FORK.md">Fork guide</a> ·
+  <a href="HACKING.md">Development</a> ·
+  <a href="docs/README.md">Documentation</a>
+</p>
+
+Personal fork by gfavaro, based on ZimengXiong/WinMux. Automatic upstream updates
+are disabled; releases and configuration belong to this fork.
 
 https://github.com/user-attachments/assets/51983568-a168-494f-8ae3-5f50ca1efce1
 
-## What is different in this fork
+## In this fork
 
-WinMuxX keeps the upstream sidebar, projects, tab groups and window commands, and
-adds personal defaults and behavior:
+WinMuxX builds on upstream's sidebar, projects, tab groups and window commands.
+These are the defaults and features maintained here:
 
 - Dwindle is the default layout, with built-in window borders enabled.
 - A single tiled window has a configurable width limit and alignment on ultrawide
@@ -35,9 +40,9 @@ adds personal defaults and behavior:
 - The native menu includes diagnostics and recovery of original window frames
   after an interrupted session.
 
-The fork has its own app identity, CLI, configuration and recovery state. Original
-WinMux configuration is copied only on first launch and is not edited in place.
-Automatic upstream updates are disabled. Releases use `gf-v` tags in this repository.
+The app has its own identity, CLI, configuration and recovery state. On first
+launch, it can copy your original WinMux configuration while leaving that file
+untouched. Releases use `gf-v` tags in this repository.
 
 ## Settings
 
@@ -56,18 +61,21 @@ Transparency, and increased contrast.
 | Automation | Startup and event commands |
 | Configuration | Complete TOML editor, validation and advanced reference |
 
-Changes use the normal configuration reload. Drafts survive reloads and page
-changes; failed saves keep the edit and offer a retry. TOML edits preserve dotted
-properties, conventional table sections, comments and multiline monitor rules.
+Settings apply through configuration reload. Your drafts stay in place when you
+switch pages or reload; if saving fails, you can retry the same edit. The editor
+preserves dotted TOML properties, table sections, comments and multiline monitor
+rules.
 Menu-bar and double-sided window preferences are stored locally in UserDefaults.
 
-## Highlights
+## How it works
 
 ### Single window on ultrawide
 
-A lone tiled window is centered at a maximum 3:2 ratio on ultrawide screens
-(screen width/height at least 2.3). Floating windows, tab groups and WinMuxX
-fullscreen bypass this limit. The available area accounts for the sidebar and
+One tiled window is centered at a maximum 3:2 ratio on ultrawide screens
+(screen width/height at least 2.3). The limit applies only when the workspace has
+one available window; an extra floating window prevents it. Minimized windows,
+hidden apps and popups do not count. Tab groups and WinMuxX fullscreen bypass
+the limit. The available area accounts for the sidebar and
 outer gaps; known application minimum widths take priority.
 Set `single-window-aspect-ratio = 0` to disable, or choose a different ratio in
 Settings → Windows. Per-monitor rules use the same syntax as gaps:
@@ -82,9 +90,8 @@ Changes take effect on configuration reload. Monitor overrides still require an
 ultrawide screen.
 
 Manually resizing a lone ultrawide tile overrides its default aspect-ratio width
-for the current session. The window keeps the configured alignment and layout height; the
-chosen width may exceed 3:2 and is clamped to the available area and application
-minimum. Mouse resizing and `resize width`/`resize smart` both support this.
+for the current session. The window keeps its alignment and layout height. You
+can make it wider than 3:2; available space and the app's minimum width still apply. Mouse resizing and `resize width`/`resize smart` both support this.
 The preference returns when the window becomes a lone tile again.
 
 Use `single-window-alignment = 'center'`, `'left'` or `'right'` to choose its
@@ -104,7 +111,7 @@ macOS versions use a native material fallback. Reduce Transparency forces an
 opaque system background in Liquid Glass. Expanded Liquid Glass always uses a
 frosted background; Show background controls the compact rail.
 
-Choose Left or Right, and Standard, Centered or Full height. Every mode reserves
+In Sidebar, choose Left or Right and a Standard, Centered or Full height. Every mode reserves
 space for the menu bar, even when it auto-hides, and respects the notch. Centered
 fits its content up to 90% of the safe height, then scrolls. Standard and Full
 currently share the same safe geometry. Expanded and collapsed widths have
@@ -137,7 +144,7 @@ native action menu. These choices persist locally, outside the TOML config.
 
 ### Menu-bar actions and diagnostics
 
-Click the WinMux menu-bar icon to browse window, layout, workspace, project and monitor actions.
+Click the WinMuxX menu-bar icon for window, layout, workspace, project and monitor actions.
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and
 key sequences are available under **Other Key Bindings** when not represented by a catalog action.
@@ -174,12 +181,17 @@ the quantity is saved in Settings. Saving replaces that list with
 shortcut-inferred persistence.
 
 ### Projects
-Projects are collection of workspaces. Think of it like a parent/child hiearchy, you can switch between projects. Each project has it's own set of workspaces.
+
+A project groups its own workspaces. Switch projects in the sidebar to keep
+different sets of windows together.
 
 ### Sidebar
-The sidebar is a more interactively-performant and useful alternative to [Sketchybar](https://github.com/felixkratz/sketchybar) and traditional workspace menu bar dropdowns for most everyday tasks. It provides better visibility into spaces and spatial awareness on the desktop.
+The sidebar shows your workspaces beside your windows. You can use it as an
+alternative to [Sketchybar](https://github.com/felixkratz/sketchybar) or a workspace
+menu in the menu bar.
 
-You can drag windows in and out of the sidebar from and to the current workspace. You can rearrange windows across all spaces using the sidebar, including tab groups.
+Drag windows or tab groups through the sidebar to move them between workspaces.
+You can also drag a window back onto the current workspace.
 
 By default the sidebar rests as a compact rail and expands when hovered. To hide the rail
 completely until the pointer reaches the selected display edge, enable auto-hide.
@@ -222,7 +234,7 @@ and are independently controlled; for example, `show-date = false` with
 ### Window borders
 
 WinMux draws click-through borders around visible managed windows, with a different color for the
-focused window. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
+focused window. Built-in borders are enabled by default. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
 
 ```toml
 [borders]
@@ -265,11 +277,17 @@ For borderless tiling, including no border beside the sidebar:
     outer.top = 0
     outer.right = 0
 ```
-### Tab Groups
-![](resources/screenshots/tab-groups.png)
-Tab groups allow you to have many windows occupy the same footprint, similar to Yabai stacks but with browser-like tab behavior. This is useful when you want to have multiple pieces of reference information next to an editor, multiple tabs in different browser profiles, or, when you simply want multiple fullscreen views without the additional friction and overhead of creating a new workspace.
+### Tab groups
 
-Unlike stack-only layouts, WinMux tab groups behave more intuitively like you would expect tabs to in browsers, and don't need a keyboard shortcut to activate. You can drag tabs from tab groups into another window's [intent zone](#managed-tiling-mode), or in between workspaces. You can also rearrange tab order within a tab group, and navigate through them with relative and absolute keybindings.
+![Tab groups](resources/screenshots/tab-groups.png)
+
+Several windows can share one tile, with a tab bar for choosing which window to
+view. This works well for reference windows beside an editor or separate browser
+profiles. Click a tab to activate it, rearrange the tabs, or use relative and
+absolute keybindings to navigate the group.
+
+Drag a tab into another window's [intent zone](#managed-tiling-mode) or move it to
+another workspace through the sidebar.
 
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
 keeps the group as overlapping windows with offsets. Double-sided windows replaces
@@ -278,9 +296,9 @@ use tabs. Option-click or Option-Tab flips between the two sides. This preferenc
 requires Show tab strips and Screen Recording access, and respects Reduce Motion.
 Tab chrome follows the sidebar's glass or solid style.
 
-### Philosophy
+<a id="managed-tiling-mode"></a>
 
-#### Automatic tiling
+### Tiling and floating
 
 With `default-root-container-layout = 'dwindle'`, existing tiled windows also use dwindle at startup,
 including tiled roots restored from older saved state. Switching the default to dwindle while WinMux
@@ -301,9 +319,11 @@ While dragging a window by its title bar, shake it horizontally to toggle betwee
 enable-shake-to-toggle-tiling = false
 ```
 
-#### Workspaces
-Empty workspaces are collected when no longer needed, but configured persistent workspaces and the active viewport
-workspace can remain empty. Numeric workspace arguments are display positions; use `workspace --name <name>` to
+### Workspace navigation
+
+Empty workspaces are collected when no longer needed. The configured minimum,
+legacy persistent names, and active display/project requirements keep the
+workspaces that still need to exist. Numeric workspace arguments are display positions; use `workspace --name <name>` to
 select an internal workspace name directly.
 
 Workspace activation can target a monitor explicitly:
@@ -322,15 +342,20 @@ project-wide. `workspace-back-and-forth` and `--auto-back-and-forth` use each di
 Clicking a sidebar activates hidden workspaces on that sidebar's display. A workspace
 already visible on another display offers override confirmation before being brought here.
 
-### Multi-Monitors
-Monitors share the global project/workspace state. Each monitor can be treated as *independent* from each other. They each just use the sidebar to browse through projects and 'select' a workspace to view.
+### Multiple monitors
 
-Monitors can not be attached to the same workspace at the same time. They can be on the same project at the same time.
+All monitors share the project and workspace list. Each display has its own
+sidebar and selects its own workspace. Two displays can use the same project,
+but each must show a different workspace.
 
-#### App Launching
-WinMux supports single-modifer keybindings (e.g. triggering an action on press of `⌘`)
+### Launching apps
 
-I highly recommend that you configure the apps you use every day to be launch with Left/Right Option+Command, or similar shortcuts, otherwise it might be hard to launch common things into the current workspace (and instead, take you to the other workspace where the app is currently active). Here is some of the apps that I have keybinded:
+WinMux supports single-modifier keybindings, such as triggering an action when
+you press `⌘`.
+
+A shortcut that opens a new window helps you launch an app into the current
+workspace instead of returning to a window on another workspace. These examples
+use separate Chrome profiles and scripts for cmux and Finder:
 
 ```toml
 [mode.main.binding-tap]
@@ -388,4 +413,6 @@ starter config. `--config-path` selects an explicit file. See
 [fork configuration ownership](docs/FORK.md#app-isolation) for details.
 
 ## Credits
-[Aerospace](https://github.com/nikitabobko/AeroSpace)
+
+WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
+build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
