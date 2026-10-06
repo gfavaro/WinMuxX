@@ -18,6 +18,37 @@ struct WorkspaceNamingTestMonitor: Monitor {
 final class WorkspaceNamingTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testFixedWorkspacesAllowOnlyOneAdjacentTransientBlank() throws {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        let fixed = Workspace.get(byName: "5")
+        _ = fixed.focusWorkspace()
+        let blank = try XCTUnwrap(createAdjacentTransientBlankWorkspaceIfAllowed(named: "6", from: fixed))
+        _ = blank.focusWorkspace()
+        XCTAssertEqual(workspaceDefaultDisplayName(blank.name), "Workspace 6")
+        XCTAssertNil(createAdjacentTransientBlankWorkspaceIfAllowed(named: "7", from: blank))
+        _ = fixed.focusWorkspace()
+        Workspace.reconcileWorkspaceState()
+        XCTAssertNil(Workspace.existing(byName: blank.name))
+        XCTAssertEqual(userFacingWorkspaces(Workspace.all).map(\.name).sorted(), ["1", "2", "3", "4", "5"])
+    }
+
+    func testFixedWorkspaceNumbersRemainStableAlongsideAutomaticWorkspaces() {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        Workspace.get(byName: "2").markAsAutomaticallyNamed()
+        let extra = Workspace.get(byName: "7")
+        extra.markAsAutomaticallyNamed()
+        _ = TestWindow.new(id: 900, parent: extra.rootTilingContainer)
+        for number in 1...5 {
+            let workspace = Workspace.get(byName: String(number))
+            XCTAssertEqual(workspaceDefaultDisplayName(workspace.name), workspace.usesAutomaticDisplayName ? "Workspace \(number)" : String(number))
+        }
+        XCTAssertEqual(workspaceDefaultDisplayName(extra.name), "Workspace 6")
+        Workspace.reconcileWorkspaceState()
+        XCTAssertTrue((1...5).allSatisfy { Workspace.existing(byName: String($0)) != nil })
+    }
+
     func testSidebarNumbersIncludeEmptyPersistentWorkspaces() {
         config.persistentWorkspaces = ["1", "2"]
         materializePersistedWorkspaces()

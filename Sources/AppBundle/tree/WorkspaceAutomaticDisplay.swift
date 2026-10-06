@@ -1,11 +1,18 @@
 @MainActor
 func automaticWorkspaceDisplayIndex(_ workspace: Workspace, focusedWorkspace: Workspace?) -> Int? {
-    projectWorkspaces(projectId: workspace.projectId)
-        .filter { !$0.isArchived }
-        .filter { isUserFacingWorkspace($0, focusedWorkspace: focusedWorkspace) }
-        .filter(\.usesAutomaticDisplayName)
-        .firstIndex(of: workspace)
-        .map { $0 + 1 }
+    if workspace.isConfiguredPersistent { return parsePositiveWorkspaceDisplayIndex(workspace.name) }
+    let visible = userFacingWorkspaces(
+        projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived },
+        focusedWorkspace: focusedWorkspace
+    )
+    var reserved = Set(visible.filter { !$0.usesAutomaticDisplayName || $0.isConfiguredPersistent }
+        .compactMap { parsePositiveWorkspaceDisplayIndex($0.name) })
+    for candidate in visible where candidate.usesAutomaticDisplayName && !candidate.isConfiguredPersistent {
+        let index = lowestUnusedPositiveIndex(reserved)
+        if candidate === workspace { return index }
+        reserved.insert(index)
+    }
+    return nil
 }
 
 func automaticWorkspaceDisplayIndexFallback(_ workspaceName: String) -> Int? {
@@ -26,9 +33,9 @@ func createAdjacentTransientBlankWorkspaceIfAllowed(named workspaceName: String,
         return nil
     }
     let automaticDisplayWorkspaces = scopedAutomaticDisplayWorkspaces(current: current)
-    guard targetIndex == automaticDisplayWorkspaces.count + 1 else { return nil }
+    guard targetIndex == nextAdjacentWorkspaceDisplayIndex(current: current) else { return nil }
     if let lastWorkspace = automaticDisplayWorkspaces.last,
-       automaticDisplayWorkspaces.count > 1,
+       orderedUserFacingWorkspaces(in: current.projectId, focusedWorkspace: current).count > 1,
        lastWorkspace.isOrdinaryEmptySlot {
         return nil
     }
@@ -38,4 +45,14 @@ func createAdjacentTransientBlankWorkspaceIfAllowed(named workspaceName: String,
     workspace.assignProject(current.projectId)
     workspace.seedMonitorIfNeeded(current.workspaceMonitor)
     return workspace
+}
+
+@MainActor
+func nextAdjacentWorkspaceDisplayIndex(current: Workspace) -> Int {
+    let indices = orderedUserFacingWorkspaces(in: current.projectId, focusedWorkspace: current).compactMap {
+        $0.usesAutomaticDisplayName
+            ? automaticWorkspaceDisplayIndex($0, focusedWorkspace: current)
+            : parsePositiveWorkspaceDisplayIndex($0.name)
+    }
+    return (indices.max() ?? 0) + 1
 }

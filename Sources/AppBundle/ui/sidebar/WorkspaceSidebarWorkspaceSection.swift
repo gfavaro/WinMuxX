@@ -465,8 +465,14 @@ extension WorkspaceSidebarWorkspaceSection {
 
     @ViewBuilder
     var headerSlot: some View {
-        header
-            .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
+        Group {
+            if !isCompact && !isRenamingWorkspace && !isShowingInUseOverlay {
+                headerButton
+            } else {
+                header
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
     }
 }
 extension WorkspaceSidebarWorkspaceSection {

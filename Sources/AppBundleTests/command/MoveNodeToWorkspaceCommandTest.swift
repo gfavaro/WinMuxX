@@ -6,6 +6,19 @@ import XCTest
 final class MoveNodeToWorkspaceCommandTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testMoveToExplicitFixedWorkspaceUsesItsReservedNumber() async throws {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        let fixed = Workspace.get(byName: "2")
+        let automatic = Workspace.get(byName: "7")
+        automatic.markAsAutomaticallyNamed()
+        let window = TestWindow.new(id: 970, parent: automatic.rootTilingContainer)
+        _ = window.focusWindow()
+        let result = try await parseCommand("move-node-to-workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(window.nodeWorkspace === fixed)
+    }
+
     func testParse() {
         testParseCommandSucc("move-node-to-workspace next", MoveNodeToWorkspaceCmdArgs(target: .relative(.next)))
         assertEquals(parseCommand("move-node-to-workspace --fail-if-noop next").errorOrNil, "--fail-if-noop is incompatible with (next|prev)")

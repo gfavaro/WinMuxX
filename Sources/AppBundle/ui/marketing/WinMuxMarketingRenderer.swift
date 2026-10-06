@@ -47,6 +47,10 @@ public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
         ("custom-solid", .light, false, false, false, .custom, .solid, .sidebar),
         ("no-background-light", .light, false, false, false, .system, .liquidGlass, .transparent),
         ("no-background-dark", .dark, false, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-brown-system-light", .light, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-brown-system-dark", .dark, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-white-system-light", .light, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-white-system-dark", .dark, true, false, false, .system, .liquidGlass, .transparent),
     ]
     for (name, scheme, collapsed, reduceTransparency, contrast, appearance, chrome, background) in variants {
         var snapshot = MarketingFixtures.sidebarSnapshot
@@ -55,14 +59,47 @@ public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
         snapshot.configuration.menuBarBackground = !name.hasPrefix("no-background-")
         snapshot.configuration.chromeStyle = chrome
         snapshot.visibleWidth = collapsed ? snapshot.configuration.collapsedWidth : snapshot.configuration.expandedWidth
+        let wallpaperSample: WorkspaceSidebarWallpaperSample? = name == "wallpaper-tint-blue"
+            ? WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.1, green: 0.2, blue: 0.8)
+            : name == "wallpaper-tint-pink"
+            ? WorkspaceSidebarWallpaperSample(tone: .light, red: 0.9, green: 0.6, blue: 0.7)
+            : name.hasPrefix("wallpaper-brown-")
+            ? WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.32, green: 0.28, blue: 0.21)
+            : (name.hasPrefix("wallpaper-white-") ? WorkspaceSidebarWallpaperSample(tone: .light, red: 0.92, green: 0.92, blue: 0.92) : nil)
+        if name.hasPrefix("wallpaper-brown-") || name.hasPrefix("wallpaper-white-") {
+            var fixedWorkspaces: [WorkspaceSidebarWorkspaceViewModel] = []
+            for number in 1...5 {
+                let workspaceName = String(number)
+                let workspace = WorkspaceSidebarWorkspaceViewModel(
+                    name: workspaceName,
+                    projectId: snapshot.activeProjectId,
+                    displayName: workspaceName,
+                    sidebarLabel: "",
+                    isGeneratedName: false,
+                    monitorScopeId: snapshot.targetMonitorScopeId,
+                    monitorName: nil,
+                    isFocused: number == 4,
+                    isVisible: number == 4,
+                    items: []
+                )
+                fixedWorkspaces.append(workspace)
+            }
+            snapshot.workspaces = fixedWorkspaces
+            snapshot.configuration.showsClock = false
+            snapshot.configuration.showsStatusPills = false
+            snapshot.configuration.menuBarBackground = false
+        }
+        let resolvedScheme = wallpaperSample.map {
+            workspaceSidebarResolvedColorScheme(menuBarColorScheme: nil, wallpaperTone: $0.tone, systemColorScheme: scheme)
+        } ?? scheme
         let size = CGSize(width: snapshot.visibleWidth, height: 700)
         // A code-defined backdrop, not the user's wallpaper or application windows.
         let backdrop = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
         backdrop.isReleasedWhenClosed = false
         backdrop.level = .floating
-        let backdropColors: [Color] = scheme == .light
+        let backdropColors: [Color] = wallpaperSample.map { [$0.color] } ?? (scheme == .light
             ? [.white, .cyan.opacity(0.35), .pink.opacity(0.3)]
-            : [.black, .indigo, .purple]
+            : [.black, .indigo, .purple])
         backdrop.contentView = NSHostingView(rootView: LinearGradient(
             colors: backdropColors,
             startPoint: .topLeading, endPoint: .bottomTrailing
@@ -73,14 +110,10 @@ public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
         }
         backdrop.orderFrontRegardless()
         defer { backdrop.orderOut(nil) }
-        let wallpaperSample: WorkspaceSidebarWallpaperSample? = switch name {
-            case "wallpaper-tint-blue": WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.1, green: 0.2, blue: 0.8)
-            case "wallpaper-tint-pink": WorkspaceSidebarWallpaperSample(tone: .light, red: 0.9, green: 0.6, blue: 0.7)
-            default: nil
-        }
         try renderMarketingView(
             WorkspaceSidebarView(snapshot: snapshot)
                 .environment(\.workspaceSidebarWallpaperSample, wallpaperSample)
+                .environment(\.colorScheme, resolvedScheme)
                 .background {
                 // Include the synthetic backdrop in the transparent proof's own surface,
                 // so exported PNGs show controls over it rather than over transparent pixels.

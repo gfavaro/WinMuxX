@@ -6,6 +6,24 @@ import XCTest
 final class WorkspaceCommandTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testFixedNumbersAndAutomaticDisplayNumberResolveToMatchingWorkspace() async throws {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        let fixed = Workspace.get(byName: "2")
+        fixed.markAsAutomaticallyNamed()
+        let automatic = Workspace.get(byName: "7")
+        automatic.markAsAutomaticallyNamed()
+        _ = TestWindow.new(id: 950, parent: automatic.rootTilingContainer)
+        _ = automatic.focusWorkspace()
+        let fixedResult = try await parseCommand("workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(fixedResult.exitCode, 0)
+        XCTAssertTrue(focus.workspace === fixed)
+        let automaticResult = try await parseCommand("workspace 6").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(automaticResult.exitCode, 0)
+        XCTAssertTrue(focus.workspace === automatic)
+        XCTAssertEqual(workspaceDefaultDisplayName(automatic.name), "Workspace 6")
+    }
+
     func testParseWorkspaceCommand() {
         testParseCommandFail("workspace my mail", msg: "ERROR: Unknown argument 'mail'")
         testParseCommandFail("workspace 'my mail'", msg: "ERROR: Whitespace characters are forbidden in workspace names")
