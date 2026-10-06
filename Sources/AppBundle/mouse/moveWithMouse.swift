@@ -84,6 +84,7 @@ private func handleMovedEvent(windowId: UInt32?, notif: String) async {
 
 @MainActor
 private func moveWithMouse(_ window: Window) async throws { // todo cover with tests
+    forgetPendingRestartWindow(window.windowId)
     syncClosedWindowsCacheToCurrentWorld()
     guard let parent = window.parent else { return }
     switch parent.cases {

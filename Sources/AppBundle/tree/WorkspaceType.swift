@@ -100,6 +100,7 @@ extension Workspace {
     @MainActor
     func assignProject(_ projectId: WorkspaceProjectId) {
         guard self.projectId != projectId else { return }
+        restoredDisplayIndex = nil
         winMuxWorkspaceState.assignWorkspace(self, to: projectId)
     }
 

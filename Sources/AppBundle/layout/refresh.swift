@@ -413,6 +413,7 @@ private func refresh() async throws {
             try await group.waitForAll()
         }
     }
+    try await retryPendingRestartWindows()
     try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: aliveWindowIds)
 
     // Garbage collect workspaces after apps, because workspaces contain apps.

@@ -5,6 +5,7 @@ import HotKey
 import XCTest
 
 struct TestMonitor: Monitor {
+    var displayUUID: String? = nil
     let monitorAppKitNsScreenScreensId: Int
     let name: String
     let rect: Rect

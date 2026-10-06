@@ -272,8 +272,21 @@ final class MacApp: AbstractApp {
         return try await thread.runInLoop { [axApp] job -> [(UInt32, RestartWindowIdentity)] in
             (axApp.threadGuarded.discoverAxWindows() ?? []).map { id, window in
                 (id, RestartWindowIdentity(bundleId: bundleId, pid: pid,
-                    launchDate: launchDate, title: window.get(Ax.titleAttr) ?? ""))
+                    launchDate: launchDate, title: window.get(Ax.titleAttr) ?? "",
+                    documentURL: window.get(Ax.documentAttr),
+                    accessibilityIdentifier: window.get(Ax.identifierAttr)))
             }
+        }
+    }
+
+    func getRestartWindowIdentity(_ windowId: UInt32) async throws -> RestartWindowIdentity? {
+        guard let bundleId = rawAppBundleId else { return nil }
+        let launchDate = nsApp.launchDate
+        let pid = pid
+        return try await withWindow(windowId) { window, _ in
+            RestartWindowIdentity(bundleId: bundleId, pid: pid, launchDate: launchDate,
+                title: window.get(Ax.titleAttr) ?? "", documentURL: window.get(Ax.documentAttr),
+                accessibilityIdentifier: window.get(Ax.identifierAttr))
         }
     }
 

@@ -2,6 +2,7 @@ import AppKit
 import Common
 
 open class TreeNode: Equatable, WinMuxAny {
+    private(set) var bindingGeneration: UInt64 = 0
     private var _children: [TreeNode] = []
     var children: [TreeNode] { _children }
     fileprivate final weak var _parent: NonLeafTreeNodeObject? = nil
@@ -66,6 +67,7 @@ open class TreeNode: Equatable, WinMuxAny {
     @MainActor
     @discardableResult
     func bind(to newParent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) -> BindingData? {
+        bindingGeneration &+= 1
         let result = unbindIfBound()
 
         if newParent === NilTreeNode.instance {

@@ -75,9 +75,10 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
         WindowRecoveryController.shared.recordBeforeMutation(window, originalRect: rect)
 
-        if let bundleId = macApp.rawAppBundleId {
+        window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
+        if window.restartIdentity == nil, let bundleId = macApp.rawAppBundleId {
             window.restartIdentity = RestartWindowIdentity(bundleId: bundleId, pid: macApp.pid,
-                launchDate: macApp.nsApp.launchDate, title: (try? await window.title) ?? "")
+                launchDate: macApp.nsApp.launchDate, title: "")
         }
         try await debugWindowsIfRecording(window)
         let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
@@ -86,6 +87,7 @@ final class MacWindow: Window {
             if !isStartup { WindowMotion.shared.noteNewWindow(windowId) }
             try await tryOnWindowDetected(window)
         }
+        if !didRestorePersistedFrozenWorld { trackPendingRestartWindow(window) }
         return window
     }
 
@@ -125,6 +127,7 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
+        forgetPendingRestartWindow(windowId)
         if macApp.nsApp.isTerminated, MacWindow.allWindowsMap[windowId] != nil {
             rememberRestartWindowBeforeAppTermination(self)
         }

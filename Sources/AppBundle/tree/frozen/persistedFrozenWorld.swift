@@ -6,6 +6,14 @@ private let persistedFrozenWorldVersion = 2
 @MainActor private var pendingRestartSnapshots: [PendingRestartSnapshot] = []
 @MainActor private var restartMatchedWindows: [[UInt32: Window]] = []
 @MainActor private var pendingRestartSave: Task<Void, Never>?
+@MainActor private var lastRestartIdentityRefresh: Date = .distantPast
+private struct RestartWindowAttempt {
+    let generation: UInt64
+    let started: Date
+    var lastAttempt: Date = .distantPast
+}
+@MainActor private var restartWindowAttempts: [UInt32: RestartWindowAttempt] = [:]
+@MainActor private var restartRetryTask: Task<Void, Never>?
 
 struct PendingRestartSnapshot: Codable, Sendable {
     let world: FrozenWorld
@@ -78,10 +86,14 @@ func schedulePersistedFrozenWorldSave() {
     guard pendingRestartSave == nil else { return }
     pendingRestartSave = Task { @MainActor in
         do { try await Task.sleep(for: .seconds(1)) } catch { return }
-        for window in MacWindow.allWindows {
-            if let title = await getCachedWindowTitle(window), let identity = window.restartIdentity {
-                window.restartIdentity = RestartWindowIdentity(bundleId: identity.bundleId,
-                    pid: identity.pid, launchDate: identity.launchDate, title: title)
+        if Date.now.timeIntervalSince(lastRestartIdentityRefresh) >= 5 {
+            lastRestartIdentityRefresh = .now
+            for window in MacWindow.allWindows {
+                guard !Task.isCancelled else { return }
+                if let identity = try? await window.macApp.getRestartWindowIdentity(window.windowId),
+                   MacWindow.allWindowsMap[window.windowId] === window {
+                    window.restartIdentity = identity
+                }
             }
         }
         guard !Task.isCancelled,
@@ -119,13 +131,15 @@ func preparePersistedFrozenWorldForStartup(_ envelope: PersistedFrozenWorldEnvel
     }
     restartMatchedWindows = pendingRestartSnapshots.map { _ in [:] }
     // Create every saved destination before new-window rules or pruning can take its slot.
-    for snapshot in pendingRestartSnapshots {
+    for (index, snapshot) in pendingRestartSnapshots.enumerated() {
         for saved in snapshot.world.workspaces {
+            if index < pendingRestartSnapshots.count - 1,
+               Set(collectFrozenWindows(saved).keys).isDisjoint(with: snapshot.remainingWindowIds) { continue }
             let workspace = Workspace.get(byName: saved.name)
             workspace.assignProject(saved.projectId)
             workspace.restoreNamingStyle(saved.namingStyle)
             workspace.restoredDisplayIndex = saved.displayIndex
-            workspace.preferredMonitorPoint = saved.monitor.topLeftCorner
+            workspace.preferredMonitorPoint = saved.monitor.preferredPoint(in: monitors)
         }
     }
 }
@@ -136,6 +150,79 @@ func workspaceHasPendingRestartWindows(_ name: String) -> Bool {
         snapshot.world.workspaces.contains { workspace in
             workspace.name == name && !Set(collectFrozenWindows(workspace).keys)
                 .intersection(snapshot.remainingWindowIds).isEmpty
+        }
+    }
+}
+
+@MainActor
+func discardPendingRestartWindows(forWorkspace name: String) {
+    for index in pendingRestartSnapshots.indices {
+        let ids = pendingRestartSnapshots[index].world.workspaces.filter { $0.name == name }
+            .flatMap { collectFrozenWindows($0).keys }
+        pendingRestartSnapshots[index].remainingWindowIds.subtract(ids)
+    }
+}
+
+@MainActor
+var pendingRestartWindowCount: Int {
+    pendingRestartSnapshots.reduce(0) { $0 + $1.remainingWindowIds.count }
+}
+
+@MainActor
+func trackPendingRestartWindow(_ window: Window) {
+    guard let bundleId = window.restartIdentity?.bundleId,
+          pendingRestartSnapshots.contains(where: { snapshot in
+              snapshot.world.workspaces.contains { workspace in
+                  collectFrozenWindows(workspace).values.contains {
+                      snapshot.remainingWindowIds.contains($0.id) && $0.restartIdentity?.bundleId == bundleId
+                  }
+              }
+          }) else { return }
+    restartWindowAttempts[window.windowId] = RestartWindowAttempt(generation: window.bindingGeneration, started: .now)
+    guard !isUnitTest, restartRetryTask == nil else { return }
+    restartRetryTask = Task { @MainActor in
+        defer { restartRetryTask = nil }
+        while !restartWindowAttempts.isEmpty {
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
+            restartWindowAttempts = restartWindowAttempts.filter { Date.now.timeIntervalSince($0.value.started) < 30 }
+            guard !Task.isCancelled else { return }
+            if !restartWindowAttempts.isEmpty, isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled,
+               NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId {
+                scheduleRefreshSession(.workspaceRestoration)
+            }
+        }
+    }
+}
+
+@MainActor
+func forgetPendingRestartWindow(_ id: UInt32) {
+    restartWindowAttempts.removeValue(forKey: id)
+}
+
+/// Some apps expose an empty/transient title or document while launching. Retry
+/// briefly, but stop as soon as placement changes; user/new-window rules win then.
+@MainActor
+func retryPendingRestartWindows() async throws {
+    for id in Array(restartWindowAttempts.keys) {
+        guard var attempt = restartWindowAttempts[id] else { continue }
+        guard let window = Window.get(byId: id), window.bindingGeneration == attempt.generation,
+              Date.now.timeIntervalSince(attempt.started) < 30 else {
+            forgetPendingRestartWindow(id)
+            continue
+        }
+        guard Date.now.timeIntervalSince(attempt.lastAttempt) >= 1 else { continue }
+        attempt.lastAttempt = .now
+        restartWindowAttempts[id] = attempt
+        if let macWindow = window as? MacWindow,
+           let identity = try? await macWindow.macApp.getRestartWindowIdentity(id) {
+            window.restartIdentity = identity
+        }
+        guard window.bindingGeneration == attempt.generation else {
+            forgetPendingRestartWindow(id)
+            continue
+        }
+        if try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window) {
+            forgetPendingRestartWindow(id)
         }
     }
 }
@@ -153,10 +240,15 @@ func rememberRestartWindowBeforeAppTermination(_ window: Window) {
 @MainActor
 func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) async throws -> Bool {
     guard let identity = window.restartIdentity else { return false }
-    let saved = pendingRestartSnapshots.flatMap { snapshot in
-        snapshot.world.workspaces.flatMap { collectFrozenWindows($0).values }
-            .filter { snapshot.remainingWindowIds.contains($0.id) }
+    let generation = window.bindingGeneration
+    let candidates = pendingRestartSnapshots.indices.flatMap { index in
+        pendingRestartSnapshots[index].world.workspaces.flatMap { workspace in
+            collectFrozenWindows(workspace).values
+                .filter { pendingRestartSnapshots[index].remainingWindowIds.contains($0.id) }
+                .map { (snapshotIndex: index, workspace: workspace, window: $0) }
+        }
     }
+    let saved = candidates.map(\.window)
     guard !saved.isEmpty else { return false }
     let live: [(UInt32, RestartWindowIdentity)]
     if let macWindow = window as? MacWindow {
@@ -167,26 +259,24 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
             return ($0.windowId, identity)
         }
     }
-    guard let savedId = matchRestartWindow(id: window.windowId, identity: identity, saved: saved, live: live),
-          let selected = saved.first(where: {
-              $0.id == savedId && $0.restartIdentity?.bundleId == identity.bundleId &&
-                  ($0.restartIdentity?.title == identity.title ||
-                   (identity.launchDate != nil && $0.restartIdentity?.pid == identity.pid &&
-                    $0.restartIdentity?.launchDate == identity.launchDate))
-          }),
-          let index = pendingRestartSnapshots.firstIndex(where: { snapshot in
-              snapshot.remainingWindowIds.contains(savedId) && snapshot.world.workspaces.contains {
-                  collectFrozenWindows($0)[savedId]?.restartIdentity == selected.restartIdentity
-              }
-          }),
-          let savedWorkspace = pendingRestartSnapshots[index].world.workspaces.first(where: {
-              collectFrozenWindows($0)[savedId] != nil
-          }), let frozen = collectFrozenWindows(savedWorkspace)[savedId] else { return false }
-    let workspace = Workspace.get(byName: savedWorkspace.name)
-    workspace.assignProject(savedWorkspace.projectId)
-    workspace.restoreNamingStyle(savedWorkspace.namingStyle)
-    workspace.restoredDisplayIndex = savedWorkspace.displayIndex
-    workspace.preferredMonitorPoint = savedWorkspace.monitor.topLeftCorner
+    guard let candidateIndex = matchRestartWindowIndex(id: window.windowId, identity: identity,
+        saved: saved, live: live), Window.get(byId: window.windowId) === window,
+        window.bindingGeneration == generation else { return false }
+    let candidate = candidates[candidateIndex]
+    let index = candidate.snapshotIndex
+    let frozen = candidate.window
+    let savedId = frozen.id
+    let savedWorkspace = candidate.workspace
+    // An app may reopen after the user moved/renamed the destination's project.
+    // Its current workspace metadata takes precedence over the old snapshot.
+    let existing = Workspace.existing(byName: savedWorkspace.name)
+    let workspace = existing ?? Workspace.get(byName: savedWorkspace.name)
+    if existing == nil {
+        workspace.assignProject(savedWorkspace.projectId)
+        workspace.restoreNamingStyle(savedWorkspace.namingStyle)
+        workspace.restoredDisplayIndex = savedWorkspace.displayIndex
+        workspace.preferredMonitorPoint = savedWorkspace.monitor.preferredPoint(in: monitors)
+    }
     applyFrozenWindowState(window, frozen)
     if savedWorkspace.floatingWindows.contains(where: { $0.id == savedId }) {
         window.bindAsFloatingWindow(to: workspace)
@@ -208,8 +298,13 @@ func finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: Set<UInt32>) async
     for index in pendingRestartSnapshots.indices {
         let matched = restartMatchedWindows[index].filter { aliveWindowIds.contains($0.value.windowId) }
         guard let trigger = matched.values.first else { continue }
-        _ = try await restoreFrozenWorldIfNeeded(pendingRestartSnapshots[index].world,
-            newlyDetectedWindow: trigger, matchedWindows: matched)
+        let snapshot = pendingRestartSnapshots[index].world
+        let workspaces = index == pendingRestartSnapshots.count - 1 ? snapshot.workspaces : snapshot.workspaces.filter {
+            !Set(collectFrozenWindows($0).keys).isDisjoint(with: Set(matched.keys))
+        }
+        let world = FrozenWorld(workspaces: workspaces, monitors: snapshot.monitors, windowIds: Set(matched.keys))
+        _ = try await restoreFrozenWorldIfNeeded(world, newlyDetectedWindow: trigger,
+            matchedWindows: matched, restoreVisibleWorkspaces: index == pendingRestartSnapshots.count - 1)
     }
     restartMatchedWindows = pendingRestartSnapshots.map { _ in [:] }
 }
@@ -220,4 +315,8 @@ func resetPersistedFrozenWorldForTests() {
     pendingRestartSave = nil
     pendingRestartSnapshots = []
     restartMatchedWindows = []
+    lastRestartIdentityRefresh = .distantPast
+    restartWindowAttempts = [:]
+    restartRetryTask?.cancel()
+    restartRetryTask = nil
 }

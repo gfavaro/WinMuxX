@@ -9,12 +9,26 @@ import AppKit
 @MainActor private var closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
 
 struct FrozenMonitor: Codable, Sendable {
+    let displayUUID: String?
     let topLeftCorner: CGPoint
     let visibleWorkspace: String
 
     @MainActor init(_ monitor: Monitor) {
+        displayUUID = monitor.displayUUID
         topLeftCorner = monitor.rect.topLeftCorner
         visibleWorkspace = monitor.activeWorkspace.name
+    }
+
+    func resolve(in monitors: [Monitor]) -> Monitor? {
+        if let displayUUID {
+            return monitors.filter { $0.displayUUID == displayUUID }.singleOrNil()
+        }
+        // Old snapshots and displays without a UUID retain the coordinate fallback.
+        return monitors.filter { $0.rect.topLeftCorner == topLeftCorner }.singleOrNil()
+    }
+
+    func preferredPoint(in monitors: [Monitor]) -> CGPoint {
+        resolve(in: monitors)?.rect.topLeftCorner ?? topLeftCorner
     }
 }
 
@@ -105,7 +119,6 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         }) else { return false }
     }
     let monitors = monitors
-    let topLeftCornerToMonitor = monitors.grouped { $0.rect.topLeftCorner }
     let restoredWorkspaceNames = Set(frozenWorld.workspaces.map(\.name))
 
     for frozenWorkspace in frozenWorld.workspaces {
@@ -113,7 +126,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex
-        workspace.preferredMonitorPoint = frozenWorkspace.monitor.topLeftCorner
+        workspace.preferredMonitorPoint = frozenWorkspace.monitor.preferredPoint(in: monitors)
         let frozenWindowById = collectFrozenWindows(frozenWorkspace)
         for frozenWindow in frozenWorkspace.floatingWindows {
             if let window = windowsById[frozenWindow.id] {
@@ -143,7 +156,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
     }
 
     for monitor in restoreVisibleWorkspaces ? frozenWorld.monitors : [] {
-        guard let targetMonitor = topLeftCornerToMonitor[monitor.topLeftCorner]?.singleOrNil() else { continue }
+        guard let targetMonitor = monitor.resolve(in: monitors) else { continue }
         let targetWorkspace: Workspace
         if let existingVisibleWorkspace = Workspace.existing(byName: monitor.visibleWorkspace),
            restoredWorkspaceNames.contains(existingVisibleWorkspace.name)

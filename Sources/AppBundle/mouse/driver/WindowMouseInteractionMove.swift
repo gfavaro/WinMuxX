@@ -129,6 +129,7 @@ extension WindowMouseInteractionDriver {
         detachOrigin: TabDetachOrigin,
         startedInSidebar: Bool,
     ) {
+        forgetPendingRestartWindow(windowId)
         let session = MoveSession(
             windowId: windowId,
             subject: subject,

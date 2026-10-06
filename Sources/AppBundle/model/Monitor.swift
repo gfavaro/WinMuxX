@@ -3,6 +3,7 @@ import Common
 import CoreGraphics
 
 private struct MonitorImpl {
+    var displayUUID: String? = nil
     let monitorAppKitNsScreenScreensId: Int
     let name: String
     let rect: Rect
@@ -17,6 +18,7 @@ extension MonitorImpl: Monitor {
 
 /// Use it instead of NSScreen because it can be mocked in tests
 protocol Monitor: WinMuxAny {
+    var displayUUID: String? { get }
     /// The index in NSScreen.screens array. 1-based index
     var monitorAppKitNsScreenScreensId: Int { get }
     var name: String { get }
@@ -27,7 +29,12 @@ protocol Monitor: WinMuxAny {
     var isMain: Bool { get }
 }
 
+extension Monitor {
+    var displayUUID: String? { nil }
+}
+
 final class LazyMonitor: Monitor {
+    var displayUUID: String? { screen.displayUUID }
     private let screen: NSScreen
     let monitorAppKitNsScreenScreensId: Int
     let name: String
@@ -60,12 +67,17 @@ final class LazyMonitor: Monitor {
 // 2. It's inaccurate because NSScreen.main doesn't work correctly from NSWorkspace.didActivateApplicationNotification &
 //    kAXFocusedWindowChangedNotification callbacks.
 extension NSScreen {
+    var displayUUID: String? {
+        guard let id = displayId, let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
+        return CFUUIDCreateString(nil, uuid) as String
+    }
     var displayId: CGDirectDisplayID? {
         (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber).map { CGDirectDisplayID(truncating: $0) }
     }
 
     fileprivate func toMonitor(monitorAppKitNsScreenScreensId: Int) -> Monitor {
         MonitorImpl(
+            displayUUID: displayUUID,
             monitorAppKitNsScreenScreensId: monitorAppKitNsScreenScreensId,
             name: localizedName,
             rect: rect,

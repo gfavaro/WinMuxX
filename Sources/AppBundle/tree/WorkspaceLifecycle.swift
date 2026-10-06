@@ -148,6 +148,7 @@ func moveWorkspaceContents(from source: Workspace, to target: Workspace) {
 
 @MainActor
 func removeWorkspaceFromRegistry(_ workspace: Workspace) {
+    discardPendingRestartWindows(forWorkspace: workspace.name)
     clearWorkspaceSidebarLabelIfNeeded(workspace.name)
     _ = winMuxWorkspaceState.removeWorkspace(workspace)
 }

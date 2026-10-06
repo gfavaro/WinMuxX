@@ -188,6 +188,7 @@ extension WindowMouseInteractionDriver {
 
 extension WindowMouseInteractionDriver {
     func startResize(windowId: UInt32) {
+        forgetPendingRestartWindow(windowId)
         let session = ResizeSession(windowId: windowId)
         let isNewSession = resizeSession != session
         logWindowDragLive("resize.start window=\(windowId) isNewSession=\(isNewSession) existingSession=\(String(describing: resizeSession)) mouseDown=\(isLeftMouseButtonDown) kind=\(getCurrentMouseManipulationKind())")

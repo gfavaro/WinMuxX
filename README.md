@@ -164,14 +164,20 @@ and native fullscreen/minimized windows, and retains failed entries for another 
 Workspace assignments are also saved during use (with a one-second delay) and on
 normal quit. Restarting WinMuxX or updating it preserves workspace names, projects
 and automatic display numbers. Existing windows are verified against their app
-and process launch; after an app or computer restart, a unique app bundle ID and
-nonempty window title can restore the previous workspace even with a new window ID.
+and process launch; after an app or computer restart, matching prefers the document
+URL and AX window identifier exposed by the app. A unique nonempty title is the
+fallback. Conflicting documents/identifiers and ambiguous matches are skipped.
 Apps may reopen later: pending assignments survive subsequent WinMuxX restarts.
-Identical or changed titles are not guessed, and WinMuxX does not reopen apps or
-documents itself. During startup, available windows recover their saved layout;
+Changed titles can still match by document/identifier. Apps with delayed metadata
+are retried for up to 30 seconds, stopping if window placement changes. WinMuxX
+does not reopen apps or documents itself. During startup, available windows recover their saved layout;
 later arrivals recover their workspace without replaying old layouts over current
 user changes. State lives in `window-state.json` in the fork's Application Support
-directory, with a previous valid snapshot as backup. Old ID-only snapshots cannot
+directory, with a previous valid snapshot as backup. Monitor matching uses display
+UUIDs when available, with coordinates as fallback for older snapshots. Deleted
+workspaces discard pending assignments, and late arrivals respect current project
+assignments. Diagnostics reports the number of windows still awaiting a unique
+match. Old ID-only snapshots cannot
 safely match reopened windows; this build starts recording verified identities.
 
 ### Workspaces to keep

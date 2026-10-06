@@ -97,6 +97,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     case menuBarButton
     case hotkeyBinding
     case startup
+    case workspaceRestoration
     case socketServer(any CmdArgs)
     case resetManipulatedWithMouse
     case ax(String)
@@ -121,7 +122,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
                 true
             case .onFocusedMonitorChanged, .onFocusChanged, .onTabSwitched:
                 true
-            case .configAutoReload, .globalObserverLeftMouseUp, .startup,
+            case .configAutoReload, .globalObserverLeftMouseUp, .startup, .workspaceRestoration,
                  .resetManipulatedWithMouse:
                 false
         }
@@ -136,7 +137,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .onTabSwitched:
                 false
             case .configAutoReload, .globalObserverLeftMouseUp, .menuBarButton, .hotkeyBinding,
-                 .startup, .socketServer, .resetManipulatedWithMouse, .onFocusedMonitorChanged,
+                 .startup, .workspaceRestoration, .socketServer, .resetManipulatedWithMouse, .onFocusedMonitorChanged,
                  .onFocusChanged, .onModeChanged:
                 true
         }
@@ -175,6 +176,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .resetManipulatedWithMouse: "resetManipulatedWithMouse"
             case .socketServer(let args): "socketServer: \(args)"
             case .startup: "startup"
+            case .workspaceRestoration: "workspaceRestoration"
             case .onFocusedMonitorChanged: "onFocusedMonitorChanged"
             case .onFocusChanged: "onFocusChanged"
             case .onModeChanged: "onModeChanged"

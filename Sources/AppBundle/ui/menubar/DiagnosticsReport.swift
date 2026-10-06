@@ -13,6 +13,7 @@ func buildDiagnosticsReport() async -> String {
     io.out("  default root layout: \(config.defaultRootContainerLayout)")
     io.out("  enabled: \(TrayMenuModel.shared.isEnabled)")
     io.out("  crash recovery: \(WindowRecoveryController.shared.diagnosticSummary)")
+    io.out("  workspace restoration: \(pendingRestartWindowCount) saved windows awaiting a unique match")
     let learned = MacWindow.allWindows.filter { !$0.learnedMinimum.isEmpty }
     io.out("  learned minimum sizes: \(learned.count) windows (persisted observations; layout enforcement pending)")
     for window in learned.sorted(by: { $0.windowId < $1.windowId }) {
