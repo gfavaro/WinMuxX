@@ -29,7 +29,7 @@ struct ShortcutConfigurationReferenceView: View {
                     ReferenceRow("project-colors", "Assign project colors using #RRGGBB values.")
                 }
                 Text("The Configuration editor validates the entire file before saving and shows parser errors inline.")
-                    .font(.caption)
+                    .font(.callout)
                     .foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -65,13 +65,24 @@ private struct ReferenceRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(key)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(width: 255, alignment: .leading)
-            Text(description)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                keyLabel.fixedSize()
+                descriptionLabel
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                keyLabel
+                descriptionLabel
+            }
         }
+    }
+
+    private var keyLabel: some View {
+        Text(key).font(.system(.body, design: .monospaced))
+            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
+    }
+    private var descriptionLabel: some View {
+        Text(description).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

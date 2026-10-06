@@ -89,3 +89,16 @@ func parsePerMonitorValues<T>(_ array: TOMLArray, _ backtrace: TomlBacktrace, _ 
         return PerMonitorValue(description: monitorDescription, value: value)
     }
 }
+
+func parseSingleWindowAspectRatio(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> DynamicConfigValue<Double> {
+    let value = parseDynamicValue(raw, Double.self, 1.5, backtrace, &errors)
+    let values: [Double] = switch value {
+        case .constant(let value): [value]
+        case .perMonitor(let rules, let fallback): rules.map(\.value) + [fallback]
+    }
+    if values.contains(where: { !$0.isFinite || $0 < 0 }) {
+        errors.append(.semantic(backtrace, "Expected a finite, non-negative aspect ratio (0 disables the limit)"))
+        return .constant(1.5)
+    }
+    return value
+}

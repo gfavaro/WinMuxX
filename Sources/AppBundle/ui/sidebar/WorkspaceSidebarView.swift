@@ -117,6 +117,16 @@ struct WorkspaceSidebarView: View {
             finishSidebarSearch(clearText: true)
             resetProjectSwipeWithoutAnimation()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didResignKeyNotification)) { notification in
+            guard let panel = notification.object as? WorkspaceSidebarPanel,
+                  panel.monitorScopeId == snapshot.targetMonitorScopeId else { return }
+            activeInUseOverrideWorkspaceName = nil
+        }
+        .onChange(of: selectedSearchTarget) { target in
+            if let name = activeInUseOverrideWorkspaceName, target != .workspace(name) {
+                activeInUseOverrideWorkspaceName = nil
+            }
+        }
         .onChange(of: overrideConfirmationState) { state in
             synchronizeOverrideConfirmation(state)
         }

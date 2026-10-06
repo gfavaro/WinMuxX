@@ -1,3 +1,13 @@
+# Minimum total across all projects; 0 disables the configured minimum.
+# Active monitors and every project still retain their required workspaces.
+minimum-workspace-count = 1
+
+# Center a lone tiled window on screens with width/height >= 2.3.
+# 1.5 means 3:2; 0 disables. Supports per-monitor values like gaps.
+single-window-aspect-ratio = 1.5
+# Alignment within the area remaining after sidebar and gaps: center, left, right.
+single-window-alignment = 'center'
+
 config-version = 2
 
 # This is the reference configuration, not your personal config.
@@ -50,7 +60,6 @@ focus-follows-mouse = false
 focus-follows-mouse-dwell = 250
 auto-add-new-windows-to-tab-group = true
 shortcuts-preset = 'none'
-persistent-workspaces = []
 on-mode-changed = []
 
 [key-mapping]

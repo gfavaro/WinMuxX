@@ -16,42 +16,64 @@ struct SettingsSection<Content: View>: View {
         self.content = content()
     }
     var body: some View {
-        Section { content } header: { Text(title) }
+        Section { content } header: { Text(title).accessibilityAddTraits(.isHeader) }
     }
 }
 
 struct SettingsToggle: View {
     let title: String
+    let id: String
     @Binding var isOn: Bool
     var help: String? = nil
     let save: () -> Void
 
-    init(_ title: String, isOn: Binding<Bool>, help: String? = nil, save: @escaping () -> Void) {
+    init(_ title: String, id: String? = nil, isOn: Binding<Bool>, help: String? = nil, save: @escaping () -> Void) {
         self.title = title
+        self.id = id ?? title
         _isOn = isOn
         self.help = help
         self.save = save
     }
     var body: some View {
-        Toggle(title, isOn: $isOn)
-        .help(help ?? title)
-        .modifier(SettingsFieldFeedback(title: title))
-        .onChange(of: isOn) { _ in
-            ShortcutSettingsModel.shared.activeSettingTitle = title
-            save()
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(title, isOn: Binding(get: { isOn }, set: { value in
+                guard value != isOn else { return }
+                isOn = value
+                ShortcutSettingsModel.shared.activeSettingTitle = title
+                save()
+            }))
+            .frame(minHeight: 28)
+            .accessibilityIdentifier(id)
+            .accessibilityHint(help ?? "")
+            if let help { SettingsDescription(help) }
         }
+        .modifier(SettingsFieldFeedback(id: id, title: title))
+    }
+}
+
+struct SettingsDescription: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        Text(text).font(.callout).foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
 struct SettingsStepper: View {
     let title: String
+    let id: String
     @Binding var value: Int
     let range: ClosedRange<Int>
     let help: String
     let unit: String
     let save: () -> Void
-    init(_ title: String, value: Binding<Int>, range: ClosedRange<Int>, help: String, unit: String = "pt", save: @escaping () -> Void) {
+    @FocusState private var focused: Bool
+    @State private var submitted: Int?
+
+    init(_ title: String, id: String? = nil, value: Binding<Int>, range: ClosedRange<Int>, help: String, unit: String = "pt", save: @escaping () -> Void) {
         self.title = title
+        self.id = id ?? title
         _value = value
         self.range = range
         self.help = help
@@ -59,68 +81,96 @@ struct SettingsStepper: View {
         self.save = save
     }
     var body: some View {
-        Stepper(value: $value, in: range) {
-            HStack {
-                Text(title)
-                Spacer()
-                TextField(title, value: $value, format: .number)
-                    .labelsHidden().multilineTextAlignment(.trailing).frame(width: 70)
-                Text(unit).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 4) {
+            ViewThatFits(in: .horizontal) {
+                HStack { Text(title); Spacer(); editor }
+                VStack(alignment: .leading) { Text(title); editor }
             }
+            SettingsDescription(help)
         }
-        .help(help)
-        .modifier(SettingsFieldFeedback(title: title))
+        .modifier(SettingsFieldFeedback(id: id, title: title))
+        .onAppear { submitted = value }
+        .onChange(of: focused) { if !$0 { commit() } }
         .onChange(of: value) { newValue in
-            let clamped = min(max(newValue, range.lowerBound), range.upperBound)
-            if clamped != newValue {
-                value = clamped
-            } else {
-                ShortcutSettingsModel.shared.activeSettingTitle = title
-                save()
-            }
+            if !focused { submitted = newValue }
         }
+    }
+
+    private var editor: some View {
+        HStack {
+            TextField(title, value: $value, format: .number)
+                .labelsHidden().multilineTextAlignment(.trailing).frame(width: 80, height: 28)
+                .focused($focused).onSubmit(commit)
+                .accessibilityLabel(title).accessibilityValue("\(value) \(unit)")
+                .accessibilityIdentifier(id + ".value")
+            Text(unit).foregroundStyle(.secondary).accessibilityHidden(true)
+            Stepper(title, value: Binding(get: { value }, set: { newValue in
+                value = newValue
+                commit(force: true)
+            }), in: range).labelsHidden()
+                .accessibilityLabel(title).accessibilityValue("\(value) \(unit)")
+        }
+    }
+
+    private func commit() { commit(force: false) }
+    private func commit(force: Bool) {
+        guard force || submitted != value else { return }
+        value = min(max(value, range.lowerBound), range.upperBound)
+        submitted = value
+        ShortcutSettingsModel.shared.activeSettingTitle = title
+        save()
     }
 }
 
 struct SettingsDoubleStepper: View {
     let title: String
+    var id: String = "borders.width"
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
     let help: String
     let save: () -> Void
+    @FocusState private var focused: Bool
+    @State private var submitted: Double?
 
     var body: some View {
-        Stepper(value: $value, in: range, step: step) {
+        VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text(title)
                 Spacer()
                 TextField(title, value: $value, format: .number)
-                    .labelsHidden().multilineTextAlignment(.trailing).frame(width: 70)
-                Text("pt").foregroundStyle(.secondary)
+                    .labelsHidden().multilineTextAlignment(.trailing).frame(width: 80, height: 28)
+                    .focused($focused).onSubmit { commit() }
+                    .accessibilityLabel(title).accessibilityValue("\(value) points")
+                Text("pt").foregroundStyle(.secondary).accessibilityHidden(true)
+                Stepper(title, value: Binding(get: { value }, set: { value = $0; commit() }), in: range, step: step)
+                    .labelsHidden().accessibilityLabel(title)
             }
+            SettingsDescription(help)
         }
-        .help(help)
-        .modifier(SettingsFieldFeedback(title: title))
-        .onChange(of: value) { newValue in
-            let clamped = min(max(newValue, range.lowerBound), range.upperBound)
-            if clamped != newValue {
-                value = clamped
-            } else {
-                ShortcutSettingsModel.shared.activeSettingTitle = title
-                save()
-            }
-        }
+        .modifier(SettingsFieldFeedback(id: id, title: title))
+        .onAppear { submitted = value }
+        .onChange(of: focused) { if !$0 { commit() } }
+    }
+
+    private func commit() {
+        guard value.isFinite, submitted != value else { return }
+        value = min(max(value, range.lowerBound), range.upperBound)
+        submitted = value
+        ShortcutSettingsModel.shared.activeSettingTitle = title
+        save()
     }
 }
 
 struct SettingsBorderColor: View {
     let title: String
+    let id: String
     @Binding var text: String
     let save: () -> Void
 
-    init(_ title: String, text: Binding<String>, save: @escaping () -> Void) {
+    init(_ title: String, id: String? = nil, text: Binding<String>, save: @escaping () -> Void) {
         self.title = title
+        self.id = id ?? title
         _text = text
         self.save = save
     }
@@ -149,7 +199,7 @@ struct SettingsBorderColor: View {
                     save()
                 }
             ), supportsOpacity: true)
-            SettingsTextField("Hex value", text: $text,
+            SettingsTextField("Hex value", id: id, text: $text,
                               help: "Use #RRGGBB or #RRGGBBAA, including optional opacity.",
                               validate: settingsHexColorError, save: save)
         }
@@ -160,14 +210,16 @@ struct SettingsTextField: View {
     @FocusState private var isFocused: Bool
     @State private var committedText: String?
     let title: String
+    let id: String
     @Binding var text: String
     let help: String
     let validate: (String) -> String?
     let save: () -> Void
 
-    init(_ title: String, text: Binding<String>, help: String,
+    init(_ title: String, id: String? = nil, text: Binding<String>, help: String,
          validate: @escaping (String) -> String? = { _ in nil }, save: @escaping () -> Void) {
         self.title = title
+        self.id = id ?? title
         _text = text
         self.help = help
         self.validate = validate
@@ -183,11 +235,14 @@ struct SettingsTextField: View {
                 .onChange(of: isFocused) { focused in if !focused { commit() } }
                 .onDisappear { commit() }
                 .help(help)
+                .accessibilityIdentifier(id)
+                .accessibilityLabel(title)
+            SettingsDescription(help)
             if let error = validate(text) {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error).font(.callout).foregroundStyle(.red)
             }
         }
-        .modifier(SettingsFieldFeedback(title: title))
+        .modifier(SettingsFieldFeedback(id: id, title: title))
     }
 
     private func commit() {
@@ -209,13 +264,15 @@ struct SettingsMultilineField: View {
     @State private var savedText: String?
     @State private var isSaving = false
     let title: String
+    let id: String
     @Binding var text: String
     let help: String
     let savedValue: String
     let save: (@escaping () -> Void) -> Void
 
-    init(_ title: String, text: Binding<String>, help: String, savedValue: String, save: @escaping (@escaping () -> Void) -> Void) {
+    init(_ title: String, id: String? = nil, text: Binding<String>, help: String, savedValue: String, save: @escaping (@escaping () -> Void) -> Void) {
         self.title = title
+        self.id = id ?? title
         _text = text
         self.help = help
         self.save = save
@@ -225,10 +282,11 @@ struct SettingsMultilineField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
-            Text(help).font(.caption).foregroundStyle(.secondary)
+            SettingsDescription(help)
             TextEditor(text: $text)
-                .font(.system(size: 12, design: .monospaced))
-                .frame(minHeight: 50)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 80)
+                .accessibilityLabel(title).accessibilityHint(help)
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: .separatorColor)))
             Button(isSaving ? "Saving…" : "Save and apply") {
                 let submittedText = text
@@ -239,29 +297,45 @@ struct SettingsMultilineField: View {
                     isSaving = false
                 }
             }
-            .controlSize(.small)
+            .controlSize(.regular)
             .disabled(isSaving || savedText == text)
             if savedText != text {
-                Text("Unsaved changes").font(.caption).foregroundStyle(.secondary)
+                Text("Unsaved changes").font(.callout).foregroundStyle(.secondary)
             }
         }
         .padding(12)
-        .modifier(SettingsFieldFeedback(title: title))
+        .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { savedText = savedValue }
+        .onChange(of: savedValue) { savedText = $0; isSaving = false }
+        .onReceive(ShortcutSettingsModel.shared.$failedSettingID) { failedID in
+            if failedID == id { isSaving = false }
+        }
     }
 }
 
 struct SettingsPicker<Selection: Hashable, Content: View>: View {
-    let title: String; @Binding var selection: Selection; let help: String; @ViewBuilder let content: Content; let onChange: () -> Void
-    init(_ title: String, selection: Binding<Selection>, help: String, @ViewBuilder content: () -> Content, onChange: @escaping () -> Void) { self.title = title; _selection = selection; self.help = help; self.content = content(); self.onChange = onChange }
+    let title: String
+    let id: String
+    @Binding var selection: Selection
+    let help: String
+    @ViewBuilder let content: Content
+    let onChange: () -> Void
+    init(_ title: String, id: String? = nil, selection: Binding<Selection>, help: String, @ViewBuilder content: () -> Content, onChange: @escaping () -> Void) {
+        self.title = title; self.id = id ?? title; _selection = selection
+        self.help = help; self.content = content(); self.onChange = onChange
+    }
     var body: some View {
-        Picker(title, selection: $selection, content: { content })
-            .help(help)
-            .modifier(SettingsFieldFeedback(title: title))
-            .onChange(of: selection) { _ in
+        VStack(alignment: .leading, spacing: 4) {
+            Picker(title, selection: Binding(get: { selection }, set: { value in
+                guard value != selection else { return }
+                selection = value
                 ShortcutSettingsModel.shared.activeSettingTitle = title
                 onChange()
-            }
+            }), content: { content })
+                .accessibilityIdentifier(id).accessibilityHint(help)
+            if !help.isEmpty { SettingsDescription(help) }
+        }
+        .modifier(SettingsFieldFeedback(id: id, title: title))
     }
 }
 
@@ -317,7 +391,7 @@ private struct SettingsColorPresetPicker<Option: Hashable & Identifiable>: View 
                 }
             }
             Text(title(selection))
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .trailing)
                 .accessibilityLabel("Selected color: \(title(selection))")
@@ -336,21 +410,30 @@ struct SettingsSolidColorPalette: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Solid color")
             Text("Choose an opaque chrome color.")
-                .font(.caption)
+                .font(.callout)
                 .foregroundStyle(.secondary)
-            SettingsColorPresetPicker("Preset", selection: $selection,
+            SettingsColorPresetPicker("Preset", selection: Binding(get: { selection }, set: { value in
+                                          guard selection != value else { return }
+                                          selection = value
+                                          ShortcutSettingsModel.shared.activeSettingTitle = "Solid color"
+                                          onSelectionChange()
+                                      }),
                                       options: ChromeSolidColor.settingsPresets,
                                       title: { $0.title },
                                       colors: { [$0 == .custom ? Color(chromeHex: customColor) : $0.color] },
                                       colorWheelOption: .custom)
             if !ChromeSolidColor.settingsPresets.contains(selection) {
                 Text("Current color: \(selection.title). Choose a preset or Custom to replace it.")
-                    .font(.caption).foregroundStyle(.secondary)
+                    .font(.callout).foregroundStyle(.secondary)
             }
             if selection == .custom {
                 ColorPicker("Custom color", selection: Binding(
                     get: { Color(chromeHex: customColor) },
-                    set: { customColor = $0.chromeHex },
+                    set: {
+                        customColor = $0.chromeHex
+                        ShortcutSettingsModel.shared.activeSettingTitle = "Custom color"
+                        onCustomColorChange()
+                    },
                 ), supportsOpacity: false)
             }
         }
@@ -360,28 +443,24 @@ struct SettingsSolidColorPalette: View {
         .overlay(alignment: .bottom) {
             Divider().padding(.leading, 14)
         }
-        .modifier(SettingsFieldFeedback(title: "Solid color"))
-        .onChange(of: selection) { _ in
-            ShortcutSettingsModel.shared.activeSettingTitle = "Solid color"
-            onSelectionChange()
-        }
-        .onChange(of: customColor) { _ in
-            guard selection == .custom else { return }
-            ShortcutSettingsModel.shared.activeSettingTitle = "Solid color"
-            onCustomColorChange()
-        }
+        .modifier(SettingsFieldFeedback(id: "workspace-sidebar.solid-chrome-color", title: "Solid color"))
+        .modifier(SettingsFieldFeedback(id: "workspace-sidebar.solid-chrome-custom-color", title: "Custom color"))
+
     }
 }
 
-private struct SettingsFieldFeedback: ViewModifier {
+struct SettingsFieldFeedback: ViewModifier {
+    let id: String
     let title: String
     @ObservedObject private var model = ShortcutSettingsModel.shared
 
     func body(content: Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             content
-            if model.failedSettingTitle == title, let error = model.errorMessage {
-                Text(error).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+            if model.failedSettingID == id, let error = model.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle")
+                    .font(.callout).textSelection(.enabled)
+                    .accessibilityLabel("Could not save \(title). \(error)")
             }
         }
     }

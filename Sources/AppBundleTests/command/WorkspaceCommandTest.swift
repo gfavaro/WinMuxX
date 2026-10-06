@@ -7,6 +7,7 @@ final class WorkspaceCommandTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
     func testFixedNumbersAndAutomaticDisplayNumberResolveToMatchingWorkspace() async throws {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
         materializePersistedWorkspaces()
         let fixed = Workspace.get(byName: "2")
@@ -88,6 +89,7 @@ final class WorkspaceCommandTest: XCTestCase {
         let workspace2 = Workspace.get(byName: "2")
         let workspace5 = Workspace.get(byName: "5")
         [workspace1, workspace2, workspace5].forEach { $0.markAsAutomaticallyNamed() }
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["2"]
         workspace2.seedMonitorIfNeeded(secondary)
         XCTAssertTrue(main.setActiveWorkspace(workspace5))
@@ -455,6 +457,7 @@ final class WorkspaceCommandTest: XCTestCase {
     }
 
     func testDirectWorkspaceFocusMaterializesConfiguredPersistentWorkspaceAfterRefresh() async throws {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["2"]
 
         let result = try await WorkspaceCommand(

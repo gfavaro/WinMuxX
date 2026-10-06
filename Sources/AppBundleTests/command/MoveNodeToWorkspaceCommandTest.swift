@@ -7,6 +7,7 @@ final class MoveNodeToWorkspaceCommandTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
     func testMoveToExplicitFixedWorkspaceUsesItsReservedNumber() async throws {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
         materializePersistedWorkspaces()
         let fixed = Workspace.get(byName: "2")

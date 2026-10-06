@@ -64,7 +64,7 @@ keeps updating its geometry without repeatedly retrying the private renderer.
 ### Sidebar appearance
 
 The active Settings screen is `ShortcutSettingsView`, whose Appearance destination
-is `ShortcutAppearanceSettingsView`. The old SwiftUI tray renderer and General
+is `ShortcutAppearanceSettingsView`; sidebar placement and content live in Sidebar. The old SwiftUI tray renderer and General
 screen have been removed; the tray is owned by `NativeActionMenu`.
 
 `chrome-style = 'liquid-glass'` chooses native glass on macOS 26+, with a native

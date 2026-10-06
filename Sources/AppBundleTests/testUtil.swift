@@ -38,6 +38,7 @@ func setUpWorkspacesForTests() {
 
     // Don't create any bindings and workspaces for tests
     config.modes = [mainModeId: Mode(bindings: [:], tapBindings: [:])]
+    config.minimumWorkspaceCount = nil
     config.persistentWorkspaces = []
 
     for workspace in Workspace.all {

@@ -155,9 +155,10 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace) {
 @MainActor
 func pruneEmptyWorkspaces() {
     let retainedEmptyWorkspaceIds = retainedEmptyWorkspaceIdsByScope()
+    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     let focusedWorkspaceBeforePrune = focus.workspace
     let workspacesToRemove = Workspace.all.filter {
-        !workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds)
+        !workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) && !minimumWorkspaceIds.contains($0.id)
     }
     var focusedReplacement: Workspace?
 
@@ -218,10 +219,11 @@ func replacementWorkspaceForPrunedWorkspace(
     {
         return retainedWorkspace
     }
+    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     if let candidate = orderedWorkspaces(in: scope).first(where: {
         $0.id != workspace.id &&
-            workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) &&
-            (workspaceHasSidebarVisibleWindows($0) || $0.isConfiguredPersistent) &&
+            (workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) || minimumWorkspaceIds.contains($0.id)) &&
+            (workspaceHasSidebarVisibleWindows($0) || $0.isConfiguredPersistent || minimumWorkspaceIds.contains($0.id)) &&
             workspaceIsAvailableForMonitor($0, monitor: workspace.workspaceMonitor)
     }) {
         return candidate

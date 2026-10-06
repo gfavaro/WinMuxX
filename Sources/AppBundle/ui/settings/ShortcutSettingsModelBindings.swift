@@ -50,20 +50,39 @@ extension ShortcutSettingsModel {
 
     func persistBindings(_ updatedAssignments: [String: String]) {
         assignments = updatedAssignments
-        Task { @MainActor in
+        bindingsDraftRevision += 1
+        let submittedRevision = bindingsDraftRevision
+        let rendered = Result { try renderedManagedAssignments(from: updatedAssignments) }
+        let commands = managedCommands
+        let previousSave = pendingSettingsSave
+        pendingSettingsSave = Task { @MainActor in
+            await previousSave?.value
+            let settingID = "mode.main.binding"
+            savingSettingIDs.insert(settingID)
+            defer { savingSettingIDs.remove(settingID) }
+            retrySettingsSave = nil
+            failedSettingID = nil
+            failedSettingTitle = nil
+            errorMessage = nil
             do {
-                let renderedAssignments = try renderedManagedAssignments(from: updatedAssignments)
                 let targetUrl = try persistMainModeBindings(
-                    assignments: renderedAssignments,
-                    managedCommands: managedCommands,
+                    assignments: rendered.get(),
+                    managedCommands: commands,
                 )
-                let isOk = try await reloadConfig(forceConfigUrl: targetUrl)
-                if isOk {
-                    reload()
+                guard try await reloadConfig(forceConfigUrl: targetUrl) else {
+                    throw shortcutSettingsError("Saved shortcuts, but could not reload the config.")
                 }
+                savedBindingsRevision = submittedRevision
+                reload()
             } catch {
                 errorMessage = error.localizedDescription
-                reload()
+                failedSettingID = settingID
+                failedSettingTitle = "shortcuts"
+                failedSaveRevision += 1
+                retrySettingsSave = { [weak self] in
+                    guard let self else { return }
+                    self.persistBindings(self.assignments)
+                }
             }
         }
     }

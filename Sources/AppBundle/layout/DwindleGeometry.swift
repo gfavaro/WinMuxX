@@ -46,7 +46,7 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                 }
         }
     }
-    let rect = workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+    let rect = workspaceTilingRect(workspace)
     visit(workspace.rootTilingContainer, physical ? rect.copy(\.height, max(rect.height - 1, 0)) : rect)
     return result
 }

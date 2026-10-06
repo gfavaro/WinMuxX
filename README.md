@@ -271,3 +271,59 @@ starter config. `--config-path` selects an explicit file. See
 
 ## Credits
 [Aerospace](https://github.com/nikitabobko/AeroSpace)
+
+A lone tiled window is centered at a maximum 3:2 ratio on ultrawide screens
+(screen width/height at least 2.3). Floating windows, tab groups and WinMuxX
+fullscreen bypass this limit. The available area accounts for the sidebar and
+outer gaps; known application minimum widths take priority.
+Set `single-window-aspect-ratio = 0` to disable, or choose a different ratio in
+Settings → Windows. Per-monitor rules use the same syntax as gaps:
+
+```toml
+single-window-aspect-ratio = [{ monitor."S34CG50" = 1.5 }, 0]
+```
+
+Settings → Windows exposes the default ratio and alignment. Per-monitor ratio
+overrides remain available in TOML and are preserved when changing the default.
+Changes take effect on configuration reload. Monitor overrides still require an
+ultrawide screen.
+
+Manually resizing a lone ultrawide tile overrides its default aspect-ratio width
+for the current session. The window keeps the configured alignment and layout height; the
+chosen width may exceed 3:2 and is clamped to the available area and application
+minimum. Mouse resizing and `resize width`/`resize smart` both support this.
+The preference returns when the window becomes a lone tile again.
+
+Use `single-window-alignment = 'center'`, `'left'` or `'right'` to choose its
+horizontal position, also available in Settings → Windows. Center is the default.
+
+For a lone ultrawide tile, a mouse resize that changes height switches the window
+to floating and preserves the resulting size and position. Width-only resizing
+keeps it tiled with the selected alignment. Small native frame rounding changes
+are ignored.
+
+Settings groups everyday options into General, Workspaces, Windows, Sidebar,
+Appearance and Shortcuts. Automation and the Configuration editor/reference hold
+advanced settings. The window can be widened; controls support keyboard access,
+accessible names and values, and system accessibility preferences.
+
+`minimum-workspace-count = 1` keeps a minimum total across all projects. Set it to
+`0` to disable the configured minimum. Occupied workspaces count; each project
+and active display still retains its required workspace. Missing slots are
+created in the default project without changing focus. Reducing the minimum
+allows only excess empty slots to be collected.
+
+Older configs keep their named `persistent-workspaces` behavior until the
+quantity is saved in Settings → Workspaces. Saving replaces the old list with
+`minimum-workspace-count`; an explicit count takes precedence over named or
+shortcut-inferred persistence.
+
+Appearance → Window spacing has sliders and numeric fields. The four-window
+preview updates while dragging; finishing the gesture applies the final value to
+the real layout. Per-monitor spacing overrides are preserved. Reduce Motion
+turns off preview animation.
+
+Windows → Show tab strips retains the overlapping layout with offsets when off.
+Double-sided windows replaces the strip for two-window groups when enabled.
+Settings edits preserve dotted TOML properties such as `window-tabs.enabled`,
+as well as conventional table sections, comments and multiline monitor rules.

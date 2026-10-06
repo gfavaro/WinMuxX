@@ -5,6 +5,8 @@ open class Window: TreeNode, Hashable {
     let windowId: UInt32
     let app: any AbstractApp
     var lastFloatingSize: CGSize?
+    // Session-local width chosen by the user for a lone tile on ultrawide.
+    var singleWindowManualWidth: CGFloat?
     var isFullscreen: Bool = false
     var noOuterGapsInFullscreen: Bool = false
     var layoutReason: LayoutReason = .standard

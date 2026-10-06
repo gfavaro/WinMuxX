@@ -8,6 +8,18 @@ struct ResizeCommand: Command {
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
 
+        if let window = target.windowOrNil, let workspace = window.nodeWorkspace,
+           singleWindowAspectRatioTarget(in: workspace) === window,
+           args.dimension.val == .width || args.dimension.val == .smart {
+            let current = workspaceTilingRect(workspace).width
+            let width: CGFloat = switch args.units.val {
+                case .set(let value): CGFloat(value)
+                case .add(let value): current + CGFloat(value)
+                case .subtract(let value): current - CGFloat(value)
+            }
+            return applySingleWindowManualResize(window, width: max(minimumTiledResizeWeight, width))
+        }
+
         let candidates: [WindowResizeCommandTarget] = target.windowOrNil?.parentsWithSelf.flatMap { node -> [WindowResizeCommandTarget] in
             guard let parent = node.parent as? TilingContainer else { return [] }
             switch parent.layout {

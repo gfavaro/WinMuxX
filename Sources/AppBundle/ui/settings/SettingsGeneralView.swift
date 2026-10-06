@@ -2,27 +2,24 @@ import SwiftUI
 
 struct ShortcutGeneralSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @State private var startAtLogin = config.startAtLogin
-    @State private var autoReloadConfig = config.autoReloadConfig
+    @SettingsDraft("start-at-login", load: { config.startAtLogin }) private var startAtLogin: Bool
+    @SettingsDraft("auto-reload-config", load: { config.autoReloadConfig }) private var autoReloadConfig: Bool
 
     var body: some View {
         SettingsScrollView {
-            if let error = model.errorMessage {
-                SettingsSection("Could not save setting") {
-                    Text(error).foregroundStyle(.red).textSelection(.enabled)
-                }
-            }
             SettingsSection("Startup") {
-                SettingsToggle("Start at login", isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
+                SettingsToggle("Start at login", id: "start-at-login", isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
                     persistRootBool("start-at-login", startAtLogin)
                 }
-                SettingsToggle("Reload config when it changes", isOn: $autoReloadConfig, help: "Apply valid edits saved from another editor automatically.") {
+            }
+            SettingsSection("Configuration") {
+                SettingsToggle("Reload config when it changes", id: "auto-reload-config", isOn: $autoReloadConfig, help: "Apply valid edits saved from another editor automatically.") {
                     persistRootBool("auto-reload-config", autoReloadConfig)
                 }
             }
         }
         .navigationTitle("General")
-        .id(model.settingsRevision)
+
     }
 
     private func persistRootBool(_ key: String, _ value: Bool) {

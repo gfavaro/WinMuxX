@@ -81,6 +81,7 @@ extension TreeNodeTest {
     }
 
     func testSnapshotAndRestorePreservesConfiguredEmptyWorkspace() async throws {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["persistent-empty"]
         let persistent = Workspace.get(byName: "persistent-empty")
         let frozenWorld = snapshotCurrentFrozenWorld()

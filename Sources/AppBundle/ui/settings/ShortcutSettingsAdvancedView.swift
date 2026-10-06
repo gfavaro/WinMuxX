@@ -21,7 +21,7 @@ struct ShortcutAdvancedView: View {
                         .font(.headline)
                     if let targetUrl {
                         Text(targetUrl.path)
-                            .font(.caption)
+                            .font(.callout)
                             .foregroundStyle(.secondary)
                             .textSelection(.enabled)
                     }
@@ -32,22 +32,22 @@ struct ShortcutAdvancedView: View {
                 Button("Reload From Disk") {
                     loadFromDisk()
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
                 Button("Validate") {
                     validateConfig()
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
                 Button(isSaving ? "Saving…" : "Save and apply") {
                     saveConfig()
                 }
-                .controlSize(.small)
+                .controlSize(.regular)
                 .keyboardShortcut("s", modifiers: [.command])
                 .disabled(isSaving || configText == savedText)
             }
 
             if let validationMessage {
                 Text(validationMessage)
-                .font(.system(size: 12, design: .monospaced))
+                .font(.system(.body, design: .monospaced))
                 .foregroundStyle(.red)
                 .padding(8)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -55,37 +55,45 @@ struct ShortcutAdvancedView: View {
                     .textSelection(.enabled)
             } else if let saveMessage {
                 Text(saveMessage)
-                    .font(.system(size: 12))
+                    .font(.callout)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 2)
             }
 
             if configText != savedText {
-                Text("Unsaved changes").font(.caption).foregroundStyle(.secondary)
+                Text("Unsaved changes").font(.callout).foregroundStyle(.secondary)
             }
 
             TextEditor(text: $configText)
-                .font(.system(size: 12, design: .monospaced))
+                .accessibilityLabel("TOML configuration editor")
+                .accessibilityHint("Edit the complete configuration. Use Validate before Save and apply.")
+                .font(.system(.body, design: .monospaced))
                 .scrollContentBackground(.hidden)
                 .padding(4)
                 .background(Color(nsColor: .textBackgroundColor))
                 .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
         }
         .padding(18)
+        .onChange(of: model.settingsRevision) { _ in
+            if configText == savedText { loadFromDisk(preservingDraft: true) }
+        }
+        .onChange(of: configText) { model.configurationDraft = $0 == savedText ? nil : $0 }
         .task {
             guard !hasLoaded else { return }
             hasLoaded = true
-            loadFromDisk()
+            loadFromDisk(preservingDraft: true)
         }
     }
 
-    private func loadFromDisk() {
+    private func loadFromDisk(preservingDraft: Bool = false) {
         let resolvedUrl = advancedConfigEditorTargetUrl()
         targetUrl = resolvedUrl
         validationMessage = nil
         saveMessage = nil
         configText = advancedConfigEditorCurrentText(for: resolvedUrl)
         savedText = configText
+        if preservingDraft, let draft = model.configurationDraft { configText = draft }
+        else { model.configurationDraft = nil }
     }
 
     private func validateConfig() {
@@ -113,8 +121,14 @@ struct ShortcutAdvancedView: View {
 
         let submittedText = configText
         isSaving = true
-        Task { @MainActor in
-            defer { isSaving = false }
+        let previousSave = model.pendingSettingsSave
+        model.pendingSettingsSave = Task { @MainActor in
+            await previousSave?.value
+            model.savingSettingIDs.insert("configuration")
+            defer {
+                isSaving = false
+                model.savingSettingIDs.remove("configuration")
+            }
             do {
                 let parentUrl = resolvedUrl.deletingLastPathComponent()
                 if parentUrl.path != resolvedUrl.path {
@@ -124,6 +138,7 @@ struct ShortcutAdvancedView: View {
                 let isOk = try await reloadConfig(forceConfigUrl: resolvedUrl)
                 if isOk {
                     savedText = submittedText
+                    if configText == submittedText { model.configurationDraft = nil }
                     saveMessage = "Saved and applied."
                     model.reload()
                 } else {

@@ -17,12 +17,18 @@ public final class ShortcutSettingsModel: ObservableObject {
     @Published public var openRequestId: Int = 0
     @Published var failedSaveRevision: Int = 0
     @Published var settingsRevision: Int = 0
+    @Published var savingSettingIDs: Set<String> = []
+    @Published var failedSettingID: String? = nil
+    var retrySettingsSave: (() -> Void)?
+    var configurationDraft: String?
     @Published var failedSettingTitle: String? = nil
     var activeSettingTitle: String? = nil
     @Published var errorMessage: String? = nil
 
     var automationDrafts: [String: String] = [:]
     var pendingSettingsSave: Task<Void, Never>?
+    var bindingsDraftRevision = 0
+    var savedBindingsRevision = 0
 
     var actionsById: [String: Action] = [:]
     var actionIdByCommand: [String: String] = [:]

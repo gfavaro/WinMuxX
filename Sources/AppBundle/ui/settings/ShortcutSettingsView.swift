@@ -3,7 +3,7 @@ import Common
 import MASShortcut
 import SwiftUI
 
-// Measured from System Settings on macOS 27: fixed width, vertically resizable.
+// Measured from System Settings on macOS 27: resizable settings window.
 let settingsWindowWidth: CGFloat = 757
 let settingsWindowMinimumHeight: CGFloat = 470
 
@@ -13,7 +13,7 @@ public let shortcutSettingsWindowId = "\(winMuxAppName).shortcutSettings"
 public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scene {
     SwiftUI.Window("WinMuxX Settings", id: shortcutSettingsWindowId) {
         ShortcutSettingsView(model: model)
-            .frame(minWidth: settingsWindowWidth, maxWidth: settingsWindowWidth,
+            .frame(minWidth: settingsWindowWidth,
                    minHeight: settingsWindowMinimumHeight, maxHeight: .infinity)
             .onAppear {
                 NSApp.setActivationPolicy(.accessory)
@@ -50,11 +50,11 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
     case general
     case shortcuts
     case workspaces
+    case sidebar
     case appearance
     case windows
     case automation
     case configuration
-    case reference
 
     var id: Self { self }
 
@@ -64,10 +64,10 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
             case .shortcuts: "Shortcuts"
             case .workspaces: "Workspaces"
             case .windows: "Windows"
-            case .appearance: "Sidebar & Appearance"
+            case .sidebar: "Sidebar"
+            case .appearance: "Appearance"
             case .automation: "Automation"
             case .configuration: "Configuration"
-            case .reference: "Configuration Reference"
         }
     }
 
@@ -77,10 +77,10 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
             case .shortcuts: "keyboard"
             case .workspaces: "rectangle.3.group"
             case .windows: "macwindow.on.rectangle"
-            case .appearance: "sidebar.left"
+            case .sidebar: "sidebar.left"
+            case .appearance: "paintpalette"
             case .automation: "gearshape.2"
             case .configuration: "doc.text"
-            case .reference: "book"
         }
     }
 }
@@ -89,7 +89,7 @@ struct ShortcutSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
     @State private var selectedItem: SettingsSidebarItem? = .general
 
-    private let sidebarItems = SettingsSidebarItem.allCases
+    private let sidebarItems: [SettingsSidebarItem] = [.general, .workspaces, .windows, .sidebar, .appearance, .shortcuts, .automation, .configuration]
 
     var body: some View {
         NavigationSplitView {
@@ -103,7 +103,9 @@ struct ShortcutSettingsView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
         } detail: {
-            Group {
+            VStack(alignment: .leading, spacing: 0) {
+                SettingsSaveSummary(model: model).padding(.horizontal, 20)
+                Group {
                 switch selectedItem {
                     case .general:
                         ShortcutGeneralSettingsView(model: model)
@@ -113,20 +115,21 @@ struct ShortcutSettingsView: View {
                         ShortcutSettingsWorkspacePane(model: model)
                     case .windows:
                         ShortcutBehaviorSettingsView(model: model)
+                    case .sidebar:
+                        ShortcutSidebarSettingsView(model: model)
                     case .appearance:
                         ShortcutAppearanceSettingsView(model: model)
-                            .id(model.settingsRevision)
+
                     case .automation:
                         ShortcutAutomationSettingsView(model: model)
                     case .configuration:
-                        ShortcutAdvancedView(model: model)
-                    case .reference:
-                        ShortcutConfigurationReferenceView()
+                        SettingsConfigurationView(model: model)
                     case nil:
                         Text("Select an item")
                 }
+                }
             }
-            .id(model.failedSaveRevision)
+
             .navigationTitle(selectedItem?.label ?? "")
         }
     }
@@ -151,45 +154,47 @@ struct ShortcutSettingsWorkspacePane: View {
 struct ShortcutCategoryView: View {
     @ObservedObject var model: ShortcutSettingsModel
     let category: ShortcutSettingsModel.Category
-    @State private var shortcutsPreset = config.shortcutsPreset.rawValue
-    @State private var projectDeletionAction = config.workspaceSidebar.projectDeletionAction
-    @State private var persistentWorkspaces = config.persistentWorkspaces.joined(separator: ", ")
+    @SettingsDraft("shortcuts-preset", load: { config.shortcutsPreset.rawValue }) private var shortcutsPreset: String
+    @SettingsDraft("workspace-sidebar.project-deletion-action", load: { config.workspaceSidebar.projectDeletionAction }) private var projectDeletionAction: WorkspaceProjectDeletionAction
+    @SettingsDraft("minimum-workspace-count", load: { config.effectiveMinimumWorkspaceCount }) private var minimumWorkspaceCount: Int
 
     var body: some View {
         Form {
-            if let error = model.errorMessage {
-                Section("Could not save setting") {
-                    Text(error).foregroundStyle(.red).textSelection(.enabled)
-                }
-            }
 
             if category == .common {
                 Section("Workspace availability") {
-                    SettingsTextField("Persistent workspaces", text: $persistentWorkspaces,
-                        help: "Comma-separated names of workspaces that remain available when empty.") {
-                        persistSettingsConfig(section: nil, key: "persistent-workspaces",
-                            renderedValue: tomlCommaSeparatedStringArray(persistentWorkspaces), model: model)
+                    SettingsStepper("Workspaces to keep", id: "minimum-workspace-count", value: $minimumWorkspaceCount,
+                        range: 0...Int.max, help: "Keep at least this many workspaces across all projects. 0 disables the configured minimum.", unit: "") {
+                        saveMinimumWorkspaceCount()
                     }
-                    Picker("Deleting projects", selection: $projectDeletionAction) {
+                    SettingsDescription("Each project and active display still keeps its required workspace. Occupied workspaces count toward this minimum.")
+                    if config.minimumWorkspaceCount == nil && !config.persistentWorkspaces.isEmpty {
+                        SettingsDescription("Saving this number replaces the old list of persistent names with a global minimum.")
+                        Button("Use this quantity") { saveMinimumWorkspaceCount() }
+                            .frame(minHeight: 28)
+                    }
+                }
+                Section("Projects") {
+                    SettingsPicker("Deleting projects", id: "workspace-sidebar.project-deletion-action", selection: $projectDeletionAction,
+                        help: "Choose what happens to the windows in a project when you delete it.") {
                         Text("Close project windows").tag(WorkspaceProjectDeletionAction.closeWindows)
                         Text("Move windows elsewhere").tag(WorkspaceProjectDeletionAction.moveWindowsToFallback)
-                    }
-                    .onChange(of: projectDeletionAction) { value in
+                    } onChange: {
                         persistSettingsConfig(section: "workspace-sidebar", key: "project-deletion-action",
-                            renderedValue: "'\(value.rawValue)'", model: model)
+                            renderedValue: "'\(projectDeletionAction.rawValue)'", model: model)
                     }
                 }
             }
 
             if category == .managed {
                 Section("Shortcut preset") {
-                    Picker("Preset", selection: $shortcutsPreset) {
+                    SettingsPicker("Preset", id: "shortcuts-preset", selection: $shortcutsPreset,
+                        help: "Custom preserves your own shortcuts. Rectangle uses the familiar Rectangle bindings.") {
                         Text("Custom").tag("none")
                         Text("Rectangle").tag("rectangle")
-                    }
-                    .onChange(of: shortcutsPreset) { value in
+                    } onChange: {
                         persistSettingsConfig(section: nil, key: "shortcuts-preset",
-                            renderedValue: "'\(value)'", model: model)
+                            renderedValue: "'\(shortcutsPreset)'", model: model)
                     }
                 }
             }
@@ -200,8 +205,16 @@ struct ShortcutCategoryView: View {
             }
         }
         .formStyle(.grouped)
-        .id(model.settingsRevision)
+
     }
+    private func saveMinimumWorkspaceCount() {
+        model.activeSettingTitle = "Workspaces to keep"
+        persistSettingsConfigEdits([
+            SettingsConfigEdit(section: nil, key: "minimum-workspace-count", renderedValue: String(minimumWorkspaceCount)),
+            SettingsConfigEdit(section: nil, key: "persistent-workspaces", renderedValue: nil),
+        ], model: model)
+    }
+
 }
 
 struct ShortcutSectionView: View {
@@ -230,7 +243,7 @@ struct ShortcutSectionView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(section.title)
                     if let summary = section.summary {
-                        Text(summary).font(.caption).foregroundStyle(.secondary)
+                        Text(summary).font(.callout).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -248,10 +261,10 @@ struct ShortcutRow: View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(action.title)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.body.weight(.medium))
                 if let subtitle = action.subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11))
+                        .font(.callout)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
@@ -259,11 +272,12 @@ struct ShortcutRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             ShortcutRecorderView(
+                title: action.title + " shortcut",
                 shortcut: .init(get: { model.shortcutValue(for: action.id) },
                                 set: { model.setShortcutValue($0, for: action.id) }),
                 onChange: { _ in }
             )
-            .frame(width: 140, height: 22)
+            .frame(width: 160, height: 28)
         }
         .padding(.vertical, 6)
     }

@@ -68,6 +68,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
     "tab-group-padding": Parser(\.tabGroupPadding, parseInt),
+    "minimum-workspace-count": Parser(\.minimumWorkspaceCount) { raw, backtrace in
+        parseInt(raw, backtrace)
+            .filter(.semantic(backtrace, "Must be a non-negative integer")) { $0 >= 0 }
+            .map { Optional($0) }
+    },
     persistentWorkspacesKey: Parser(\.persistentWorkspaces, parsePersistentWorkspaces),
     "exec-on-workspace-change": Parser(\.execOnWorkspaceChange, parseArrayOfStrings),
     "exec": Parser(\.execConfig, parseExecConfig),
@@ -76,6 +81,12 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     modeConfigRootKey: Parser(\.modes, skipParsing(Config().modes)), // Parsed manually
 
     "auto-add-new-windows-to-tab-group": Parser(\.autoAddNewWindowsToTabGroup, parseBool),
+    "single-window-alignment": Parser(\.singleWindowAlignment) { raw, backtrace in
+        parseString(raw, backtrace).flatMap {
+            SingleWindowAlignment(rawValue: $0).orFailure(.semantic(backtrace, "Expected center, left or right"))
+        }
+    },
+    "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
@@ -219,7 +230,8 @@ func parseString(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> Par
 }
 
 func parseSimpleType<T>(_ raw: TOMLValueConvertible) -> T? {
-    (raw.int as? T) ?? (raw.string as? T) ?? (raw.bool as? T)
+    if T.self == Double.self { return (raw.double ?? raw.int.map(Double.init)) as? T }
+    return (raw.int as? T) ?? (raw.string as? T) ?? (raw.bool as? T)
 }
 
 func parseTomlArray(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<TOMLArray> {

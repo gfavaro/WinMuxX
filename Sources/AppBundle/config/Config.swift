@@ -51,6 +51,8 @@ struct Config: ConvenienceCopyable {
     var shortcutsPreset: ShortcutsPreset = .none
     var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
+    var minimumWorkspaceCount: Int? = nil
+    var effectiveMinimumWorkspaceCount: Int { minimumWorkspaceCount ?? max(1, persistentWorkspaces.count) }
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
     var keyMapping = KeyMapping()
@@ -61,6 +63,8 @@ struct Config: ConvenienceCopyable {
     var onFocusedMonitorChanged: [any Command] = []
 
     var autoAddNewWindowsToTabGroup: Bool = false
+    var singleWindowAlignment: SingleWindowAlignment = .center
+    var singleWindowAspectRatio: DynamicConfigValue<Double> = .constant(1.5)
     var gaps: Gaps = .zero
     var workspaceSidebar = WorkspaceSidebarConfig()
     var windowTabs = WindowTabsConfig()
@@ -292,3 +296,5 @@ extension WorkspaceSidebarConfig {
             .filter { seenTopLeftCorners.insert($0.rect.topLeftCorner).inserted }
     }
 }
+
+enum SingleWindowAlignment: String, CaseIterable, Sendable { case center, left, right }

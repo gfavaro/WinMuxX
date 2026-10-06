@@ -200,6 +200,7 @@ final class TreeNodeTest: XCTestCase {
     }
 
     func testReconcileWorkspaceStateKeepsPersistentEmptyWorkspace() {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["keep"]
         let workspace = Workspace.get(byName: "keep")
 
@@ -210,6 +211,7 @@ final class TreeNodeTest: XCTestCase {
 
     func testReconcileMaterializesConfiguredPersistentWorkspaceWithoutChangingViewport() {
         let active = focus.workspace
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["keep-empty"]
 
         Workspace.reconcileWorkspaceState()
@@ -419,6 +421,7 @@ final class TreeNodeTest: XCTestCase {
     }
 
     func testShouldShowWorkspaceInSidebarIncludesPersistentEmptyWorkspace() {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["persistent"]
         let persistentWorkspace = Workspace.get(byName: "persistent")
 
@@ -460,6 +463,7 @@ final class TreeNodeTest: XCTestCase {
     }
 
     func testUserFacingWorkspacesIncludePersistentEmptyWorkspace() {
+        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["persistent"]
         let persistentWorkspace = Workspace.get(byName: "persistent")
         let occupiedWorkspace = Workspace.get(byName: "occupied")

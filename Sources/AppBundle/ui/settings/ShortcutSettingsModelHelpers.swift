@@ -205,7 +205,7 @@ func inferWorkspaceShortcutState(
 
 @MainActor
 func shortcutSettingsWorkspaceNumbers() -> [String] {
-    let configuredNumbers = Set(Array(config.persistentWorkspaces).filter { workspaceKey(for: $0) != nil })
+    let configuredNumbers = Set(Array(config.minimumWorkspaceCount == nil ? config.persistentWorkspaces : []).filter { workspaceKey(for: $0) != nil })
         .union(TrayMenuModel.shared.workspaces.map(\.name).filter { workspaceKey(for: $0) != nil })
     let defaults = (1 ... 9).map(String.init)
     let merged = configuredNumbers.union(defaults)

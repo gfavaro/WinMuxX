@@ -92,7 +92,7 @@ struct DemoContainer<Content: View>: View {
 
 struct FocusDemoView: View {
     @State private var phase = 0
-    private let timer = Timer.publish(every: 0.8, on: .main, in: .common).autoconnect()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         DemoContainer {
@@ -100,17 +100,23 @@ struct FocusDemoView: View {
                 RoundedRectangle(cornerRadius: 4).fill(DemoColors.win1).opacity(phase == 1 ? 1 : 0.3)
                 RoundedRectangle(cornerRadius: 4).fill(DemoColors.win2).opacity(phase == 2 ? 1 : 0.3)
             }
-            .animation(.easeInOut(duration: 0.2), value: phase)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: phase)
         }
-        .onReceive(timer) { _ in
-            phase = (phase + 1) % 4 // 0: reset, 1: left focused, 2: right focused, 3: delay
+        .accessibilityHidden(true)
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { phase = 0; return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(800)) } catch { return }
+                guard !Task.isCancelled else { return }
+                phase = (phase + 1) % 4
+            }
         }
     }
 }
 
 struct MoveDemoView: View {
     @State private var phase = 0
-    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         DemoContainer {
@@ -118,17 +124,17 @@ struct MoveDemoView: View {
                 let spacing: CGFloat = 4
                 let winW = (geo.size.width - spacing) / 2
                 let h = geo.size.height
-                
+
                 // Left position x: winW / 2
                 // Right position x: winW + spacing + winW / 2
-                
+
                 RoundedRectangle(cornerRadius: 4).fill(DemoColors.win1)
                     .frame(width: winW, height: h)
                     .position(
                         x: phase == 1 ? (winW + spacing + winW / 2) : winW / 2,
                         y: h / 2
                     )
-                
+
                 RoundedRectangle(cornerRadius: 4).fill(DemoColors.win2)
                     .frame(width: winW, height: h)
                     .position(
@@ -136,17 +142,23 @@ struct MoveDemoView: View {
                         y: h / 2
                     )
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: phase)
+            .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.7), value: phase)
         }
-        .onReceive(timer) { _ in
-            phase = (phase + 1) % 3 // 0: A-B, 1: B-A, 2: delay
+        .accessibilityHidden(true)
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { phase = 0; return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(1000)) } catch { return }
+                guard !Task.isCancelled else { return }
+                phase = (phase + 1) % 3
+            }
         }
     }
 }
 
 struct SplitDemoView: View {
     @State private var phase = 0
-    private let timer = Timer.publish(every: 1.2, on: .main, in: .common).autoconnect()
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         DemoContainer {
@@ -154,12 +166,12 @@ struct SplitDemoView: View {
                 let w = geo.size.width
                 let h = geo.size.height
                 let spacing: CGFloat = 4
-                
+
                 // Left Window (Win 1)
                 RoundedRectangle(cornerRadius: 4).fill(DemoColors.win1).opacity(0.4)
                     .frame(width: phase == 1 ? (w - spacing) / 2 : (w - 2 * spacing) / 3, height: h)
                     .position(x: phase == 1 ? (w - spacing) / 4 : (w - 2 * spacing) / 6, y: h / 2)
-                
+
                 // Container for Win 2 and Win 3
                 Group {
                     // Win 2 (Top in split)
@@ -172,7 +184,7 @@ struct SplitDemoView: View {
                             x: phase == 1 ? 3 * (w - spacing) / 4 + spacing : (w - 2 * spacing) / 2 + spacing,
                             y: phase == 1 ? (h - spacing) / 4 : h / 2
                         )
-                    
+
                     // Win 3 (Bottom in split, Focused)
                     RoundedRectangle(cornerRadius: 4).fill(DemoColors.win3)
                         .frame(
@@ -185,10 +197,16 @@ struct SplitDemoView: View {
                         )
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.7), value: phase)
+            .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.7), value: phase)
         }
-        .onReceive(timer) { _ in
-            phase = (phase + 1) % 3 // 0: side-by-side, 1: stacked, 2: delay
+        .accessibilityHidden(true)
+        .task(id: reduceMotion) {
+            guard !reduceMotion else { phase = 0; return }
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .milliseconds(1000)) } catch { return }
+                guard !Task.isCancelled else { return }
+                phase = (phase + 1) % 3
+            }
         }
     }
 }
@@ -237,14 +255,15 @@ struct CompassPad<Demo: View>: View {
     private func recorderCell(for id: String, label: String) -> some View {
         VStack(spacing: 4) {
             Text(label)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.callout.weight(.semibold))
                 .foregroundStyle(.secondary)
             ShortcutRecorderView(
+                title: title + " " + label + " shortcut",
                 shortcut: .init(get: { model.shortcutValue(for: id) },
                                 set: { model.setShortcutValue($0, for: id) }),
                 onChange: { _ in }
             )
-            .frame(width: 120, height: 22)
+            .frame(width: 120, height: 28)
         }
     }
 }

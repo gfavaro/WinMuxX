@@ -37,7 +37,8 @@ func isUserFacingWorkspace(_ workspace: Workspace, focusedWorkspace: Workspace? 
                 workspace.isVisible ||
                 workspace.isConfiguredPersistent ||
                 !workspaceOwnedMinimizedWindows(workspace).isEmpty ||
-                workspaceIsRetainedEmptySlot(workspace)
+                workspaceIsRetainedEmptySlot(workspace) ||
+                minimumWorkspaceRetentionIds().contains(workspace.id)
         )
 }
 

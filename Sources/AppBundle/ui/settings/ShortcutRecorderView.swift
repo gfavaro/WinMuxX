@@ -2,6 +2,7 @@ import MASShortcut
 import SwiftUI
 
 struct ShortcutRecorderView: NSViewRepresentable {
+    var title = "Shortcut"
     @Binding var shortcut: MASShortcut?
     var onChange: (MASShortcut?) -> Void
 
@@ -16,6 +17,8 @@ struct ShortcutRecorderView: NSViewRepresentable {
     func makeNSView(context: Context) -> RecordingAwareShortcutView {
         let recorder = RecordingAwareShortcutView(frame: .zero)
         recorder.shortcutValidator = nil
+        recorder.setAccessibilityLabel(title)
+        recorder.setAccessibilityHelp("Activate to record a shortcut. Press Escape to cancel recording.")
         recorder.onRecordingChanged = { isRecording in
             Task { @MainActor in
                 setHotkeysSuspended(isRecording)
@@ -31,6 +34,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: RecordingAwareShortcutView, context: Context) {
+        nsView.setAccessibilityLabel(title)
         guard !nsView.isRecording else { return }
         let shouldUpdate: Bool
         if let shortcut, let existing = nsView.shortcutValue {
@@ -45,7 +49,7 @@ struct ShortcutRecorderView: NSViewRepresentable {
         }
     }
 
-    static func dismantleNSView(_ nsView: RecordingAwareShortcutView, coordinator: ()) {
+    static func dismantleNSView(_ nsView: RecordingAwareShortcutView, coordinator: Coordinator) {
         nsView.onRecordingChanged = { _ in }
         Task { @MainActor in
             setHotkeysSuspended(false)

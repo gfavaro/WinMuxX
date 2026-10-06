@@ -8,6 +8,8 @@ struct WindowTabGroupChromeContent: Equatable {
     let occludingFloatingWindowFrames: [CGRect]
     let chromeStyle: ChromeStyle
     let solidChromeColor: ChromeSolidColor
+    let solidChromeCustomColor: String
+    let frostedTint: WorkspaceSidebarFrostedTint
 
     @MainActor init(strip: WindowTabStripViewModel) {
         workspaceName = strip.workspaceName
@@ -17,5 +19,7 @@ struct WindowTabGroupChromeContent: Equatable {
         occludingFloatingWindowFrames = strip.occludingFloatingWindowFrames
         chromeStyle = config.workspaceSidebar.chromeStyle
         solidChromeColor = config.workspaceSidebar.solidChromeColor
+        solidChromeCustomColor = config.workspaceSidebar.solidChromeCustomColor
+        frostedTint = config.workspaceSidebar.frostedTint
     }
 }

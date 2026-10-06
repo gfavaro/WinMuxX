@@ -14,14 +14,10 @@ struct WindowTabGroupFrameView: View {
         ZStack(alignment: .topLeading) {
             // The shell includes the tab bar and the visible border around the active window.
             // Its even-odd mask keeps the window body transparent while retaining that chrome.
-            GlassSurface(
-                shape: outerShape,
-                style: config.workspaceSidebar.chromeStyle,
-                solidColor: config.workspaceSidebar.resolvedSolidChromeColor,
-            )
-            .mask {
-                shellShape.fill(style: FillStyle(eoFill: true))
-            }
+            groupSurface(in: outerShape)
+                .mask {
+                    shellShape.fill(style: FillStyle(eoFill: true))
+                }
 
             outerShape
                 .stroke(Color.white.opacity(GlassToken.borderOpacity), lineWidth: windowTabGroupFrameStrokeWidth)
@@ -41,4 +37,19 @@ struct WindowTabGroupFrameView: View {
         .frame(width: groupSize.width, height: groupSize.height)
         .allowsHitTesting(false)
     }
+
+    @ViewBuilder
+    private func groupSurface<S: Shape>(in shape: S) -> some View {
+        if config.workspaceSidebar.chromeStyle == .solid {
+            GlassSurface(shape: shape, style: .solid,
+                solidColor: config.workspaceSidebar.resolvedSolidChromeColor)
+        } else {
+            WorkspaceSidebarFrostedSurface(tint: config.workspaceSidebar.frostedTint)
+                .clipShape(shape)
+                .environment(\.colorScheme, config.workspaceSidebar.frostedTint.preferredColorScheme ?? colorScheme)
+        }
+    }
+
+    @Environment(\.colorScheme) private var colorScheme
+
 }

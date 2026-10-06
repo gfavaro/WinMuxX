@@ -24,18 +24,21 @@ extension ShortcutSettingsModel {
         )
         collectMainBindings(workspaceNumbers: workspaceNumbers, assignments: &nextAssignments, customBindings: &nextCustomBindings)
 
-        self.assignments = nextAssignments
-        self.tapBindings = nextTapBindings()
-        self.customBindings = nextCustomBindings
-        self.workspaceSwitchModifiers = workspaceState.switchModifiers
-        self.workspaceMoveModifiers = workspaceState.moveModifiers
-        self.workspaceOverrides = workspaceNumbers.map {
-            WorkspaceOverride(
-                workspaceName: $0,
-                switchNotation: workspaceState.switchOverrides[$0],
-                moveNotation: workspaceState.moveOverrides[$0],
-            )
+        if bindingsDraftRevision == savedBindingsRevision {
+            self.assignments = nextAssignments
+            self.tapBindings = nextTapBindings()
+            self.customBindings = nextCustomBindings
+            self.workspaceSwitchModifiers = workspaceState.switchModifiers
+            self.workspaceMoveModifiers = workspaceState.moveModifiers
+            self.workspaceOverrides = workspaceNumbers.map {
+                WorkspaceOverride(
+                    workspaceName: $0,
+                    switchNotation: workspaceState.switchOverrides[$0],
+                    moveNotation: workspaceState.moveOverrides[$0],
+                )
+            }
         }
+        SettingsDraftStore.shared.refreshSavedValues()
         settingsRevision += 1
     }
 

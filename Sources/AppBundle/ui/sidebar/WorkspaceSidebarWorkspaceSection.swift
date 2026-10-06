@@ -88,10 +88,6 @@ struct WorkspaceSidebarWorkspaceSection: View {
                     Text("Delete Workspace")
                 }
             }
-            .onHover { hover in
-                isHovered = hover
-                actions.hoverWorkspace(workspace.name, hover)
-            }
             .onDrop(of: [workspaceSidebarDragPayloadType], delegate: WorkspaceSidebarDropDelegate(
                 target: .workspace(workspace.name),
                 actions: actions,
@@ -120,6 +116,15 @@ struct WorkspaceSidebarWorkspaceSection: View {
                     .opacity(allowsWorkspaceActivation && isShowingInUseOverlay ? 1 : 0)
                     .allowsHitTesting(allowsWorkspaceActivation && isShowingInUseOverlay)
                     .zIndex(5)
+            }
+            .onHover { hover in
+                isHovered = hover
+                actions.hoverWorkspace(workspace.name, hover)
+                // Track the whole section, including its confirmation overlay, so
+                // moving from the workspace button to Override does not cancel it.
+                if !hover, isShowingInUseOverlay {
+                    activeInUseOverrideWorkspaceName = nil
+                }
             }
             .shadow(
                 color: isDropTarget ? sidebarColors.foreground.opacity(0.16) : .clear,

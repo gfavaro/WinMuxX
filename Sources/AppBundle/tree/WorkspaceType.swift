@@ -71,6 +71,8 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         winMuxWorkspaceState.pruneProjectWorkspaceIndexes()
         repairInvalidVisibleWorkspaceAssignments()
         rearrangeWorkspacesOnMonitors()
+        ensureMinimumWorkspaceForAllProjects()
+        ensureConfiguredMinimumWorkspaces()
         pruneEmptyWorkspaces()
         clearOrphanedWorkspaceSidebarLabels()
         ensureVisibleActiveProjectWorkspaces()
@@ -131,7 +133,7 @@ extension Workspace {
 
     @MainActor
     var isConfiguredPersistent: Bool {
-        config.persistentWorkspaces.contains(name)
+        config.minimumWorkspaceCount == nil && config.persistentWorkspaces.contains(name)
     }
 
     @MainActor

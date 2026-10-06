@@ -90,6 +90,22 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
 @MainActor
 func applyResizeWithMouse(_ window: Window, rect: Rect) {
     syncClosedWindowsCacheToCurrentWorld()
+    if floatSingleWindowAfterHeightResize(window, rect: rect) {
+        currentlyManipulatedWithMouseWindowId = window.windowId
+        setCurrentMouseManipulationKind(.resize)
+        clearPendingWindowDragIntent()
+        return
+    }
+    // Only explicit user gestures set the override; AX events from our own layout
+    // and application minimum-size corrections must never become user preferences.
+    if let previous = window.lastAppliedLayoutPhysicalRect,
+       abs(rect.width - previous.width) > 1,
+       applySingleWindowManualResize(window, width: rect.width) {
+        currentlyManipulatedWithMouseWindowId = window.windowId
+        setCurrentMouseManipulationKind(.resize)
+        clearPendingWindowDragIntent()
+        return
+    }
     guard let weightMap = proposedResizeWeightMap(window, rect: rect) else { return }
     for change in weightMap.changes {
         change.node.setWeight(change.orientation, change.weight)

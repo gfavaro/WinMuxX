@@ -86,6 +86,7 @@ func materializePersistedWorkspaceProjects() {
 
 @MainActor
 func materializePersistedWorkspaces() {
+    guard config.minimumWorkspaceCount == nil else { return }
     for rawName in config.persistentWorkspaces {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { continue }

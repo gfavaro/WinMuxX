@@ -8,7 +8,7 @@ func windowResizePreviewItems(
     excludingActiveWindowId activeWindowId: UInt32?,
 ) -> [WindowResizePreviewItem] {
     guard !workspace.isEffectivelyEmpty else { return [] }
-    let rect = workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+    let rect = workspaceTilingRect(workspace)
     let context = WindowResizePreviewLayoutContext(workspace: workspace, weightMap: weightMap)
     var items = windowResizePreviewItems(
         node: workspace.rootTilingContainer,
