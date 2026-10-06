@@ -3,6 +3,13 @@ import AppKit
 import XCTest
 
 final class LearnedWindowMinimumTest: XCTestCase {
+    func testFullscreenMinimizedAndIntermediateAnimationFramesAreNotEvidence() {
+        XCTAssertTrue(shouldLearnWindowMinimum(nativeFullscreen: false, nativeMinimized: false, animating: false))
+        XCTAssertFalse(shouldLearnWindowMinimum(nativeFullscreen: true, nativeMinimized: false, animating: false))
+        XCTAssertFalse(shouldLearnWindowMinimum(nativeFullscreen: false, nativeMinimized: true, animating: false))
+        XCTAssertFalse(shouldLearnWindowMinimum(nativeFullscreen: false, nativeMinimized: false, animating: true))
+    }
+
     func testConfirmedRefusalLearnsEachAxisIndependently() {
         var minimum = LearnedWindowMinimum()
         minimum.observe(requested: CGSize(width: 200, height: 300),

@@ -19,7 +19,7 @@ private func persistedFrozenWorldUrl() throws -> URL {
         appropriateFor: nil,
         create: true,
     )
-    let directory = appSupport.appendingPathComponent(winMuxAppName, isDirectory: true)
+    let directory = appSupport.appendingPathComponent(winMuxAppSupportDirectoryName, isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     return directory.appendingPathComponent(persistedFrozenWorldFilename, isDirectory: false)
 }

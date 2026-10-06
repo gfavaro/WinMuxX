@@ -2,6 +2,14 @@ import Foundation
 import TOMLKit
 
 private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebarConfig>] = [
+    "position": Parser(\.position) { raw, backtrace in
+        parseString(raw, backtrace).flatMap { WorkspaceSidebarPosition(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: left, right")) }
+    },
+    "height-mode": Parser(\.heightMode) { raw, backtrace in
+        parseString(raw, backtrace).flatMap { value in
+            WorkspaceSidebarHeightMode(rawValue: value).map { Optional($0) }.orFailure(.semantic(backtrace, "Possible values: standard, centered, full"))
+        }
+    },
     "enabled": Parser(\.enabled, parseBool),
     "enable-focus": Parser(\.enableFocus, parseBool),
     "auto-hide": Parser(\.autoHide, parseBool),
@@ -16,6 +24,10 @@ private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebar
     "show-seconds": Parser(\.showSeconds, parseBool),
     "show-date": Parser(\.showDate, parseBool),
     "show-weekday": Parser(\.showWeekday, parseBool),
+    "appearance": Parser(\.appearance, parseWorkspaceSidebarAppearance),
+    "background": Parser(\.background, parseWorkspaceSidebarBackground),
+    "menu-bar-background": Parser(\.menuBarBackground, parseBool),
+    "frosted-tint": Parser(\.frostedTint, parseWorkspaceSidebarFrostedTint),
     "chrome-style": Parser(\.chromeStyle, parseChromeStyle),
     "solid-chrome-color": Parser(\.solidChromeColor, parseChromeSolidColor),
     "solid-chrome-custom-color": Parser(\.solidChromeCustomColor, parseChromeSolidCustomColor),
@@ -54,6 +66,33 @@ func parseWorkspaceSidebar(
 private func parseChromeSolidCustomColor(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<String> {
     parseString(raw, backtrace).flatMap { rawValue in
         normalizedWorkspaceSidebarColorHex(rawValue).orFailure(.semantic(backtrace, "Use a six-digit hex color, such as #1A2B3C"))
+    }
+}
+
+private func parseWorkspaceSidebarAppearance(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<WorkspaceSidebarAppearance> {
+    parseString(raw, backtrace).flatMap { value in
+        WorkspaceSidebarAppearance(rawValue: value).orFailure(.semantic(
+            backtrace,
+            "Possible values: \(WorkspaceSidebarAppearance.allCases.map(\.rawValue).joined(separator: ", "))",
+        ))
+    }
+}
+
+private func parseWorkspaceSidebarBackground(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<WorkspaceSidebarBackground> {
+    parseString(raw, backtrace).flatMap { value in
+        WorkspaceSidebarBackground(rawValue: value).orFailure(.semantic(
+            backtrace,
+            "Possible values: \(WorkspaceSidebarBackground.allCases.map(\.rawValue).joined(separator: ", "))",
+        ))
+    }
+}
+
+private func parseWorkspaceSidebarFrostedTint(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<WorkspaceSidebarFrostedTint> {
+    parseString(raw, backtrace).flatMap { value in
+        WorkspaceSidebarFrostedTint(rawValue: value).orFailure(.semantic(
+            backtrace,
+            "Possible values: \(WorkspaceSidebarFrostedTint.allCases.map(\.rawValue).joined(separator: ", "))",
+        ))
     }
 }
 

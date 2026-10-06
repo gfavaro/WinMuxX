@@ -3,6 +3,7 @@ import Common
 import SwiftUI
 
 struct WorkspaceSidebarWorkspaceSection: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let workspace: WorkspaceSidebarWorkspaceViewModel
     let dragPreview: WorkspaceSidebarDropPreviewViewModel?
     let expansionProgress: CGFloat
@@ -33,7 +34,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
     @State var isDropSettling = false
     @Environment(\.accessibilityReduceMotion) var reduceMotion
 
-    let headerHeight: CGFloat = workspaceSidebarWorkspaceSectionHeaderHeight
+    var compactMetrics: WorkspaceSidebarCompactMetrics { WorkspaceSidebarCompactMetrics(width: layout.collapsedWidth) }
+    var headerHeight: CGFloat { isCompact ? compactMetrics.headerHeight : workspaceSidebarWorkspaceSectionHeaderHeight }
     let rowHeight: CGFloat = workspaceSidebarWorkspaceRowHeight
 
     var contentWidth: CGFloat { workspaceSidebarContentWidth(expansionProgress, layout: layout) }
@@ -41,7 +43,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
     var isCompact: Bool { expansionProgress < workspaceSidebarRowsRevealProgress }
     var showsWindowRows: Bool { expansionProgress >= workspaceSidebarRowsRevealProgress }
     var sectionMinHeight: CGFloat? {
-        if !isCompact, allowsWorkspaceActivation, isInUseOnOtherDisplay, workspace.items.isEmpty {
+        if !isCompact, allowsWorkspaceActivation, isInUseOnOtherDisplay,
+           workspace.items.isEmpty || isShowingInUseOverlay {
             return workspaceSidebarInUseOverrideEmptySectionMinHeight
         }
         return nil
@@ -64,7 +67,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
     var body: some View {
         interactiveSectionContent
             .padding(.vertical, isCompact ? 3 : 4)
-            .padding(.horizontal, workspaceSidebarSectionInnerHorizontalInset)
+            .padding(.horizontal, isCompact ? compactMetrics.innerInset : workspaceSidebarSectionInnerHorizontalInset)
             .frame(width: sectionWidth, alignment: .leading)
             .frame(minHeight: sectionMinHeight, alignment: .top)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -98,8 +101,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
             ))
             .help(isInUseOnOtherDisplay ? inUseOverrideText : workspace.displayName)
             .zIndex(isDropTarget ? 1 : 0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.82), value: dragPreview)
-            .animation(.spring(response: 0.2, dampingFraction: 0.82), value: expansionProgress)
+            .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.82), value: dragPreview)
+            .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.82), value: expansionProgress)
             .animation(reduceMotion ? workspaceSidebarReducedMotionHoverAnimation : workspaceSidebarHoverAnimation, value: isHovered)
             .animation(reduceMotion ? workspaceSidebarReducedMotionHoverAnimation : workspaceSidebarHoverAnimation, value: hoveredWindowId)
             .animation(reduceMotion ? workspaceSidebarReducedMotionHoverAnimation : workspaceSidebarHoverAnimation, value: hoveredTabGroupId)
@@ -107,9 +110,9 @@ struct WorkspaceSidebarWorkspaceSection: View {
             .background {
                 ZStack {
                     sectionBackground
-                if !isCompact && allowsWorkspaceActivation && !isShowingInUseOverlay {
-                    sectionActivationButton
-                }
+                    if !isCompact && allowsWorkspaceActivation && !isShowingInUseOverlay {
+                        sectionActivationButton
+                    }
                 }
             }
             .overlay(alignment: .center) {
@@ -119,7 +122,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
                     .zIndex(5)
             }
             .shadow(
-                color: isDropTarget ? Color.white.opacity(0.16) : .clear,
+                color: isDropTarget ? sidebarColors.foreground.opacity(0.16) : .clear,
                 radius: isDropTarget ? 12 : 0
             )
             .background {
@@ -139,9 +142,12 @@ extension WorkspaceSidebarWorkspaceSection {
     func handleSectionClick() {
         guard allowsWorkspaceActivation else { return }
         if isInUseOnOtherDisplay {
+            // A workspace already visible elsewhere must require an explicit second action
+            // before replacing the destination monitor's active workspace.
             activeInUseOverrideWorkspaceName = workspace.name
             return
         }
+        activeInUseOverrideWorkspaceName = nil
         if shouldHandleWorkspaceSidebarActivation(
             isEditing: false,
             isSidebarDragInProgress: isWorkspaceSidebarDragInProgress()
@@ -183,12 +189,12 @@ extension WorkspaceSidebarWorkspaceSection {
             .overlay {
                 if isActiveWorkspaceSelection {
                     sectionShape
-                        .strokeBorder(Color.white.opacity(isCompact ? 0.30 : 0.20), lineWidth: StrokeToken.control)
+                        .strokeBorder(sidebarColors.foreground.opacity(isCompact ? 0.30 : 0.20), lineWidth: StrokeToken.control)
                 }
                 if isPinnedActiveWorkspace && !isSearchFiltering {
                     sectionShape
                         .strokeBorder(
-                            Color.white.opacity(0.24),
+                            sidebarColors.foreground.opacity(0.24),
                             style: StrokeStyle(lineWidth: 1, dash: [5, 4])
                         )
                 }
@@ -203,7 +209,9 @@ extension WorkspaceSidebarWorkspaceSection {
     /// tint fills on top. No-op on older systems; the plain tint fill stands in.
     @ViewBuilder
     var sectionGlassCard: some View {
-        if #available(macOS 26.0, *), layout.chromeStyle == .liquidGlass {
+        if layout.appearance == .system {
+            sectionShape.strokeBorder(sidebarColors.separator, lineWidth: StrokeToken.hairline)
+        } else if #available(macOS 26.0, *), layout.chromeStyle == .liquidGlass {
             GlassEffectContainer {
                 ZStack {
                     Color.clear.glassEffect(.regular, in: sectionShape)
@@ -212,8 +220,8 @@ extension WorkspaceSidebarWorkspaceSection {
                         .fill(
                             LinearGradient(
                                 stops: [
-                                    .init(color: Color.white.opacity(0.16), location: 0),
-                                    .init(color: Color.white.opacity(0.04), location: 0.14),
+                                    .init(color: sidebarColors.foreground.opacity(0.16), location: 0),
+                                    .init(color: sidebarColors.foreground.opacity(0.04), location: 0.14),
                                     .init(color: Color.clear, location: 0.5),
                                 ],
                                 startPoint: .top,
@@ -225,7 +233,7 @@ extension WorkspaceSidebarWorkspaceSection {
                     Color.clear
                         .glassEffect(.regular, in: sectionShape)
                         .mask(sectionShape.stroke(lineWidth: 2))
-                    sectionShape.strokeBorder(Color.white.opacity(0.12), lineWidth: 0.5)
+                    sectionShape.strokeBorder(sidebarColors.foreground.opacity(0.12), lineWidth: 0.5)
                 }
             }
             .glassShadow(.resting)
@@ -233,7 +241,7 @@ extension WorkspaceSidebarWorkspaceSection {
             sectionShape
                 .fill(layout.resolvedSolidChromeColor.opacity(0.38))
                 .overlay {
-                    sectionShape.strokeBorder(Color.white.opacity(0.12), lineWidth: StrokeToken.hairline)
+                    sectionShape.strokeBorder(sidebarColors.foreground.opacity(0.12), lineWidth: StrokeToken.hairline)
                 }
         }
     }
@@ -242,13 +250,13 @@ extension WorkspaceSidebarWorkspaceSection {
         if isDropTarget {
             // A neutral lift works against both solid colors and Liquid Glass without
             // introducing the system accent color into themed chrome.
-            return Color.white.opacity(layout.chromeStyle == .solid ? 0.18 : 0.14)
+            return sidebarColors.foreground.opacity(layout.appearance == .custom && layout.chromeStyle == .solid ? 0.18 : 0.14)
         }
         if isSearchSelectedWorkspace {
-            return Color.white.opacity(0.105)
+            return sidebarColors.foreground.opacity(0.105)
         }
         if isSearchFiltering {
-            return isHovered ? Color.white.opacity(0.045) : Color.white.opacity(0.015)
+            return isHovered ? sidebarColors.foreground.opacity(0.045) : sidebarColors.foreground.opacity(0.015)
         }
         if allowsWorkspaceActivation && isInUseOnOtherDisplay {
             let redOpacity: Double = workspace.isFocused ? 0.16 : 0.065
@@ -256,20 +264,20 @@ extension WorkspaceSidebarWorkspaceSection {
             return Color(nsColor: .systemRed).opacity(isHovered ? hoveredRedOpacity : redOpacity)
         }
         if isPinnedActiveWorkspace {
-            return Color.white.opacity(isHovered ? 0.15 : 0.10)
+            return sidebarColors.foreground.opacity(isHovered ? 0.15 : 0.10)
         }
         if isActiveOnTargetMonitor {
             let compactOpacity: Double = workspace.isFocused ? 0.24 : 0.14
             let expandedOpacity: Double = workspace.isFocused ? 0.12 : 0.07
-            return Color.white.opacity(isCompact ? compactOpacity : expandedOpacity)
+            return sidebarColors.foreground.opacity(isCompact ? compactOpacity : expandedOpacity)
         }
         if isFromOtherDisplay {
             return Color(nsColor: .systemPink).opacity(isHovered ? 0.10 : 0.05)
         }
         if isHovered {
-            return Color.white.opacity(0.045)
+            return sidebarColors.foreground.opacity(0.045)
         }
-        return Color.white.opacity(0.015)
+        return sidebarColors.foreground.opacity(0.015)
     }
 
     var isActiveWorkspaceSelection: Bool {
@@ -280,7 +288,9 @@ extension WorkspaceSidebarWorkspaceSection {
         isCompact && !isOnFocusedMonitor ? 0.72 : 1
     }
 
-    var inUseOverrideOverlay: some View {
+    var inUseOverrideOverlay: some View { overrideConfirmation }
+
+    var overrideConfirmation: WorkspaceSidebarInUseOverrideOverlay {
         WorkspaceSidebarInUseOverrideOverlay(text: inUseOverrideText, isCompact: isCompact, onOverride: {
             activeInUseOverrideWorkspaceName = nil
             actions.send(.overrideWorkspaceInUse(workspace.name))
@@ -289,13 +299,10 @@ extension WorkspaceSidebarWorkspaceSection {
 }
 extension WorkspaceSidebarWorkspaceSection {
     var workspaceBadge: some View {
-        Text(workspaceBadgeText)
-            .font(.system(size: 18, weight: isActiveOnTargetMonitor ? .bold : .semibold))
-            .monospacedDigit()
-            .foregroundStyle(workspaceBadgeForeground)
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
-            .frame(width: workspaceSidebarBadgeWidth, height: workspaceSidebarBadgeWidth)
+        WorkspaceSidebarLabel(text: workspaceBadgeText, size: compactMetrics.fontSize,
+            weight: isActiveOnTargetMonitor ? .bold : .semibold, secondary: !isActiveOnTargetMonitor,
+            monospacedDigit: true, alignment: .center, customColor: workspaceBadgeForeground)
+            .frame(width: compactMetrics.badgeSize, height: compactMetrics.badgeSize)
     }
 
     var workspaceBadgeText: String {
@@ -319,9 +326,9 @@ extension WorkspaceSidebarWorkspaceSection {
 
     var workspaceBadgeForeground: Color {
         if isActiveOnTargetMonitor {
-            return Color.white
+            return sidebarColors.foreground
         }
-        return Color.white.opacity(0.70)
+        return sidebarColors.text(opacity: 0.70)
     }
 }
 extension WorkspaceSidebarWorkspaceSection {
@@ -332,6 +339,7 @@ extension WorkspaceSidebarWorkspaceSection {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(isCompact ? workspaceBadgeText : workspace.displayName)
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -341,7 +349,7 @@ extension WorkspaceSidebarWorkspaceSection {
         Group {
             if isCompact {
                 workspaceBadge
-                    .frame(width: workspaceSidebarBadgeWidth, height: workspaceSidebarBadgeWidth)
+                    .frame(width: compactMetrics.badgeSize, height: compactMetrics.badgeSize)
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 expandedHeader
@@ -359,11 +367,9 @@ extension WorkspaceSidebarWorkspaceSection {
                     onCancel: onCancelRenameWorkspace,
                 )
             } else {
-                Text(workspace.displayName)
-                    .font(.system(size: 15, weight: isActiveOnTargetMonitor ? .bold : .semibold))
-                    .foregroundStyle(isActiveOnTargetMonitor ? Color.white : Color.white.opacity(0.85))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                WorkspaceSidebarLabel(text: workspace.displayName, size: 15,
+                    weight: isActiveOnTargetMonitor ? .bold : .semibold,
+                    customColor: isActiveOnTargetMonitor ? sidebarColors.foreground : sidebarColors.text(opacity: 0.85))
             }
             if let projectContextLabel, let projectContextColor {
                 Text(projectContextLabel)
@@ -459,8 +465,14 @@ extension WorkspaceSidebarWorkspaceSection {
 
     @ViewBuilder
     var headerSlot: some View {
-        header
-            .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
+        Group {
+            if !isCompact && !isRenamingWorkspace && !isShowingInUseOverlay {
+                headerButton
+            } else {
+                header
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
     }
 }
 extension WorkspaceSidebarWorkspaceSection {
@@ -493,10 +505,6 @@ extension WorkspaceSidebarWorkspaceSection {
         Button {
             guard allowsWorkspaceActivation else { return }
             guard shouldHandleWorkspaceSidebarActivation(isEditing: false, isSidebarDragInProgress: isWorkspaceSidebarDragInProgress()) else { return }
-            if isInUseOnOtherDisplay {
-                activeInUseOverrideWorkspaceName = workspace.name
-                return
-            }
             activeInUseOverrideWorkspaceName = nil
             actions.send(.selectWindow(group.representativeWindowId))
         } label: {
@@ -542,10 +550,6 @@ extension WorkspaceSidebarWorkspaceSection {
         Button {
             guard allowsWorkspaceActivation else { return }
             guard shouldHandleWorkspaceSidebarActivation(isEditing: false, isSidebarDragInProgress: isWorkspaceSidebarDragInProgress()) else { return }
-            if isInUseOnOtherDisplay {
-                activeInUseOverrideWorkspaceName = workspace.name
-                return
-            }
             activeInUseOverrideWorkspaceName = nil
             actions.send(.selectWindow(window.windowId))
         } label: {

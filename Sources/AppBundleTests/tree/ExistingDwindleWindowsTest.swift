@@ -7,6 +7,7 @@ final class ExistingDwindleWindowsTest: XCTestCase {
 
     func testStartupKeepsDwindleForMoreThanThreeAlreadyOpenWindows() async throws {
         config.defaultRootContainerLayout = .dwindle
+        config.defaultRootContainerOrientation = .auto
         config.enableNormalizationFlattenContainers = true
         config.enableNormalizationOppositeOrientationForNestedContainers = true
         let workspace = focus.workspace

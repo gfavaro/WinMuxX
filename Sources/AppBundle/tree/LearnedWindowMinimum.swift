@@ -1,9 +1,17 @@
 import AppKit
 
+func shouldLearnWindowMinimum(nativeFullscreen: Bool, nativeMinimized: Bool, animating: Bool) -> Bool {
+    !nativeFullscreen && !nativeMinimized && !animating
+}
+
 /// Conservative, session-local evidence. A refused request is not proof of a minimum:
 /// apps may resize asynchronously, and terminal windows round to character cells.
 struct LearnedWindowMinimum {
     private(set) var size: CGSize = .zero
+
+    init(size: CGSize = .zero) {
+        self.size = size
+    }
 
     mutating func observe(requested: CGSize, first: CGSize, confirmed: CGSize) {
         guard [requested.width, requested.height, first.width, first.height,

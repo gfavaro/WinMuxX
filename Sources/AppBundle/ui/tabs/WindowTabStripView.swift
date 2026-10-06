@@ -189,8 +189,8 @@ extension WindowTabStripView {
             topTrailingRadius: windowTabStripCornerRadius,
             style: .continuous,
         ))
-        .animation(reduceMotion ? windowTabReducedMotionAnimation : windowTabPillAnimation, value: hoveredTabId)
-        .animation(reduceMotion ? windowTabReducedMotionAnimation : windowTabPillAnimation, value: activeWindowId)
+        .animation(reduceMotion ? nil : windowTabPillAnimation, value: hoveredTabId)
+        .animation(reduceMotion ? nil : windowTabPillAnimation, value: activeWindowId)
         .onChange(of: context.tabOrder) { newOrder in
             clearPendingReorderDropIfModelApplied(currentOrder: newOrder)
         }

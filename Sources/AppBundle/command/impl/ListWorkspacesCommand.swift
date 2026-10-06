@@ -21,14 +21,13 @@ struct ListWorkspacesCommand: Command {
 
         if args.outputOnlyCount {
             return io.out("\(result.count)")
-        } else {
-            return result.map { FormatObject.workspace($0) }.writeFormattedOutput(
-                to: io,
-                format: args.format,
-                json: args.json,
-                ignoreRightPaddingVar: args._format.isEmpty,
-            )
         }
+        return result.map { FormatObject.workspace($0) }.writeFormattedOutput(
+            to: io,
+            format: args.format,
+            json: args.json,
+            ignoreRightPaddingVar: args._format.isEmpty,
+        )
     }
 }
 

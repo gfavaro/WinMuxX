@@ -36,11 +36,13 @@ struct ReloadConfigCommand: Command {
             if !args.dryRun {
                 lastConfigReloadError = nil
                 let previousRootLayout = config.defaultRootContainerLayout
+                let previousRootOrientation = config.defaultRootContainerOrientation
                 resetHotKeys()
                 config = parsedConfig
                 configUrl = url
                 materializePersistedWorkspaces()
                 applyUpdatedDefaultWindowLayout(previousLayout: previousRootLayout)
+                applyUpdatedDwindleOrientation(previousOrientation: previousRootOrientation)
                 try await activateMode(activeMode)
                 syncStartAtLogin()
                 applyReloadedConfigurationToRunningApp()
@@ -73,10 +75,24 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 /// reload rather than individual Settings controls, so GUI edits, config-editor saves, and
 /// filesystem auto-reloads share the same live-update behavior.
 @MainActor private func applyReloadedConfigurationToRunningApp() {
+    ShortcutSettingsModel.shared.reload()
     WorkspaceSidebarPanel.refreshAll()
     WindowTabStripPanelController.shared.refresh()
     SecureInputPanel.shared.refresh()
 
     guard isWinMuxRuntimeReady else { return }
     scheduleRefreshSession(.configAutoReload)
+}
+
+@MainActor
+func applyUpdatedDwindleOrientation(previousOrientation: DefaultContainerOrientation) {
+    guard isWinMuxRuntimeReady, previousOrientation != config.defaultRootContainerOrientation else { return }
+    for workspace in Workspace.all where workspace.rootTilingContainer.layout == .dwindle {
+        workspace.rootTilingContainer.dwindleOrientation = switch config.defaultRootContainerOrientation {
+            case .auto: nil
+            case .horizontal: .h
+            case .vertical: .v
+        }
+    }
+    syncClosedWindowsCacheToCurrentWorld()
 }

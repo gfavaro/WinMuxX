@@ -5,6 +5,7 @@ import SwiftUI
 // MARK: - Create Workspace Section
 
 struct WorkspaceSidebarCreateWorkspaceSection: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let projectId: WorkspaceProjectId
     let monitorScopeId: String
     let dragPreview: WorkspaceSidebarDropPreviewViewModel?
@@ -18,6 +19,7 @@ struct WorkspaceSidebarCreateWorkspaceSection: View {
     @State private var isDropTargeted = false
     @State private var isDropSettling = false
 
+    private var compactMetrics: WorkspaceSidebarCompactMetrics { WorkspaceSidebarCompactMetrics(width: layout.collapsedWidth) }
     private var sectionWidth: CGFloat { workspaceSidebarSectionWidth(expansionProgress, layout: layout) }
     private var isCompact: Bool { expansionProgress < workspaceSidebarRowsRevealProgress }
     private var showsDropTarget: Bool {
@@ -83,35 +85,35 @@ struct WorkspaceSidebarCreateWorkspaceSection: View {
             HStack(spacing: workspaceSidebarHeaderSpacing) {
                 if isCompact {
                     Image(systemName: "plus")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.white.opacity(0.45))
+                        .font(.system(size: 14 * compactMetrics.scale, weight: .semibold))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.45))
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
                 } else {
                     HStack(spacing: 6) {
                         Image(systemName: "plus")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color.white.opacity(0.45))
+                            .foregroundStyle(sidebarColors.text(opacity: 0.45))
                         Text("New Workspace")
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(Color.white.opacity(0.48))
+                            .foregroundStyle(sidebarColors.text(opacity: 0.48))
                             .lineLimit(1)
                         Spacer(minLength: 0)
                     }
                 }
             }
             .padding(.vertical, isCompact ? 3 : 4)
-            .padding(.horizontal, workspaceSidebarSectionInnerHorizontalInset + workspaceSidebarHeaderRowLeadingPadding)
+            .padding(.horizontal, isCompact ? compactMetrics.innerInset : workspaceSidebarSectionInnerHorizontalInset + workspaceSidebarHeaderRowLeadingPadding)
             .frame(
                 width: sectionWidth,
-                height: isCompact ? workspaceSidebarWorkspaceSectionHeightCompact : workspaceSidebarWorkspaceSectionHeightExpanded,
+                height: isCompact ? compactMetrics.headerHeight : workspaceSidebarWorkspaceSectionHeightExpanded,
                 alignment: isCompact ? .center : .leading,
             )
             .background {
-                sectionShape.fill(Color.white.opacity(0.012))
+                sectionShape.fill(sidebarColors.foreground.opacity(0.012))
             }
             .overlay {
                 sectionShape.strokeBorder(
-                    Color.white.opacity(0.10),
+                    sidebarColors.foreground.opacity(0.10),
                     style: StrokeStyle(lineWidth: 0.5, dash: [3, 2.5])
                 )
             }

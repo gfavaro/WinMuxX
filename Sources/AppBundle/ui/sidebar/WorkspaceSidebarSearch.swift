@@ -85,18 +85,7 @@ private func workspaceSidebarSearchResultItem(
                     terms: terms,
                 )
             }
-            if !matchingTabs.isEmpty {
-                return WorkspaceSidebarItemViewModel(kind: .tabGroup(WorkspaceSidebarTabGroupViewModel(
-                    representativeWindowId: group.representativeWindowId,
-                    workspaceName: group.workspaceName,
-                    title: group.title,
-                    windowCount: group.windowCount,
-                    isFocused: group.isFocused,
-                    tabs: group.tabs,
-                    searchVisibleTabs: matchingTabs,
-                )))
-            }
-            guard workspaceSidebarSearchTextMatches(
+            guard !matchingTabs.isEmpty || workspaceSidebarSearchTextMatches(
                 [
                     group.title,
                     workspace.displayName,
@@ -114,7 +103,7 @@ private func workspaceSidebarSearchResultItem(
                 windowCount: group.windowCount,
                 isFocused: group.isFocused,
                 tabs: group.tabs,
-                searchVisibleTabs: [],
+                searchVisibleTabs: matchingTabs,
             )))
     }
 }

@@ -6,29 +6,20 @@ struct ExperimentalUISettings {
         set { UserDefaults.standard.set(newValue, forKey: "doubleSidedWindows") }
     }
 
-    var displayStyle: MenuBarStyle {
-        get {
-            if let value = UserDefaults.standard.string(forKey: ExperimentalUISettingsItems.displayStyle.rawValue) {
-                return MenuBarStyle(rawValue: value) ?? .monospacedText
-            } else {
-                return .monospacedText
-            }
-        }
-        set {
-            UserDefaults.standard.setValue(newValue.rawValue, forKey: ExperimentalUISettingsItems.displayStyle.rawValue)
-            UserDefaults.standard.synchronize()
-        }
+    var indicator: MenuBarIndicator {
+        get { MenuBarIndicator(rawValue: UserDefaults.standard.string(forKey: "menuBarIndicator") ?? "") ?? .icon }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "menuBarIndicator") }
     }
 
     var iconAppearance: MenuBarIconAppearance {
         get {
-            guard let value = UserDefaults.standard.string(forKey: ExperimentalUISettingsItems.iconAppearance.rawValue) else {
+            guard let value = UserDefaults.standard.string(forKey: "iconAppearance") else {
                 return .color
             }
             return MenuBarIconAppearance(rawValue: value) ?? .color
         }
         set {
-            UserDefaults.standard.setValue(newValue.rawValue, forKey: ExperimentalUISettingsItems.iconAppearance.rawValue)
+            UserDefaults.standard.setValue(newValue.rawValue, forKey: "iconAppearance")
             UserDefaults.standard.synchronize()
         }
     }
@@ -48,25 +39,13 @@ enum MenuBarIconAppearance: String, CaseIterable, Identifiable, Equatable, Hasha
     }
 }
 
-enum MenuBarStyle: String, CaseIterable, Identifiable, Equatable, Hashable {
-    case monospacedText
-    case systemText
-    case squares
-    case i3
-    case i3Ordered
+enum MenuBarIndicator: String, CaseIterable, Identifiable {
+    case icon, workspace
     var id: String { rawValue }
-    var title: String {
-        switch self {
-            case .monospacedText: "Monospaced font"
-            case .systemText: "System font"
-            case .squares: "Square images"
-            case .i3: "i3 style grouped"
-            case .i3Ordered: "i3 style ordered"
-        }
-    }
+    var title: String { self == .icon ? "Icon" : "Workspace" }
 }
 
-enum ExperimentalUISettingsItems: String {
-    case displayStyle
-    case iconAppearance
+func menuBarWorkspaceIndicator(label: String?, number: Int) -> String {
+    let label = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return label.first.map { String($0).uppercased() } ?? String(number)
 }

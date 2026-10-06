@@ -22,7 +22,7 @@ public struct LayoutCmdArgs: CmdArgs {
         case tabGroup = "tab-group"
         case dwindle
         case tiles
-        case horizontal, vertical
+        case horizontal, vertical, auto
         case hTabGroup = "h_tab_group"
         case vTabGroup = "v_tab_group"
         case h_tiles, v_tiles

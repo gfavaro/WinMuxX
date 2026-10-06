@@ -20,10 +20,7 @@ extension TreeNode {
         if let window = self as? Window {
             return window.windowId == windowId
         }
-        for child in children where child.containsLeafWindow(withId: windowId) {
-            return true
-        }
-        return false
+        return children.contains { $0.containsLeafWindow(withId: windowId) }
     }
 
     var ownIndex: Int? {
@@ -47,10 +44,8 @@ extension TreeNode {
     var nodeMonitor: Monitor? {
         switch self.nodeCases {
             case .workspace(let ws): ws.workspaceMonitor
-            case .window: parent?.nodeMonitor
-            case .tilingContainer: parent?.nodeMonitor
-            case .macosFullscreenWindowsContainer: parent?.nodeMonitor
-            case .macosHiddenAppsWindowsContainer: parent?.nodeMonitor
+            case .window, .tilingContainer, .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer:
+                parent?.nodeMonitor
             case .macosMinimizedWindowsContainer, .macosPopupWindowsContainer: nil
         }
     }

@@ -1,11 +1,19 @@
 import SwiftUI
 
+struct WorkspaceSidebarCompactMetrics {
+    let width: CGFloat
+
+    var scale: CGFloat { min(max(width / 44, 0.75), 1.3) }
+    var sectionWidth: CGFloat { max(0, width - workspaceSidebarCompactRailHorizontalInset * 2) }
+    var badgeSize: CGFloat { min(workspaceSidebarBadgeWidth * scale, max(0, sectionWidth - 4)) }
+    var fontSize: CGFloat { 18 * scale }
+    var headerHeight: CGFloat { workspaceSidebarWorkspaceSectionHeaderHeight * scale }
+    var innerInset: CGFloat { min(workspaceSidebarSectionInnerHorizontalInset, max(0, (sectionWidth - badgeSize) / 2)) }
+}
+
 @MainActor
 func workspaceSidebarCompactSectionWidth(layout: WorkspaceSidebarConfiguration) -> CGFloat {
-    max(
-        layout.collapsedWidth - (workspaceSidebarCompactRailHorizontalInset * 2),
-        workspaceSidebarBadgeWidth + (workspaceSidebarSectionInnerHorizontalInset * 2),
-    )
+    WorkspaceSidebarCompactMetrics(width: layout.collapsedWidth).sectionWidth
 }
 
 @MainActor

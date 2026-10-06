@@ -1,11 +1,125 @@
 @testable import AppBundle
+import SwiftUI
 import AppKit
 import Common
-import SwiftUI
 import XCTest
 
 @MainActor
 final class WorkspaceSidebarOverrideTest: XCTestCase {
+    override func setUp() {
+        super.setUp()
+        // SwiftUI lazily creates its accessibility nodes only when requested.
+        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+    }
+
+    override func tearDown() {
+        NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        super.tearDown()
+    }
+
+    private func render<Content: View>(_ view: Content, size: CGSize) -> (NSWindow, NSHostingView<Content>) {
+        let host = NSHostingView(rootView: view)
+        let window = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        host.frame = CGRect(origin: .zero, size: size)
+        window.setFrameOrigin(NSPoint(x: -20000, y: -20000))
+        window.orderFront(nil)
+        host.layoutSubtreeIfNeeded()
+        host.displayIfNeeded()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+        return (window, host)
+    }
+
+    private func accessibilityButtons(_ element: AnyObject) -> [AnyObject] {
+        // SwiftUI nodes implement the selectors without declaring protocol conformance.
+        var result: [AnyObject] = element.accessibilityRole?() == .button ? [element] : []
+        let children = element.accessibilityChildren?() ?? []
+        for child in children {
+            result += accessibilityButtons(child as AnyObject)
+        }
+        return result
+    }
+
+    func testRenderedCompactOverrideFitsNarrowRailsAndPerformsAction() throws {
+        for railWidth: CGFloat in [33, 44, 57] {
+            var count = 0
+            let width = WorkspaceSidebarCompactMetrics(width: railWidth).sectionWidth
+            let (window, host) = render(WorkspaceSidebarInUseOverrideOverlay(
+                text: "In use on External Display", isCompact: true, onOverride: { count += 1 }
+            ).frame(width: width, height: 44), size: CGSize(width: width, height: 44))
+            defer { window.close() }
+            let button = try XCTUnwrap(accessibilityButtons(host).first { ($0.accessibilityLabel?() ?? $0.accessibilityTitle?()) == "Override" })
+            let size = try XCTUnwrap(button.accessibilityFrame?()).size
+            XCTAssertLessThanOrEqual(size.width, width, "Button overflows compact rail \(railWidth)")
+            XCTAssertGreaterThanOrEqual(size.height, 28)
+            XCTAssertEqual(button.accessibilityPerformPress?(), true)
+            XCTAssertEqual(count, 1)
+        }
+    }
+
+    func testRenderedExpandedConfirmationOffersExplicitCancel() throws {
+        var overrides = 0
+        var cancels = 0
+        let (window, host) = render(WorkspaceSidebarInUseOverrideOverlay(
+            text: "In use on External Display", onOverride: { overrides += 1 }, onCancel: { cancels += 1 }
+        ).frame(width: 240, height: 100), size: CGSize(width: 240, height: 100))
+        defer { window.close() }
+        let buttons = accessibilityButtons(host)
+        let cancel = try XCTUnwrap(buttons.first { ($0.accessibilityLabel?() ?? $0.accessibilityTitle?()) == "Cancel" })
+        XCTAssertEqual(cancel.accessibilityPerformPress?(), true)
+        XCTAssertEqual(cancels, 1)
+        XCTAssertEqual(overrides, 0)
+    }
+
+    func testCompactAndExpandedClicksRequireExplicitOverride() throws {
+        let item = WorkspaceSidebarWindowViewModel(windowId: 10, workspaceName: "remote",
+            appName: "Finder", appBundleId: "com.apple.finder", appBundlePath: nil,
+            title: "Example", isFocused: false)
+        var layout = WorkspaceSidebarConfiguration.empty
+        layout.collapsedWidth = 44
+        layout.expandedWidth = 240
+        let workspace = WorkspaceSidebarWorkspaceViewModel(
+            name: "remote", projectId: workspaceProjectDefaultId, displayName: "Remote",
+            sidebarLabel: "Remote", isGeneratedName: false,
+            monitorScopeId: "monitor:1920.0,0.0", monitorName: "External Display",
+            isFocused: false, isVisible: true, items: [WorkspaceSidebarItemViewModel(kind: .window(item))])
+        for progress: CGFloat in [0, 1] {
+            var pending: String?
+            var actions: [WorkspaceSidebarAction] = []
+            let section = WorkspaceSidebarWorkspaceSection(
+                workspace: workspace, dragPreview: nil, expansionProgress: progress,
+                layout: layout, emitsDropTarget: false, isFromOtherDisplay: false,
+                isInUseOnOtherDisplay: true, isOnFocusedMonitor: false,
+                allowsWorkspaceActivation: true, isPinnedActiveWorkspace: false,
+                isActiveOnTargetMonitor: false, projectContextLabel: nil, projectContextColor: nil,
+                renamingWorkspaceName: .constant(nil), renamingWorkspaceText: .constant(""),
+                onBeginRenameWorkspace: {}, onCommitRenameWorkspace: {}, onCancelRenameWorkspace: {},
+                selectedSearchTarget: nil, isSearchFiltering: false,
+                activeInUseOverrideWorkspaceName: Binding(get: { pending }, set: { pending = $0 }),
+                actions: WorkspaceSidebarActions(send: { actions.append($0) }))
+            section.handleSectionClick()
+            XCTAssertEqual(pending, workspace.name)
+            XCTAssertTrue(actions.isEmpty, "A click must request confirmation before activating or swapping")
+            XCTAssertEqual(section.inUseOverrideText, "In use on External Display")
+            XCTAssertEqual(section.overrideConfirmation.isCompact, progress == 0)
+            if progress == 1 {
+                XCTAssertEqual(section.sectionMinHeight, workspaceSidebarInUseOverrideEmptySectionMinHeight)
+                let (window, host) = render(section, size: CGSize(width: 240, height: 121))
+                defer { window.close() }
+                let override = try XCTUnwrap(accessibilityButtons(host).first { $0.accessibilityLabel?() == "Override" })
+                let frame = try XCTUnwrap(override.accessibilityFrame?())
+                XCTAssertTrue(window.accessibilityFrame().contains(frame), "Confirmation button must remain inside the section's hit area")
+                XCTAssertEqual(override.accessibilityPerformPress?(), true)
+                XCTAssertNil(pending)
+                XCTAssertEqual(actions, [.overrideWorkspaceInUse(workspace.name)])
+            }
+        }
+    }
+}
+
+@MainActor
+final class WorkspaceSidebarOverrideSizeRegressionTest: XCTestCase {
     func testConfirmationTracksCompactExpandedAndSplitWidths() {
         for collapsed: CGFloat in [36, 44, 56, 80, 120] {
             for expanded: CGFloat in [160, 240, 280, 420] {

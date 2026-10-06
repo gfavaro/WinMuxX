@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct WorkspaceSidebarCompactClockCard: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let date: Date
     let sectionWidth: CGFloat
     let showsSeconds: Bool
@@ -15,18 +16,18 @@ struct WorkspaceSidebarCompactClockCard: View {
             let shape = RoundedRectangle(cornerRadius: workspaceSidebarStatusCornerRadius, style: .continuous)
             ZStack(alignment: .bottomLeading) {
                 shape
-                    .fill(Color.white.opacity(0.06))
+                    .fill(sidebarColors.foreground.opacity(0.06))
 
                 VStack(alignment: .center, spacing: 4) {
                     Text(components.hour)
-                        .foregroundStyle(Color.white.opacity(0.90))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.90))
 
                     Text(components.minute)
-                        .foregroundStyle(Color.white.opacity(0.90))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.90))
 
                     if showsSeconds {
                         Text(components.second)
-                            .foregroundStyle(Color.white.opacity(0.66))
+                            .foregroundStyle(sidebarColors.text(opacity: 0.66))
                     }
                 }
                 .font(.system(size: 19, weight: .bold, design: .rounded))
@@ -34,7 +35,7 @@ struct WorkspaceSidebarCompactClockCard: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
                 shape
-                    .strokeBorder(Color.white.opacity(0.05), lineWidth: 0.5)
+                    .strokeBorder(sidebarColors.foreground.opacity(0.05), lineWidth: 0.5)
             }
             .clipShape(shape)
         }

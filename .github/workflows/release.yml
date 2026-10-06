@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   release:
-    if: github.repository == 'gfavaro/WinMuXx'
+    if: github.repository == 'gfavaro/WinMuxX'
     runs-on: macos-26
     timeout-minutes: 60
     permissions:
@@ -52,6 +52,6 @@ jobs:
         run: |
           set -euo pipefail
           version="$(tr -d '[:space:]' < VERSION)"
-          gh release create "$RELEASE_REF" ".release/WinMuXx-$version-$BUILD_NUMBER.zip" \
-            --verify-tag --generate-notes --title "WinMuXx $version" \
+          gh release create "$RELEASE_REF" ".release/WinMuxX-$version-$BUILD_NUMBER.zip" \
+            --verify-tag --generate-notes --title "WinMuxX $version" \
             --notes 'Personal fork build. Ad hoc signed, not notarized. Automatic updates are disabled.'

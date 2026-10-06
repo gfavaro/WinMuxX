@@ -17,10 +17,9 @@ class ForkIdentityTests(unittest.TestCase):
     def test_project_generates_only_fork_bundle_identifiers(self):
         project = (ROOT / "project.yml").read_text()
         package = (ROOT / "Package.swift").read_text()
-        self.assertIn("PRODUCT_NAME: WinMuXx\n", project)
         self.assertIn('executable(name: "winmuxx", targets: ["Cli"])', package)
-        self.assertIn("PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmux\n", project)
-        self.assertIn("PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmux.debug\n", project)
+        self.assertIn("PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmuxx\n", project)
+        self.assertIn("PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmuxx.debug\n", project)
         self.assertNotIn("com.zimengxiong", project)
         self.assertNotIn("SUFeedURL", project)
         self.assertNotIn("SUPublicEDKey", project)
@@ -40,7 +39,14 @@ class ForkIdentityTests(unittest.TestCase):
         build = (ROOT / "script/fork-build.sh").read_text()
         self.assertIn('"$fork_app/Contents/MacOS/winmuxx-cli"', build)
         self.assertIn('"$fork_bin/winmuxx"', build)
-        self.assertNotEqual("WinMuXx".casefold(), "winmuxx-cli".casefold())
+        self.assertNotIn('"$fork_app/Contents/MacOS/winmuxx"', build)
+        self.assertNotEqual("WinMuxX".casefold(), "winmuxx-cli".casefold())
+
+    def test_fork_build_accepts_a_persistent_local_signing_identity(self):
+        build = (ROOT / "script/fork-build.sh").read_text()
+        self.assertIn('"${CODESIGN_IDENTITY:-}"', build)
+        self.assertIn("winmux-gf/signing-identity", build)
+        self.assertIn('codesign --force --deep --sign "$fork_signing_identity"', build)
 
 
 if __name__ == "__main__":

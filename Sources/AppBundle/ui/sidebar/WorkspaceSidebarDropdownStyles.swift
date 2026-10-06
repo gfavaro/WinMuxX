@@ -1,13 +1,14 @@
 import SwiftUI
 
 struct WorkspaceSidebarDropdownControlStyle: ViewModifier {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let isActive: Bool
-    var activeFill: Color = Color.white.opacity(0.12)
-    var activeStroke: Color = Color.white.opacity(0.18)
-    var inactiveFill: Color = Color.white.opacity(0.06)
-    var inactiveHoverFill: Color = Color.white.opacity(0.10)
-    var inactiveStroke: Color = Color.white.opacity(0.08)
-    var inactiveHoverStroke: Color = Color.white.opacity(0.14)
+    var activeFill: Color? = nil
+    var activeStroke: Color? = nil
+    var inactiveFill: Color? = nil
+    var inactiveHoverFill: Color? = nil
+    var inactiveStroke: Color? = nil
+    var inactiveHoverStroke: Color? = nil
     @State private var isHovered = false
 
     func body(content: Content) -> some View {
@@ -31,20 +32,25 @@ struct WorkspaceSidebarDropdownControlStyle: ViewModifier {
 
     private var controlFill: Color {
         if isActive {
-            return activeFill
+            return activeFill ?? sidebarColors.foreground.opacity(0.12)
         }
-        return isHovered ? inactiveHoverFill : inactiveFill
+        return isHovered
+            ? inactiveHoverFill ?? sidebarColors.foreground.opacity(0.10)
+            : inactiveFill ?? sidebarColors.foreground.opacity(0.06)
     }
 
     private var controlStroke: Color {
         if isActive {
-            return activeStroke
+            return activeStroke ?? sidebarColors.foreground.opacity(0.18)
         }
-        return isHovered ? inactiveHoverStroke : inactiveStroke
+        return isHovered
+            ? inactiveHoverStroke ?? (sidebarColors.appearance == .system ? sidebarColors.separator : .white.opacity(0.14))
+            : inactiveStroke ?? sidebarColors.foreground.opacity(0.08)
     }
 }
 
 struct WorkspaceSidebarDropdownMenuRowStyle: ViewModifier {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let isSelected: Bool
     var rowHeight: CGFloat = workspaceSidebarDropdownHeight
     @State private var isHovered = false
@@ -67,14 +73,23 @@ struct WorkspaceSidebarDropdownMenuRowStyle: ViewModifier {
 
     private var rowFill: Color {
         if isSelected {
-            return Color.white.opacity(isHovered ? 0.10 : 0.06)
+            return sidebarColors.foreground.opacity(isHovered ? 0.10 : 0.06)
         }
-        return Color.white.opacity(isHovered ? 0.07 : 0)
+        return sidebarColors.foreground.opacity(isHovered ? 0.07 : 0)
     }
 }
 
 func checkmark(isVisible: Bool) -> some View {
-    Image(systemName: "checkmark")
-        .font(.system(size: 9, weight: .bold))
-        .foregroundStyle(Color.white.opacity(isVisible ? 0.80 : 0))
+    WorkspaceSidebarCheckmark(isVisible: isVisible)
+}
+
+private struct WorkspaceSidebarCheckmark: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
+    let isVisible: Bool
+
+    var body: some View {
+        Image(systemName: "checkmark")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(sidebarColors.text(opacity: isVisible ? 0.80 : 0))
+    }
 }

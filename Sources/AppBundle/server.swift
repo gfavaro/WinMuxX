@@ -23,7 +23,7 @@ func toggleReleaseServerIfDebug(_ state: EnableCmdArgs.State) async {
     let socketFile = "/tmp/\(stableWinMuxAppId)-\(unixUserName).sock"
     let connection = NWConnection(to: NWEndpoint.unix(path: socketFile), using: .tcp)
     defer { connection.cancel() }
-    if await connection.startBlocking().error != nil { // Can't connect, WinMuXx.app is not running
+    if await connection.startBlocking().error != nil { // Can't connect, WinMuxX.app is not running
         return
     }
 
@@ -120,7 +120,7 @@ private func newConnection(_ connection: NWConnection) async { // todo add exit 
                     serverVersionAndHash: serverVersionAndHash,
                 )
             if request.windowId == nil || request.workspace == nil {
-                answer.stderr += "\n\nWinMuXx client has sent incomplete JSON request. 'windowId' or/and 'workspace' fields are missing. Please forward WINMUX_WINDOW_ID and WINMUX_WORKSPACE to these JSON fields. If the appropriate environment variables are empty, pass explicit 'null' in the JSON."
+                answer.stderr += "\n\nWinMuxX client has sent incomplete JSON request. 'windowId' or/and 'workspace' fields are missing. Please forward WINMUX_WINDOW_ID and WINMUX_WORKSPACE to these JSON fields. If the appropriate environment variables are empty, pass explicit 'null' in the JSON."
             }
             await answerToClient(answer)
             continue

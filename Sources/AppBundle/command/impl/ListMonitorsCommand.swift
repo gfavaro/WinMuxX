@@ -18,13 +18,12 @@ struct ListMonitorsCommand: Command {
 
         if args.outputOnlyCount {
             return io.out("\(result.count)")
-        } else {
-            return result.map { FormatObject.monitor($0) }.writeFormattedOutput(
-                to: io,
-                format: args.format,
-                json: args.json,
-                ignoreRightPaddingVar: args._format.isEmpty,
-            )
         }
+        return result.map { FormatObject.monitor($0) }.writeFormattedOutput(
+            to: io,
+            format: args.format,
+            json: args.json,
+            ignoreRightPaddingVar: args._format.isEmpty,
+        )
     }
 }

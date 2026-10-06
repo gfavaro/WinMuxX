@@ -25,6 +25,7 @@ struct EnableCommand: Command {
         TrayMenuModel.shared.isEnabled = newState
         if newState { WindowRecoveryController.shared.resumeTiling() }
         if !newState {
+            GlobalObserver.cancelFocusFollowsMouse()
             TrayMenuModel.shared.isWorkspaceSidebarExpanded = false
             clearPendingWindowDragIntent()
             cancelManipulatedWithMouseState()

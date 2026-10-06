@@ -33,16 +33,21 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
     }
 
-    func testDirectSelectionSwapsExactlyAndRestoresDestinationFocus() async throws {
+    func testDirectSelectionOnlyFocusesDestinationAndPreservesHistory() async throws {
+        for display in displays {
+            winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
+        }
+        let before = winMuxWorkspaceState.monitorViewportsById
         try await run("workspace 2")
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[0])
-        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
-        XCTAssertEqual(focus.windowOrNil?.windowId, 902)
-        XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
-        try await run("workspace-back-and-forth")
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        XCTAssertEqual(focus.windowOrNil?.windowId, 902)
+        XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
+        for (id, viewport) in before {
+            XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
+            XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.activeWorkspaceId, viewport.activeWorkspaceId)
+        }
     }
 
     func testRelativeNavigationSkipsOtherDisplaysAndPreservesStdinOrder() async throws {
@@ -77,17 +82,17 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
     }
 
-    func testForcedAssignmentBlocksSwapWithoutPartialChanges() async throws {
+    func testForcedSourceAssignmentDoesNotBlockCrossMonitorFocus() async throws {
         config.workspaceToMonitorForceAssignment = ["1": [.main]]
-        // The initial history can point at the transient empty workspace created by test setup,
-        // which normal reconciliation prunes while handling the rejected activation.
-        winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(displays[0])]?.previousWorkspaceId = spaces[2].id
+        for display in displays {
+            winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
+        }
         let before = winMuxWorkspaceState.monitorViewportsById
         let result = try await parseCommand("workspace --name 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
-        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
-        XCTAssertEqual(focus.workspace, spaces[0])
+        XCTAssertEqual(focus.workspace, spaces[1])
         for (id, viewport) in before {
             XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
         }
@@ -99,16 +104,33 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[3])
     }
 
-    func testSidebarTargetsClickedDisplayAndSwapsWithFocusedDisplay() {
-        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[0])
-        XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
+    func testSidebarRequiresOverrideForWorkspaceVisibleOnAnotherDisplay() {
+        XCTAssertFalse(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
     }
 
-    func testForcedDestinationAssignmentAlsoBlocksSwap() async throws {
+    func testForcedDestinationAssignmentAllowsFocusOnItsExistingMonitor() async throws {
         config.workspaceToMonitorForceAssignment = ["2": [.sequenceNumber(2)]]
         let result = try await parseCommand("workspace --name 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(focus.workspace, spaces[1])
+    }
+
+    func testForcedHiddenWorkspaceStillCannotActivateOnWrongMonitor() async throws {
+        config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(2)]]
+        let result = try await parseCommand("workspace --name 3").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(focus.workspace, spaces[0])
+    }
+
+    func testAlreadyFocusedVisibleWorkspaceIsNoopEvenWhenAnotherMonitorIsRequested() async throws {
+        let result = try await parseCommand("workspace --monitor 2 --name 1 --fail-if-noop").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 1)
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
@@ -147,4 +169,13 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         try await run("workspace-back-and-forth")
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
     }
+    func testSidebarOverrideSwapsOnlyTheSourceAndDestinationDisplays() {
+        XCTAssertTrue(overrideWorkspaceOnMonitorBySwappingActiveViewports(spaces[0], targetMonitor: displays[1]))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
+        XCTAssertEqual(focus.workspace, spaces[0])
+    }
+
 }

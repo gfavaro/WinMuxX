@@ -32,7 +32,8 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         field.isBezeled = false
         field.drawsBackground = false
         field.focusRingType = .none
-        field.textColor = .white
+        field.textColor = context.environment.workspaceSidebarAppearance == .system ? .labelColor : .white
+        field.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         field.font = .systemFont(ofSize: 12.5, weight: .medium)
         field.lineBreakMode = .byTruncatingTail
         field.usesSingleLineMode = true
@@ -46,6 +47,8 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ field: NSTextField, context: Context) {
+        field.textColor = context.environment.workspaceSidebarAppearance == .system ? .labelColor : .white
+        field.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         debugWorkspaceSidebarRenameLog("updateNSView didFocus=\(context.coordinator.didFocus) text=\(text) field=\(field.stringValue) windowKey=\(field.window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: field.window?.firstResponder))")
         if field.stringValue != text {
             field.stringValue = text
@@ -137,6 +140,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
 }
 
 struct WorkspaceSidebarProjectRenameField: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let project: WorkspaceSidebarProjectViewModel
     @Binding var text: String
     let onCommit: @MainActor @Sendable () -> Void
@@ -156,7 +160,7 @@ struct WorkspaceSidebarProjectRenameField: View {
             .frame(height: workspaceSidebarDropdownHeight)
             .background {
                 RoundedRectangle(cornerRadius: workspaceSidebarPlateCornerRadius, style: .continuous)
-                    .fill(Color.white.opacity(0.12))
+                    .fill(sidebarColors.foreground.opacity(0.12))
             }
             .overlay {
                 RoundedRectangle(cornerRadius: workspaceSidebarPlateCornerRadius, style: .continuous)
@@ -232,6 +236,7 @@ struct WorkspaceSidebarProjectRenameField: View {
 }
 
 struct WorkspaceSidebarWorkspaceRenameField: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     @Binding var text: String
     let workspaceName: String
     let onCommit: @MainActor @Sendable () -> Void
@@ -252,11 +257,11 @@ struct WorkspaceSidebarWorkspaceRenameField: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: workspaceSidebarRowCornerRadius, style: .continuous)
-                .fill(Color.white.opacity(0.12))
+                .fill(sidebarColors.foreground.opacity(0.12))
         }
         .overlay {
             RoundedRectangle(cornerRadius: workspaceSidebarRowCornerRadius, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.62), lineWidth: 0.8)
+                .strokeBorder(sidebarColors.foreground.opacity(0.62), lineWidth: 0.8)
         }
         .onAppear {
             debugWorkspaceSidebarRenameLog("workspaceRenameField onAppear workspace=\(workspaceName) text=\(text)")

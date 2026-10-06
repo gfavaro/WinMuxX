@@ -10,8 +10,6 @@ import Foundation
         var bootstrappedConfigUrl: URL? = nil
         if isDebug {
             await toggleReleaseServerIfDebug(.off)
-            interceptTermination(SIGINT)
-            interceptTermination(SIGKILL)
         }
         do {
             bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
@@ -49,11 +47,6 @@ import Foundation
             _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
         }
         isWinMuxRuntimeReady = true
-        if bootstrappedConfigUrl != nil {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                ShortcutSettingsModel.shared.requestWindowOpen()
-            }
-        }
     }
 }
 
@@ -83,11 +76,11 @@ struct ServerArgs: Sendable {
 }
 
 private let serverHelp = """
-    USAGE: \(CommandLine.arguments.first ?? "WinMuXx.app/Contents/MacOS/WinMuXx") [<options>]
+    USAGE: \(CommandLine.arguments.first ?? "WinMuxX.app/Contents/MacOS/WinMuxX") [<options>]
 
     OPTIONS:
       -h, --help              Print help
-      -v, --version           Print WinMuXx.app version
+      -v, --version           Print WinMuxX.app version
       --config-path <path>    Config path. Takes priority over ${XDG_CONFIG_HOME}/winmux-gf/winmux.toml
                               (defaults to ~/.config/winmux-gf/winmux.toml).
       --read-only             Run without mutating macOS windows.

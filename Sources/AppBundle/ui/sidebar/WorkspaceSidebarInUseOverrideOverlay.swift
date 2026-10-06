@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WorkspaceSidebarInUseOverrideOverlay: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let text: String
     var isCompact = false
     let onOverride: () -> Void
@@ -28,7 +29,7 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                 if !isCompact {
                     Text(text)
                         .font(.system(size: 10.5, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.88))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.88))
                         .lineLimit(2)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 12)
@@ -39,6 +40,9 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                         Group {
                             if isCompact {
                                 Image(systemName: "arrow.left.arrow.right")
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(width: 10, height: 10)
                                     .frame(maxWidth: .infinity, minHeight: 28)
                             } else {
                                 Text("Override")
@@ -56,10 +60,12 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                     .background {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(Color(nsColor: .systemRed).opacity(isOverrideHovered ? 1 : 0.88))
+                            .allowsHitTesting(false)
                     }
                     .overlay {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
-                            .strokeBorder(Color.white.opacity(isOverrideHovered ? 0.28 : 0), lineWidth: 0.6)
+                            .strokeBorder(sidebarColors.foreground.opacity(isOverrideHovered ? 0.28 : 0), lineWidth: 0.6)
+                            .allowsHitTesting(false)
                     }
                     .onHover { hovering in
                         isOverrideHovered = hovering

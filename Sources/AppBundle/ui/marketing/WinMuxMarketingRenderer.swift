@@ -32,18 +32,122 @@ public func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
 }
 
 @MainActor
+public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
+    let application = NSApplication.shared
+    application.setActivationPolicy(.accessory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let variants: [(String, ColorScheme, Bool, Bool, Bool, WorkspaceSidebarAppearance, ChromeStyle, WorkspaceSidebarBackground)] = [
+        ("light-expanded", .light, false, false, false, .system, .liquidGlass, .menuBar),
+        ("dark-expanded", .dark, false, false, false, .system, .liquidGlass, .menuBar),
+        ("light-collapsed", .light, true, false, false, .system, .liquidGlass, .menuBar),
+        ("dark-collapsed", .dark, true, false, false, .system, .liquidGlass, .menuBar),
+        ("reduced-transparency", .light, false, true, false, .system, .liquidGlass, .menuBar),
+        ("increased-contrast", .light, false, false, true, .system, .liquidGlass, .menuBar),
+        ("custom-liquid", .light, false, false, false, .custom, .liquidGlass, .sidebar),
+        ("custom-solid", .light, false, false, false, .custom, .solid, .sidebar),
+        ("no-background-light", .light, false, false, false, .system, .liquidGlass, .transparent),
+        ("no-background-dark", .dark, false, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-brown-system-light", .light, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-brown-system-dark", .dark, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-white-system-light", .light, true, false, false, .system, .liquidGlass, .transparent),
+        ("wallpaper-white-system-dark", .dark, true, false, false, .system, .liquidGlass, .transparent),
+    ]
+    for (name, scheme, collapsed, reduceTransparency, contrast, appearance, chrome, background) in variants {
+        var snapshot = MarketingFixtures.sidebarSnapshot
+        snapshot.configuration.appearance = appearance
+        snapshot.configuration.background = background
+        snapshot.configuration.menuBarBackground = !name.hasPrefix("no-background-")
+        snapshot.configuration.chromeStyle = chrome
+        snapshot.visibleWidth = collapsed ? snapshot.configuration.collapsedWidth : snapshot.configuration.expandedWidth
+        let wallpaperSample: WorkspaceSidebarWallpaperSample? = name.hasPrefix("wallpaper-brown-")
+            ? WorkspaceSidebarWallpaperSample(tone: .dark, red: 0.32, green: 0.28, blue: 0.21)
+            : (name.hasPrefix("wallpaper-white-") ? WorkspaceSidebarWallpaperSample(tone: .light, red: 0.92, green: 0.92, blue: 0.92) : nil)
+        if name.hasPrefix("wallpaper-brown-") || name.hasPrefix("wallpaper-white-") {
+            var fixedWorkspaces: [WorkspaceSidebarWorkspaceViewModel] = []
+            for number in 1...5 {
+                let workspaceName = String(number)
+                let workspace = WorkspaceSidebarWorkspaceViewModel(
+                    name: workspaceName,
+                    projectId: snapshot.activeProjectId,
+                    displayName: workspaceName,
+                    sidebarLabel: "",
+                    isGeneratedName: false,
+                    monitorScopeId: snapshot.targetMonitorScopeId,
+                    monitorName: nil,
+                    isFocused: number == 4,
+                    isVisible: number == 4,
+                    items: []
+                )
+                fixedWorkspaces.append(workspace)
+            }
+            snapshot.workspaces = fixedWorkspaces
+            snapshot.configuration.showsClock = false
+            snapshot.configuration.showsStatusPills = false
+            snapshot.configuration.menuBarBackground = false
+        }
+        let resolvedScheme = wallpaperSample.map {
+            workspaceSidebarResolvedColorScheme(menuBarColorScheme: nil, wallpaperTone: $0.tone, systemColorScheme: scheme)
+        } ?? scheme
+        let size = CGSize(width: snapshot.visibleWidth, height: 700)
+        // A code-defined backdrop, not the user's wallpaper or application windows.
+        let backdrop = NSWindow(contentRect: CGRect(origin: .zero, size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+        backdrop.isReleasedWhenClosed = false
+        backdrop.level = .floating
+        let backdropColors: [Color] = wallpaperSample.map { [$0.color] } ?? (scheme == .light
+            ? [.white, .cyan.opacity(0.35), .pink.opacity(0.3)]
+            : [.black, .indigo, .purple])
+        backdrop.contentView = NSHostingView(rootView: LinearGradient(
+            colors: backdropColors,
+            startPoint: .topLeading, endPoint: .bottomTrailing
+        ))
+        backdrop.backgroundColor = scheme == .light ? .white : .black
+        if let screen = NSScreen.main?.visibleFrame {
+            backdrop.setFrameOrigin(CGPoint(x: screen.midX - size.width / 2, y: screen.midY - size.height / 2))
+        }
+        backdrop.orderFrontRegardless()
+        defer { backdrop.orderOut(nil) }
+        try renderMarketingView(
+            WorkspaceSidebarView(snapshot: snapshot)
+                .environment(\.workspaceSidebarWallpaperSample, wallpaperSample)
+                .environment(\.colorScheme, resolvedScheme)
+                .background {
+                // Include the synthetic backdrop in the transparent proof's own surface,
+                // so exported PNGs show controls over it rather than over transparent pixels.
+                if background == .transparent {
+                    LinearGradient(colors: backdropColors, startPoint: .topLeading, endPoint: .bottomTrailing)
+                }
+            },
+            to: directory.appendingPathComponent(name + ".png"),
+            size: size,
+            colorScheme: scheme,
+            reduceTransparency: reduceTransparency,
+            increasedContrast: contrast,
+            isOpaque: false
+        )
+    }
+}
+
+@MainActor
 private func renderMarketingView<Content: View>(
     _ rootView: Content,
     to outputURL: URL,
     size: CGSize = CGSize(width: 1_600, height: 900),
-    renderScale: CGFloat = 1
+    renderScale: CGFloat = 1,
+    colorScheme: ColorScheme = .dark,
+    reduceTransparency: Bool = false,
+    increasedContrast: Bool = false,
+    isOpaque: Bool = true
 ) throws {
     let renderSize = CGSize(width: size.width * renderScale, height: size.height * renderScale)
     let content = rootView
         .frame(width: size.width, height: size.height)
         .scaleEffect(renderScale, anchor: .topLeading)
         .frame(width: renderSize.width, height: renderSize.height, alignment: .topLeading)
-        .environment(\.colorScheme, .dark)
+        .environment(\.colorScheme, colorScheme)
+        .environment(\.workspaceSidebarPreviewAccessibility, WorkspaceSidebarPreviewAccessibility(
+            reduceTransparency: reduceTransparency,
+            increasedContrast: increasedContrast
+        ))
         .environment(\.workspaceSidebarClockDate, Calendar.current.date(
             from: DateComponents(year: 2026, month: 9, day: 5, hour: 10)
         ))
@@ -67,8 +171,12 @@ private func renderMarketingView<Content: View>(
         defer: false
     )
     window.contentView = hostingView
-    window.backgroundColor = .black
-    window.isOpaque = true
+    window.backgroundColor = isOpaque ? .black : .clear
+    window.isOpaque = isOpaque
+    let appearanceName: NSAppearance.Name = increasedContrast
+        ? (colorScheme == .light ? .accessibilityHighContrastAqua : .accessibilityHighContrastDarkAqua)
+        : (colorScheme == .light ? .aqua : .darkAqua)
+    window.appearance = NSAppearance(named: appearanceName)
     window.hasShadow = false
     window.level = .floating
     window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
@@ -342,7 +450,7 @@ private struct WinMuxMarketingCanvas: View {
                     .shadow(color: .black.opacity(0.42), radius: 14, y: 8)
 
                 VStack(alignment: .leading, spacing: 1) {
-                    Text("WinMuXx")
+                    Text("WinMuxX")
                         .font(.system(size: 19, weight: .bold, design: .rounded))
                     Text("A sidebar-first window manager for macOS")
                         .font(.system(size: 13, weight: .medium))
@@ -441,7 +549,7 @@ private struct MarketingMenuBar: View {
         HStack(spacing: 21) {
             Image(systemName: "apple.logo")
                 .font(.system(size: 15, weight: .semibold))
-            Text("WinMuXx").fontWeight(.semibold)
+            Text("WinMuxX").fontWeight(.semibold)
             Text("File")
             Text("Edit")
             Text("View")
@@ -788,7 +896,7 @@ private struct MarketingCodeContent: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                Label("WinMuXx", systemImage: "folder.fill")
+                Label("WinMuxX", systemImage: "folder.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(Color.white.opacity(0.72))
                 ForEach(["AppBundle", "ui", "sidebar", "tabs", "MarketingRenderer.swift"], id: \.self) { item in
@@ -1063,7 +1171,7 @@ private enum MarketingFixtures {
             ),
         ],
         projects: [
-            WorkspaceSidebarProjectViewModel(id: defaultProject, displayName: "WinMuXx", colorHex: "#7C6CF2"),
+            WorkspaceSidebarProjectViewModel(id: defaultProject, displayName: "WinMuxX", colorHex: "#7C6CF2"),
             WorkspaceSidebarProjectViewModel(id: "personal", displayName: "Personal", colorHex: "#58A6FF"),
         ],
         activeProjectId: defaultProject,
@@ -1124,8 +1232,8 @@ private enum MarketingFixtures {
         activeWindowId: 301,
         tabs: [
             tab(301, workspace: "work", app: "Helium", bundle: "net.imput.helium", title: "alpaca engineering", active: true),
-            tab(302, workspace: "work", app: "Ghostty", bundle: "com.mitchellh.ghostty", title: "WinMuXx"),
-            tab(303, workspace: "work", app: "Finder", bundle: "com.apple.finder", title: "WinMuXx"),
+            tab(302, workspace: "work", app: "Ghostty", bundle: "com.mitchellh.ghostty", title: "WinMuxX"),
+            tab(303, workspace: "work", app: "Finder", bundle: "com.apple.finder", title: "WinMuxX"),
         ]
     )
 

@@ -16,6 +16,31 @@ final class MoveCommandTest: XCTestCase {
         assertEquals(root.layoutDescription, .h_tiles([.window(2), .window(1)]))
     }
 
+    func testDwindleMoveSwapsSameParentSlotsWithoutChangingRatios() async throws {
+        config.defaultRootContainerLayout = .dwindle
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let left = TestWindow.new(id: 7201, parent: root)
+        let upperRight = TestWindow.new(id: 7202, parent: root)
+        let lowerRight = TestWindow.new(id: 7203, parent: root)
+        root.setDwindleSplitRatio(0.65, at: 0)
+        workspace.normalizeContainers()
+        let originalShares = root.dwindleChildRatios
+        try await workspace.layoutWorkspace()
+
+        let originalLeftRect = try XCTUnwrap(left.lastAppliedLayoutPhysicalRect)
+        let originalUpperRightRect = try XCTUnwrap(upperRight.lastAppliedLayoutPhysicalRect)
+        let originalLowerRightRect = lowerRight.lastAppliedLayoutPhysicalRect
+        XCTAssertTrue(left.focusWindow())
+        try await MoveCommand(args: MoveCmdArgs(rawArgs: [], .right)).run(.defaultEnv, .emptyStdin)
+        try await workspace.layoutWorkspace()
+
+        XCTAssertEqual(left.lastAppliedLayoutPhysicalRect, originalUpperRightRect)
+        XCTAssertEqual(upperRight.lastAppliedLayoutPhysicalRect, originalLeftRect)
+        XCTAssertEqual(lowerRight.lastAppliedLayoutPhysicalRect, originalLowerRightRect)
+        XCTAssertEqual(root.dwindleChildRatios, originalShares)
+    }
+
     func testMove_swapWithTabGroupTreatsTabGroupAsSingleNode() async throws {
         let root = Workspace.get(byName: name).rootTilingContainer.apply {
             TilingContainer(parent: $0, adaptiveWeight: 1, .v, .tabGroup, index: INDEX_BIND_LAST).apply {

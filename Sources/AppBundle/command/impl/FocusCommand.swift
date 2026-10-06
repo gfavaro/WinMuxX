@@ -18,6 +18,12 @@ struct FocusCommand: Command {
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil
+                if target.workspace.rootTilingContainer.layout == .dwindle, let window {
+                    if let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction) {
+                        return neighbor.focusWindow()
+                    }
+                    return hitWorkspaceBoundaries(target, io, args, direction)
+                }
                 if let (parent, ownIndex) = window?.closestParent(hasChildrenInDirection: direction, withLayout: nil) {
                     guard let windowToFocus = parent.children[ownIndex + direction.focusOffset]
                         .findLeafWindowRecursive(snappedTo: direction.opposite) else { return false }
@@ -116,6 +122,21 @@ struct FocusCommand: Command {
 }
 
 @MainActor private func wrapAroundTheWorkspace(_ target: LiveFocus, _ io: CmdIo, _ direction: CardinalDirection) -> Bool {
+    if target.workspace.rootTilingContainer.layout == .dwindle {
+        let frames = dwindleFocusFrames(in: target.workspace)
+        let current = target.windowOrNil.flatMap { frames[$0.windowId] }
+        let candidates = target.workspace.rootTilingContainer.allLeafWindowsRecursive.compactMap { window -> (Window, [CGFloat])? in
+            guard let rect = frames[window.windowId], window.participatesInWorkspaceFocus else { return nil }
+            let edge = direction.orientation == .h
+                ? (direction.isPositive ? rect.minX : -rect.maxX)
+                : (direction.isPositive ? rect.minY : -rect.maxY)
+            let cross = current.map { direction.orientation == .h ? abs(rect.center.y - $0.center.y) : abs(rect.center.x - $0.center.x) } ?? 0
+            return (window, [edge, cross])
+        }
+        return candidates.min { lhs, rhs in
+            lhs.1 == rhs.1 ? lhs.0.windowId < rhs.0.windowId : lhs.1.lexicographicallyPrecedes(rhs.1)
+        }?.0.focusWindow() ?? io.err(noWindowIsFocused)
+    }
     guard let windowToFocus = target.workspace.findLeafWindowRecursive(snappedTo: direction.opposite) else {
         return io.err(noWindowIsFocused)
     }
@@ -250,7 +271,7 @@ extension TreeNode {
             case .window(let window):
                 return window
             case .tilingContainer(let container):
-                if direction.orientation == container.orientation {
+                if direction.orientation == container.navigationOrientation {
                     return (direction.isPositive ? container.children.last : container.children.first)?
                         .findLeafWindowRecursive(snappedTo: direction)
                 } else {

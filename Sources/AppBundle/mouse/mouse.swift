@@ -52,6 +52,7 @@ final class MousePointerTracker {
 @MainActor private var currentMouseTabDetachOrigin: TabDetachOrigin = .window
 @MainActor private var currentMouseDragStartedInSidebar: Bool = false
 @MainActor private var currentMouseManipulationKind: MouseManipulationKind = .none
+@MainActor var isMouseManipulationActive: Bool { currentMouseManipulationKind != .none }
 @MainActor private var draggedWindowAnchorRectById: [UInt32: Rect] = [:]
 @MainActor private var suppressedPostDragAxObserverEventsUntil: ContinuousClock.Instant? = nil
 @MainActor private var suppressedPostDragAxObserverEventsByWindowId: [UInt32: ContinuousClock.Instant] = [:]

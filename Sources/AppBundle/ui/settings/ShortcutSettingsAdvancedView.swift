@@ -10,6 +10,8 @@ struct ShortcutAdvancedView: View {
     @State private var saveMessage: String? = nil
     @State private var targetUrl: URL? = nil
     @State private var hasLoaded = false
+    @State private var savedText = ""
+    @State private var isSaving = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -35,11 +37,12 @@ struct ShortcutAdvancedView: View {
                     validateConfig()
                 }
                 .controlSize(.small)
-                Button("Save") {
+                Button(isSaving ? "Saving…" : "Save and apply") {
                     saveConfig()
                 }
                 .controlSize(.small)
                 .keyboardShortcut("s", modifiers: [.command])
+                .disabled(isSaving || configText == savedText)
             }
 
             if let validationMessage {
@@ -55,6 +58,10 @@ struct ShortcutAdvancedView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 2)
+            }
+
+            if configText != savedText {
+                Text("Unsaved changes").font(.caption).foregroundStyle(.secondary)
             }
 
             TextEditor(text: $configText)
@@ -78,6 +85,7 @@ struct ShortcutAdvancedView: View {
         validationMessage = nil
         saveMessage = nil
         configText = advancedConfigEditorCurrentText(for: resolvedUrl)
+        savedText = configText
     }
 
     private func validateConfig() {
@@ -103,16 +111,20 @@ struct ShortcutAdvancedView: View {
         let resolvedUrl = targetUrl ?? advancedConfigEditorTargetUrl()
         targetUrl = resolvedUrl
 
+        let submittedText = configText
+        isSaving = true
         Task { @MainActor in
+            defer { isSaving = false }
             do {
                 let parentUrl = resolvedUrl.deletingLastPathComponent()
                 if parentUrl.path != resolvedUrl.path {
                     try FileManager.default.createDirectory(at: parentUrl, withIntermediateDirectories: true)
                 }
-                try configText.write(to: resolvedUrl, atomically: true, encoding: .utf8)
+                try submittedText.write(to: resolvedUrl, atomically: true, encoding: .utf8)
                 let isOk = try await reloadConfig(forceConfigUrl: resolvedUrl)
                 if isOk {
-                    saveMessage = "Saved and reloaded."
+                    savedText = submittedText
+                    saveMessage = "Saved and applied."
                     model.reload()
                 } else {
                     saveMessage = nil
@@ -155,11 +167,13 @@ func shortcutSettingsWindow() -> NSWindow? {
 
 @MainActor
 func presentShortcutSettingsWindow(_ window: NSWindow) {
-    let fixedSize = NSSize(width: 760, height: 620)
-    window.styleMask.remove(.resizable)
-    window.minSize = fixedSize
-    window.maxSize = fixedSize
-    window.setContentSize(fixedSize)
+    window.styleMask.insert(.resizable)
+    window.contentMinSize = NSSize(width: settingsWindowWidth, height: settingsWindowMinimumHeight)
+    window.contentMaxSize = NSSize(width: settingsWindowWidth, height: .greatestFiniteMagnitude)
+    if abs(window.contentLayoutRect.width - settingsWindowWidth) > 1 {
+        window.setContentSize(NSSize(width: settingsWindowWidth,
+                                    height: max(settingsWindowMinimumHeight, window.contentLayoutRect.height)))
+    }
     NSApp.activate(ignoringOtherApps: true)
     window.center()
     window.makeKeyAndOrderFront(nil)

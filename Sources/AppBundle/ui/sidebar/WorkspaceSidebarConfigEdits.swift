@@ -64,30 +64,6 @@ private func updateWorkspaceSidebarScalarConfig(
     return resultLines.joined(separator: "\n")
 }
 
-@MainActor
-func persistWorkspaceSidebarMenuBarReserveHeight(_ height: Int) throws -> URL {
-    let targetUrl = preferredWorkspaceSidebarConfigUrl()
-    let currentText = (try? String(contentsOf: targetUrl, encoding: .utf8)) ?? starterConfigText()
-    let updatedText = updateWorkspaceSidebarMenuBarReserveConfig(in: currentText, height: height)
-    if let parent = targetUrl.deletingLastPathComponent().takeIf({ $0.path != targetUrl.path }) {
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-    }
-    try updatedText.write(to: targetUrl, atomically: true, encoding: .utf8)
-    return targetUrl
-}
-
-@MainActor
-func persistWorkspaceSidebarProjectDeletionAction(_ action: WorkspaceProjectDeletionAction) throws -> URL {
-    let targetUrl = preferredWorkspaceSidebarConfigUrl()
-    let currentText = (try? String(contentsOf: targetUrl, encoding: .utf8)) ?? starterConfigText()
-    let updatedText = updateWorkspaceSidebarProjectDeletionActionConfig(in: currentText, action: action)
-    if let parent = targetUrl.deletingLastPathComponent().takeIf({ $0.path != targetUrl.path }) {
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-    }
-    try updatedText.write(to: targetUrl, atomically: true, encoding: .utf8)
-    return targetUrl
-}
-
 func updateWorkspaceSidebarLabelConfig(
     in configText: String,
     workspaceName: String,

@@ -46,11 +46,11 @@ targets:
         DEVELOPMENT_TEAM: ${XCODEGEN_WINMUX_DEVELOPMENT_TEAM}
       configs:
         Debug:
-          PRODUCT_NAME: WinMuXx-Debug
-          PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmux.debug
+          PRODUCT_NAME: WinMuxX-Debug
+          PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmuxx.debug
         Release:
-          PRODUCT_NAME: WinMuXx
-          PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmux
+          PRODUCT_NAME: WinMuxX
+          PRODUCT_BUNDLE_IDENTIFIER: com.gfavaro.winmuxx
           ENABLE_HARDENED_RUNTIME: YES
           SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
           GCC_TREAT_WARNINGS_AS_ERRORS: YES

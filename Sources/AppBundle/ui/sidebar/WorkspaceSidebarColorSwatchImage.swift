@@ -1,11 +1,12 @@
 import AppKit
 
-func workspaceSidebarProjectColorSwatchImage(hex: String, isSelected: Bool) -> NSImage {
-    let color = workspaceSidebarNSColor(hex: hex) ?? NSColor.white.withAlphaComponent(0.65)
+func workspaceSidebarProjectColorSwatchImage(hex: String, isSelected: Bool, appearance: WorkspaceSidebarAppearance = .custom) -> NSImage {
+    let foreground: NSColor = appearance == .system ? .labelColor : .white
+    let color = workspaceSidebarNSColor(hex: hex) ?? foreground.withAlphaComponent(0.65)
     return workspaceSidebarSwatchImage {
         drawWorkspaceSidebarSwatchCircle(
             fill: color,
-            stroke: NSColor.white.withAlphaComponent(isSelected ? 0.92 : 0.26),
+            stroke: foreground.withAlphaComponent(isSelected ? 0.92 : 0.26),
             lineWidth: isSelected ? 1.5 : 1,
         )
         guard isSelected else { return }

@@ -1,107 +1,78 @@
+
 <p align="left">
-  <img src="resources/winmux-logo.svg" width="80" alt="WinMuXx logo">
+  <img src="resources/winmux-logo.svg" width="80" alt="WinMux logo">
 </p>
 
-# WinMuXx
+# WinMuxX
 
-WinMuXx is gfavaro's fork of [ZimengXiong/WinMux](https://github.com/ZimengXiong/WinMux).
-The fork keeps the original project and adds the changes listed first below. Fork builds and
-maintenance details are in [docs/FORK.md](docs/FORK.md).
+Personal fork by gfavaro, based on ZimengXiong/WinMux.
+See [fork maintenance, builds and releases](docs/FORK.md),
+[development guide](HACKING.md), and [documentation index](docs/README.md).
+Automatic upstream updates are disabled. Build with `make fork-build`.
 
-## WinMuXx additions
+<p align="left">A powerful sidebar-first window manager for macOS.</p>
 
-The section below describes changes specific to this fork. The original WinMux README follows it
-for reference. When the two sections describe different behavior, use the WinMuXx instructions.
-
-### Layout and workspaces
-
-Set `default-root-container-layout = 'dwindle'` to use recursive dwindle tiling automatically.
-WinMuXx applies the setting to tiled windows already open at startup, including windows restored
-from saved state, and to existing tiled roots after a config reload. Floating windows, tab groups and
-manual layout choices are preserved during ordinary refreshes and unrelated config changes.
-
-Workspace commands target the focused display unless `--monitor` names another one. For example:
-
-```sh
-winmuxx workspace 2 --monitor secondary
-winmuxx workspace --name 9
-```
-
-Selecting a workspace that is already visible on another display exchanges the active workspaces
-and focuses the destination display, subject to `workspace-to-monitor-force-assignment`.
-`workspace next` and `workspace prev` skip workspaces shown on other displays. Back-and-forth
-navigation keeps a separate history for each display, and sidebar clicks act on the display that
-owns that sidebar.
-
-### Menu, diagnostics and recovery
-
-The menu-bar icon lists window, layout, workspace, project and monitor actions. It shows shortcuts
-from the active mode's configuration and refreshes them whenever the menu opens. Actions without a
-configured shortcut have no shortcut label. Other command chains, modifier taps and key sequences
-appear under **Other Key Bindings** when they do not match a catalog action.
-
-**Diagnostics…** reports the loaded config path, validation results, effective layout, permissions,
-monitors, other window managers and per-app accessibility latency. Use **Refresh** or **Copy
-Diagnostics** in the report window, or run `winmuxx doctor`. Checks do not change macOS preferences
-or stop other apps. Review paths and app names before sharing a report.
-
-After an interrupted session, the menu can offer **Recover N Windows from Previous Session…**.
-Recovery pauses tiling and restores the positions and sizes recorded before WinMuXx moved the windows.
-It checks each app's process and launch identity, skips disconnected displays and native fullscreen or
-minimized windows, and keeps failed entries for another attempt. Choose **Enable** to resume tiling.
-The recovery journal is separate from the saved managed layout.
-
-### Window borders
-
-WinMuXx draws click-through borders around visible managed windows, with a different color for the
-focused window. Configure them in `winmux.toml`:
-
-```toml
-[borders]
-    enabled = true
-    width = 4
-    active-color = '#e1e3e4'
-    inactive-color = '#494d64'
-    order = 'below'
-    exclude-apps = []
-```
-
-Colors accept `#RRGGBB` or `#RRGGBBAA`; width is measured in points. Changes apply on config reload.
-Borders hide with their windows and in fullscreen. If you started JankyBorders in
-`after-startup-command`, remove that command and stop its `borders` process to avoid duplicates.
-
-### App name, CLI and installation
-
-The app is named `WinMuXx`; the standalone command-line executable is `winmuxx`. Download the
-latest ZIP from [this fork's releases](https://github.com/gfavaro/WinMuXx/releases), or build it:
-
-```sh
-make check
-make fork-build
-open .release/WinMuXx.app
-```
-
-Fork builds are ad-hoc signed and not notarized. macOS may require you to right-click the app and
-choose **Open** on first launch. Automatic updates are disabled. The app bundle includes the CLI as
-`Contents/MacOS/winmuxx-cli`; the standalone SwiftPM product is `winmuxx`.
-
-WinMuXx stores its config in `${XDG_CONFIG_HOME:-~/.config}/winmux-gf/winmux.toml`. On first launch,
-it copies an existing `~/.config/winmux/winmux.toml` into the fork's config directory and leaves the
-original file untouched. See [docs/FORK.md](docs/FORK.md) for the fork's repository workflow, builds
-and releases.
-
-### Experimental window-size observations
-
-WinMuXx can record minimum-size observations for windows during a session. These observations are
-experimental and do not currently constrain layout.
-
-## Original WinMux README
-
-The following sections preserve the original project's feature and usage documentation. The
-installation and migration instructions here apply to WinMux, not to WinMuXx. For this fork, use the
-WinMuXx installation and config instructions above.
+https://github.com/user-attachments/assets/51983568-a168-494f-8ae3-5f50ca1efce1
 
 ## Highlights
+
+### Native sidebar appearance
+
+Settings → Appearance controls the sidebar. Choose Liquid Glass for native glass
+on macOS 26 and later, or Solid color for an opaque preset/custom color. Earlier
+macOS versions use a native material fallback. Reduce Transparency forces an
+opaque system background in Liquid Glass. Expanded Liquid Glass always uses a
+frosted background; Show background controls the compact rail.
+
+Choose Left or Right, and Standard, Centered or Full height. Every mode reserves
+space for the menu bar, even when it auto-hides, and respects the notch. Centered
+fits its content up to 90% of the safe height, then scrolls. Standard and Full
+currently share the same safe geometry. Expanded and collapsed widths have
+Small, Medium and Large presets. Always expanded reserves window space on the
+chosen side.
+
+Tiled windows glide into place by default (150 ms). Set `animations.enabled = false`
+or `animations.duration-ms = 0` for immediate placement. Reduce Motion disables
+the glide. See [window motion](docs/WINDOW_MOTION.md) for configuration and limits.
+
+```toml
+[workspace-sidebar]
+    chrome-style = 'liquid-glass' # or 'solid'
+    menu-bar-background = false
+    position = 'left'            # or 'right'
+    height-mode = 'standard'     # or 'centered', 'full'
+```
+
+`appearance`, `background` and `frosted-tint` remain accepted for older configs;
+`chrome-style` is the appearance selector used at runtime. Legacy
+`menu-bar-reserve-height` applies only when height-mode is absent and cannot
+reduce the mandatory system reservation.
+
+### Menu-bar indicator
+
+Settings → Appearance → Menu bar offers Icon or Workspace. Workspace follows the
+focused monitor and shows the label initial, or the workspace number when there
+is no label. Icon supports color or monochrome appearance. Both open the same
+native action menu. These choices persist locally, outside the TOML config.
+
+### Menu-bar actions and diagnostics
+
+Click the WinMux menu-bar icon to browse window, layout, workspace, project and monitor actions.
+Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
+it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and
+key sequences are available under **Other Key Bindings** when not represented by a catalog action.
+
+Choose **Diagnostics…** to inspect the loaded config path, file validation, effective default layout,
+permissions, monitors, potentially conflicting window managers and per-app accessibility latency.
+The window offers **Refresh** and **Copy Diagnostics**; `winmux doctor` uses the same report generator.
+Checks do not change macOS preferences or stop other apps. Review local paths and app names before
+sharing a report. Upcoming improvements are tracked in [the roadmap](docs/ROADMAP.md).
+
+After an interrupted session, the menu can offer **Recover N Windows from Previous Session…**.
+Recovery pauses tiling and restores the original positions and sizes recorded before WinMux moved
+the windows. It validates the owning app's process and launch identity, skips disconnected displays
+and native fullscreen/minimized windows, and retains failed entries for another attempt. Choose
+**Enable** to resume tiling. The recovery journal is separate from the saved managed layout.
 
 ### Projects
 Projects are collection of workspaces. Think of it like a parent/child hiearchy, you can switch between projects. Each project has it's own set of workspaces.
@@ -112,15 +83,14 @@ The sidebar is a more interactively-performant and useful alternative to [Sketch
 You can drag windows in and out of the sidebar from and to the current workspace. You can rearrange windows across all spaces using the sidebar, including tab groups.
 
 By default the sidebar rests as a compact rail and expands when hovered. To hide the rail
-completely until the pointer reaches the left display edge, enable auto-hide. On macOS 26 and
-newer, native Liquid Glass is enabled by default. Choose an opaque solid color for greater
-contrast across the sidebar, tab groups, and switcher:
+completely until the pointer reaches the selected display edge, enable auto-hide.
+Sidebar appearance also controls tabs and the switcher. To use an opaque color:
 
 ```toml
 [workspace-sidebar]
     auto-hide = true
     chrome-style = 'solid'
-    solid-chrome-color = 'lavender' # Choose any color shown in Appearance, including custom.
+    solid-chrome-color = 'blue' # Or choose Custom in Appearance.
 ```
 
 To keep the full sidebar visible, reserve its expanded width when laying out tiled windows:
@@ -131,7 +101,7 @@ To keep the full sidebar visible, reserve its expanded width when laying out til
     width = 240
 ```
 
-`always-expanded` takes precedence over `auto-hide`. The configured `gaps.outer.left` remains
+`always-expanded` takes precedence over `auto-hide`. The outer gap on the selected side remains
 the spacing between the sticky sidebar and tiled windows, and monitor selection continues to
 control which displays reserve sidebar space.
 
@@ -148,6 +118,25 @@ The sidebar clock can be configured independently:
 `show-clock` hides the entire clock card. The other settings independently control seconds,
 the month and day, and the weekday; for example, `show-date = false` with
 `show-weekday = true` leaves a weekday-only calendar label in the expanded sidebar.
+
+### Window borders
+
+WinMux draws click-through borders around visible managed windows, with a different color for the
+focused window. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
+
+```toml
+[borders]
+    enabled = true
+    width = 4                     # Points; fractional values are supported.
+    active-color = '#e1e3e4'       # #RRGGBB or #RRGGBBAA.
+    inactive-color = '#494d64'
+    order = 'below'               # 'above' draws the ring over the window.
+    exclude-apps = []             # Application bundle IDs.
+```
+
+Changes apply on config reload. Borders hide with their windows and in fullscreen. If you previously
+started JankyBorders in `after-startup-command`, remove that command and stop the external `borders`
+process to avoid drawing two sets of borders.
 
 ### Window and sidebar spacing
 
@@ -167,7 +156,6 @@ For borderless tiling, including no border beside the sidebar:
     outer.top = 0
     outer.right = 0
 ```
-
 ### Tab Groups
 ![](resources/screenshots/tab-groups.png)
 Tab groups allow you to have many windows occupy the same footprint, similar to Yabai stacks but with browser-like tab behavior. This is useful when you want to have multiple pieces of reference information next to an editor, multiple tabs in different browser profiles, or, when you simply want multiple fullscreen views without the additional friction and overhead of creating a new workspace.
@@ -177,6 +165,11 @@ Unlike stack-only layouts, WinMux tab groups behave more intuitively like you wo
 ### Philosophy
 
 #### Automatic tiling
+
+With `default-root-container-layout = 'dwindle'`, existing tiled windows also use dwindle at startup,
+including tiled roots restored from older saved state. Switching the default to dwindle while WinMux
+is running updates existing tiled roots on config reload. Floating windows and tab groups are preserved;
+manual layout choices made afterward remain active during ordinary refreshes and unrelated config edits.
 
 WinMux tiles newly discovered windows by default. To keep their existing macOS size and position while still using WinMux's sidebar, workspaces, and manual layout commands, disable automatic tiling:
 
@@ -193,7 +186,25 @@ enable-shake-to-toggle-tiling = false
 ```
 
 #### Workspaces
-You can NOT create workspaces that have no windows in them. Workspaces with no windows are automatically destroyed.
+Empty workspaces are collected when no longer needed, but configured persistent workspaces and the active viewport
+workspace can remain empty. Numeric workspace arguments are display positions; use `workspace --name <name>` to
+select an internal workspace name directly.
+
+Workspace activation can target a monitor explicitly:
+
+```shell
+winmux workspace 2 --monitor secondary
+winmux workspace --name 9
+```
+
+Workspace commands activate on the focused monitor unless `--monitor` specifies another display.
+Selecting a workspace already visible elsewhere focuses it on its existing display without
+moving either workspace or changing monitor history. Hidden workspace activation still respects
+`workspace-to-monitor-force-assignment`.
+`workspace next` and `workspace prev` skip workspaces visible on other displays; numbering stays
+project-wide. `workspace-back-and-forth` and `--auto-back-and-forth` use each display's own history.
+Clicking a sidebar activates hidden workspaces on that sidebar's display. A workspace
+already visible on another display offers override confirmation before being brought here.
 
 ### Multi-Monitors
 Monitors share the global project/workspace state. Each monitor can be treated as *independent* from each other. They each just use the sidebar to browse through projects and 'select' a workspace to view.
@@ -240,33 +251,23 @@ tell application "Finder"
         activate
     end if
 end tell
+
 ```
 
 ## Installation
-Install WinMux with Homebrew:
 
-```shell
-brew tap ZimengXiong/homebrew https://github.com/ZimengXiong/homebrew
-brew trust ZimengXiong/homebrew
-brew install --cask winmux
-xattr -cr /Applications/WinMux.app
-```
-
-Or download the latest binary from releases and launch.
-
-Release builds are signed with the project's Apple Development certificate. They are not notarized, so macOS may require you to right-click the app and choose **Open** the first time you launch it.
-
-WinMux checks GitHub Releases for signed updates automatically. You can also select **Check for Updates…** from the menu bar.
+Build this fork with `make fork-build BUILD_NUMBER=<new-number>`, then install
+`.release/WinMuxX.app` as described in [HACKING.md](HACKING.md). Fork builds retain
+the configured local signing identity, are not notarized, and have automatic
+upstream updates disabled. The upstream Homebrew cask installs WinMux, not WinMuxX.
 
 ## Migrating
-### From AeroSpace
-If `~/.config/winmux/winmux.toml` already exists, WinMux uses it as-is.
 
-If you have an AeroSpace config but no WinMux config yet, WinMux creates one for you on first launch. It copies over your AeroSpace shortcuts/key mapping and fills in the rest with WinMux defaults, including the sidebar and window tabs.
-
-You do not need to edit anything to get started. After import, WinMux uses `~/.config/winmux/winmux.toml` and leaves your AeroSpace config alone.
-
-If neither exists, WinMux creates a new WinMux config with the bundled defaults.
+The fork owns `${XDG_CONFIG_HOME:-~/.config}/winmux-gf/winmux.toml`. On first launch
+it copies an existing original WinMux config without modifying it. If no original
+config is found, AeroSpace import remains available; otherwise it generates a
+starter config. `--config-path` selects an explicit file. See
+[fork configuration ownership](docs/FORK.md#app-isolation) for details.
 
 ## Credits
 [Aerospace](https://github.com/nikitabobko/AeroSpace)

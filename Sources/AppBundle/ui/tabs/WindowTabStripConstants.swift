@@ -32,7 +32,6 @@ let windowTabGroupFrameMaxInnerCornerRadius: CGFloat = {
 }()
 let windowTabGroupFrameMaxTopInnerCornerRadius: CGFloat = 40
 let windowTabPillAnimation: Animation = MotionToken.pill
-let windowTabReducedMotionAnimation: Animation = MotionToken.quick
 
 func windowTabStripContentPadding() -> CGFloat {
     windowTabStripContentHorizontalPadding

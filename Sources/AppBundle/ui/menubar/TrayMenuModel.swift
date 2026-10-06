@@ -6,12 +6,14 @@ public final class TrayMenuModel: ObservableObject {
 
     init() {}
 
-    @Published var trayText: String = ""
-    @Published var trayItems: [TrayItem] = []
+    @Published var menuBarWorkspaceIndicator: String = "1"
+    @Published var menuBarWorkspaceName: String = ""
     /// Is "layouting" enabled
     @Published var isEnabled: Bool = true
     @Published var workspaces: [WorkspaceViewModel] = []
     @Published var workspaceSidebarWorkspaces: [WorkspaceSidebarWorkspaceViewModel] = []
+    @Published var workspaceSidebarConfiguration: WorkspaceSidebarConfiguration = .empty
+    @Published var workspaceSidebarWallpaperRefreshGeneration: UInt64 = 0
     @Published var workspaceSidebarProjects: [WorkspaceSidebarProjectViewModel] = []
     @Published var workspaceSidebarActiveProjectId: WorkspaceProjectId = workspaceProjectDefaultId
     @Published var workspaceSidebarMonitorScopes: [WorkspaceSidebarMonitorScopeViewModel] = []
@@ -58,7 +60,14 @@ extension ObservableObject {
 
 @MainActor func updateTrayText() {
     let focus = focus
-    TrayMenuModel.shared.setIfChanged(\.trayText, activeMode?.takeIf { $0 != mainModeId }?.first.map { "(\($0.uppercased()))" } ?? "A")
+    let workspace = focus.workspace
+    let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)
+        ?? Int(workspace.name)
+        ?? userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: workspace)
+            .filter { $0.projectId == workspace.projectId }.firstIndex(of: workspace).map { $0 + 1 }
+        ?? 1
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name], number: number))
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, workspaceDisplayName(workspace.name))
     let workspaces = userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace).filter {
         $0.projectId == activeWorkspaceProjectId(for: $0.workspaceMonitor)
     }.map {
@@ -80,8 +89,5 @@ extension ObservableObject {
         )
     }
     TrayMenuModel.shared.setIfChanged(\.workspaces, workspaces)
-    let items = activeMode?.takeIf { $0 != mainModeId }?.first.map {
-        TrayItem(type: .mode, name: $0.uppercased(), isActive: true, hasFullscreenWindows: false)
-    }.map { [$0] } ?? []
-    TrayMenuModel.shared.setIfChanged(\.trayItems, items)
+
 }

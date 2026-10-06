@@ -34,7 +34,8 @@ final class TreeNodeTest: XCTestCase {
         let second = TestWindow.new(id: 991, parent: binding.parent, adaptiveWeight: binding.adaptiveWeight)
 
         XCTAssertNotNil(split)
-        XCTAssertEqual(split?.layout, .tiles)
+        XCTAssertEqual(split?.layout, .dwindle)
+        XCTAssertTrue(split?.isExplicitDwindle == true)
         XCTAssertEqual(split?.children, [first, second])
         XCTAssertEqual(split?.orientation, .h)
     }

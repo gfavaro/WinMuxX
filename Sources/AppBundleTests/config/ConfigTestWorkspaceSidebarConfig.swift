@@ -103,7 +103,7 @@ extension ConfigTest {
             """,
         )
         assertEquals(solidColorErrors.descriptions, [
-            "workspace-sidebar.solid-chrome-color: Possible values: black, onyx, charcoal, midnight, graphite, slate, steel, silver, fog, blue, indigo, lavender, ocean, teal, mint, green, sage, gold, cocoa, rose, mauve, plum, violet, apricot, custom",
+            "workspace-sidebar.solid-chrome-color: Possible values: purple, pink, red, orange, yellow, black, onyx, charcoal, midnight, graphite, slate, steel, silver, fog, blue, indigo, lavender, ocean, teal, mint, green, sage, gold, cocoa, rose, mauve, plum, violet, apricot, custom",
         ])
 
         let (_, alwaysExpandedWidthErrors) = parseConfig(

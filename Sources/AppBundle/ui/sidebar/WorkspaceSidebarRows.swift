@@ -5,6 +5,7 @@ import SwiftUI
 // MARK: - Window Row
 
 struct WorkspaceSidebarWindowRow: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     enum Style {
         case window
         case tabGroupHeader
@@ -31,16 +32,13 @@ struct WorkspaceSidebarWindowRow: View {
     var body: some View {
         HStack(spacing: workspaceSidebarAppIconTextSpacing) {
             appIconStack
-            Text(title)
-                .font(.system(size: isTabGroupHeader ? 13 : 12.5, weight: isActiveRow ? .semibold : .regular))
-                .foregroundStyle(rowTextColor)
-                .lineLimit(1)
-                .truncationMode(.tail)
+            WorkspaceSidebarLabel(text: title, size: isTabGroupHeader ? 13 : 12.5,
+                weight: isActiveRow ? .semibold : .regular, secondary: !isActiveRow, customColor: rowTextColor)
             Spacer(minLength: 0)
             if let badge {
                 Text(badge)
                     .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(isTabGroupHeader ? Color.white.opacity(0.50) : Color.white.opacity(0.38))
+                    .foregroundStyle(isTabGroupHeader ? sidebarColors.text(opacity: 0.50) : sidebarColors.text(opacity: 0.38))
             }
         }
         .padding(.horizontal, workspaceSidebarRowHorizontalPadding)
@@ -90,12 +88,12 @@ struct WorkspaceSidebarWindowRow: View {
 
     private var rowTextColor: Color {
         if isActiveRow {
-            return Color.white.opacity(isTabGroupHeader ? 0.96 : 1)
+            return sidebarColors.text(opacity: isTabGroupHeader ? 0.96 : 1)
         }
         if isTabGroupChild {
-            return Color.white.opacity(0.58)
+            return sidebarColors.text(opacity: 0.58)
         }
-        return Color.white.opacity(0.78)
+        return sidebarColors.text(opacity: 0.78)
     }
 
     private var rowIconOpacity: Double {
@@ -105,23 +103,23 @@ struct WorkspaceSidebarWindowRow: View {
     private var rowBackgroundFill: Color {
         if isActiveRow {
             if isTabGroupHeader {
-                return Color.white.opacity(0.14)
+                return sidebarColors.foreground.opacity(0.14)
             }
             if isTabGroupChild {
-                return Color.white.opacity(0.055)
+                return sidebarColors.foreground.opacity(0.055)
             }
-            return Color.white.opacity(0.085)
+            return sidebarColors.foreground.opacity(0.085)
         }
         return Color.clear
     }
 
     private var rowHoverOverlayFill: Color {
         if isTabGroupHeader {
-            return Color.white.opacity(0.04)
+            return sidebarColors.foreground.opacity(0.04)
         }
         if isTabGroupChild {
-            return Color.white.opacity(0.03)
+            return sidebarColors.foreground.opacity(0.03)
         }
-        return Color.white.opacity(0.045)
+        return sidebarColors.foreground.opacity(0.045)
     }
 }

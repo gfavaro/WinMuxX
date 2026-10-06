@@ -38,13 +38,16 @@ default-root-container-orientation = 'auto'
 on-focus-changed = []
 on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 # Workspace commands target the focused monitor unless --monitor is specified.
-# If the target workspace is visible elsewhere, the monitors exchange workspaces,
-# provided any workspace-to-monitor-force-assignment rules permit it.
+# If the target workspace is visible elsewhere, focus follows it to that monitor;
+# neither workspace moves. Hidden targets still respect forced monitor assignments.
 
 automatically-unhide-macos-hidden-apps = false
 automatically-tile-new-windows = true
 # Shake a window horizontally while dragging its title bar to toggle floating/tiling.
 enable-shake-to-toggle-tiling = true
+# Focus a tiled window after the pointer remains over it for the configured dwell.
+focus-follows-mouse = false
+focus-follows-mouse-dwell = 250
 auto-add-new-windows-to-tab-group = true
 shortcuts-preset = 'none'
 persistent-workspaces = []
@@ -68,7 +71,7 @@ on-mode-changed = []
     enabled = true
     # Offer a 'Focused' monitor scope in the sidebar's monitor selector.
     enable-focus = false
-    # Hide the compact rail until the pointer reaches the display's left edge.
+    # Hide the compact rail until the pointer reaches the selected display edge.
     auto-hide = false
     # Keep the full sidebar open and reserve its width for tiled windows.
     always-expanded = false
@@ -78,14 +81,24 @@ on-mode-changed = []
     # Legacy monitor = 'main' is also treated as all displays for this sidebar.
     # Use monitor = 1, 'secondary', 2, or a list to restrict it.
     # monitor = [1, 'secondary']
-    menu-bar-reserve-height = 28
+    position = 'left'
+    # All height modes protect the menu bar, including its auto-hide reveal area.
+    # Centered fits content, growing up to 90% of the safe display height.
+    height-mode = 'standard'
     project-deletion-action = 'close-windows'
     show-status-pills = true
     show-clock = false
     show-seconds = true
     show-date = false
     show-weekday = true
-    # Apply this style to sidebar, tab groups, and switcher chrome. Use 'solid' for opaque color.
+    # Liquid Glass uses native menu-bar-inspired glass and adaptive wallpaper contrast.
+    # Solid uses the selected opaque color. Also applies to tab groups and switcher.
+    # Legacy appearance/background/frosted-tint keys remain accepted but no longer
+    # override this style. The Settings UI calls this choice Sidebar appearance.
+    # Compact Liquid Glass sidebar only: false shows wallpaper without glass.
+    # Expanded Liquid Glass always uses a frosted background.
+    # Reduce Transparency overrides this with an opaque system background.
+    menu-bar-background = false
     chrome-style = 'liquid-glass'
     # Used when chrome-style = 'solid'. Choose from the Appearance palette, or use 'custom'.
     solid-chrome-color = 'midnight'

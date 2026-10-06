@@ -32,6 +32,7 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> B
         return BindingData(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
     }
     if workspace.rootTilingContainer.layout == .dwindle {
+        workspace.materializeDwindleTree()
         return bindingDataBySplittingDwindleAnchor(workspace: workspace, focusedWindow: mruWindow)
     }
     if tilingParent.layout == .tabGroup {
@@ -46,16 +47,31 @@ private func bindingDataBySplittingDwindleAnchor(workspace: Workspace, focusedWi
     while let parent = anchor.parent as? TilingContainer, parent.layout == .tabGroup {
         anchor = parent
     }
-    let previousBinding = anchor.unbindFromParent()
-    let splitRect = anchor.lastAppliedLayoutVirtualRect ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+    let splitRect = anchor.lastAppliedLayoutPhysicalRect ?? anchor.lastAppliedLayoutVirtualRect ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
     let orientation: Orientation = splitRect.width >= splitRect.height ? .h : .v
+    let parent = anchor.parent as? TilingContainer
+    if let parent, parent.layout == .dwindle, parent.isExplicitDwindle,
+       parent.navigationOrientation == orientation || parent.children.count == 1 {
+        if parent.children.count == 1 { parent.dwindleOrientation = orientation }
+        return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: anchor.ownIndex.orDie() + 1)
+    }
+    if let parent, parent.layout == .tiles, parent.orientation == orientation {
+        return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: anchor.ownIndex.orDie() + 1)
+    }
+    let ratios = parent?.dwindleSplitRatios
+    let siblingRatios = parent?.dwindleChildRatios
+    let previousBinding = anchor.unbindFromParent()
     let split = TilingContainer(
         parent: previousBinding.parent,
         adaptiveWeight: previousBinding.adaptiveWeight,
         orientation,
-        .tiles,
+        .dwindle,
         index: previousBinding.index,
     )
+    if let ratios { parent?.dwindleSplitRatios = ratios }
+    if let siblingRatios { parent?.dwindleChildRatios = siblingRatios }
+    split.dwindleOrientation = orientation
+    split.dwindleChildRatios = []
     anchor.bind(to: split, adaptiveWeight: 1, index: 0)
     return BindingData(parent: split, adaptiveWeight: 1, index: 1)
 }

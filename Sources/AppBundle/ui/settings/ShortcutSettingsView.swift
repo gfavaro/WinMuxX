@@ -3,17 +3,32 @@ import Common
 import MASShortcut
 import SwiftUI
 
+// Measured from System Settings on macOS 27: fixed width, vertically resizable.
+let settingsWindowWidth: CGFloat = 757
+let settingsWindowMinimumHeight: CGFloat = 470
+
 public let shortcutSettingsWindowId = "\(winMuxAppName).shortcutSettings"
 
 @MainActor
 public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scene {
-    SwiftUI.Window("WinMux Settings", id: shortcutSettingsWindowId) {
+    SwiftUI.Window("WinMuxX Settings", id: shortcutSettingsWindowId) {
         ShortcutSettingsView(model: model)
-            .frame(width: 760, height: 620)
+            .frame(minWidth: settingsWindowWidth, maxWidth: settingsWindowWidth,
+                   minHeight: settingsWindowMinimumHeight, maxHeight: .infinity)
             .onAppear {
                 NSApp.setActivationPolicy(.accessory)
+                // SwiftUI may materialize a Window scene during app launch even
+                // when no openWindow request was made. Settings is opt-in, so
+                // dismiss that implicit scene and keep explicit requests intact.
+                if model.openRequestId == 0 {
+                    DispatchQueue.main.async {
+                        shortcutSettingsWindow()?.close()
+                    }
+                }
             }
     }
+    .defaultSize(width: settingsWindowWidth, height: 700)
+    .windowResizability(.contentSize)
 }
 
 @MainActor
@@ -31,11 +46,13 @@ public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
     }
 }
 
-enum SettingsSidebarItem: Hashable, Identifiable {
+enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
+    case general
     case shortcuts
     case workspaces
-    case behavior
     case appearance
+    case windows
+    case automation
     case configuration
     case reference
 
@@ -43,10 +60,12 @@ enum SettingsSidebarItem: Hashable, Identifiable {
 
     var label: String {
         switch self {
+            case .general: "General"
             case .shortcuts: "Shortcuts"
             case .workspaces: "Workspaces"
-            case .behavior: "Behavior"
-            case .appearance: "Appearance"
+            case .windows: "Windows"
+            case .appearance: "Sidebar & Appearance"
+            case .automation: "Automation"
             case .configuration: "Configuration"
             case .reference: "Configuration Reference"
         }
@@ -54,10 +73,12 @@ enum SettingsSidebarItem: Hashable, Identifiable {
 
     var icon: String {
         switch self {
+            case .general: "gearshape"
             case .shortcuts: "keyboard"
             case .workspaces: "rectangle.3.group"
-            case .behavior: "arrow.triangle.2.circlepath"
+            case .windows: "macwindow.on.rectangle"
             case .appearance: "sidebar.left"
+            case .automation: "gearshape.2"
             case .configuration: "doc.text"
             case .reference: "book"
         }
@@ -66,30 +87,37 @@ enum SettingsSidebarItem: Hashable, Identifiable {
 
 struct ShortcutSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @State private var selectedItem: SettingsSidebarItem? = .shortcuts
+    @State private var selectedItem: SettingsSidebarItem? = .general
+
+    private let sidebarItems = SettingsSidebarItem.allCases
 
     var body: some View {
         NavigationSplitView {
             List(selection: $selectedItem) {
-                ForEach([SettingsSidebarItem.shortcuts, .workspaces, .behavior, .appearance, .configuration, .reference]) { item in
+                ForEach(sidebarItems) { item in
                     NavigationLink(value: item) {
                         Label(item.label, systemImage: item.icon)
                     }
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 200, ideal: 220)
+            .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
         } detail: {
             Group {
                 switch selectedItem {
+                    case .general:
+                        ShortcutGeneralSettingsView(model: model)
                     case .shortcuts:
                         ShortcutSettingsShortcutsView(model: model)
                     case .workspaces:
                         ShortcutSettingsWorkspacePane(model: model)
-                    case .behavior:
+                    case .windows:
                         ShortcutBehaviorSettingsView(model: model)
                     case .appearance:
                         ShortcutAppearanceSettingsView(model: model)
+                            .id(model.settingsRevision)
+                    case .automation:
+                        ShortcutAutomationSettingsView(model: model)
                     case .configuration:
                         ShortcutAdvancedView(model: model)
                     case .reference:
@@ -98,6 +126,7 @@ struct ShortcutSettingsView: View {
                         Text("Select an item")
                 }
             }
+            .id(model.failedSaveRevision)
             .navigationTitle(selectedItem?.label ?? "")
         }
     }
@@ -122,25 +151,56 @@ struct ShortcutSettingsWorkspacePane: View {
 struct ShortcutCategoryView: View {
     @ObservedObject var model: ShortcutSettingsModel
     let category: ShortcutSettingsModel.Category
+    @State private var shortcutsPreset = config.shortcutsPreset.rawValue
+    @State private var projectDeletionAction = config.workspaceSidebar.projectDeletionAction
+    @State private var persistentWorkspaces = config.persistentWorkspaces.joined(separator: ", ")
 
     var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                if let error = model.errorMessage {
-                    Text(error)
-                        .foregroundStyle(.white)
-                        .padding()
-                        .background(Color.red)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                let sections = model.sections.filter { $0.category == category && $0.id != "managed-move" }
-                ForEach(sections) { section in
-                    ShortcutSectionView(model: model, section: section)
+        Form {
+            if let error = model.errorMessage {
+                Section("Could not save setting") {
+                    Text(error).foregroundStyle(.red).textSelection(.enabled)
                 }
             }
-            .padding(18)
+
+            if category == .common {
+                Section("Workspace availability") {
+                    SettingsTextField("Persistent workspaces", text: $persistentWorkspaces,
+                        help: "Comma-separated names of workspaces that remain available when empty.") {
+                        persistSettingsConfig(section: nil, key: "persistent-workspaces",
+                            renderedValue: tomlCommaSeparatedStringArray(persistentWorkspaces), model: model)
+                    }
+                    Picker("Deleting projects", selection: $projectDeletionAction) {
+                        Text("Close project windows").tag(WorkspaceProjectDeletionAction.closeWindows)
+                        Text("Move windows elsewhere").tag(WorkspaceProjectDeletionAction.moveWindowsToFallback)
+                    }
+                    .onChange(of: projectDeletionAction) { value in
+                        persistSettingsConfig(section: "workspace-sidebar", key: "project-deletion-action",
+                            renderedValue: "'\(value.rawValue)'", model: model)
+                    }
+                }
+            }
+
+            if category == .managed {
+                Section("Shortcut preset") {
+                    Picker("Preset", selection: $shortcutsPreset) {
+                        Text("Custom").tag("none")
+                        Text("Rectangle").tag("rectangle")
+                    }
+                    .onChange(of: shortcutsPreset) { value in
+                        persistSettingsConfig(section: nil, key: "shortcuts-preset",
+                            renderedValue: "'\(value)'", model: model)
+                    }
+                }
+            }
+
+            let sections = model.sections.filter { $0.category == category && $0.id != "managed-move" }
+            ForEach(sections) { section in
+                ShortcutSectionView(model: model, section: section)
+            }
         }
+        .formStyle(.grouped)
+        .id(model.settingsRevision)
     }
 }
 
@@ -149,20 +209,7 @@ struct ShortcutSectionView: View {
     let section: ShortcutSettingsModel.Section
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            if section.id != "managed-focus" {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(section.title)
-                        .font(.headline)
-                    if let summary = section.summary {
-                        Text(summary)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-
+        Section {
             if section.id == "managed-focus" {
                 ManagedDirectionalShortcutsView(model: model)
             } else if section.id == "managed-move" {
@@ -174,13 +221,17 @@ struct ShortcutSectionView: View {
             } else if section.id == "workspaces" {
                 WorkspaceShortcutSectionView(model: model)
             } else {
-                VStack(spacing: 0) {
-                    ForEach(section.actions.indices, id: \.self) { index in
-                        let action = section.actions[index]
-                        ShortcutRow(model: model, action: action)
-                        if index < section.actions.count - 1 {
-                            Divider().padding(.leading, 12)
-                        }
+                ForEach(section.actions) { action in
+                    ShortcutRow(model: model, action: action)
+                }
+            }
+        } header: {
+            if section.id != "managed-focus" {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(section.title)
+                    if let summary = section.summary {
+                        Text(summary).font(.caption).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }

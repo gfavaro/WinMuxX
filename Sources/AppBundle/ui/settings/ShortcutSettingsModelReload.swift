@@ -54,10 +54,10 @@ extension ShortcutSettingsModel {
         } ?? []
         for binding in mainBindings {
             let command = binding.commands.prettyDescription
-            if parseWorkspaceCommandTarget(command, kind: .switchTo).flatMap({ workspaceNumbers.contains($0) ? $0 : nil }) != nil {
+            if let workspace = parseWorkspaceCommandTarget(command, kind: .switchTo), workspaceNumbers.contains(workspace) {
                 continue
             }
-            if parseWorkspaceCommandTarget(command, kind: .moveTo).flatMap({ workspaceNumbers.contains($0) ? $0 : nil }) != nil {
+            if let workspace = parseWorkspaceCommandTarget(command, kind: .moveTo), workspaceNumbers.contains(workspace) {
                 continue
             }
             if let actionId = actionIdByCommand[command] {

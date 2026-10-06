@@ -9,7 +9,7 @@ func focusWorkspaceFromSidebar(_ workspaceName: String, targetMonitorScopeId: St
     runWorkspaceSidebarSession {
         guard let workspace = Workspace.existing(byName: workspaceName) else { return }
         if !focusWorkspaceFromSidebar(workspace, targetMonitorScopeId: targetMonitorScopeId) {
-            showWorkspaceSidebarError("Monitor assignments prevent activating or swapping this workspace")
+            showWorkspaceSidebarError("Monitor assignment prevents activating this workspace")
         }
     }
 }
@@ -21,20 +21,19 @@ func focusWorkspaceFromSidebar(_ workspaceName: String, targetMonitorScopeId: St
 private func optimisticallyMarkWorkspaceFocusedInSidebar(_ workspaceName: String, targetMonitorScopeId: String?) {
     let workspaces = TrayMenuModel.shared.workspaceSidebarWorkspaces
     guard let workspace = Workspace.existing(byName: workspaceName) else { return }
-    let monitor = targetMonitorScopeId.flatMap(workspaceSidebarMonitor(forScopeId:)) ?? focus.workspace.workspaceMonitor
+    let requestedMonitor = targetMonitorScopeId.flatMap(workspaceSidebarMonitor(forScopeId:)) ?? focus.workspace.workspaceMonitor
+    if let visibleMonitor = workspace.visibleMonitor,
+       visibleMonitor.rect.topLeftCorner != requestedMonitor.rect.topLeftCorner { return }
+    let monitor = requestedMonitor
     guard isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) else { return }
     let outgoing = monitor.activeWorkspace
-    let source = workspace.visibleMonitor
-    let swapping = source.map { $0.rect.topLeftCorner != monitor.rect.topLeftCorner } ?? false
-    if swapping, let source, !isValidAssignment(workspace: outgoing, screen: source.rect.topLeftCorner) { return }
     var visibleNames = Set(monitors.map { $0.activeWorkspace.name })
-    visibleNames.remove(outgoing.name)
+    if !workspace.isVisible { visibleNames.remove(outgoing.name) }
     visibleNames.insert(workspaceName)
-    if swapping { visibleNames.insert(outgoing.name) }
     TrayMenuModel.shared.workspaceSidebarWorkspaces = workspaces.map { w in
         let isFocused = w.name == workspaceName
         let isVisible = visibleNames.contains(w.name)
-        let destination: Monitor? = isFocused ? monitor : (swapping && w.name == outgoing.name ? source : nil)
+        let destination: Monitor? = isFocused ? monitor : nil
         return WorkspaceSidebarWorkspaceViewModel(
             name: w.name,
             projectId: w.projectId,
@@ -58,7 +57,12 @@ func focusWorkspaceFromSidebar(_ workspace: Workspace, targetMonitorScopeId: Str
         guard let monitor = workspaceSidebarMonitor(forScopeId: targetMonitorScopeId) else { return false }
         targetMonitor = monitor
     } else { targetMonitor = focus.workspace.workspaceMonitor }
-    return activateWorkspaceForUser(workspace, on: targetMonitor)
+    if workspace.isVisible {
+        guard workspace.workspaceMonitor.rect.topLeftCorner == targetMonitor.rect.topLeftCorner else { return false }
+        return workspace.focusWorkspace()
+    }
+    guard targetMonitor.setActiveWorkspace(workspace) else { return false }
+    return workspace.focusWorkspace()
 }
 
 @MainActor
@@ -69,8 +73,10 @@ func overrideWorkspaceInUseFromSidebar(_ workspaceName: String, targetMonitorSco
               let targetMonitorScopeId,
               let targetMonitor = workspaceSidebarMonitor(forScopeId: targetMonitorScopeId)
         else { return }
-        if !activateWorkspaceForUser(workspace, on: targetMonitor) {
-            showWorkspaceSidebarError("Monitor assignments prevent swapping these workspaces")
+        if !overrideWorkspaceOnMonitorBySwappingActiveViewports(workspace, targetMonitor: targetMonitor) {
+            showWorkspaceSidebarError("Monitor assignment prevents activating this workspace")
+        } else {
+            _ = workspace.focusWorkspace()
         }
     }
 }
@@ -122,13 +128,7 @@ func workspaceSidebarTargetMonitor(
 
 @MainActor
 func selectedWorkspaceSidebarMonitorScope() -> Monitor? {
-    let selectedScopeId = TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId
-    guard selectedScopeId != workspaceSidebarDefaultScopeId,
-          selectedScopeId != workspaceSidebarFocusedScopeId
-    else {
-        return nil
-    }
-    return sortedMonitors.first { workspaceSidebarMonitorScopeId(for: $0) == selectedScopeId }
+    workspaceSidebarMonitorForScopeId(TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId)
 }
 
 @MainActor
@@ -410,124 +410,6 @@ private func workspaceSidebarDropPreviewTabs(
             appBundlePath: window.app.bundlePath,
         )
     }
-}
-
-@MainActor
-func selectWorkspaceSidebarProject(
-    _ projectId: WorkspaceProjectId,
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
-) {
-    let knownProjects = workspaceProjects()
-    let resolvedTargetScopeId = targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
-    debugWorkspaceSidebarProjectLog(
-        "selectProjectBegin project=\(projectId.rawValue) known=\(knownProjects.map(\.id.rawValue)) targetScope=\(resolvedTargetScopeId) activeBefore=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
-    )
-    guard knownProjects.contains(where: { $0.id == projectId }) else {
-        debugWorkspaceSidebarProjectLog("selectProjectAbort unknownProject=\(projectId.rawValue)")
-        return
-    }
-    runWorkspaceSidebarSession {
-        let monitor = workspaceSidebarTargetMonitor(
-            scopeId: targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
-        )
-        debugWorkspaceSidebarProjectLog(
-            "selectProjectSession project=\(projectId.rawValue) monitor=\(monitor.monitorAppKitNsScreenScreensId) visibleBefore=\(monitor.activeWorkspace.name) activeProjectBefore=\(activeWorkspaceProjectId(for: monitor).rawValue)"
-        )
-        if let workspace = switchWorkspaceProject(projectId, on: monitor) {
-            debugWorkspaceSidebarProjectLog(
-                "selectProjectSwitchResult project=\(projectId.rawValue) workspace=\(workspace.name) workspaceProject=\(workspace.projectId.rawValue)"
-            )
-            _ = workspace.focusWorkspace()
-            viewModel.workspaceSidebarActiveProjectId = projectId
-        } else {
-            debugWorkspaceSidebarProjectLog("selectProjectSwitchResult project=\(projectId.rawValue) workspace=nil")
-        }
-        await updateWorkspaceSidebarModel()
-        debugWorkspaceSidebarProjectLog(
-            "selectProjectEnd project=\(projectId.rawValue) activeAfter=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
-        )
-    }
-}
-
-@MainActor
-func createWorkspaceSidebarProject(
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
-) {
-    runWorkspaceSidebarSession {
-        let project = createWorkspaceProject()
-        let monitor = workspaceSidebarTargetMonitor(
-            scopeId: targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
-        )
-        if let workspace = switchWorkspaceProject(project.id, on: monitor) {
-            _ = workspace.focusWorkspace()
-            viewModel.workspaceSidebarActiveProjectId = project.id
-        }
-        await updateWorkspaceSidebarModel()
-    }
-}
-
-@MainActor
-func renameWorkspaceSidebarProject(_ projectId: WorkspaceProjectId, displayName: String) {
-    runWorkspaceSidebarSession {
-        try renameWorkspaceProject(projectId, displayName: displayName)
-        await updateWorkspaceSidebarModel()
-    }
-}
-
-@MainActor
-func setWorkspaceSidebarProjectColor(_ project: WorkspaceSidebarProjectViewModel, colorHex: String?) {
-    runWorkspaceSidebarSession {
-        let normalizedColorHex = colorHex.flatMap(normalizedWorkspaceSidebarColorHex)
-        if let normalizedColorHex {
-            config.workspaceSidebar.projectColors[project.id.rawValue] = normalizedColorHex
-        } else {
-            config.workspaceSidebar.projectColors.removeValue(forKey: project.id.rawValue)
-        }
-        if !isUnitTest {
-            try persistWorkspaceSidebarProjectColor(projectId: project.id.rawValue, colorHex: normalizedColorHex)
-        }
-        await updateWorkspaceSidebarModel()
-    }
-}
-
-@MainActor
-func deleteWorkspaceSidebarProject(
-    _ project: WorkspaceSidebarProjectViewModel,
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-) {
-    guard canDeleteWorkspaceProject(project.id) else { return }
-    guard confirmWorkspaceSidebarProjectDeletion(project) else { return }
-    runWorkspaceSidebarSession {
-        try await deleteWorkspaceProjectFromSidebar(project.id)
-        await updateWorkspaceSidebarModel()
-    }
-}
-
-@MainActor
-private func confirmWorkspaceSidebarProjectDeletion(_ project: WorkspaceSidebarProjectViewModel) -> Bool {
-    let windowCount = windowsInWorkspaceProject(project.id).count
-    guard windowCount > 0 else { return true }
-
-    let alert = NSAlert()
-    switch config.workspaceSidebar.projectDeletionAction {
-        case .closeWindows:
-            alert.messageText = "Close Project Windows?"
-            alert.informativeText = """
-            WinMux will ask macOS to close \(windowCount) window\(windowCount == 1 ? "" : "s") in “\(project.displayName)”. Apps may show their own confirmation dialogs for unsaved work. If any window stays open, WinMux will keep the project.
-            """
-            alert.addButton(withTitle: "Close Project")
-        case .moveWindowsToFallback:
-            alert.messageText = "Delete Project?"
-            alert.informativeText = """
-            WinMux will delete “\(project.displayName)” and move \(windowCount) window\(windowCount == 1 ? "" : "s") to another project.
-            """
-            alert.addButton(withTitle: "Delete Project")
-    }
-    alert.addButton(withTitle: "Cancel")
-    alert.alertStyle = .warning
-    return alert.runModal() == .alertFirstButtonReturn
 }
 
 @MainActor

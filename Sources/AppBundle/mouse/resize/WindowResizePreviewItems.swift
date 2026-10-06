@@ -103,7 +103,17 @@ private func windowResizePreviewContainerItems(
         )]
     }
     switch container.layout {
-        case .tiles, .dwindle:
+        case .dwindle:
+            let frames = container.dwindleChildFrames(in: physicalRect, gaps: context.resolvedGaps) {
+                context.weightMap.dwindleRatio(for: container, at: $0)
+            }
+            return zip(container.children, frames).flatMap { child, frame in
+                windowResizePreviewItems(
+                    node: child, point: frame.topLeftCorner, width: frame.width, height: frame.height,
+                    virtual: frame, context: context, activeWindowId: activeWindowId,
+                )
+            }
+        case .tiles:
             return windowResizePreviewTileItems(
                 container: container,
                 point: point,

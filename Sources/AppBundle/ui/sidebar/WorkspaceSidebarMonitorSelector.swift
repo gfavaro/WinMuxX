@@ -5,6 +5,8 @@ import SwiftUI
 // MARK: - Monitor Selector
 
 struct WorkspaceSidebarMonitorSelector: View {
+    @Environment(\.accessibilityReduceMotion) var reduceMotion
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let scopes: [WorkspaceSidebarMonitorScopeViewModel]
     let projects: [WorkspaceSidebarProjectViewModel]
     let selectedScopeId: String
@@ -12,6 +14,7 @@ struct WorkspaceSidebarMonitorSelector: View {
     let browsedProjectId: WorkspaceProjectId?
     let expansionProgress: CGFloat
     let sectionWidth: CGFloat
+    var position: WorkspaceSidebarPosition = .left
     var onSelectScope: (String) -> Void = { selectWorkspaceSidebarMonitorScope($0) }
     var onSelectProject: (WorkspaceProjectId?) -> Void = { _ in }
     var onRenameProject: (WorkspaceSidebarProjectViewModel) -> Void = { _ in }
@@ -77,14 +80,14 @@ struct WorkspaceSidebarMonitorSelector: View {
         .zIndex(isProjectMenuOpen ? 200 : 0)
         .onReceive(NotificationCenter.default.publisher(for: workspaceSidebarWillCollapseNotification)) { _ in
             if isProjectMenuOpen {
-                withAnimation(.easeOut(duration: 0.08)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.08)) {
                     isProjectMenuOpen = false
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: workspaceSidebarDismissProjectMenusNotification)) { _ in
             if isProjectMenuOpen {
-                withAnimation(.easeOut(duration: 0.10)) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.10)) {
                     isProjectMenuOpen = false
                 }
             }
@@ -100,7 +103,7 @@ struct WorkspaceSidebarMonitorSelector: View {
             Text(scope.id == workspaceSidebarFocusedScopeId ? "Focus" : scope.displayName)
                 .font(.system(size: 12.5, weight: isActive ? .semibold : .medium))
                 .lineLimit(1)
-                .foregroundStyle(isActive ? Color.white : Color.white.opacity(0.68))
+                .foregroundStyle(isActive ? sidebarColors.foreground : sidebarColors.text(opacity: 0.68))
                 .modifier(WorkspaceSidebarDropdownControlStyle(isActive: isActive))
         }
         .buttonStyle(.plain)
@@ -141,19 +144,19 @@ struct WorkspaceSidebarMonitorSelector: View {
             HStack(spacing: 4) {
                 Text(selectedProject?.displayName ?? "Other Projects")
                     .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(isActive ? 0.86 : 0.72))
+                    .foregroundStyle(sidebarColors.text(opacity: isActive ? 0.86 : 0.72))
                     .lineLimit(1)
                     .truncationMode(.tail)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(Color.white.opacity(isActive ? 0.86 : 0.72))
+                    .foregroundStyle(sidebarColors.text(opacity: isActive ? 0.86 : 0.72))
                     .rotationEffect(.degrees(isProjectMenuOpen ? 180 : 0))
             }
             .modifier(WorkspaceSidebarDropdownControlStyle(isActive: isActive))
         }
         .buttonStyle(.plain)
         .fixedSize(horizontal: true, vertical: false)
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: position == .left ? .topTrailing : .topLeading) {
             projectPopup
                 .offset(y: workspaceSidebarDropdownHeight + workspaceSidebarSectionGap)
         }

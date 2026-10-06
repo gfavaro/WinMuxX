@@ -43,21 +43,20 @@ struct ListWindowsCommand: Command {
 
         if args.outputOnlyCount {
             return io.out("\(windows.count)")
-        } else {
-            var windowInfos: [(window: Window, title: String)] = []
-            for window in windows {
-                windowInfos.append((window, try await window.title))
-            }
-            windowInfos = windowInfos
-                .filter { $0.window.isBound }
-                .sortedBy([{ $0.window.app.name ?? "" }, \.title])
-
-            return windowInfos.map { FormatObject.window(window: $0.window, title: $0.title) }.writeFormattedOutput(
-                to: io,
-                format: args.format,
-                json: args.json,
-                ignoreRightPaddingVar: args._format.isEmpty,
-            )
         }
+        var windowInfos: [(window: Window, title: String)] = []
+        for window in windows {
+            windowInfos.append((window, try await window.title))
+        }
+        windowInfos = windowInfos
+            .filter { $0.window.isBound }
+            .sortedBy([{ $0.window.app.name ?? "" }, \.title])
+
+        return windowInfos.map { FormatObject.window(window: $0.window, title: $0.title) }.writeFormattedOutput(
+            to: io,
+            format: args.format,
+            json: args.json,
+            ignoreRightPaddingVar: args._format.isEmpty,
+        )
     }
 }

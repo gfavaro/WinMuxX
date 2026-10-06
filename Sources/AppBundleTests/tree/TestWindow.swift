@@ -2,6 +2,8 @@
 import AppKit
 
 final class TestWindow: Window, CustomStringConvertible {
+    @MainActor var testMinimumSize: CGSize = .zero
+    @MainActor override var minimumLayoutSize: CGSize { testMinimumSize }
     private var _rect: Rect?
     private var _isHiddenInCorner: Bool = false
     // Mutating the fake native state models a real state transition, which in production is

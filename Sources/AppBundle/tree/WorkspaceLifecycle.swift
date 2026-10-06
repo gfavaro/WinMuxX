@@ -282,18 +282,14 @@ func activateWorkspaceForUser(
     _ workspace: Workspace,
     on targetMonitor: Monitor,
 ) -> Bool {
+    // Selection follows an already-visible workspace; it does not relocate either
+    // monitor's viewport or history. Forced assignments only matter for hidden targets.
+    if workspace.isVisible {
+        guard workspace.visibleMonitor != nil else { return false }
+        return workspace.focusWorkspace()
+    }
     guard isValidAssignment(workspace: workspace, screen: targetMonitor.rect.topLeftCorner) else {
         return false
-    }
-
-    if workspace.isVisible {
-        let visibleMonitor = workspace.visibleMonitor
-        guard let visibleMonitor else { return false }
-        if visibleMonitor.rect.topLeftCorner != targetMonitor.rect.topLeftCorner {
-            guard overrideWorkspaceOnMonitorBySwappingActiveViewports(workspace, targetMonitor: targetMonitor) else { return false }
-            return workspace.focusWorkspace()
-        }
-        return workspace.focusWorkspace()
     }
 
     guard targetMonitor.setActiveWorkspace(workspace) else { return false }

@@ -64,7 +64,7 @@ extension TreeNode {
                             window.isFullscreen = false
                         }
                         if !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
-                            window.setAxFrame(point, CGSize(width: width, height: height))
+                            WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
                         }
                     }
                 }
@@ -159,73 +159,30 @@ extension Window {
 extension TilingContainer {
     @MainActor
     fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
-        var point = point
-        var virtualPoint = virtual.topLeftCorner
-
-        guard let delta = ((orientation == .h ? width : height) - CGFloat(children.sumOfDouble { $0.getWeight(orientation) }))
-            .div(children.count) else { return }
-
-        let lastIndex = children.indices.last
-        for (i, child) in children.enumerated() {
-            child.setWeight(orientation, child.getWeight(orientation) + delta)
-            let rawGap = context.resolvedGaps.inner.get(orientation).toDouble()
-            // Gaps. Consider 4 cases:
-            // 1. Multiple children. Layout first child
-            // 2. Multiple children. Layout last child
-            // 3. Multiple children. Layout child in the middle
-            // 4. Single child   let rawGap = gaps.inner.get(orientation).toDouble()
-            let gap = rawGap - (i == 0 ? rawGap / 2 : 0) - (i == lastIndex ? rawGap / 2 : 0)
-            try await child.layoutRecursive(
-                i == 0 ? point : point.addingOffset(orientation, rawGap / 2),
-                width: orientation == .h ? child.hWeight - gap : width,
-                height: orientation == .v ? child.vWeight - gap : height,
-                virtual: Rect(
-                    topLeftX: virtualPoint.x,
-                    topLeftY: virtualPoint.y,
-                    width: orientation == .h ? child.hWeight : width,
-                    height: orientation == .v ? child.vWeight : height,
-                ),
-                context,
-            )
-            virtualPoint = orientation == .h ? virtualPoint.addingXOffset(child.hWeight) : virtualPoint.addingYOffset(child.vWeight)
-            point = orientation == .h ? point.addingXOffset(child.hWeight) : point.addingYOffset(child.vWeight)
+        let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
+        let frames = tileChildFrames(in: rect, gaps: context.resolvedGaps)
+        for (child, frame) in zip(children, frames) {
+            child.setWeight(orientation, frame.weight)
+            let childVirtual = Rect(
+                topLeftX: frame.virtual.topLeftX + virtual.topLeftX - point.x,
+                topLeftY: frame.virtual.topLeftY + virtual.topLeftY - point.y,
+                width: frame.virtual.width, height: frame.virtual.height)
+            try await child.layoutRecursive(frame.physical.topLeftCorner,
+                width: frame.physical.width, height: frame.physical.height, virtual: childVirtual, context)
         }
     }
 
     @MainActor
     fileprivate func layoutDwindle(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
-        guard !children.isEmpty else { return }
-        var currentPoint = point
-        var currentVirtual = virtual
-        var currentWidth = width
-        var currentHeight = height
-
-        for (index, child) in children.enumerated() {
-            let last = index == children.indices.last
-            let splitOrientation: Orientation = currentWidth >= currentHeight ? .h : .v
-            let splitLength = splitOrientation == .h ? currentWidth : currentHeight
-            let gap = last ? 0 : CGFloat(context.resolvedGaps.inner.get(splitOrientation).toDouble())
-            let childLength = last ? splitLength : max(splitLength * 0.5 - gap / 2, 0)
-            let childWidth = splitOrientation == .h ? childLength : currentWidth
-            let childHeight = splitOrientation == .v ? childLength : currentHeight
-            try await child.layoutRecursive(
-                currentPoint,
-                width: childWidth,
-                height: childHeight,
-                virtual: Rect(topLeftX: currentVirtual.topLeftX, topLeftY: currentVirtual.topLeftY, width: childWidth, height: childHeight),
-                context,
+        let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
+        let frames = dwindleChildFrames(in: rect, gaps: context.resolvedGaps)
+        for (child, frame) in zip(children, frames) {
+            let childVirtual = Rect(
+                topLeftX: virtual.topLeftX + frame.topLeftX - point.x,
+                topLeftY: virtual.topLeftY + frame.topLeftY - point.y,
+                width: frame.width, height: frame.height,
             )
-            if splitOrientation == .h {
-                let consumed = childWidth + gap
-                currentPoint = currentPoint.addingXOffset(consumed)
-                currentVirtual = currentVirtual.copy(\.topLeftX, currentVirtual.topLeftX + consumed)
-                currentWidth -= consumed
-            } else {
-                let consumed = childHeight + gap
-                currentPoint = currentPoint.addingYOffset(consumed)
-                currentVirtual = currentVirtual.copy(\.topLeftY, currentVirtual.topLeftY + consumed)
-                currentHeight -= consumed
-            }
+            try await child.layoutRecursive(frame.topLeftCorner, width: frame.width, height: frame.height, virtual: childVirtual, context)
         }
     }
 
@@ -290,6 +247,58 @@ extension TilingContainer {
                         context,
                     )
             }
+        }
+    }
+}
+
+@MainActor
+func fitLayoutSizes(_ requested: [CGFloat], minimums: [CGFloat], total: CGFloat) -> [CGFloat] {
+    guard requested.count == minimums.count,
+          !requested.isEmpty,
+          minimums.allSatisfy({ $0.isFinite && $0 >= 0 }),
+          requested.allSatisfy({ $0.isFinite && $0 >= 0 }),
+          minimums.reduce(0, +) <= total else { return requested }
+    var result = requested
+    var pinned = Set<Int>()
+    while let short = result.indices.first(where: { !pinned.contains($0) && result[$0] + 0.5 < minimums[$0] }) {
+        pinned.insert(short)
+        let pinnedTotal = pinned.reduce(CGFloat.zero) { $0 + minimums[$1] }
+        let free = result.indices.filter { !pinned.contains($0) }
+        let freeRequested = free.reduce(CGFloat.zero) { $0 + requested[$1] }
+        for index in pinned { result[index] = minimums[index] }
+        let remaining = max(total - pinnedTotal, 0)
+        for index in free {
+            result[index] = freeRequested > 0 ? remaining * requested[index] / freeRequested : remaining / CGFloat(max(free.count, 1))
+        }
+    }
+    return result
+}
+
+@MainActor
+extension TreeNode {
+    func minimumLayoutExtent(along axis: Orientation, gaps: ResolvedGaps? = nil, rect: Rect? = nil) -> CGFloat {
+        let gaps = gaps ?? ResolvedGaps(gaps: config.gaps, monitor: nodeMonitor ?? mainMonitor)
+        switch nodeCases {
+            case .window(let window):
+                let minimum = window.minimumLayoutSize
+                return axis == .h ? minimum.width : minimum.height
+            case .tilingContainer(let container):
+                let rect = rect ?? container.lastAppliedLayoutPhysicalRect ?? container.nodeMonitor?.visibleRectPaddedByOuterGaps
+                if container.layout == .dwindle, let rect {
+                    return container.dwindleMinimumExtent(children: container.children[...], along: axis, rect: rect, gaps: gaps)
+                }
+                let minimums = container.children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
+                guard !minimums.isEmpty else { return 0 }
+                if container.layout == .tabGroup {
+                    let chrome = container.showsWindowTabs
+                        ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()
+                            : resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0
+                    return (minimums.max() ?? 0) + chrome
+                }
+                return container.orientation == axis
+                    ? minimums.reduce(0, +) + CGFloat(gaps.inner.get(axis).toDouble()) * CGFloat(minimums.count - 1)
+                    : minimums.max() ?? 0
+            default: return 0
         }
     }
 }

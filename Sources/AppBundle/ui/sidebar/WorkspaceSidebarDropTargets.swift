@@ -1,5 +1,8 @@
 import SwiftUI
 
+@MainActor
+var workspaceSidebarDropTargets: [WorkspaceSidebarDropTarget] = []
+
 enum WorkspaceSidebarDropTargetKind: Equatable {
     case workspace(String)
     case newWorkspace(projectId: WorkspaceProjectId, monitorScopeId: String)

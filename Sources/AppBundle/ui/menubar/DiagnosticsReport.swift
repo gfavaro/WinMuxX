@@ -14,7 +14,7 @@ func buildDiagnosticsReport() async -> String {
     io.out("  enabled: \(TrayMenuModel.shared.isEnabled)")
     io.out("  crash recovery: \(WindowRecoveryController.shared.diagnosticSummary)")
     let learned = MacWindow.allWindows.filter { !$0.learnedMinimum.isEmpty }
-    io.out("  learned minimum sizes: \(learned.count) windows (session-local; observation only)")
+    io.out("  learned minimum sizes: \(learned.count) windows (persisted observations; layout enforcement pending)")
     for window in learned.sorted(by: { $0.windowId < $1.windowId }) {
         let minimum = window.learnedMinimum.size
         io.out("    window \(window.windowId): width=\(minimum.width) height=\(minimum.height)pt (0 = unknown)")
@@ -33,9 +33,7 @@ func buildDiagnosticsReport() async -> String {
     if let error = lastConfigReloadError { io.out("  last reload error: \(error)") }
     io.out("")
 
-    let appConflicts = otherTilingManagers(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
-    let daemonConflicts = await runningDaemonTilers()
-    let conflicts = Array(Set(appConflicts + daemonConflicts)).sorted()
+    let conflicts = runningOtherWindowManagers()
     io.out("Other window managers:")
     io.out(conflicts.isEmpty ? "  none detected" : conflicts.map { "  WARNING: \($0) is running; window management may conflict" }.joined(separator: "\n"))
     io.out("  macOS automatically rearranges Spaces: \(dockDiagnosticSetting("mru-spaces"))")
@@ -89,23 +87,6 @@ func otherTilingManagers(_ bundleIds: [String]) -> [String] {
         "com.hegenberg.BetterSnapTool": "BetterSnapTool", "com.crowdcafe.windowmagnet": "Magnet",
     ]
     return Set(bundleIds.compactMap { names[$0] }).sorted()
-}
-
-private func runningDaemonTilers() async -> [String] {
-    await Task.detached {
-        ["yabai"].filter { name in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
-            process.arguments = ["-x", name]
-            process.standardOutput = FileHandle.nullDevice
-            process.standardError = FileHandle.nullDevice
-            do {
-                try process.run()
-                process.waitUntilExit()
-                return process.terminationStatus == 0
-            } catch { return false }
-        }
-    }.value
 }
 
 private func dockDiagnosticSetting(_ key: String) -> String {

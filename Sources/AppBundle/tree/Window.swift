@@ -60,6 +60,8 @@ open class Window: TreeNode, Hashable {
         lastKnownActualRect = rect
     }
 
+    @MainActor var minimumLayoutSize: CGSize { .zero }
+
     @MainActor
     init(id: UInt32, _ app: any AbstractApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
         self.windowId = id

@@ -12,9 +12,10 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
     private var observation: AnyCancellable?
+    private var appearanceObservation: NSKeyValueObservation?
     private var checkForUpdates: (() -> Void)?
     private var bindings = ActionMenuBindings(mode: nil)
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
 
     func install(checkForUpdates: (() -> Void)?) {
         guard statusItem == nil else { return }
@@ -24,6 +25,15 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.delegate = self
         item.menu = menu
         statusItem = item
+        if let button = item.button {
+            appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
+                Task { @MainActor in
+                    let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+                    WorkspaceSidebarPanel.menuBarColorScheme = match == .aqua ? .light : .dark
+                    WorkspaceSidebarPanel.refreshWallpaperContrast()
+                }
+            }
+        }
         updateIcon()
         observation = TrayMenuModel.shared.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateIcon() }
@@ -32,28 +42,45 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.experimentalUISettings.iconAppearance)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance { return }
+        let state = (enabled: model.isEnabled, appearance: model.experimentalUISettings.iconAppearance, indicator: model.experimentalUISettings.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name { return }
         lastIconState = state
+        if model.isEnabled && state.indicator == .workspace {
+            statusItem?.length = NSStatusItem.variableLength
+            statusItem?.button?.image = nil
+            statusItem?.button?.title = state.text
+            statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display"
+            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display")
+            return
+        }
+        statusItem?.length = NSStatusItem.squareLength
+        statusItem?.button?.title = ""
+        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" : "WinMux disabled")
         let image: NSImage?
         if model.isEnabled {
             let monochrome = model.experimentalUISettings.iconAppearance != .color
             image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
             image?.isTemplate = monochrome
         } else {
-            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuXx disabled")
+            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuxX disabled")
         }
         image?.size = NSSize(width: 18, height: 18)
         statusItem?.button?.image = image
-        statusItem?.button?.toolTip = "WinMuXx"
+        statusItem?.button?.toolTip = "WinMuxX"
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.autoenablesItems = false
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
-        menu.addItem(NSMenuItem(title: "WinMuXx v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "WinMuxX v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
+        let conflicts = runningOtherWindowManagers()
+        if !conflicts.isEmpty {
+            menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))
+            menu.addItem(callbackItem("Window management may conflict — view diagnostics…", #selector(openDiagnostics)))
+        }
         menu.addItem(.separator())
         for section in buildShortcutSections() where !section.actions.isEmpty {
             addSubmenu(section.title, to: menu) { submenu in
@@ -145,7 +172,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if checkForUpdates != nil { menu.addItem(callbackItem("Check for Updates…", #selector(checkUpdates))) }
         menu.addItem(callbackItem("GitHub Repository", #selector(openRepository)))
         menu.addItem(callbackItem("File an Issue…", #selector(openIssue)))
-        menu.addItem(callbackItem("Quit WinMuXx", #selector(quit)))
+        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
     }
 
     private func addSubmenu(_ title: String, to menu: NSMenu, build: (NSMenu) -> Void) {
@@ -260,12 +287,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     @objc private func checkUpdates() { checkForUpdates?() }
     @objc private func openRepository() { NSWorkspace.shared.open(URL(string: forkRepositoryURL)!) }
     @objc private func openIssue() { NSWorkspace.shared.open(URL(string: forkRepositoryURL + "/issues/new")!) }
-    @objc private func quit() {
-        Task {
-            do { try await terminationHandler.beforeTermination(); terminateApp() }
-            catch { MessageModel.shared.message = Message(description: "Quit Error", body: String(describing: error)) }
-        }
-    }
+    @objc private func quit() { terminateApp() }
+
 }
 
 final class MenuCommandPayload {

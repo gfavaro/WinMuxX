@@ -49,12 +49,12 @@ build-clean:
 run:
 	$(MAKE) build VERSION="$(VERSION)"
 	/bin/bash -lc 'cd "$(CURDIR)" && \
-	if pgrep -x yabai >/dev/null 2>&1; then echo "warning: yabai is still running and may conflict with WinMuXx" >&2; fi && \
+	if pgrep -x yabai >/dev/null 2>&1; then echo "warning: yabai is still running and may conflict with WinMux" >&2; fi && \
 	if pgrep -x skhd >/dev/null 2>&1; then echo "warning: skhd is still running; its yabai shortcuts will keep firing" >&2; fi && \
 	config_path="$${WINMUX_CONFIG_PATH:-}"; \
 	if [ -n "$$config_path" ]; then \
 	    if [ ! -f "$$config_path" ]; then \
-	        echo "Missing WinMuXx config: $$config_path" >&2; \
+	        echo "Missing WinMux config: $$config_path" >&2; \
 	        exit 1; \
 	    fi; \
 	    exec ./.debug/WinMuxApp --config-path "$$config_path" $(ARGS); \
@@ -65,12 +65,12 @@ run:
 run-clean:
 	$(MAKE) build-clean VERSION="$(VERSION)"
 	/bin/bash -lc 'cd "$(CURDIR)" && \
-	if pgrep -x yabai >/dev/null 2>&1; then echo "warning: yabai is still running and may conflict with WinMuXx" >&2; fi && \
+	if pgrep -x yabai >/dev/null 2>&1; then echo "warning: yabai is still running and may conflict with WinMux" >&2; fi && \
 	if pgrep -x skhd >/dev/null 2>&1; then echo "warning: skhd is still running; its yabai shortcuts will keep firing" >&2; fi && \
 	config_path="$${WINMUX_CONFIG_PATH:-}"; \
 	if [ -n "$$config_path" ]; then \
 	    if [ ! -f "$$config_path" ]; then \
-	        echo "Missing WinMuXx config: $$config_path" >&2; \
+	        echo "Missing WinMux config: $$config_path" >&2; \
 	        exit 1; \
 	    fi; \
 	    exec ./.debug/WinMuxApp --config-path "$$config_path" $(ARGS); \
@@ -96,7 +96,7 @@ release:
 	$(MAKE) fork-build VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)"
 
 install:
-	@echo 'Install .release/WinMuXx.app explicitly. This target never replaces WinMux.app.' >&2
+	@echo 'Install .release/WinMuxX.app explicitly. This target never replaces WinMux.app.' >&2
 	@exit 1
 installed: install
 

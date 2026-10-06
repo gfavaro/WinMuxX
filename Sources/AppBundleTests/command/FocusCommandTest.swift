@@ -98,6 +98,29 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
+    func testDwindleFocusUsesGeometricNeighborsOnBothAxes() async throws {
+        config.defaultRootContainerLayout = .dwindle
+        config.defaultRootContainerOrientation = .auto
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        let left = TestWindow.new(id: 7101, parent: root)
+        let upperRight = TestWindow.new(id: 7102, parent: root)
+        let lowerRight = TestWindow.new(id: 7103, parent: root)
+        try await workspace.layoutWorkspace()
+
+        XCTAssertTrue(left.focusWindow())
+        try await FocusCommand.new(direction: .down).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(focus.windowOrNil?.windowId, left.windowId)
+
+        XCTAssertTrue(upperRight.focusWindow())
+        try await FocusCommand.new(direction: .down).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(focus.windowOrNil?.windowId, lowerRight.windowId)
+
+        XCTAssertTrue(lowerRight.focusWindow())
+        try await FocusCommand.new(direction: .up).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(focus.windowOrNil?.windowId, upperRight.windowId)
+    }
+
     func testFocusAcrossTheContainerOrientation() async throws {
         Workspace.get(byName: name).apply {
             TestWindow.new(id: 1, parent: $0.rootTilingContainer)

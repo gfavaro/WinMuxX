@@ -84,7 +84,9 @@ open class TreeNode: Equatable, WinMuxAny {
         } else {
             self.adaptiveWeight = adaptiveWeight
         }
-        newParent._children.insert(self, at: index != INDEX_BIND_LAST ? index : newParent._children.count)
+        let insertionIndex = index != INDEX_BIND_LAST ? index : newParent._children.count
+        (newParent as? TilingContainer)?.dwindleChildWillInsert(at: insertionIndex)
+        newParent._children.insert(self, at: insertionIndex)
         _parent = newParent
         unboundStacktrace = nil
         // todo consider disabling automatic mru propogation
@@ -101,7 +103,9 @@ open class TreeNode: Equatable, WinMuxAny {
     private func unbindIfBound() -> BindingData? {
         guard let _parent else { return nil }
 
-        let index = _parent._children.remove(element: self) ?? dieT("Can't find child in its parent")
+        let index = _parent._children.firstIndex(of: self) ?? dieT("Can't find child in its parent")
+        (_parent as? TilingContainer)?.dwindleChildWillRemove(at: index)
+        _parent._children.remove(at: index)
         check(_parent._mruChildren.remove(self))
         self._parent = nil
         unboundStacktrace = getStringStacktrace()

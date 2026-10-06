@@ -2,6 +2,7 @@ import Foundation
 import SwiftUI
 
 struct WorkspaceSidebarExpandedStatusCard: View {
+    @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let date: Date
     let sectionWidth: CGFloat
     let showsSeconds: Bool
@@ -31,13 +32,13 @@ struct WorkspaceSidebarExpandedStatusCard: View {
                 Text(date, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
                     .font(.system(size: 42, weight: .bold, design: .rounded))
                     .monospacedDigit()
-                    .foregroundStyle(Color.white.opacity(0.90))
+                    .foregroundStyle(sidebarColors.text(opacity: 0.90))
                     .lineLimit(1)
                 if showsSeconds {
                     Text(date, format: .dateTime.second(.twoDigits))
                         .font(.system(size: 16, weight: .semibold, design: .rounded))
                         .monospacedDigit()
-                        .foregroundStyle(Color.white.opacity(0.34))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.34))
                         .lineLimit(1)
                         .padding(.top, 9)
                 }
@@ -60,10 +61,10 @@ struct WorkspaceSidebarExpandedStatusCard: View {
         )
         .background(
             RoundedRectangle(cornerRadius: workspaceSidebarStatusCornerRadius, style: .continuous)
-                .fill(Color.white.opacity(GlassToken.fillResting))
+                .fill(sidebarColors.foreground.opacity(GlassToken.fillResting))
                 .overlay {
                     RoundedRectangle(cornerRadius: workspaceSidebarStatusCornerRadius, style: .continuous)
-                        .strokeBorder(Color.white.opacity(GlassToken.cardStroke), lineWidth: StrokeToken.hairline)
+                        .strokeBorder(sidebarColors.foreground.opacity(GlassToken.cardStroke), lineWidth: StrokeToken.hairline)
                 }
         )
         .accessibilityElement(children: .ignore)
@@ -73,7 +74,7 @@ struct WorkspaceSidebarExpandedStatusCard: View {
     private func dateLine(_ text: String) -> some View {
         Text(text)
             .font(.system(size: 15, weight: .semibold))
-            .foregroundStyle(Color.white.opacity(0.48))
+            .foregroundStyle(sidebarColors.text(opacity: 0.48))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .allowsTightening(true)

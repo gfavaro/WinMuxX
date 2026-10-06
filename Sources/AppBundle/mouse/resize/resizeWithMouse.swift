@@ -5,6 +5,11 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
     let notif = notif as String
     let windowId = ax.containingWindowId()
     Task { @MainActor in
+        if let windowId, WindowMotion.shared.isAnimating(windowId), NSEvent.pressedMouseButtons & 1 == 0 {
+            Window.get(byId: windowId)?.invalidateLastKnownNativeState()
+            return
+        }
+        WindowBorderController.shared.refresh()
         if WindowMouseInteractionOpacityController.shared.shouldSuppressObserverEvent(windowId: windowId) {
             return
         }
@@ -89,6 +94,9 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     for change in weightMap.changes {
         change.node.setWeight(change.orientation, change.weight)
     }
+    for change in weightMap.dwindleChanges {
+        change.container.setDwindleSplitRatio(change.ratio, at: change.index)
+    }
     currentlyManipulatedWithMouseWindowId = window.windowId
     setCurrentMouseManipulationKind(.resize)
     clearPendingWindowDragIntent()
@@ -101,6 +109,21 @@ struct WindowResizeWeightChange {
 }
 
 struct WindowResizePreviewWeightMap {
+    struct DwindleChange {
+        let container: TilingContainer
+        let index: Int
+        let ratio: CGFloat
+    }
+    private(set) var dwindleChanges: [DwindleChange] = []
+
+    mutating func setDwindleRatio(_ ratio: CGFloat, for container: TilingContainer, at index: Int) {
+        dwindleChanges.removeAll { $0.container === container && $0.index == index }
+        dwindleChanges.append(DwindleChange(container: container, index: index, ratio: ratio))
+    }
+
+    func dwindleRatio(for container: TilingContainer, at index: Int) -> CGFloat {
+        dwindleChanges.first { $0.container === container && $0.index == index }?.ratio ?? container.dwindleSplitRatio(at: index)
+    }
     private var weights: [WindowResizeWeightKey: CGFloat] = [:]
     private var nodes: [ObjectIdentifier: TreeNode] = [:]
 
@@ -135,6 +158,33 @@ func proposedResizeWeightMap(_ window: Window, rect: Rect) -> WindowResizePrevie
     guard window.parent is TilingContainer else { return nil }
     guard let lastAppliedLayoutRect = window.lastAppliedLayoutPhysicalRect else { return nil }
     var weightMap = WindowResizePreviewWeightMap()
+    if let workspace = window.nodeWorkspace {
+        // Recompute after each axis, so an automatic split that changes shape is never
+        // resized using the other axis's stale length. Adjacency is checked at mouse-down.
+        let originalTargets = window.parentsWithSelf.flatMap { $0.dwindleResizeTargets() }
+        for axis in [Orientation.h, .v] {
+            for node in window.parentsWithSelf.reversed() {
+                let geometry = dwindleGeometry(in: workspace, weightMap: weightMap, physical: true)
+                for split in node.dwindleResizeTargets(geometry: geometry) where split.orientation == axis {
+                    guard let original = originalTargets.first(where: {
+                        $0.container === split.container && $0.splitIndex == split.splitIndex && $0.orientation == axis
+                    }) else { continue }
+                    let oldEdge: CGFloat
+                    let newEdge: CGFloat
+                    switch (axis, split.resizesLeadingChild) {
+                        case (.h, true): (oldEdge, newEdge) = (lastAppliedLayoutRect.maxX, rect.maxX)
+                        case (.h, false): (oldEdge, newEdge) = (lastAppliedLayoutRect.minX, rect.minX)
+                        case (.v, true): (oldEdge, newEdge) = (lastAppliedLayoutRect.maxY, rect.maxY)
+                        case (.v, false): (oldEdge, newEdge) = (lastAppliedLayoutRect.minY, rect.minY)
+                    }
+                    guard abs(oldEdge - original.resizeEdge) < 1, abs(newEdge - oldEdge) > 5 else { continue }
+                    let current = split.resizesLeadingChild ? split.leadingLength : split.availableLength - split.leadingLength
+                    let delta = (newEdge - oldEdge) * (split.resizesLeadingChild ? 1 : -1)
+                    weightMap.setDwindleRatio(split.ratio(forLength: current + delta), for: split.container, at: split.splitIndex)
+                }
+            }
+        }
+    }
     let (lParent, lOwnIndex) = window.closestParent(hasChildrenInDirection: .left, withLayout: .tiles) ?? (nil, nil)
     let (dParent, dOwnIndex) = window.closestParent(hasChildrenInDirection: .down, withLayout: .tiles) ?? (nil, nil)
     let (uParent, uOwnIndex) = window.closestParent(hasChildrenInDirection: .up, withLayout: .tiles) ?? (nil, nil)

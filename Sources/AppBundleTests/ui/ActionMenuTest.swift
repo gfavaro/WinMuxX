@@ -161,6 +161,11 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(otherTilingManagers([]).isEmpty)
     }
 
+    func testProcessConflictsIncludeDaemonsAndIgnoreUnrelatedProcesses() {
+        XCTAssertEqual(otherTilingManagerProcesses(["AeroSpace", "aerospace", "yabai", "KiwiDesk", "Dinky", "WinMux", "Dock"]), ["AeroSpace", "Dinky", "KiwiDesk", "yabai"])
+        XCTAssertTrue(otherTilingManagerProcesses([]).isEmpty)
+    }
+
     func testDiagnosticsReportsLoadedConfigurationAndDoesNotChangeLayout() async {
         let originalConfig = config
         let originalUrl = configUrl
@@ -193,7 +198,7 @@ final class ActionMenuTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = false
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        for title in ["Enable", "Reload Config", "Settings…", "Diagnostics…", "Quit WinMuXx"] {
+        for title in ["Enable", "Reload Config", "Settings…", "Diagnostics…", "Quit WinMuxX"] {
             XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == title }).isEnabled, title)
         }
         let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
@@ -257,7 +262,7 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(menuWorkspaceTargets().allSatisfy { $0.workspace.projectId == focus.workspace.projectId })
     }
 
-    func testWorkspaceMenuCommandSwapsOnFocusedMonitor() async throws {
+    func testWorkspaceMenuCommandFocusesVisibleWorkspaceWithoutMovingIt() async throws {
         let displays = (0..<2).map { index in
             let rect = Rect(topLeftX: Double(index * 1920), topLeftY: 0, width: 1920, height: 1080)
             return TestMonitor(monitorAppKitNsScreenScreensId: index + 1, name: "Display\(index + 1)", rect: rect, visibleRect: rect, isMain: index == 0)
@@ -280,8 +285,8 @@ final class ActionMenuTest: XCTestCase {
         let payload = try XCTUnwrap(item.representedObject as? MenuCommandPayload)
         let result = try await payload.commands.runCmdSeq(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0, result.stderr.joined(separator: "\n"))
-        XCTAssertEqual(displays[0].activeWorkspace, second)
-        XCTAssertEqual(displays[1].activeWorkspace, first)
+        XCTAssertEqual(displays[0].activeWorkspace, first)
+        XCTAssertEqual(displays[1].activeWorkspace, second)
         XCTAssertEqual(focus.workspace, second)
     }
 }

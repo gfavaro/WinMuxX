@@ -28,6 +28,12 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .dwindle, targetOrientation: nil, window: window)
             case .tiles:
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: nil, window: window)
+            case .auto:
+                guard let parent = window.parent as? TilingContainer, parent.layout == .dwindle else {
+                    return io.err("Automatic orientation requires dwindle layout")
+                }
+                parent.dwindleOrientation = nil
+                return true
             case .horizontal:
                 return changeTilingLayout(io, targetLayout: nil, targetOrientation: .h, window: window)
             case .vertical:
@@ -59,8 +65,12 @@ struct LayoutCommand: Command {
     guard let parent = window.parent else { return false }
     switch parent.cases {
         case .tilingContainer(let parent):
+            let requestedOrientation = targetOrientation
             let targetOrientation = targetOrientation ?? parent.orientation
             let targetLayout = targetLayout ?? parent.layout
+            if targetLayout == .dwindle, let requestedOrientation {
+                parent.dwindleOrientation = requestedOrientation
+            }
             parent.layout = targetLayout
             parent.changeOrientation(targetOrientation)
             return true
@@ -76,8 +86,9 @@ extension Window {
             case .tabGroup:   (parent as? TilingContainer)?.layout == .tabGroup
             case .dwindle:    (parent as? TilingContainer)?.layout == .dwindle
             case .tiles:       (parent as? TilingContainer)?.layout == .tiles
-            case .horizontal:  (parent as? TilingContainer)?.orientation == .h
-            case .vertical:    (parent as? TilingContainer)?.orientation == .v
+            case .auto: (parent as? TilingContainer).map { $0.layout == .dwindle && $0.dwindleOrientation == nil } == true
+            case .horizontal: (parent as? TilingContainer).map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .h } == true
+            case .vertical: (parent as? TilingContainer).map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .v } == true
             case .hTabGroup:   (parent as? TilingContainer).map { $0.layout == .tabGroup && $0.orientation == .h } == true
             case .vTabGroup:   (parent as? TilingContainer).map { $0.layout == .tabGroup && $0.orientation == .v } == true
             case .h_tiles:     (parent as? TilingContainer).map { $0.layout == .tiles && $0.orientation == .h } == true

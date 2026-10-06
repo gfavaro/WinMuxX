@@ -42,13 +42,13 @@ struct WorkspaceCommand: Command {
 
     @MainActor
     private func activateWorkspace(_ workspace: Workspace, on monitor: Monitor, io: CmdIo) -> Bool {
-        if workspace == focus.workspace && workspace.visibleMonitor?.rect.topLeftCorner == monitor.rect.topLeftCorner {
+        if workspace == focus.workspace && workspace.visibleMonitor != nil {
             if args.failIfNoop { return false }
             io.err("Workspace '\(workspaceDisplayName(workspace.name))' is already focused. Tip: use --fail-if-noop to exit with non-zero code")
             return true
         }
         guard activateWorkspaceForUser(workspace, on: monitor) else {
-            return io.err("Can't activate workspace '\(workspace.name)' on monitor '\(monitor.name)': monitor assignment prevents activation or swapping")
+            return io.err("Can't activate workspace '\(workspace.name)' on monitor '\(monitor.name)': monitor assignment prevents activation")
         }
         return true
     }
@@ -124,14 +124,14 @@ private func createNextTransientBlankWorkspaceIfAllowed(
     usesStdin: Bool,
 ) -> Workspace? {
     guard isNext, !wrapAround, !usesStdin else { return nil }
-    let nextWorkspaceIndex = scopedAutomaticDisplayWorkspaces(current: current).count + 1
+    let nextWorkspaceIndex = nextAdjacentWorkspaceDisplayIndex(current: current)
     return createAdjacentTransientBlankWorkspaceIfAllowed(named: String(nextWorkspaceIndex), from: current)
 }
 
 @MainActor
 private func findDirectWorkspaceTarget(named workspaceName: String, from current: Workspace) -> Workspace? {
     if let targetIndex = parsePositiveWorkspaceDisplayIndex(workspaceName) {
-        if let workspace = scopedAutomaticDisplayWorkspaces(current: current).getOrNil(atIndex: targetIndex - 1) {
+        if let workspace = scopedAutomaticDisplayWorkspaces(current: current).first(where: { automaticWorkspaceDisplayIndex($0, focusedWorkspace: current) == targetIndex }) {
             return workspace
         }
         guard let workspace = Workspace.existing(byName: workspaceName),

@@ -35,15 +35,15 @@ struct Main {
             print(
                 """
                 winmuxx CLI client version: \(cliClientVersionAndHash)
-                WinMuXx.app server version: \(serverVersionAndHash ?? "Unknown. The server is not running")
+                WinMuxX.app server version: \(serverVersionAndHash ?? "Unknown. The server is not running")
                 """,
             )
             if serverVersionAndHash != nil && cliClientVersionAndHash != serverVersionAndHash {
                 eprint(
                     """
-                    Warning: WinMuXx client/server versions don't match. Possible fixes:
-                      - Restart WinMuXx.app (server restart is required after each update)
-                      - Reinstall and restart WinMuXx (corrupted installation)
+                    Warning: WinMuxX client/server versions don't match. Possible fixes:
+                      - Restart WinMuxX.app (server restart is required after each update)
+                      - Reinstall and restart WinMuxX (corrupted installation)
                     """,
                 )
             }
@@ -63,7 +63,7 @@ struct Main {
         let connection = NWConnection(to: NWEndpoint.unix(path: socketPath), using: .tcp)
 
         if let e = await connection.startBlocking().error {
-            exit(1, err: "Can't connect to WinMuXx server. Is WinMuXx.app running?\n\(e.localizedDescription)")
+            exit(1, err: "Can't connect to WinMuxX server. Is WinMuxX.app running?\n\(e.localizedDescription)")
         }
 
         var stdin = ""
@@ -108,12 +108,12 @@ struct Main {
         if ans.exitCode != 0 && ans.serverVersionAndHash != cliClientVersionAndHash {
             eprint(
                 """
-                Warning: WinMuXx client/server versions don't match
+                Warning: WinMuxX client/server versions don't match
                   - winmuxx CLI client version: \(cliClientVersionAndHash)
-                  - WinMuXx.app server version: \(ans.serverVersionAndHash)
+                  - WinMuxX.app server version: \(ans.serverVersionAndHash)
                   Possible fixes:
-                  - Restart WinMuXx.app (server restart is required after each update)
-                  - Reinstall and restart WinMuXx (corrupted installation)
+                  - Restart WinMuxX.app (server restart is required after each update)
+                  - Reinstall and restart WinMuxX (corrupted installation)
                 """,
             )
         }

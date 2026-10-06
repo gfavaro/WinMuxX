@@ -21,12 +21,12 @@ extension WorkspaceSidebarProjectPager {
                     .fill(isDotHovered ? projectColor.opacity(0.14) : Color.clear)
                     .frame(width: 34, height: 22)
                 Capsule(style: .continuous)
-                    .fill(isCurrent ? Color.white.opacity(0.17) : projectColor.opacity(isDotHovered ? 0.58 : (isHovered ? 0.44 : 0.32)))
+                    .fill(isCurrent ? sidebarColors.foreground.opacity(0.17) : projectColor.opacity(isDotHovered ? 0.58 : (isHovered ? 0.44 : 0.32)))
                     .frame(width: isCurrent ? 28 : 13, height: isCompact ? 10 : 9)
                     .overlay {
                         Capsule(style: .continuous)
                             .strokeBorder(
-                                isCurrent ? Color.white.opacity(0.42) : projectColor.opacity(isDotHovered ? 0.70 : (isHovered ? 0.54 : 0.36)),
+                                isCurrent ? sidebarColors.foreground.opacity(0.42) : projectColor.opacity(isDotHovered ? 0.70 : (isHovered ? 0.54 : 0.36)),
                                 lineWidth: isDotHovered || isCurrent ? 0.8 : 0.5,
                             )
                     }
@@ -35,7 +35,7 @@ extension WorkspaceSidebarProjectPager {
                             Capsule(style: .continuous)
                                 .fill(
                                     LinearGradient(
-                                        colors: [Color.white.opacity(0.18), .clear],
+                                        colors: [sidebarColors.foreground.opacity(0.18), .clear],
                                         startPoint: .top,
                                         endPoint: .bottom,
                                     )

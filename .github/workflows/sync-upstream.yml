@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'gfavaro/WinMuXx'
+    if: github.repository == 'gfavaro/WinMuxX'
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -8,34 +8,28 @@ struct ResizeCommand: Command {
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
 
-        let candidates = target.windowOrNil?.parentsWithSelf
-            .filter { ($0.parent as? TilingContainer)?.layout == .tiles }
-            ?? []
-
-        let orientation: Orientation?
-        let parent: TilingContainer?
-        let node: TreeNode?
+        let candidates: [WindowResizeCommandTarget] = target.windowOrNil?.parentsWithSelf.flatMap { node -> [WindowResizeCommandTarget] in
+            guard let parent = node.parent as? TilingContainer else { return [] }
+            switch parent.layout {
+                case .tiles: return [.tiles(node, parent)]
+                case .dwindle: return node.dwindleResizeTargets().map(WindowResizeCommandTarget.dwindle)
+                case .tabGroup: return []
+            }
+        } ?? []
+        let selected: WindowResizeCommandTarget?
         switch args.dimension.val {
-            case .width:
-                orientation = .h
-                node = candidates.first(where: { ($0.parent as? TilingContainer)?.orientation == orientation })
-                parent = node?.parent as? TilingContainer
-            case .height:
-                orientation = .v
-                node = candidates.first(where: { ($0.parent as? TilingContainer)?.orientation == orientation })
-                parent = node?.parent as? TilingContainer
-            case .smart:
-                node = candidates.first
-                parent = node?.parent as? TilingContainer
-                orientation = parent?.orientation
+            case .width: selected = candidates.first { $0.orientation == .h }
+            case .height: selected = candidates.first { $0.orientation == .v }
+            case .smart: selected = candidates.first
             case .smartOpposite:
-                orientation = (candidates.first?.parent as? TilingContainer)?.orientation.opposite
-                node = candidates.first(where: { ($0.parent as? TilingContainer)?.orientation == orientation })
-                parent = node?.parent as? TilingContainer
+                selected = candidates.first { $0.orientation == candidates.first?.orientation.opposite }
         }
-        guard let parent else { return io.err("resize command doesn't support floating windows yet https://github.com/nikitabobko/WinMux/issues/9") }
-        guard let orientation else { return false }
-        guard let node else { return false }
+        guard let selected else {
+            return io.err("resize command doesn't support floating windows yet https://github.com/nikitabobko/WinMux/issues/9")
+        }
+        if case .dwindle(let split) = selected { return split.resize(args.units.val) }
+        guard case .tiles(let node, let parent) = selected else { return false }
+        let orientation = parent.orientation
         let requestedDiff: CGFloat = switch args.units.val {
             case .set(let unit): CGFloat(unit) - node.getWeight(orientation)
             case .add(let unit): CGFloat(unit)

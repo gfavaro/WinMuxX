@@ -18,6 +18,59 @@ struct WorkspaceNamingTestMonitor: Monitor {
 final class WorkspaceNamingTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testFixedWorkspacesAllowOnlyOneAdjacentTransientBlank() throws {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        let fixed = Workspace.get(byName: "5")
+        _ = fixed.focusWorkspace()
+        let blank = try XCTUnwrap(createAdjacentTransientBlankWorkspaceIfAllowed(named: "6", from: fixed))
+        _ = blank.focusWorkspace()
+        XCTAssertEqual(workspaceDefaultDisplayName(blank.name), "Workspace 6")
+        XCTAssertNil(createAdjacentTransientBlankWorkspaceIfAllowed(named: "7", from: blank))
+        _ = fixed.focusWorkspace()
+        Workspace.reconcileWorkspaceState()
+        XCTAssertNil(Workspace.existing(byName: blank.name))
+        XCTAssertEqual(userFacingWorkspaces(Workspace.all).map(\.name).sorted(), ["1", "2", "3", "4", "5"])
+    }
+
+    func testFixedWorkspaceNumbersRemainStableAlongsideAutomaticWorkspaces() {
+        config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
+        materializePersistedWorkspaces()
+        Workspace.get(byName: "2").markAsAutomaticallyNamed()
+        let extra = Workspace.get(byName: "7")
+        extra.markAsAutomaticallyNamed()
+        _ = TestWindow.new(id: 900, parent: extra.rootTilingContainer)
+        for number in 1...5 {
+            let workspace = Workspace.get(byName: String(number))
+            XCTAssertEqual(workspaceDefaultDisplayName(workspace.name), workspace.usesAutomaticDisplayName ? "Workspace \(number)" : String(number))
+        }
+        XCTAssertEqual(workspaceDefaultDisplayName(extra.name), "Workspace 6")
+        Workspace.reconcileWorkspaceState()
+        XCTAssertTrue((1...5).allSatisfy { Workspace.existing(byName: String($0)) != nil })
+    }
+
+    func testSidebarNumbersIncludeEmptyPersistentWorkspaces() {
+        config.persistentWorkspaces = ["1", "2"]
+        materializePersistedWorkspaces()
+        let first = Workspace.get(byName: "1")
+        let second = Workspace.get(byName: "2")
+        let third = Workspace.get(byName: "4")
+        for workspace in [first, second, third] { workspace.markAsAutomaticallyNamed() }
+        _ = TestWindow.new(id: 9001, parent: third.rootTilingContainer)
+        Workspace.reconcileWorkspaceState()
+
+        XCTAssertTrue(isUserFacingWorkspace(first, focusedWorkspace: focus.workspace))
+        XCTAssertTrue(isUserFacingWorkspace(second, focusedWorkspace: focus.workspace))
+        XCTAssertEqual([first, second, third].map {
+            sidebarWorkspaceDisplayName(
+                $0.name, labels: [:],
+                displayIndex: automaticWorkspaceDisplayIndex($0, focusedWorkspace: focus.workspace)
+            )
+        }, ["Workspace 1", "Workspace 2", "Workspace 3"])
+        XCTAssertTrue(first.isConfiguredPersistent)
+        XCTAssertTrue(second.isConfiguredPersistent)
+    }
+
     func testSanitizedWorkspaceSidebarHoveredWorkspaceNameClearsDeadWorkspaceReferences() {
         let sanitized = sanitizedWorkspaceSidebarHoveredWorkspaceName(
             visibleWorkspaceNames: ["live"],
@@ -34,26 +87,6 @@ final class WorkspaceNamingTest: XCTestCase {
         )
 
         XCTAssertEqual(sanitized, "live")
-    }
-
-    func testTrayItemDisablesRawWorkspaceIconWhenDisplayNameIsCustom() {
-        let renamedWorkspace = TrayItem(
-            type: .workspace,
-            name: "1",
-            displayName: "Code",
-            isActive: true,
-            hasFullscreenWindows: false,
-        )
-        let plainWorkspace = TrayItem(
-            type: .workspace,
-            name: "1",
-            displayName: "1",
-            isActive: true,
-            hasFullscreenWindows: false,
-        )
-
-        XCTAssertNil(renamedWorkspace.systemImageName)
-        XCTAssertEqual(plainWorkspace.systemImageName, "1.square.fill")
     }
 
     func testAutomaticNumericWorkspaceDisplayNamesCompactLiveWorkspaceSet() {
