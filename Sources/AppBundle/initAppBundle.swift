@@ -38,15 +38,16 @@ import Foundation
         startUnixSocketServer()
         GlobalObserver.initObserver()
         MonitorConfigurationObserver.shared.startObserving()
+        let didLoadPersistedFrozenWorld = loadPersistedFrozenWorldForStartupIfPresent()
         Workspace.reconcileWorkspaceState() // init workspaces
         _ = Workspace.all.first?.focusWorkspace()
-        let didLoadPersistedFrozenWorld = loadPersistedFrozenWorldForStartupIfPresent()
         try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
         try await runLightSession(.startup, .forceRun) {
             applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
             _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
         }
         isWinMuxRuntimeReady = true
+        schedulePersistedFrozenWorldSave()
     }
 }
 

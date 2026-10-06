@@ -161,6 +161,19 @@ the windows. It validates the owning app's process and launch identity, skips di
 and native fullscreen/minimized windows, and retains failed entries for another attempt. Choose
 **Enable** to resume tiling. The recovery journal is separate from the saved managed layout.
 
+Workspace assignments are also saved during use (with a one-second delay) and on
+normal quit. Restarting WinMuxX or updating it preserves workspace names, projects
+and automatic display numbers. Existing windows are verified against their app
+and process launch; after an app or computer restart, a unique app bundle ID and
+nonempty window title can restore the previous workspace even with a new window ID.
+Apps may reopen later: pending assignments survive subsequent WinMuxX restarts.
+Identical or changed titles are not guessed, and WinMuxX does not reopen apps or
+documents itself. During startup, available windows recover their saved layout;
+later arrivals recover their workspace without replaying old layouts over current
+user changes. State lives in `window-state.json` in the fork's Application Support
+directory, with a previous valid snapshot as backup. Old ID-only snapshots cannot
+safely match reopened windows; this build starts recording verified identities.
+
 ### Workspaces to keep
 
 Settings → Workspaces → Workspaces to keep sets a minimum total across all

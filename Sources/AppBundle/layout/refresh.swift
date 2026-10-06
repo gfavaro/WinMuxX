@@ -236,6 +236,7 @@ func runRefreshSessionBlocking(
                     pendingActivation = nil
                 }
                 await updateWindowTabModel()
+                schedulePersistedFrozenWorldSave()
                 debugFocusLog("runRefreshSessionBlocking end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focus=\(debugDescribe(focus))")
             }
         }
@@ -283,6 +284,7 @@ func runLightSession<T>(
                 try await layoutWorkspaces()
                 try checkCancellation()
                 await updateWindowTabModel()
+                schedulePersistedFrozenWorldSave()
                 if focusBefore != focusAfter {
                     focusAfter?.nativeFocus() // syncFocusToMacOs
                 }
@@ -411,7 +413,7 @@ private func refresh() async throws {
             try await group.waitForAll()
         }
     }
-    finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: aliveWindowIds)
+    try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: aliveWindowIds)
 
     // Garbage collect workspaces after apps, because workspaces contain apps.
     Workspace.reconcileWorkspaceState()

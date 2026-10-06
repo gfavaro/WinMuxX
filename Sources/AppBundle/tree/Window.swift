@@ -4,6 +4,7 @@ import Common
 open class Window: TreeNode, Hashable {
     let windowId: UInt32
     let app: any AbstractApp
+    var restartIdentity: RestartWindowIdentity?
     var lastFloatingSize: CGSize?
     // Session-local width chosen by the user for a lone tile on ultrawide.
     var singleWindowManualWidth: CGFloat?

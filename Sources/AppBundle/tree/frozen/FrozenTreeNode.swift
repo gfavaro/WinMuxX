@@ -39,6 +39,7 @@ struct FrozenContainer: Codable, Sendable {
 
 struct FrozenWindow: Codable, Sendable {
     let id: UInt32
+    let restartIdentity: RestartWindowIdentity?
     let weight: CGFloat
     let isFullscreen: Bool
     let noOuterGapsInFullscreen: Bool
@@ -47,6 +48,7 @@ struct FrozenWindow: Codable, Sendable {
 
     @MainActor init(_ window: Window) {
         id = window.windowId
+        restartIdentity = window.restartIdentity
         weight = getWeightOrNil(window) ?? 1
         isFullscreen = window.isFullscreen
         noOuterGapsInFullscreen = window.noOuterGapsInFullscreen
@@ -56,6 +58,7 @@ struct FrozenWindow: Codable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id
+        case restartIdentity
         case weight
         case isFullscreen
         case noOuterGapsInFullscreen
@@ -66,6 +69,7 @@ struct FrozenWindow: Codable, Sendable {
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UInt32.self, forKey: .id)
+        restartIdentity = try container.decodeIfPresent(RestartWindowIdentity.self, forKey: .restartIdentity)
         weight = try container.decode(CGFloat.self, forKey: .weight)
         isFullscreen = try container.decode(Bool.self, forKey: .isFullscreen)
         noOuterGapsInFullscreen = try container.decode(Bool.self, forKey: .noOuterGapsInFullscreen)

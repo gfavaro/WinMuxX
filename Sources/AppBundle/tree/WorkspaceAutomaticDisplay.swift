@@ -1,13 +1,15 @@
 @MainActor
 func automaticWorkspaceDisplayIndex(_ workspace: Workspace, focusedWorkspace: Workspace?) -> Int? {
     if workspace.isConfiguredPersistent { return parsePositiveWorkspaceDisplayIndex(workspace.name) }
+    if let index = workspace.restoredDisplayIndex { return index }
     let visible = userFacingWorkspaces(
         projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived },
         focusedWorkspace: focusedWorkspace
     )
     var reserved = Set(visible.filter { !$0.usesAutomaticDisplayName || $0.isConfiguredPersistent }
         .compactMap { parsePositiveWorkspaceDisplayIndex($0.name) })
-    for candidate in visible where candidate.usesAutomaticDisplayName && !candidate.isConfiguredPersistent {
+    reserved.formUnion(visible.compactMap(\.restoredDisplayIndex))
+    for candidate in visible where candidate.usesAutomaticDisplayName && !candidate.isConfiguredPersistent && candidate.restoredDisplayIndex == nil {
         let index = lowestUnusedPositiveIndex(reserved)
         if candidate === workspace { return index }
         reserved.insert(index)

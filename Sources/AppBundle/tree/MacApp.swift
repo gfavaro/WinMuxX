@@ -264,6 +264,19 @@ final class MacApp: AbstractApp {
         }
     }
 
+    func restartWindowIdentities() async throws -> [(UInt32, RestartWindowIdentity)] {
+        guard let bundleId = rawAppBundleId else { return [] }
+        let launchDate = nsApp.launchDate
+        let pid = pid
+        guard let thread else { return [] }
+        return try await thread.runInLoop { [axApp] job -> [(UInt32, RestartWindowIdentity)] in
+            (axApp.threadGuarded.discoverAxWindows() ?? []).map { id, window in
+                (id, RestartWindowIdentity(bundleId: bundleId, pid: pid,
+                    launchDate: launchDate, title: window.get(Ax.titleAttr) ?? ""))
+            }
+        }
+    }
+
     @MainActor
     private var logicalWindowCount: Int {
         var result = 0
@@ -384,6 +397,9 @@ final class MacApp: AbstractApp {
 
     @MainActor
     static func refreshAllAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [MacApp: [UInt32]] {
+        // Unit tests use TestApp/TestWindow. Enumerating the runner's real desktop
+        // can feed native AX elements into the mock-only attribute decoder.
+        guard !isUnitTest else { return [:] }
         for (_, app) in MacApp.allAppsMap { // gc dead apps
             try checkCancellation()
             if app.nsApp.isTerminated {

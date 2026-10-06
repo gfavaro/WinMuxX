@@ -26,6 +26,7 @@ let projectRoot: URL = {
 
 @MainActor
 func setUpWorkspacesForTests() {
+    resetPersistedFrozenWorldForTests()
     config = defaultConfig
     setMonitorsForTests(nil)
     configUrl = defaultConfigUrl
