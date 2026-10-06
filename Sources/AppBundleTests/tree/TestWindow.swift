@@ -48,6 +48,8 @@ final class TestWindow: Window, CustomStringConvertible {
         }
     }
 
+    @MainActor override func getAxSize() async throws -> CGSize? { _rect?.size }
+
     @MainActor override func getAxRect() async throws -> Rect? { // todo change to not Optional
         recordAuthoritativeActualRect(_rect)
         return _rect

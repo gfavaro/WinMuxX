@@ -4,7 +4,13 @@ import Common
 @MainActor
 func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?) async throws -> BindingData {
     let windowLevel = getWindowLevel(for: windowId)
-    return switch try await macApp.getAxUiElementWindowType(windowId, windowLevel) {
+    let type = try await macApp.getAxUiElementWindowType(windowId, windowLevel)
+    return bindingDataForNewWindow(type: type, workspace: workspace, window: window)
+}
+
+@MainActor
+func bindingDataForNewWindow(type: AxUiElementWindowType, workspace: Workspace, window: Window?) -> BindingData {
+    switch type {
         case .popup: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .dialog: BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .window: bindingDataForNewRegularWindow(workspace, window: window)
