@@ -31,13 +31,13 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         container.configure(configuration: configuration, visibleWidth: 44)
         XCTAssertTrue(container.activeSurface === container.clearSurface)
         container.configure(configuration: configuration, visibleWidth: 280)
-        XCTAssertTrue(container.activeSurface === container.effect)
+        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
 
         configuration.menuBarBackground = true
         container.configure(configuration: configuration, visibleWidth: 44)
         XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
         container.configure(configuration: configuration, visibleWidth: 280)
-        XCTAssertTrue(container.activeSurface === container.effect)
+        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
     }
 
     func testEachSidebarCanApplyItsOwnWallpaperContrast() {

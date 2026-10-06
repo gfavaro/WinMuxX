@@ -204,11 +204,18 @@ struct WorkspaceSidebarSystemSurface: View {
         case .frosted:
             WorkspaceSidebarFrostedSurface()
         case .glass:
-            if #available(macOS 26, *) {
-                WorkspaceSidebarNativeGlass()
-            } else {
-                WorkspaceSidebarVisualEffect(background: .menuBar)
-            }
+            WorkspaceSidebarGlassSurface()
+        }
+    }
+}
+
+/// The expanded sidebar and the Background toggle share one translucent backing.
+private struct WorkspaceSidebarGlassSurface: View {
+    var body: some View {
+        if #available(macOS 26, *) {
+            WorkspaceSidebarNativeGlass()
+        } else {
+            WorkspaceSidebarVisualEffect(background: .menuBar)
         }
     }
 }
@@ -274,7 +281,7 @@ struct WorkspaceSidebarFrostedSurface: View {
             Color(nsColor: .windowBackgroundColor)
         } else {
             ZStack {
-                WorkspaceSidebarVisualEffect(frosted: true)
+                WorkspaceSidebarGlassSurface()
                 WorkspaceSidebarFrostedVeil(tint: tint)
             }
         }
@@ -304,7 +311,7 @@ struct WorkspaceSidebarFrostedVeil: View {
 }
 
 func workspaceSidebarFrostedVeilOpacity(tint: WorkspaceSidebarFrostedTint, hasWallpaperSample: Bool) -> Double {
-    tint == .automatic && !hasWallpaperSample ? 0.14 : 0.36
+    tint == .automatic && !hasWallpaperSample ? 0.14 : 0.18
 }
 
 extension WorkspaceSidebarFrostedTint {

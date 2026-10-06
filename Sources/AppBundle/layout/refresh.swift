@@ -20,18 +20,34 @@ private var refreshOverrideForTests: (@MainActor @Sendable () async throws -> Vo
 @MainActor
 private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
 
+/// Activation survives event coalescing and cancelled sessions until focus is reconciled.
+struct RefreshActivationContext: Equatable, Sendable {
+    let generation: UInt64
+    let workspaceName: String
+    let pid: Int32
+
+    func shouldRaise(currentWorkspace: String, nativeWindowId: UInt32?, logicalWindowId: UInt32?,
+                     frontmostPid: Int32?, targetPid: Int32?) -> Bool {
+        workspaceName != currentWorkspace && nativeWindowId != nil && nativeWindowId == logicalWindowId &&
+            frontmostPid == pid && targetPid == pid
+    }
+}
+
+@MainActor private var activationGeneration: UInt64 = 0
+@MainActor private var pendingActivation: RefreshActivationContext?
+
+@MainActor
+func recordRefreshActivation(workspaceName: String, pid: Int32) {
+    activationGeneration += 1
+    pendingActivation = RefreshActivationContext(generation: activationGeneration, workspaceName: workspaceName, pid: pid)
+}
+
+@MainActor
+func pendingRefreshActivationForTests() -> RefreshActivationContext? { pendingActivation }
+
 private func isAxGeometryRefreshEvent(_ event: RefreshSessionEvent) -> Bool {
     guard case .ax(let notif) = event else { return false }
     return notif == kAXMovedNotification as String || notif == kAXResizedNotification as String
-}
-
-func shouldRaiseActivatedWindow(
-    event: RefreshSessionEvent, previousWorkspace: String, currentWorkspace: String,
-    nativeWindowId: UInt32?, logicalWindowId: UInt32?
-) -> Bool {
-    guard case .globalObserver(let notification) = event,
-          notification == NSWorkspace.didActivateApplicationNotification.rawValue else { return false }
-    return previousWorkspace != currentWorkspace && nativeWindowId != nil && nativeWindowId == logicalWindowId
 }
 
 private func shouldDropScheduledRefresh(_ newEvent: RefreshSessionEvent, activeEvent: RefreshSessionEvent?) -> Bool {
@@ -75,7 +91,13 @@ private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessio
 func scheduleRefreshSession(
     _ event: RefreshSessionEvent,
     optimisticallyPreLayoutWorkspaces: Bool = false,
+    recordsActivation: Bool = true,
 ) {
+    if recordsActivation, case .globalObserver(let notification) = event,
+       notification == NSWorkspace.didActivateApplicationNotification.rawValue,
+       let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
+        recordRefreshActivation(workspaceName: focus.workspace.name, pid: pid)
+    }
     if shouldDropScheduledRefresh(event, activeEvent: activeScheduledRefreshEvent) ||
         shouldDropScheduledRefresh(event, activeEvent: pendingRefreshRequest?.event)
     {
@@ -92,9 +114,15 @@ func scheduleRefreshSession(
         } ?? (event, optimisticallyPreLayoutWorkspaces)
         return
     }
+    // A light session may cancel the active task while leaving a heavier request pending.
+    let request = pendingRefreshRequest.map {
+        (event: mergeRefreshEvents($0.event, event),
+         optimisticallyPreLayoutWorkspaces: $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
+    } ?? (event: event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
+    pendingRefreshRequest = nil
     activeScheduledRefreshGeneration += 1
     let generation = activeScheduledRefreshGeneration
-    activeScheduledRefreshEvent = event
+    activeScheduledRefreshEvent = request.event
     let override = scheduledRefreshOverrideForTests
     activeRefreshTask = Task { @MainActor in
         defer {
@@ -105,16 +133,17 @@ func scheduleRefreshSession(
                 activeScheduledRefreshEvent = nil
                 if let pending = pendingRefreshRequest {
                     pendingRefreshRequest = nil
-                    scheduleRefreshSession(pending.event, optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces)
+                    scheduleRefreshSession(pending.event, optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
+                                           recordsActivation: false)
                 }
             }
         }
         do {
             try checkCancellation()
             if let override {
-                try await override(event, optimisticallyPreLayoutWorkspaces)
+                try await override(request.event, request.optimisticallyPreLayoutWorkspaces)
             } else {
-                try await runRefreshSessionBlocking(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
+                try await runRefreshSessionBlocking(request.event, optimisticallyPreLayoutWorkspaces: request.optimisticallyPreLayoutWorkspaces)
             }
         } catch is CancellationError {
             return
@@ -132,6 +161,7 @@ func runRefreshSessionBlocking(
     defer { signposter.endInterval(#function, state) }
     if !TrayMenuModel.shared.isEnabled { return }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
+    let activation = pendingActivation
     debugFocusLog("runRefreshSessionBlocking begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
     try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
@@ -186,12 +216,13 @@ func runRefreshSessionBlocking(
                         } else {
                             // Cmd+Tab already reports the chosen AX window as focused, but
                             // switching virtual workspaces can leave another window above it.
-                            if shouldRaiseActivatedWindow(
-                                event: event, previousWorkspace: focusSnapshot.focus.workspaceName,
-                                currentWorkspace: focus.workspace.name,
-                                nativeWindowId: nativeFocused?.windowId, logicalWindowId: logicalFocused?.windowId
-                            ), let window = logicalFocused as? MacWindow,
-                               NSWorkspace.shared.frontmostApplication?.processIdentifier == window.macApp.pid {
+                            if pendingActivation == activation, let window = logicalFocused as? MacWindow,
+                               activation?.shouldRaise(
+                                   currentWorkspace: focus.workspace.name,
+                                   nativeWindowId: nativeFocused?.windowId, logicalWindowId: logicalFocused?.windowId,
+                                   frontmostPid: NSWorkspace.shared.frontmostApplication?.processIdentifier,
+                                   targetPid: window.macApp.pid
+                               ) == true {
                                 window.macApp.nativeFocus(window.windowId, forceRaise: true)
                             }
                             debugFocusLog(
@@ -199,6 +230,10 @@ func runRefreshSessionBlocking(
                             )
                         }
                     }
+                }
+                // A newer activation arriving during AX awaits belongs to the next session.
+                if shouldLayoutWorkspaces, pendingActivation == activation {
+                    pendingActivation = nil
                 }
                 await updateWindowTabModel()
                 debugFocusLog("runRefreshSessionBlocking end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focus=\(debugDescribe(focus))")
@@ -269,6 +304,8 @@ func setScheduledRefreshOverrideForTests(
     activeRefreshTask = nil
     activeScheduledRefreshEvent = nil
     pendingRefreshRequest = nil
+    pendingActivation = nil
+    activeScheduledRefreshGeneration += 1
     scheduledRefreshOverrideForTests = override
 }
 
@@ -281,6 +318,8 @@ func setBlockingRefreshOverridesForTests(
     activeRefreshTask = nil
     activeScheduledRefreshEvent = nil
     pendingRefreshRequest = nil
+    pendingActivation = nil
+    activeScheduledRefreshGeneration += 1
     refreshOverrideForTests = refresh
     normalizeLayoutReasonOverrideForTests = normalizeLayoutReason
 }
@@ -290,7 +329,6 @@ func waitForScheduledRefreshForTests() async throws {
     // A completing session may schedule a coalesced follow-up session; drain until quiet.
     for _ in 0 ..< 100 {
         guard let task = activeRefreshTask else { return }
-        activeRefreshTask = nil
         try await task.value
     }
 }

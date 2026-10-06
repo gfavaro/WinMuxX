@@ -34,7 +34,7 @@ See [the detailed Dinky comparison](DWINDLE_DINKY_COMPARISON.md) for behavior an
 
 ## Ideas to revisit
 
-- [x] **Denser frost for the expanded sidebar:** the frosted effect now uses a more opaque AppKit surface and a stronger tint veil, retaining native blur, wallpaper-derived automatic tint, manual color choices, and the current compact rail. Reduce Transparency still overrides it with an opaque surface.
+- [x] **Denser frost for the expanded sidebar:** the expanded sidebar now shares the Background toggle’s translucent glass surface with a lighter tint veil, retaining native blur, wallpaper-derived automatic tint, manual color choices, and the current compact rail. Reduce Transparency still overrides it with an opaque surface.
 - **Fixed workspace layouts (deferred):** reserve grid cells, preserve empty slots, define overflow expansion without rearranging existing placements. This remains outside the current delivery scope. [Reference](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#workspacenumber).
 - [x] **Optional short animations:** sidebar and tab-strip state transitions now disable animation when Reduce Motion is enabled. State-driven SwiftUI transitions retarget to the latest value; monitor reflow remains responsible for settling geometry after display changes. Runtime interruption checks remain useful follow-up validation. [Reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/Animator.swift).
 - [x] **Focus follows mouse:** off by default, configurable dwell, ignores dragging and button presses, and protects focus after pointer changes. Runtime validation remains pending. [Reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/FocusFollowsMouse.swift).
@@ -50,3 +50,13 @@ Future items need a detailed implementation plan and tests before execution. The
 Adapted from [Dinky 0.11's Electron fix](https://github.com/mikker/Dinky/commit/0fd853017eb6afca01126bf0f1011b09c5c7a614). Manual validation with Obsidian/Electron remains pending.
 
 Revisão de cada controle de aparência e suas dependências: [APPEARANCE_SETTINGS_REVIEW.md](APPEARANCE_SETTINGS_REVIEW.md). Modos de sidebar unificados, controles sem efeito removidos/condicionados e overrides de gaps preservados; validação visual pendente.
+
+## Dinky 0.12 / 0.13 follow-up
+
+Dinky 0.13 uses the same fullscreen-button classification and title-bar exceptions already present in WinMuxX. Mocked AX regression coverage now checks missing/disabled controls, terminal/editor exceptions, Chrome, Ghostty and native dialogs. Existing `on-window-detected` layout rules remain the per-app override; no global floating setting is added.
+
+Dinky 0.12's selected-window raise already existed here. Activation context now survives heavier coalesced refresh events and cancellation by light sessions, retaining the originating workspace and latest activated PID. Raising remains restricted to a matching native/logical window on another workspace whose app is still frontmost. Scheduler tests cover creation, destruction and wake event merges in both orders.
+
+References: [classification](https://github.com/mikker/Dinky/blob/main/Sources/dinky/WindowRules.swift), [activation](https://github.com/mikker/Dinky/blob/main/Sources/dinky/ActivationFollower.swift). Manual Cmd-Tab/Dock checks with multiple windows and one/two monitors, Finder copy progress, Calculator and hidden-titlebar terminals remain pending.
+
+Validation: the full Swift suite passed (803 tests), followed by all nine focus regression tests including two added checks for superseding activation during refresh and native selection across workspaces. The Debug `WinMuxApp` product build and `git diff --check` passed. The runtime checks listed above have not been performed.

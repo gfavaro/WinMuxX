@@ -70,8 +70,8 @@ final class WorkspaceSidebarFrostedTintTest: XCTestCase {
 
     func testExpandedFrostVeilAddsContrastWithoutChangingTintResolution() {
         XCTAssertEqual(workspaceSidebarFrostedVeilOpacity(tint: .automatic, hasWallpaperSample: false), 0.14)
-        XCTAssertEqual(workspaceSidebarFrostedVeilOpacity(tint: .automatic, hasWallpaperSample: true), 0.36)
-        XCTAssertEqual(workspaceSidebarFrostedVeilOpacity(tint: .aurora, hasWallpaperSample: false), 0.36)
+        XCTAssertEqual(workspaceSidebarFrostedVeilOpacity(tint: .automatic, hasWallpaperSample: true), 0.18)
+        XCTAssertEqual(workspaceSidebarFrostedVeilOpacity(tint: .aurora, hasWallpaperSample: false), 0.18)
     }
 
     func testTintEditPreservesBackgroundAndShortcuts() {

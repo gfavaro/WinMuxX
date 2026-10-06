@@ -276,8 +276,8 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         } else {
             switch background {
             case .clear: surface = clearSurface
-            case .glass: surface = glassSurface ?? effect
-            case .frosted, .opaque: surface = effect
+            case .glass, .frosted: surface = glassSurface ?? effect
+            case .opaque: surface = effect
             }
         }
         let contentParent = surface === glassSurface ? glassContent : surface
@@ -310,8 +310,8 @@ final class WorkspaceSidebarMaterialContainer: NSView {
             expanded: expanded
         ) {
         case .clear: return clearSurface
-        case .glass: return glassSurface ?? effect
-        case .frosted, .opaque: return effect
+        case .glass, .frosted: return glassSurface ?? effect
+        case .opaque: return effect
         }
     }
 
