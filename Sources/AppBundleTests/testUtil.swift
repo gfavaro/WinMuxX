@@ -77,12 +77,12 @@ extension ParsedCmd {
     var cmdOrDie: T { cmdOrNil ?? dieT() }
 }
 
-func testParseCommandFail(_ command: String, msg expected: String) {
+func testParseCommandFail(_ command: String, msg expected: String, file: StaticString = #filePath, line: UInt = #line) {
     let parsed = parseCommand(command)
     switch parsed {
-        case .cmd(let command): XCTFail("\(command) isn't supposed to be parcelable")
-        case .failure(let msg): assertEquals(msg, expected)
-        case .help: die() // todo test help
+        case .cmd(let command): XCTFail("\(command) isn't supposed to be parseable", file: file, line: line)
+        case .failure(let msg): assertEquals(msg, expected, file: file, line: line)
+        case .help: XCTFail("Expected parse failure, got help", file: file, line: line)
     }
 }
 

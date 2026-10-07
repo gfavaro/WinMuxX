@@ -9,7 +9,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
             Window.get(byId: windowId)?.invalidateLastKnownNativeState()
             return
         }
-        WindowBorderController.shared.refresh()
+        if let windowId { WindowBorderController.shared.windowGeometryChanged(windowId) }
         if WindowMouseInteractionOpacityController.shared.shouldSuppressObserverEvent(windowId: windowId) {
             return
         }

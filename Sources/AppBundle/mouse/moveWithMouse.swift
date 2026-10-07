@@ -18,7 +18,7 @@ private func handleMovedEvent(windowId: UInt32?, notif: String) async {
         Window.get(byId: windowId)?.invalidateLastKnownNativeState()
         return
     }
-    WindowBorderController.shared.refresh()
+    if let windowId { WindowBorderController.shared.windowGeometryChanged(windowId) }
     if shouldIgnoreMovedObsForCurrentDragSession(windowId: windowId) ||
         WindowMouseInteractionOpacityController.shared.shouldSuppressObserverEvent(windowId: windowId) ||
         shouldIgnoreAxObserverEventForPostDragSuppression(windowId: windowId, notif: notif)

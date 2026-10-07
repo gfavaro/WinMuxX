@@ -3,6 +3,12 @@ import Common
 import XCTest
 
 final class ClientServerTest: XCTestCase {
+    func testMalformedClientRequestsAreRejected() {
+        for json in ["{", "{}", #"{"args":42,"stdin":""}"#, #"{"args":[],"stdin":42}"#] {
+            assertFail(ClientRequest.decodeJson(Data(json.utf8)))
+        }
+    }
+
     func testClientRequestJsonV1_decoding() {
         let data = """
             { "command": "deprecated", "args": ["foo", "bar"], "stdin": "stdin" }
@@ -43,7 +49,14 @@ final class ClientServerTest: XCTestCase {
         let data = """
             { "args": ["foo", "bar"], "stdin": "stdin", "yet another future field": 1 }
             """.data(using: .utf8)!
-        assertSucc(ClientRequest.decodeJson(data))
+        switch ClientRequest.decodeJson(data) {
+            case .success(let request):
+                XCTAssertEqual(request.args, ["foo", "bar"])
+                XCTAssertEqual(request.stdin, "stdin")
+                XCTAssertNil(request.windowId)
+                XCTAssertNil(request.workspace)
+            case .failure(let error): XCTFail(error)
+        }
     }
 
     func testClientRequestJsonCompatibility_encoding() throws {
@@ -106,6 +119,9 @@ final class ClientServerTest: XCTestCase {
             let data = json.data(using: .utf8)!
             let event = try JSONDecoder().decode(ServerEvent.self, from: data)
             assertEquals(event.eventType, expectedEventType)
+            let encoded = try JSONEncoder().encode(event)
+            XCTAssertEqual(try JSONSerialization.jsonObject(with: encoded) as? NSDictionary,
+                           try JSONSerialization.jsonObject(with: data) as? NSDictionary)
         }
     }
 }

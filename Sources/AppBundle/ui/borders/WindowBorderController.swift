@@ -1,11 +1,13 @@
 import AppKit
 import Common
 import PrivateApi
+import QuartzCore
 
 @MainActor
 final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
+    private var movingBorders = WindowBorderMotionTracking()
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
     private(set) var missionControlWindowIds = Set<UInt32>()
@@ -13,15 +15,15 @@ final class WindowBorderController {
     func startMissionControlMonitoring() {
         guard !isUnitTest else { return }
         if !winmux_watch_mission_control({ event, windowId in
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 let controller = WindowBorderController.shared
                 // Our own reshape/order notifications cannot change Mission Control.
                 // Scanning every border transaction creates a geometry feedback storm.
-                if controller.borders.values.contains(where: { $0.windowId == windowId && windowId != 0 }) { return }
+                if controller.borders.values.contains(where: { $0.windowIds.contains(windowId) && windowId != 0 }) { return }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),
-                   WindowMotion.shared.isAnimating(windowId) {
-                    controller.refreshMovingBorder(windowId)
+                   controller.borders[windowId] != nil {
+                    controller.windowGeometryChanged(windowId)
                     return
                 }
                 controller.missionControlChanged()
@@ -61,6 +63,21 @@ final class WindowBorderController {
         guard let transition = missionControlState.update(active: active) else { return }
         if transition { WindowMotion.shared.finishAll(); clear() } else { refresh() }
     }
+    func windowGeometryChanged(_ windowId: UInt32) {
+        guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
+        refreshMovingBorder(windowId)
+        // Poll only the moving window between notifications, which can arrive well
+        // after the WindowServer has already moved the content.
+        guard NSEvent.pressedMouseButtons & 1 != 0 else { return }
+        movingBorders.note(windowId, at: CACurrentMediaTime())
+        DisplayRefreshDriver.shared.add(owner: self) { [weak self] timestamp in
+            guard let self else { return }
+            let ids = self.movingBorders.active(at: timestamp, mouseDown: NSEvent.pressedMouseButtons & 1 != 0)
+            for id in ids { self.refreshMovingBorder(id) }
+            if ids.isEmpty { DisplayRefreshDriver.shared.remove(owner: self) }
+        }
+    }
+
     private func refreshMovingBorder(_ windowId: UInt32) {
         guard config.windowBorders.enabled, !missionControlState.active,
               let window = MacWindow.allWindowsMap[windowId], !window.isHiddenInCorner,
@@ -93,8 +110,32 @@ final class WindowBorderController {
         }}
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
     }
-    func clear() { borders.values.forEach { $0.destroy() }; borders.removeAll() }
+    func clear() {
+        movingBorders = WindowBorderMotionTracking()
+        DisplayRefreshDriver.shared.remove(owner: self)
+        borders.values.forEach { $0.destroy() }
+        borders.removeAll()
+    }
     func remove(windowId: UInt32) { borders.removeValue(forKey: windowId)?.destroy() }
+}
+
+/// A short lease keeps tracking alive between drag notifications, then stops at rest.
+struct WindowBorderMotionTracking {
+    private var lastEvents: [UInt32: CFTimeInterval] = [:]
+
+    mutating func note(_ windowId: UInt32, at timestamp: CFTimeInterval) {
+        lastEvents[windowId] = timestamp
+    }
+
+    mutating func active(at timestamp: CFTimeInterval, mouseDown: Bool) -> [UInt32] {
+        let pending = Array(lastEvents.keys)
+        guard mouseDown else {
+            lastEvents.removeAll()
+            return pending // One final position update on release.
+        }
+        lastEvents = lastEvents.filter { timestamp - $0.value < 0.15 }
+        return Array(lastEvents.keys)
+    }
 }
 
 struct MissionControlBorderState {
@@ -114,45 +155,55 @@ func resolvedWindowBorderFrame(snapshot: CGRect, nativeFrame: CGRect?) -> CGRect
 @MainActor
 final class WindowBorder {
     let target: UInt32
-    private var nativeID: UInt32 = 0
+    private var nativeID: OpaquePointer?
     private var frame: CGRect?
     private var appearance: Appearance?
     private var scale: CGFloat = 0
-    private var fallbackPanel: WindowBorderFallbackPanel?
-    private let createNativeBorder: (Float, inout UInt32) -> Bool
+    private var fallbackPanels: [WindowBorderFallbackPanel] = []
+    private let createNativeBorder: (Float, inout OpaquePointer?) -> Bool
+    private let updateNativeBorder: (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool) -> Bool
+    private let destroyNativeBorder: (OpaquePointer?) -> Void
 
-    var windowId: UInt32 {
-        nativeID != 0 ? nativeID : UInt32(max(fallbackPanel?.windowNumber ?? 0, 0))
+    var windowIds: [UInt32] {
+        if let nativeID { return (0..<4).map { winmux_border_window_id(nativeID, Int32($0)) }.filter { $0 != 0 } }
+        return fallbackPanels.map { UInt32(max($0.windowNumber, 0)) }.filter { $0 != 0 }
     }
 
-    init(target: UInt32, createNativeBorder: @escaping (Float, inout UInt32) -> Bool = { scale, id in
-        winmux_border_create(scale, &id)
-    }) {
+    var windowId: UInt32 { windowIds.first ?? 0 }
+
+    init(
+        target: UInt32,
+        createNativeBorder: @escaping (Float, inout OpaquePointer?) -> Bool = { scale, id in winmux_border_create(scale, &id) },
+        updateNativeBorder: @escaping (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool) -> Bool = winmux_border_update,
+        destroyNativeBorder: @escaping (OpaquePointer?) -> Void = winmux_border_destroy
+    ) {
         self.target = target
         self.createNativeBorder = createNativeBorder
+        self.updateNativeBorder = updateNativeBorder
+        self.destroyNativeBorder = destroyNativeBorder
     }
 
-    deinit {
-        if nativeID != 0 { winmux_border_destroy(nativeID) }
+    isolated deinit {
+        if let nativeID { destroyNativeBorder(nativeID) }
+        fallbackPanels.forEach { $0.close() }
     }
 
     func update(frame: CGRect, active: Bool, settings: WindowBordersConfig) {
         let cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
                                 width: frame.width, height: frame.height)
-        if let fallbackPanel {
-            fallbackPanel.update(frame: cocoaFrame, windowId: target, active: active, settings: settings)
-            return
-        }
         let center = CGPoint(x: cocoaFrame.midX, y: cocoaFrame.midY)
         let nextScale = NSScreen.screens.first(where: { $0.frame.contains(center) })?.backingScaleFactor ?? 2
-        if nativeID == 0 || scale != nextScale {
-            if nativeID != 0 { winmux_border_destroy(nativeID) }
-            nativeID = 0
+        if !fallbackPanels.isEmpty {
+            updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+            return
+        }
+        if nativeID == nil || scale != nextScale {
+            if let nativeID { destroyNativeBorder(nativeID) }
+            nativeID = nil
             guard createNativeBorder(Float(nextScale), &nativeID) else {
-                nativeID = 0
-                let panel = WindowBorderFallbackPanel()
-                fallbackPanel = panel
-                panel.update(frame: cocoaFrame, windowId: target, active: active, settings: settings)
+                if let nativeID { destroyNativeBorder(nativeID) }
+                nativeID = nil
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
                 return
             }
             scale = nextScale
@@ -160,24 +211,45 @@ final class WindowBorder {
             appearance = nil
         }
         let nextAppearance = Appearance(settings: settings, active: active)
+        if appearance == nextAppearance, self.frame == frame { return }
         if appearance != nextAppearance || self.frame?.size != frame.size {
-            winmux_border_update(nativeID, target, frame, Float(systemWindowCornerRadius()),
-                                 nextAppearance.rgba, Float(settings.width), settings.order == .above)
+            guard updateNativeBorder(nativeID, target, frame, Float(systemWindowCornerRadius()),
+                                       nextAppearance.rgba, Float(settings.width), settings.order == .above) else {
+                if let nativeID { destroyNativeBorder(nativeID) }
+                nativeID = nil
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+                return
+            }
             appearance = nextAppearance
         } else {
-            winmux_border_move(nativeID, target, frame, Float(settings.width), settings.order == .above)
+            if !winmux_border_move(nativeID, target, frame, Float(settings.width), settings.order == .above) {
+                if let nativeID { destroyNativeBorder(nativeID) }
+                nativeID = nil
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+                return
+            }
         }
         self.frame = frame
     }
 
-    func destroy() {
-        if nativeID != 0 {
-            winmux_border_hide(nativeID)
-            winmux_border_destroy(nativeID)
-            nativeID = 0
+    private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat) {
+        if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
+        let outer = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
+        let radius = systemWindowCornerRadius()
+        for (index, panel) in fallbackPanels.enumerated() {
+            let piece = winmux_border_piece(outer.size, Float(radius), Float(settings.width), Float(scale), Int32(index))
+            panel.update(outer: outer, piece: piece, radius: radius, windowId: target, active: active, settings: settings)
         }
-        fallbackPanel?.close()
-        fallbackPanel = nil
+    }
+
+    func destroy() {
+        if let nativeID {
+            winmux_border_hide(nativeID)
+            destroyNativeBorder(nativeID)
+            self.nativeID = nil
+        }
+        fallbackPanels.forEach { $0.close() }
+        fallbackPanels.removeAll()
     }
 }
 
@@ -195,7 +267,7 @@ func isMissionControlVisible(_ windows: [[String: Any]], screenSizes: [CGSize], 
 @MainActor
 private final class WindowBorderFallbackPanel: NSPanelHud {
     private let borderView = WindowBorderFallbackView()
-    private var previousSize: CGSize?
+
 
     override init() {
         super.init()
@@ -212,17 +284,24 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
         borderView.autoresizingMask = [.width, .height]
     }
 
+    // Edge panels must retain their exact coordinates across menu-bar boundaries.
+    override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    func update(frame: CGRect, windowId: UInt32, active: Bool, settings: WindowBordersConfig) {
-        let width = CGFloat(settings.width)
-        setFrame(frame.insetBy(dx: -width, dy: -width), display: false)
-        if previousSize != frame.size || borderView.settings != settings || borderView.active != active {
+    func update(outer: CGRect, piece: CGRect, radius: CGFloat, windowId: UInt32, active: Bool, settings: WindowBordersConfig) {
+        guard !piece.isEmpty else { orderOut(nil); return }
+        let frame = piece.offsetBy(dx: outer.minX, dy: outer.minY)
+        if self.frame != frame { setFrame(frame, display: false) }
+        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius
+        if geometryChanged || borderView.settings != settings || borderView.active != active {
             borderView.settings = settings
             borderView.active = active
+            borderView.outerSize = outer.size
+            borderView.piece = piece
+            borderView.radius = radius
             borderView.needsDisplay = true
-            previousSize = frame.size
         }
         order(settings.order == .above ? .above : .below, relativeTo: Int(windowId))
     }
@@ -232,21 +311,18 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
 private final class WindowBorderFallbackView: NSView {
     var settings = WindowBordersConfig()
     var active = false
+    var outerSize = CGSize.zero
+    var piece = CGRect.zero
+    var radius: CGFloat = 0
 
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.clear.setFill()
-        bounds.fill(using: .copy)
         let hex = active ? settings.activeColor : settings.inactiveColor
         let value = UInt32(hex.dropFirst(), radix: 16) ?? 0
         let rgb = hex.count == 9 ? value >> 8 : value
         let alpha = hex.count == 9 ? CGFloat(value & 255) / 255 : 1
-        NSColor(srgbRed: CGFloat((rgb >> 16) & 255) / 255,
-                green: CGFloat((rgb >> 8) & 255) / 255,
-                blue: CGFloat(rgb & 255) / 255, alpha: alpha).setStroke()
-        let width = CGFloat(settings.width)
-        let radius = systemWindowCornerRadius() + width / 2
-        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: width / 2, dy: width / 2), xRadius: radius, yRadius: radius)
-        path.lineWidth = width
-        path.stroke()
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        let rgbValue = UInt32(rgb)
+        let rgba = (rgbValue << 8) | UInt32(round(alpha * 255))
+        winmux_border_draw(context, outerSize, piece, Float(radius), rgba, Float(settings.width))
     }
 }

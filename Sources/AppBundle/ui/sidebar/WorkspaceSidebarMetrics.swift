@@ -43,7 +43,5 @@ let workspaceSidebarHoverAnimation: Animation = MotionToken.hover
 let workspaceSidebarReducedMotionHoverAnimation: Animation? = nil
 let workspaceSidebarProjectSwipeIntentThreshold: CGFloat = 5
 let workspaceSidebarProjectSwipeNavigateThreshold: CGFloat = 44
-let workspaceSidebarProjectSwipeCreateThreshold: CGFloat = 104
-let workspaceSidebarProjectSwipeFormationStart: CGFloat = 22
 let workspaceSidebarHoverOpenThresholdFraction: CGFloat = 0.75
 let workspaceSidebarDisplayEdgeCompactionMargin: CGFloat = 12

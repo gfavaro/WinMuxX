@@ -512,69 +512,20 @@ final class WorkspaceSidebarDragTest: XCTestCase {
         )
     }
 
-    func testProjectSwipeCreatesOnlyPastEdgesAfterBreakPoint() {
-        XCTAssertFalse(
-            shouldCreateWorkspaceSidebarProjectAfterSwipe(
-                currentIndex: 1,
-                projectCount: 3,
-                direction: 1,
-                distance: 120,
-            ),
-        )
-        XCTAssertFalse(
-            shouldCreateWorkspaceSidebarProjectAfterSwipe(
-                currentIndex: 2,
-                projectCount: 3,
-                direction: 1,
-                distance: 96,
-            ),
-        )
-        XCTAssertTrue(
-            shouldCreateWorkspaceSidebarProjectAfterSwipe(
-                currentIndex: 2,
-                projectCount: 3,
-                direction: 1,
-                distance: 110,
-            ),
-        )
-        XCTAssertTrue(
-            shouldCreateWorkspaceSidebarProjectAfterSwipe(
-                currentIndex: 0,
-                projectCount: 3,
-                direction: -1,
-                distance: 110,
-            ),
-        )
+    func testProjectSwipeStopsAtEdgesEvenForLongGestures() {
+        for distance: CGFloat in [44, 110, 1000] {
+            XCTAssertNil(workspaceSidebarProjectSwipeTarget(currentIndex: 0, projectCount: 3, direction: -1, distance: distance))
+            XCTAssertNil(workspaceSidebarProjectSwipeTarget(currentIndex: 2, projectCount: 3, direction: 1, distance: distance))
+            for direction in [-1, 1] {
+                XCTAssertNil(workspaceSidebarProjectSwipeTarget(currentIndex: 0, projectCount: 1, direction: direction, distance: distance))
+            }
+        }
     }
 
-    func testProjectSwipeFormationProgressOnlyAtEdges() {
-        XCTAssertEqual(
-            workspaceSidebarProjectEdgeCreationProgress(
-                currentIndex: 1,
-                projectCount: 3,
-                direction: 1,
-                distance: 100,
-            ),
-            0,
-        )
-        XCTAssertEqual(
-            workspaceSidebarProjectEdgeCreationProgress(
-                currentIndex: 2,
-                projectCount: 3,
-                direction: 1,
-                distance: 22,
-            ),
-            0,
-        )
-        XCTAssertEqual(
-            workspaceSidebarProjectEdgeCreationProgress(
-                currentIndex: 2,
-                projectCount: 3,
-                direction: 1,
-                distance: 104,
-            ),
-            1,
-        )
+    func testProjectSwipeNeedsThresholdForExistingTarget() {
+        XCTAssertNil(workspaceSidebarProjectSwipeTarget(currentIndex: 1, projectCount: 3, direction: 1, distance: 43))
+        XCTAssertEqual(workspaceSidebarProjectSwipeTarget(currentIndex: 1, projectCount: 3, direction: 1, distance: 44), 2)
+        XCTAssertEqual(workspaceSidebarProjectSwipeTarget(currentIndex: 1, projectCount: 3, direction: -1, distance: 1000), 0)
     }
 
     func testProjectSwipeSwitchProgressReachesOneAtNavigationThreshold() {

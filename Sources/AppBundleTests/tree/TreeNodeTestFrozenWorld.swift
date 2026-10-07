@@ -150,7 +150,7 @@ extension TreeNodeTest {
         XCTAssertFalse(floating.noOuterGapsInFullscreen)
     }
 
-    func testRestoreFrozenWorldIfNeededRetilesRestoredMinimizedWindowAfterNativeUnminimize() async throws {
+    func testDetachedMinimizedSnapshotDoesNotRetileWindowAfterNativeUnminimize() async throws {
         let workspace = Workspace.get(byName: "restore")
         let window = TestWindow.new(id: 43, parent: workspace.rootTilingContainer)
         window.rememberMacOsLayoutOrigin(detachFromWorkspace: true)
@@ -176,7 +176,7 @@ extension TreeNodeTest {
         XCTAssertEqual(window.layoutReason, .standard)
     }
 
-    func testRestoreFrozenWorldIfNeededKeepsStillMinimizedWindowInMinimizedContainer() async throws {
+    func testDetachedMinimizedSnapshotDoesNotRebindStillMinimizedWindow() async throws {
         let workspace = Workspace.get(byName: "restore")
         let window = TestWindow.new(id: 44, parent: workspace.rootTilingContainer)
         window.rememberMacOsLayoutOrigin(detachFromWorkspace: true)

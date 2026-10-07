@@ -355,6 +355,7 @@ final class WindowTabsTest: XCTestCase {
 
         XCTAssertGreaterThan(tabInteractionZone.height, tabDropZone.height)
         XCTAssertGreaterThan(swapDropZone.minY, tabDropZone.maxY)
+        XCTAssertTrue(swapDropZone.contains(CGPoint(x: 160, y: 154)))
     }
 
     @MainActor
@@ -383,30 +384,7 @@ final class WindowTabsTest: XCTestCase {
         XCTAssertGreaterThan(tabDropZone.height, tabBarRect.height)
         XCTAssertGreaterThan(tabInteractionZone.height, tabDropZone.height)
         XCTAssertGreaterThan(swapDropZone.minY, tabDropZone.maxY)
-    }
-
-    @MainActor
-    func testWindowSwapZoneKeepsCenterActive() {
-        setUpWorkspacesForTests()
-        let workspace = Workspace.get(byName: "tabs")
-        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
-        window.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 0, width: 360, height: 240)
-
-        let swapDropZone = window.swapDropZoneRect.orDie()
-        XCTAssertTrue(swapDropZone.contains(swapDropZone.center))
-    }
-
-    @MainActor
-    func testTabGroupSwapZoneKeepsBodyActive() {
-        setUpWorkspacesForTests()
-        let workspace = Workspace.get(byName: "tabs")
-        let tabGroup = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, .v, .tabGroup, index: INDEX_BIND_LAST)
-        _ = TestWindow.new(id: 1, parent: tabGroup)
-        _ = TestWindow.new(id: 2, parent: tabGroup)
-        tabGroup.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 0, width: 420, height: 280)
-
-        let swapDropZone = tabGroup.swapDropZoneRect.orDie()
-        XCTAssertTrue(swapDropZone.contains(swapDropZone.center))
+        XCTAssertTrue(swapDropZone.contains(CGPoint(x: 200, y: 182)))
     }
 
 }

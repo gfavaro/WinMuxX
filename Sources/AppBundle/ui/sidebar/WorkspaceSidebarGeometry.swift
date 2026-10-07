@@ -5,14 +5,15 @@ func workspaceSidebarPanelFrame(
     screen: CGRect,
     menuBarHeight: CGFloat,
     config: WorkspaceSidebarConfig,
-    contentHeight: CGFloat
+    contentHeight: CGFloat,
+    backingWidth: CGFloat? = nil
 ) -> CGRect {
     let reserve = min(max(0, menuBarHeight, config.heightMode == nil ? CGFloat(config.menuBarReserveHeight) : 0), max(0, screen.height - 1))
     let availableHeight = max(1, screen.height - reserve)
     let height = config.heightMode == .centered
         ? min(max(1, contentHeight), availableHeight * 0.9)
         : availableHeight
-    let width = CGFloat(config.width) * 2
+    let width = max(1, backingWidth ?? CGFloat(config.width) * 2)
     return CGRect(
         x: config.position == .left ? screen.minX : screen.maxX - width,
         y: screen.minY + (availableHeight - height) / 2,
@@ -51,7 +52,14 @@ extension WorkspaceSidebarPanel {
 
         let menuBarHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, screen.safeAreaInsets.top, NSStatusBar.system.thickness)
         return WorkspaceSidebarPanelLayout(
-            frame: workspaceSidebarPanelFrame(screen: screen.frame, menuBarHeight: menuBarHeight, config: sidebarConfig, contentHeight: measuredContentHeight > 0 ? measuredContentHeight : screen.frame.height * 0.6),
+            frame: workspaceSidebarPanelFrame(screen: screen.frame, menuBarHeight: menuBarHeight, config: sidebarConfig, contentHeight: measuredContentHeight > 0 ? measuredContentHeight : screen.frame.height * 0.6,
+                backingWidth: workspaceSidebarBackingWidth(
+                    config: sidebarConfig,
+                    visibleWidth: viewModel.workspaceSidebarVisibleWidth,
+                    isExpanded: viewModel.isWorkspaceSidebarExpanded,
+                    isAnimating: pendingBackingResize != nil
+                )
+            ),
             expandedWidth: expandedWidth,
             collapsedWidth: collapsedWidth,
         )
@@ -66,4 +74,14 @@ extension WorkspaceSidebarPanel {
             atIndex: monitor.monitorAppKitNsScreenScreensId - 1
         ) ?? NSScreen.screens.first
     }
+}
+
+/// Keep the browsing canvas during transitions; idle rails need only their hit region.
+func workspaceSidebarBackingWidth(
+    config: WorkspaceSidebarConfig, visibleWidth: CGFloat, isExpanded: Bool, isAnimating: Bool
+) -> CGFloat {
+    if config.alwaysExpanded || isExpanded || isAnimating || visibleWidth > workspaceSidebarRestingWidth(config) + 0.5 {
+        return CGFloat(config.width) * 2
+    }
+    return max(1, workspaceSidebarHoverActivationWidth(config), workspaceSidebarRestingWidth(config))
 }

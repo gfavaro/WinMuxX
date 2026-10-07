@@ -6,6 +6,23 @@ import XCTest
 /// the background), while a first-sight window is fetched inline so its first paint is correct.
 final class SessionWindowTitleTest: XCTestCase {
     @MainActor
+    func testBlankRefreshPreservesKnownTitleAndBlankFirstSightReturnsNil() async {
+        setUpWorkspacesForTests()
+        let start = Date(timeIntervalSince1970: 0)
+        let known = StubSessionTitleWindow(id: 64, title: "Document")
+        let initial = await getCachedWindowTitle(known, now: start)
+        XCTAssertEqual(initial, "Document")
+        known.stubTitle = "  \n "
+        let refreshed = await getCachedWindowTitle(known, now: start.addingTimeInterval(100))
+        XCTAssertEqual(refreshed, "Document")
+        XCTAssertEqual(known.titleGetCount, 2)
+        let unknown = StubSessionTitleWindow(id: 65, title: "  ")
+        let first = await getCachedWindowTitle(unknown, now: start)
+        XCTAssertNil(first)
+        XCTAssertEqual(unknown.titleGetCount, 1)
+    }
+
+    @MainActor
     func testFirstSightFetchesInline() async {
         setUpWorkspacesForTests()
         resetCachedWindowTitles()

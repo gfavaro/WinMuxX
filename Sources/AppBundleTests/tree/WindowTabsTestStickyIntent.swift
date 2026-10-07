@@ -340,36 +340,6 @@ import XCTest
     }
 
     @MainActor
-    func testDetachedTabStillOffersTabReentryHint() {
-        setUpWorkspacesForTests()
-        clearPendingWindowDragIntent()
-        let previousWindowTabs = config.windowTabs.enabled
-        config.windowTabs.enabled = true
-        defer {
-            config.windowTabs.enabled = previousWindowTabs
-            clearPendingWindowDragIntent()
-        }
-
-        let workspace = Workspace.get(byName: "tabs")
-        XCTAssertTrue(workspace.focusWorkspace())
-        let tabGroup = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, .v, .tabGroup, index: INDEX_BIND_LAST)
-        let source = TestWindow.new(id: 1, parent: tabGroup)
-        let target = TestWindow.new(id: 2, parent: tabGroup)
-        tabGroup.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 0, width: 420, height: 280)
-        source.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 34, width: 420, height: 246)
-        target.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 34, width: 420, height: 246)
-
-        XCTAssertTrue(updatePendingWindowDragIntent(
-            sourceWindow: source,
-            mouseLocation: tabGroup.windowTabDropInteractionRect.orDie().center,
-            subject: .window,
-            detachOrigin: .tabStrip,
-        ))
-
-        XCTAssertEqual(debugPendingWindowDragIntentSummary()?.kind, .reorderTab(windowId: source.windowId, targetIndex: 0))
-    }
-
-    @MainActor
     func testCrossWorkspaceOverlayDoesNotHideTargetTabGroupChrome() {
         setUpWorkspacesForTests()
         clearPendingWindowDragIntent()

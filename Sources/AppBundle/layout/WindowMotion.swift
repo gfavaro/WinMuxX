@@ -37,6 +37,11 @@ final class WindowMotion: NSObject {
 
     func noteNewWindow(_ id: UInt32) { newWindows.insert(id) }
 
+    func snapOnNextLayout(_ id: UInt32) {
+        cancel(id)
+        displayPolicy.snapOnNextLayout(id)
+    }
+
     func isAnimating(_ id: UInt32) -> Bool { jobs[id] != nil }
 
     func screensChanged() {
@@ -76,7 +81,7 @@ final class WindowMotion: NSObject {
         }
     }
 
-    func apply(_ window: Window, target: CGRect) {
+    func apply(_ window: Window, target: CGRect) async throws {
         let target = windowMotionNativeTarget(target)
         let snap = displayPolicy.shouldSnap(window.windowId)
         guard let window = window as? MacWindow else {
@@ -84,6 +89,11 @@ final class WindowMotion: NSObject {
             return
         }
         let id = window.windowId
+        if snap {
+            cancel(id)
+            try await window.setAxFrameBlocking(target.origin, target.size)
+            return
+        }
         let isNewWindow = newWindows.remove(id) != nil
         // AX move/resize events reassert the same tile while we are travelling.
         // They must not restart the clock indefinitely.
@@ -234,6 +244,8 @@ func windowMotionOrigin(nativeFrame: CGRect, destination: CGRect?, isNewWindow: 
 struct WindowMotionDisplayPolicy {
     private var pending = Set<UInt32>()
     private var changing = false
+
+    mutating func snapOnNextLayout(_ id: UInt32) { pending.insert(id) }
 
     mutating func screensChanged(windowIds: Set<UInt32>) {
         pending.formUnion(windowIds)

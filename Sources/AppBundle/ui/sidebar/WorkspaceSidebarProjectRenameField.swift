@@ -59,6 +59,11 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         }
     }
 
+    static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
+        coordinator.isAttached = false
+        field.delegate = nil
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text, onCommit: onCommit, onCancel: onCancel, onPanelReady: onPanelReady)
     }
@@ -68,6 +73,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         let onCommit: @MainActor @Sendable () -> Void
         let onCancel: @MainActor @Sendable () -> Void
         let onPanelReady: @MainActor (WorkspaceSidebarPanel) -> Void
+        var isAttached = true
         var didFocus = false
         var focusAttempts = 0
 
@@ -85,7 +91,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
 
         @MainActor
         func focus(_ field: NSTextField) {
-            guard !didFocus else { return }
+            guard isAttached, !didFocus else { return }
             guard let window = field.window else {
                 debugWorkspaceSidebarRenameLog("focus noWindow attempt=\(focusAttempts)")
                 scheduleFocusRetry(field)
@@ -124,6 +130,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
             debugWorkspaceSidebarRenameLog("control command=\(commandSelector) text=\(textView.string)")
+            guard !textView.hasMarkedText() else { return false }
             switch commandSelector {
                 case #selector(NSResponder.insertNewline(_:)):
                     text = textView.string
@@ -145,7 +152,6 @@ struct WorkspaceSidebarProjectRenameField: View {
     @Binding var text: String
     let onCommit: @MainActor @Sendable () -> Void
     let onCancel: @MainActor @Sendable () -> Void
-    @State private var shouldReplaceSelection = true
 
     var body: some View {
         WorkspaceSidebarProjectRenameTextField(
@@ -168,7 +174,6 @@ struct WorkspaceSidebarProjectRenameField: View {
             }
             .onAppear {
                 debugWorkspaceSidebarRenameLog("renameField onAppear project=\(project.id.rawValue) text=\(text)")
-                shouldReplaceSelection = true
             }
             .onDisappear {
                 debugWorkspaceSidebarRenameLog("renameField onDisappear project=\(project.id.rawValue) text=\(text)")
@@ -178,61 +183,10 @@ struct WorkspaceSidebarProjectRenameField: View {
 
     @MainActor
     private func startInlineTextEditing(on panel: WorkspaceSidebarPanel) {
-        guard WorkspaceSidebarPanel.activeInlineTextEditingPanel !== panel else { return }
         WorkspaceSidebarPanel.activeInlineTextEditingPanel?.endInlineTextEditing()
-        panel.beginInlineTextEditing(
-            locksExpansion: true,
-            cancelsOnPointerExit: true,
-            onCancel: onCancel,
-            onKeyDown: { key in
-                handleInlineTextKey(key)
-            }
-        )
+        panel.beginInlineTextEditing(onCancel: onCancel)
     }
 
-    @MainActor
-    private func handleInlineTextKey(_ key: WorkspaceSidebarInlineTextKey) {
-        switch key {
-            case .text(let inserted):
-                if shouldReplaceSelection {
-                    text = inserted
-                    shouldReplaceSelection = false
-                } else {
-                    text += inserted
-                }
-            case .deleteBackward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                } else if !text.isEmpty {
-                    text.removeLast()
-                }
-            case .deleteWordBackward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                } else {
-                    text.deleteLastWord()
-                }
-            case .deleteToBeginningOfLine:
-                text = ""
-                shouldReplaceSelection = false
-            case .deleteForward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                }
-            case .commit:
-                onCommit()
-            case .cancel:
-                onCancel()
-            case .moveUp, .moveDown:
-                break
-            case .ignored:
-                break
-        }
-        debugWorkspaceSidebarRenameLog("inlineTextKey applied key=\(key) text=\(text)")
-    }
 }
 
 struct WorkspaceSidebarWorkspaceRenameField: View {
@@ -241,7 +195,6 @@ struct WorkspaceSidebarWorkspaceRenameField: View {
     let workspaceName: String
     let onCommit: @MainActor @Sendable () -> Void
     let onCancel: @MainActor @Sendable () -> Void
-    @State private var shouldReplaceSelection = true
 
     var body: some View {
         WorkspaceSidebarProjectRenameTextField(
@@ -265,7 +218,6 @@ struct WorkspaceSidebarWorkspaceRenameField: View {
         }
         .onAppear {
             debugWorkspaceSidebarRenameLog("workspaceRenameField onAppear workspace=\(workspaceName) text=\(text)")
-            shouldReplaceSelection = true
         }
         .onDisappear {
             debugWorkspaceSidebarRenameLog("workspaceRenameField onDisappear workspace=\(workspaceName) text=\(text)")
@@ -275,58 +227,8 @@ struct WorkspaceSidebarWorkspaceRenameField: View {
 
     @MainActor
     private func startInlineTextEditing(on panel: WorkspaceSidebarPanel) {
-        debugWorkspaceSidebarRenameLog("workspaceRenameField startInline workspace=\(workspaceName) panelScope=\(panel.monitorScopeId) panelVisibleWidth=\(panel.viewModel.workspaceSidebarVisibleWidth) activePanelSame=\(WorkspaceSidebarPanel.activeInlineTextEditingPanel === panel)")
-        guard WorkspaceSidebarPanel.activeInlineTextEditingPanel !== panel else { return }
         WorkspaceSidebarPanel.activeInlineTextEditingPanel?.endInlineTextEditing()
-        panel.beginInlineTextEditing(
-            locksExpansion: true,
-            cancelsOnPointerExit: true,
-            onCancel: onCancel,
-            onKeyDown: { key in
-                handleInlineTextKey(key)
-            }
-        )
+        panel.beginInlineTextEditing(onCancel: onCancel)
     }
 
-    @MainActor
-    private func handleInlineTextKey(_ key: WorkspaceSidebarInlineTextKey) {
-        switch key {
-            case .text(let inserted):
-                if shouldReplaceSelection {
-                    text = inserted
-                    shouldReplaceSelection = false
-                } else {
-                    text += inserted
-                }
-            case .deleteBackward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                } else if !text.isEmpty {
-                    text.removeLast()
-                }
-            case .deleteWordBackward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                } else {
-                    text.deleteLastWord()
-                }
-            case .deleteToBeginningOfLine:
-                text = ""
-                shouldReplaceSelection = false
-            case .deleteForward:
-                if shouldReplaceSelection {
-                    text = ""
-                    shouldReplaceSelection = false
-                }
-            case .commit:
-                onCommit()
-            case .cancel:
-                onCancel()
-            case .moveUp, .moveDown, .ignored:
-                break
-        }
-        debugWorkspaceSidebarRenameLog("workspaceInlineTextKey applied workspace=\(workspaceName) key=\(key) text=\(text)")
-    }
 }

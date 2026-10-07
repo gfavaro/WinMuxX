@@ -31,6 +31,7 @@ struct WorkspaceSidebarView: View {
     @State var renamingWorkspaceText = ""
     @State var searchText = ""
     @State var isSearchEditing = false
+    @State var searchUsesNativeEditor = false
     @State var searchEditingPanel: WorkspaceSidebarPanel? = nil
     @State var selectedSearchTarget: WorkspaceSidebarSearchSelection? = nil
     @State var lastProjectEdgeDragDirection: Int? = nil
@@ -126,6 +127,9 @@ struct WorkspaceSidebarView: View {
             if let name = activeInUseOverrideWorkspaceName, target != .workspace(name) {
                 activeInUseOverrideWorkspaceName = nil
             }
+        }
+        .onChange(of: searchText) { _ in
+            selectFirstSearchTarget()
         }
         .onChange(of: overrideConfirmationState) { state in
             synchronizeOverrideConfirmation(state)
@@ -333,7 +337,7 @@ extension WorkspaceSidebarView {
         trailingInset: CGFloat,
         swipeDirection: Int?,
         switchProgress: CGFloat,
-        edgeProgress: CGFloat,
+        measuring: Bool = false,
     ) -> some View {
         WorkspaceSidebarProjectPager(
             projects: snapshot.projects,
@@ -366,6 +370,7 @@ extension WorkspaceSidebarView {
             onDeleteProject: { project in
                 actions.send(.deleteProject(project.id))
             },
+            measuring: measuring,
         )
         .zIndex(2)
         .padding(.leading, leadingInset)
@@ -406,15 +411,7 @@ extension WorkspaceSidebarView {
         }
     }
 
-    func finishProjectSwipeCreation() {
-        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.16, dampingFraction: 0.9)) {
-            resetProjectSwipe()
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) {
-            guard projectSwipeStartProjectId == nil else { return }
-            actions.send(.createProject)
-        }
-    }
+
 }
 extension WorkspaceSidebarView {
     func handleProjectSwipeEnded(
@@ -434,9 +431,6 @@ extension WorkspaceSidebarView {
            let selectedProjectIndex {
             projectSwipeStartProjectId = snapshot.projects[selectedProjectIndex].id
         }
-        if finishProjectSwipeCreationIfNeeded(direction: direction, distance: abs(horizontalTranslation)) {
-            return
-        }
         finishProjectSwipeNavigationIfNeeded(direction: direction, distance: abs(horizontalTranslation))
     }
 
@@ -446,26 +440,13 @@ extension WorkspaceSidebarView {
         }
     }
 
-    private func finishProjectSwipeCreationIfNeeded(direction: Int, distance: CGFloat) -> Bool {
-        guard shouldCreateWorkspaceSidebarProjectAfterSwipe(
-            currentIndex: projectPagerDisplayIndex,
-            projectCount: snapshot.projects.count,
-            direction: direction,
-            distance: distance,
-        ) else {
-            return false
-        }
-        performWorkspaceSidebarProjectHaptic(.levelChange)
-        finishProjectSwipeCreation()
-        return true
-    }
-
     private func finishProjectSwipeNavigationIfNeeded(direction: Int, distance: CGFloat) {
-        guard let nextIndex = workspaceSidebarProjectIndexAfterSwipe(
+        guard let nextIndex = workspaceSidebarProjectSwipeTarget(
             currentIndex: projectPagerDisplayIndex,
             projectCount: snapshot.projects.count,
             direction: direction,
-        ), distance >= workspaceSidebarProjectSwipeNavigateThreshold else {
+            distance: distance
+        ) else {
             performWorkspaceSidebarProjectHaptic(.alignment)
             finishProjectSwipeSnapBack()
             return
@@ -533,6 +514,7 @@ extension WorkspaceSidebarView {
         expansionProgress: CGFloat,
         leadingInset: CGFloat,
         trailingInset: CGFloat,
+        measuring: Bool = false,
     ) -> some View {
         WorkspaceSidebarMonitorSelector(
             scopes: snapshot.monitorScopes,
@@ -542,7 +524,6 @@ extension WorkspaceSidebarView {
             browsedProjectId: browsedProjectId,
             expansionProgress: expansionProgress,
             sectionWidth: workspaceSidebarTopSectionWidth(expansionProgress: expansionProgress),
-            position: snapshot.configuration.position,
             onSelectScope: { scopeId in
                 if scopeId == workspaceSidebarDefaultScopeId {
                     browseMode = .activeProject
@@ -571,6 +552,7 @@ extension WorkspaceSidebarView {
             onDeleteProject: { project in
                 actions.send(.deleteProject(project.id))
             },
+            measuring: measuring,
         )
         .padding(.leading, leadingInset)
         .padding(.trailing, trailingInset)
@@ -610,41 +592,13 @@ extension WorkspaceSidebarView {
         leadingInset: CGFloat,
         trailingInset: CGFloat,
     ) -> some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(sidebarColors.text(opacity: 0.66))
-                .frame(width: 14)
-
-            Text(searchText)
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(1)
-                .foregroundStyle(sidebarColors.text(opacity: 0.9))
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                finishSidebarSearch(clearText: true)
-                beginSidebarSearchIfNeeded()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(sidebarColors.text(opacity: 0.7))
-                    .frame(width: 18, height: 18)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Clear search")
-        }
-        .padding(.horizontal, 8)
+        WorkspaceSidebarSearchField(
+            text: $searchText,
+            requestsFocus: searchUsesNativeEditor,
+            onEditorReady: sidebarSearchEditorReady,
+            onCommand: handleSidebarSearchKey
+        )
         .frame(width: workspaceSidebarSectionWidth(expansionProgress, layout: snapshot.configuration), height: workspaceSidebarSearchHeight)
-        .background {
-            RoundedRectangle(cornerRadius: workspaceSidebarDropdownCornerRadius, style: .continuous)
-                .fill(sidebarColors.foreground.opacity(0.11))
-        }
-        .overlay {
-            RoundedRectangle(cornerRadius: workspaceSidebarDropdownCornerRadius, style: .continuous)
-                .strokeBorder(sidebarColors.foreground.opacity(0.12), lineWidth: 0.6)
-        }
         .padding(.leading, leadingInset)
         .padding(.trailing, trailingInset)
         .padding(.bottom, workspaceSidebarSectionGap)

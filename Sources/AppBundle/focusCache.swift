@@ -10,10 +10,37 @@ import Foundation
 
 @MainActor private var workspaceProjectFocusHold: WorkspaceProjectFocusHold? = nil
 
+@MainActor private struct WindowClosureFocusHold {
+    let workspaceId: WorkspaceId
+    let appPid: Int32
+    let expiresAt: Date
+}
+
+@MainActor private var windowClosureFocusHold: WindowClosureFocusHold?
+
+@MainActor
+func holdFocusAfterLastWindowClosure(on workspace: Workspace, appPid: Int32, now: Date = .now) {
+    windowClosureFocusHold = WindowClosureFocusHold(workspaceId: workspace.id, appPid: appPid, expiresAt: now.addingTimeInterval(0.25))
+}
+
+@MainActor
+private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?, now: Date) -> Bool {
+    guard let hold = windowClosureFocusHold else { return false }
+    guard now < hold.expiresAt, focus.workspace.id == hold.workspaceId else {
+        windowClosureFocusHold = nil
+        return false
+    }
+    guard let nativeFocused, let workspace = nativeFocused.visualWorkspace else { return false }
+    // Closing the final document can make macOS promote another document of
+    // the same app, even when it is parked in an inactive workspace.
+    return nativeFocused.app.pid == hold.appPid && workspace.id != hold.workspaceId && !workspace.isVisible
+}
+
 @MainActor
 func resetFocusCacheForTests() {
     lastKnownNativeFocusedWindowId = nil
     workspaceProjectFocusHold = nil
+    windowClosureFocusHold = nil
 }
 
 @MainActor
@@ -53,11 +80,16 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 /// The data should flow (from nativeFocused to focused) and
 ///                      (from nativeFocused to lastKnownNativeFocusedWindowId)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
-@MainActor func updateFocusCache(_ nativeFocused: Window?) {
+@MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
     if nativeFocused?.parent is MacosPopupWindowsContainer {
         return
     }
     let lastKnownNativeFocusedWindowIdBefore = lastKnownNativeFocusedWindowId
+    if shouldIgnoreNativeFocusAfterWindowClosure(nativeFocused, now: now) {
+        lastKnownNativeFocusedWindowId = nil
+        debugFocusLog("updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
+        return
+    }
     if shouldIgnoreNativeFocusDuringProjectHold(nativeFocused) {
         lastKnownNativeFocusedWindowId = nil
         debugFocusLog(

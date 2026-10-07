@@ -167,6 +167,9 @@ final class MacWindow: Window {
                 case .tilingContainer, .workspace, .macosHiddenAppsWindowsContainer, .macosFullscreenWindowsContainer:
                     debugFocusLog("MacWindow.garbageCollect replacement closing=\(windowId) replacement=\(debugDescribe(replacementFocus))")
                     _ = setFocus(to: replacementFocus)
+                    if replacementFocus.windowOrNil == nil, replacementFocus.workspace === deadWindowWorkspace {
+                        holdFocusAfterLastWindowClosure(on: replacementFocus.workspace, appPid: macApp.pid)
+                    }
                     if replacementFocus.windowOrNil != currentFocus.windowOrNil {
                         replacementFocus.windowOrNil?.nativeFocus()
                     }
@@ -239,17 +242,20 @@ final class MacWindow: Window {
                 let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: 1)
                 p = nodeMonitor.visibleRect.bottomRightCorner - onePixelOffset
         }
-        setAxFrame(p, nil)
+        // Complete parking before another workspace is revealed. AX frame writes
+        // are otherwise queued, allowing outgoing windows to overlap the destination.
+        guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        try await setAxFrameBlocking(p, nil)
         hiddenInCorner = (corner, nodeMonitor.visibleRect)
     }
 
     @MainActor
-    func unhideFromCorner() {
+    func unhideFromCorner() async throws {
         guard let prevUnhiddenProportionalPositionInsideWorkspaceRect else { return }
         guard let nodeWorkspace else { return } // hiding only makes sense for workspace windows
         guard let parent else { return }
 
-        func restoreToSavedWorkspacePosition() {
+        func restoreToSavedWorkspacePosition() async throws {
             let workspaceRect = nodeWorkspace.workspaceMonitor.rect
             var newX = workspaceRect.topLeftX + workspaceRect.width * prevUnhiddenProportionalPositionInsideWorkspaceRect.x
             var newY = workspaceRect.topLeftY + workspaceRect.height * prevUnhiddenProportionalPositionInsideWorkspaceRect.y
@@ -257,16 +263,18 @@ final class MacWindow: Window {
             let windowHeight = lastKnownActualRect?.height ?? lastFloatingSize?.height ?? 0
             newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
             newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
-            setAxFrame(CGPoint(x: newX, y: newY), nil)
+            try await setAxFrameBlocking(CGPoint(x: newX, y: newY), nil)
         }
 
         switch getChildParentRelation(child: self, parent: parent) {
             // Just a small optimization to avoid unnecessary AX calls for non floating windows
             // Tiling windows should be unhidden with layoutRecursive anyway
             case .floatingWindow:
-                restoreToSavedWorkspacePosition()
+                try await restoreToSavedWorkspacePosition()
+            case .tiling:
+                WindowMotion.shared.snapOnNextLayout(windowId)
             case .macosNativeFullscreenWindow, .macosNativeHiddenAppWindow, .macosNativeMinimizedWindow,
-                 .macosPopupWindow, .tiling, .rootTilingContainer, .shimContainerRelation: break
+                 .macosPopupWindow, .rootTilingContainer, .shimContainerRelation: break
         }
 
         self.prevUnhiddenProportionalPositionInsideWorkspaceRect = nil

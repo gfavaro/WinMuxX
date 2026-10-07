@@ -198,7 +198,6 @@ func runRefreshSessionBlocking(
                     refreshModel()
                 }
                 updateTrayText()
-                await updateWorkspaceSidebarModel()
                 SecureInputPanel.shared.refresh()
                 if shouldLayoutWorkspaces {
                     try await layoutWorkspaces()
@@ -231,6 +230,7 @@ func runRefreshSessionBlocking(
                         }
                     }
                 }
+                await updateWorkspaceSidebarModel()
                 // A newer activation arriving during AX awaits belongs to the next session.
                 if shouldLayoutWorkspaces, pendingActivation == activation {
                     pendingActivation = nil
@@ -279,15 +279,15 @@ func runLightSession<T>(
                 let focusAfter = focus.windowOrNil
 
                 updateTrayText()
-                await updateWorkspaceSidebarModel()
                 SecureInputPanel.shared.refresh()
                 try await layoutWorkspaces()
                 try checkCancellation()
+                if focusBefore != focusAfter {
+                    focusAfter?.nativeFocus() // syncFocusToMacOs before sidebar title queries
+                }
+                await updateWorkspaceSidebarModel()
                 await updateWindowTabModel()
                 schedulePersistedFrozenWorldSave()
-                if focusBefore != focusAfter {
-                    focusAfter?.nativeFocus() // syncFocusToMacOs
-                }
                 if shouldSchedulePostRefresh {
                     scheduleRefreshSession(event)
                 }
@@ -469,14 +469,16 @@ private func layoutWorkspaces() async throws {
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
     if !TrayMenuModel.shared.isEnabled {
         for workspace in Workspace.all {
-            workspace.allLeafWindowsRecursive.forEach { window in
-                guard let macWindow = window as? MacWindow else { return }
+            for window in workspace.allLeafWindowsRecursive {
+                try checkCancellation()
+                guard let macWindow = window as? MacWindow else { continue }
                 if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
-                    return
+                    continue
                 }
-                macWindow.unhideFromCorner()
+                try await macWindow.unhideFromCorner()
             }
             try await workspace.layoutWorkspace() // Unhide tiling windows from corner
+            try checkCancellation()
         }
         return
     }
@@ -506,22 +508,11 @@ private func layoutWorkspaces() async throws {
         monitorToOptimalHideCorner[monitor.rect.topLeftCorner] = corner
     }
 
-    // to reduce flicker, first unhide visible workspaces, then hide invisible ones
-    for monitor in monitors {
-        let workspace = monitor.activeWorkspace
-        workspace.allLeafWindowsRecursive.forEach { window in
-            guard let macWindow = window as? MacWindow else { return }
-            if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
-                return
-            }
-            macWindow.unhideFromCorner()
-        }
-        try await workspace.layoutWorkspace()
-    }
     for workspace in Workspace.all where !workspace.isVisible {
         let corner = monitorToOptimalHideCorner[workspace.workspaceMonitor.rect.topLeftCorner] ?? .bottomRightCorner
         let shouldReassertHiddenWindows = refreshSessionEvent?.requiresHiddenWindowsReassertion == true
         for window in workspace.allLeafWindowsRecursive {
+            try checkCancellation()
             guard let macWindow = window as? MacWindow else { continue }
             macWindow.lastAppliedLayoutPhysicalRect = nil
             macWindow.lastAppliedLayoutVirtualRect = nil
@@ -537,6 +528,20 @@ private func layoutWorkspaces() async throws {
             }
             try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows || geometryUnconfirmed)
         }
+    }
+    // Reveal incoming windows only after outgoing workspaces are parked.
+    for monitor in monitors {
+        let workspace = monitor.activeWorkspace
+        for window in workspace.allLeafWindowsRecursive {
+            try checkCancellation()
+            guard let macWindow = window as? MacWindow else { continue }
+            if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
+                continue
+            }
+            try await macWindow.unhideFromCorner()
+        }
+        try await workspace.layoutWorkspace()
+        try checkCancellation()
     }
 }
 

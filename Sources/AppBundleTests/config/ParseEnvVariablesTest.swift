@@ -66,7 +66,7 @@ final class ParseEnvVariablesTest: XCTestCase {
 private func testSucInterpolation(_ str: String, _ vars: [String: String] = [:], expected: String) {
     switch str.interpolate(with: vars) {
         case .success(let actual): assertEquals(actual, expected)
-        case .failure(let actual): assertEquals(actual, [])
+        case .failure(let actual): XCTFail("Expected successful interpolation: \(actual)")
     }
 }
 

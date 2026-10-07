@@ -49,6 +49,26 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
     }
 
+    func testIdleBackingShrinksAndTransitionsPreserveBrowsingCanvas() {
+        var config = WorkspaceSidebarConfig()
+        config.width = 240
+        config.alwaysExpanded = false
+        let resting = workspaceSidebarRestingWidth(config)
+        let idle = workspaceSidebarBackingWidth(config: config, visibleWidth: resting, isExpanded: false, isAnimating: false)
+        XCTAssertLessThan(idle, 480)
+        XCTAssertGreaterThanOrEqual(idle, workspaceSidebarHoverActivationWidth(config))
+        for (expanded, animating, width) in [(true, false, resting), (false, true, resting), (false, false, CGFloat(240))] {
+            XCTAssertEqual(workspaceSidebarBackingWidth(config: config, visibleWidth: width, isExpanded: expanded, isAnimating: animating), 480)
+        }
+        let screen = CGRect(x: -1920, y: -300, width: 1920, height: 1080)
+        for side in WorkspaceSidebarPosition.allCases {
+            config.position = side
+            let frame = workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 300, backingWidth: idle)
+            XCTAssertEqual(frame.width, idle)
+            XCTAssertEqual(side == .left ? frame.minX : frame.maxX, side == .left ? screen.minX : screen.maxX)
+        }
+    }
+
     func testGeometryOptionsParseAndRejectInvalidValues() {
         for position in WorkspaceSidebarPosition.allCases {
             for mode in WorkspaceSidebarHeightMode.allCases {

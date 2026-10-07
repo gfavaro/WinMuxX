@@ -16,7 +16,7 @@ final class LayoutFrameWriteBenchmarkTest: XCTestCase {
         let workspace = Workspace.get(byName: "layout-bench")
         workspace.rootTilingContainer.layout = .tiles
         let windowCount = 6
-        let frameDelayNanoseconds: UInt64 = 1_000_000
+        let frameDelayNanoseconds: UInt64 = ProcessInfo.processInfo.environment["LAYOUT_FRAME_BENCHMARK_LABEL"] == nil ? 0 : 1_000_000
         for index in 0 ..< windowCount {
             _ = BenchmarkFrameWindow.new(
                 id: UInt32(index + 1),
@@ -46,7 +46,8 @@ final class LayoutFrameWriteBenchmarkTest: XCTestCase {
         )
         print("LAYOUT_FRAME_BENCHMARK \(result.json)")
 
-        XCTAssertGreaterThan(BenchmarkFrameWindow.frameWriteCount, 0)
+        XCTAssertGreaterThanOrEqual(BenchmarkFrameWindow.frameWriteCount, windowCount)
+        XCTAssertLessThanOrEqual(BenchmarkFrameWindow.frameWriteCount, windowCount * iterations)
     }
 }
 

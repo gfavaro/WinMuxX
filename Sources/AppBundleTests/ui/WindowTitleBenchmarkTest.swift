@@ -25,7 +25,7 @@ final class WindowTitleBenchmarkTest: XCTestCase {
 
         let workspaceCount = 4
         let windowsPerWorkspace = 5
-        let titleDelayNanoseconds: UInt64 = 1_000_000
+        let titleDelayNanoseconds: UInt64 = ProcessInfo.processInfo.environment["WINDOW_TITLE_BENCHMARK_LABEL"] == nil ? 0 : 1_000_000
 
         for workspaceIndex in 0 ..< workspaceCount {
             let workspace = Workspace.get(byName: "bench-\(workspaceIndex)")
@@ -64,7 +64,7 @@ final class WindowTitleBenchmarkTest: XCTestCase {
         )
         print("WINDOW_TITLE_BENCHMARK \(result.json)")
 
-        XCTAssertGreaterThan(BenchmarkTitleWindow.titleGetCount, 0)
+        XCTAssertEqual(BenchmarkTitleWindow.titleGetCount, workspaceCount * windowsPerWorkspace)
     }
 }
 
