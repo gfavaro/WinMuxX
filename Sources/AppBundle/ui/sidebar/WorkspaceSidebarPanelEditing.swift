@@ -83,6 +83,7 @@ extension WorkspaceSidebarPanel {
     func beginInlineTextEditing(
         locksExpansion: Bool = true,
         cancelsOnPointerExit: Bool = true,
+        activatesWindow: Bool = true,
         onCancel: (@MainActor () -> Void)? = nil,
         onKeyDown: (@MainActor (WorkspaceSidebarInlineTextKey) -> Void)? = nil
     ) {
@@ -95,9 +96,13 @@ extension WorkspaceSidebarPanel {
         inlineTextEditingKeyDown = onKeyDown
         inlineTextEditingStartedAt = .now
         inlineTextEditingPointerEnteredVisibleRegion = isMouseInsideVisibleRegion()
-        prepareForInlineTextEditing()
+        prepareForInlineTextEditing(activatesWindow: activatesWindow)
         installInlineTextEditingEventMonitors()
-        installInlineTextEditingKeyEventTap()
+        if onKeyDown != nil {
+            installInlineTextEditingKeyEventTap()
+        } else {
+            removeInlineTextEditingKeyEventTap()
+        }
     }
 
     func endInlineTextEditing() {
@@ -119,12 +124,13 @@ extension WorkspaceSidebarPanel {
         }
     }
 
-    func prepareForInlineTextEditing() {
+    func prepareForInlineTextEditing(activatesWindow: Bool = true) {
         debugWorkspaceSidebarRenameLog("prepareForInlineTextEditing before visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder))")
         cancelExpansionWork()
-        expandSidebar(to: CGFloat(config.workspaceSidebar.width))
+        expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), viewModel.workspaceSidebarVisibleWidth))
         ignoresMouseEvents = false
         orderFrontRegardless()
+        guard activatesWindow else { return }
         makeKeyAndOrderFront(nil)
         makeKey()
         NSApp.activate(ignoringOtherApps: true)

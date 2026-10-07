@@ -219,6 +219,30 @@ final class WorkspaceNamingTest: XCTestCase {
         XCTAssertEqual(workspaceDisplayName(third.name), "Workspace 2")
     }
 
+    func testDeletingRestoredWorkspaceFiveRenumbersSixInSidebar() async throws {
+        config.minimumWorkspaceCount = nil
+        config.persistentWorkspaces = []
+        let workspaces = (1...6).map { number in
+            let workspace = Workspace.get(byName: String(number))
+            workspace.markAsAutomaticallyNamed()
+            workspace.restoredDisplayIndex = number
+            _ = TestWindow.new(id: UInt32(9500 + number), parent: workspace.rootTilingContainer)
+            return workspace
+        }
+        XCTAssertEqual(workspaceDisplayName(workspaces[5].name), "Workspace 6")
+
+        try deleteWorkspaceForSidebar(workspaceName: workspaces[4].name)
+
+        let rows = await buildWorkspaceSidebarWorkspaceViewModels(
+            currentFocus: focus, workspaceLabels: [:], availableMonitors: monitors
+        )
+        let survivingNames = Set(workspaces.filter { $0 !== workspaces[4] }.map(\.name))
+        XCTAssertEqual(rows.filter { survivingNames.contains($0.name) }.map(\.displayName),
+                       ["Workspace 1", "Workspace 2", "Workspace 3", "Workspace 4", "Workspace 5"])
+        XCTAssertEqual(workspaceDisplayName(workspaces[5].name), "Workspace 5")
+        XCTAssertTrue(Workspace.existing(byName: "6") === workspaces[5])
+    }
+
     func testWorkspaceNameAfterCompactionUsesCurrentAutomaticName() throws {
         let deleted = Workspace.get(byName: "10")
         deleted.markAsAutomaticallyNamed()

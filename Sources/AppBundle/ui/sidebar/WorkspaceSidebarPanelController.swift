@@ -13,6 +13,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     let hostingView: WorkspaceSidebarHostingView
     let materialContainer: WorkspaceSidebarMaterialContainer
     let monitorScopeId: String
+    var pendingBackingResize: DispatchWorkItem?
     var pendingExpand: DispatchWorkItem?
     var pendingCollapse: DispatchWorkItem?
     var pendingCollapseFinalize: DispatchWorkItem?

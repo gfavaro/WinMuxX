@@ -5,6 +5,21 @@ import XCTest
 
 @MainActor
 final class ConfigBootstrapTest: XCTestCase {
+    func testBootstrapPreservesExistingUserConfig() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let target = directory.appending(path: "winmux.toml")
+        let legacy = directory.appending(path: "legacy.toml")
+        let original = Data("# user configuration\nconfig-version = 2\n".utf8)
+        try original.write(to: target)
+        try Data("# replacement".utf8).write(to: legacy)
+        XCTAssertFalse(try materializeBootstrapConfigIfNeeded(
+            targetUrl: target, existingLegacyUrls: [legacy], aerospaceImportUrl: legacy
+        ))
+        XCTAssertEqual(try Data(contentsOf: target), original)
+    }
+
     func testStarterConfigParses() {
         let (parsedConfig, errors) = parseConfig(starterConfigText())
         assertEquals(errors, [])

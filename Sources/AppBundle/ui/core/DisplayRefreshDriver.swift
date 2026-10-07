@@ -2,6 +2,7 @@ import CoreGraphics
 import CoreVideo
 import Foundation
 import QuartzCore
+import os
 
 private let displayRefreshHostClockFrequency = CVGetHostClockFrequency()
 
@@ -18,14 +19,46 @@ private func displayRefreshDriverCallback(
     let timestamp = displayRefreshHostClockFrequency > 0
         ? Double(now.pointee.hostTime) / displayRefreshHostClockFrequency
         : CACurrentMediaTime()
-    Task { @MainActor in
-        driver.fire(timestamp: timestamp)
-    }
+    driver.enqueueFrame(timestamp: timestamp)
     return kCVReturnSuccess
 }
 
+/// Backpressure between the display-link thread and the main actor. A busy main
+/// actor needs the most recent frame, rather than a queue of obsolete frames.
+final class DisplayRefreshFrameMailbox: Sendable {
+    private struct State {
+        var timestamp: CFTimeInterval?
+        var generation: UInt64 = 0
+    }
+
+    private let state = OSAllocatedUnfairLock(initialState: State())
+
+    func enqueue(timestamp: CFTimeInterval) -> UInt64? {
+        state.withLock { state in
+            let needsDelivery = state.timestamp == nil
+            state.timestamp = timestamp
+            return needsDelivery ? state.generation : nil
+        }
+    }
+
+    func take(generation: UInt64) -> CFTimeInterval? {
+        state.withLock { state in
+            guard generation == state.generation else { return nil }
+            defer { state.timestamp = nil }
+            return state.timestamp
+        }
+    }
+
+    func reset() {
+        state.withLock { state in
+            state.generation &+= 1
+            state.timestamp = nil
+        }
+    }
+}
+
 @MainActor
-final class DisplayRefreshDriver: @unchecked Sendable {
+final class DisplayRefreshDriver {
     static let shared = DisplayRefreshDriver()
 
     private struct Subscription {
@@ -36,8 +69,17 @@ final class DisplayRefreshDriver: @unchecked Sendable {
     private var subscriptions: [ObjectIdentifier: Subscription] = [:]
     private var displayLink: CVDisplayLink?
     private var fallbackTimer: Timer?
+    nonisolated private let frameMailbox = DisplayRefreshFrameMailbox()
 
     private init() {}
+
+    nonisolated fileprivate func enqueueFrame(timestamp: CFTimeInterval) {
+        guard let generation = frameMailbox.enqueue(timestamp: timestamp) else { return }
+        Task { @MainActor in
+            guard let timestamp = frameMailbox.take(generation: generation) else { return }
+            fire(timestamp: timestamp)
+        }
+    }
 
     func add(owner: AnyObject, callback: @escaping (CFTimeInterval) -> Void) {
         subscriptions[ObjectIdentifier(owner)] = Subscription(owner: owner, callback: callback)
@@ -75,9 +117,9 @@ final class DisplayRefreshDriver: @unchecked Sendable {
     }
 
     private func startFallbackTimer() {
-        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { _ in
-            Task { @MainActor in
-                DisplayRefreshDriver.shared.fire(timestamp: CACurrentMediaTime())
+        let timer = Timer(timeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.fire(timestamp: CACurrentMediaTime())
             }
         }
         fallbackTimer = timer
@@ -93,6 +135,7 @@ final class DisplayRefreshDriver: @unchecked Sendable {
         }
         fallbackTimer?.invalidate()
         fallbackTimer = nil
+        frameMailbox.reset()
     }
 
     private func pruneReleasedOwners() {

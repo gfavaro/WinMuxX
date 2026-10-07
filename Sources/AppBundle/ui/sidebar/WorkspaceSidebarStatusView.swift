@@ -23,28 +23,32 @@ struct WorkspaceSidebarStatusView: View {
 
     var body: some View {
         Group {
-            if isCompact {
+            if let clockDate {
+                clockCard(date: clockDate)
+            } else if showsSeconds {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    WorkspaceSidebarCompactClockCard(
-                        date: clockDate ?? context.date,
-                        sectionWidth: sectionWidth,
-                        showsSeconds: showsSeconds,
-                    )
+                    clockCard(date: context.date)
                 }
             } else {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    WorkspaceSidebarExpandedStatusCard(
-                        date: clockDate ?? context.date,
-                        sectionWidth: sectionWidth,
-                        showsSeconds: showsSeconds,
-                        showsDate: showsDate,
-                        showsWeekday: showsWeekday,
-                    )
+                TimelineView(.everyMinute) { context in
+                    clockCard(date: context.date)
                 }
             }
         }
         .frame(width: sectionWidth, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .leading)
         .animation(.easeInOut(duration: 0.16), value: isCompact)
+    }
+
+    @ViewBuilder
+    private func clockCard(date: Date) -> some View {
+        if isCompact {
+            WorkspaceSidebarCompactClockCard(date: date, sectionWidth: sectionWidth, showsSeconds: showsSeconds)
+        } else {
+            WorkspaceSidebarExpandedStatusCard(
+                date: date, sectionWidth: sectionWidth, showsSeconds: showsSeconds,
+                showsDate: showsDate, showsWeekday: showsWeekday
+            )
+        }
     }
 }

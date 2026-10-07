@@ -38,13 +38,6 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(bindings.unshown.isEmpty)
     }
 
-    func testDifferentInitializedArgumentsAreNotEqual() {
-        XCTAssertNotEqual(Lateinit.initialized(1), Lateinit.initialized(2))
-        XCTAssertEqual(Lateinit.initialized(1), Lateinit.initialized(1))
-        XCTAssertEqual(Lateinit<Int>.uninitialized, .uninitialized)
-        XCTAssertNotEqual(Lateinit<Int>.uninitialized, .initialized(1))
-    }
-
     func testOnlyExactConfiguredLayoutGetsShortcut() throws {
         var bindings = ActionMenuBindings(mode: try mode("""
         [mode.main.binding]

@@ -46,20 +46,12 @@ extension WorkspaceSidebarView {
             return
         }
         let activeProjectIndex = projectPagerDisplayIndex
-        let shouldCreate = shouldCreateWorkspaceSidebarProjectAfterSwipe(
+        let shouldCommit = workspaceSidebarProjectSwipeTarget(
             currentIndex: activeProjectIndex,
             projectCount: snapshot.projects.count,
             direction: direction,
-            distance: abs(horizontalTranslation),
-        )
-        let shouldNavigate =
-            workspaceSidebarProjectIndexAfterSwipe(
-                currentIndex: activeProjectIndex,
-                projectCount: snapshot.projects.count,
-                direction: direction,
-            ) != nil &&
-            abs(horizontalTranslation) >= workspaceSidebarProjectSwipeNavigateThreshold
-        let shouldCommit = shouldCreate || shouldNavigate
+            distance: abs(horizontalTranslation)
+        ) != nil
         if shouldCommit && !projectSwipeDidCrossBreakPoint {
             projectSwipeDidCrossBreakPoint = true
             performWorkspaceSidebarProjectHaptic(.alignment)

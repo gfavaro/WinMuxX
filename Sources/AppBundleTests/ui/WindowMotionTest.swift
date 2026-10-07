@@ -3,6 +3,15 @@ import AppKit
 import XCTest
 
 final class WindowMotionTest: XCTestCase {
+    func testWorkspaceRevealSnapsOnceAndAllowsLaterLayoutAnimation() {
+        var policy = WindowMotionDisplayPolicy()
+        policy.snapOnNextLayout(42)
+        XCTAssertTrue(policy.shouldSnap(42), "Restoration must not animate from the parking corner")
+        XCTAssertFalse(policy.shouldSnap(42), "Later layout changes should animate normally")
+        policy.snapOnNextLayout(42)
+        policy.forget(42)
+        XCTAssertFalse(policy.shouldSnap(42), "A closed window must not leave motion state behind")
+    }
     func testOddColumnsHaveStableNativeEdgesOnNegativeOriginMonitor() {
         for count in [3, 5, 7] {
             let origin: CGFloat = -908

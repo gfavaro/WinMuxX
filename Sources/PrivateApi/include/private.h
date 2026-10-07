@@ -5,15 +5,17 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <stdint.h>
 
-typedef uint32_t WinMuxBorderWindowID;
-bool winmux_border_create(float scale, WinMuxBorderWindowID *identifier);
-void winmux_border_update(WinMuxBorderWindowID border, uint32_t target, CGRect frame,
-                          float radius, uint32_t rgba, float width, bool above);
-void winmux_border_move(WinMuxBorderWindowID border, uint32_t target, CGRect frame,
-                        float width, bool above);
-void winmux_border_move_to_space(WinMuxBorderWindowID border, uint64_t space);
-void winmux_border_hide(WinMuxBorderWindowID border);
-void winmux_border_destroy(WinMuxBorderWindowID border);
+typedef struct WinMuxBorder *WinMuxBorderHandle;
+bool winmux_border_create(float scale, WinMuxBorderHandle *handle);
+bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect frame,
+                         float radius, uint32_t rgba, float width, bool above);
+bool winmux_border_move(WinMuxBorderHandle border, uint32_t target, CGRect frame,
+                       float width, bool above);
+void winmux_border_hide(WinMuxBorderHandle border);
+void winmux_border_destroy(WinMuxBorderHandle border);
+uint32_t winmux_border_window_id(WinMuxBorderHandle border, int index);
+void winmux_border_draw(CGContextRef context, CGSize size, CGRect piece, float radius, uint32_t rgba, float width);
+CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, int index);
 // WindowServer liveness, independent of AX's cached window enumeration.
 bool winmux_window_exists(uint32_t window);
 bool winmux_window_frame(uint32_t window, CGRect *frame);

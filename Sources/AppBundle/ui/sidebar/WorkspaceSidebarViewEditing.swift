@@ -59,23 +59,28 @@ extension WorkspaceSidebarView {
 
     func adoptCommandSidebarSearchIfNeeded(panel editingPanel: WorkspaceSidebarPanel) {
         guard renamingProjectId == nil, renamingWorkspaceName == nil else { return }
-        if !isSearchEditing {
+        let startsEditing = !isSearchEditing || searchEditingPanel !== editingPanel
+        if startsEditing {
             isSearchEditing = true
             searchEditingPanel = editingPanel
             selectFirstSearchTarget()
         }
         let locksExpansion = editingPanel.commandExpansionLocksCollapse || editingPanel.shouldLockNextSidebarSearchExpansion
+        searchUsesNativeEditor = searchUsesNativeEditor || locksExpansion
         editingPanel.shouldLockNextSidebarSearchExpansion = false
-        editingPanel.beginInlineTextEditing(
-            locksExpansion: locksExpansion,
-            cancelsOnPointerExit: false,
-            onCancel: {
-                finishSidebarSearch(clearText: true)
-            },
-            onKeyDown: { key in
-                handleSidebarSearchKey(key)
-            },
-        )
+        if startsEditing {
+            editingPanel.beginInlineTextEditing(
+                locksExpansion: locksExpansion,
+                cancelsOnPointerExit: false,
+                activatesWindow: searchUsesNativeEditor,
+                onCancel: {
+                    finishSidebarSearch(clearText: true)
+                },
+                onKeyDown: { key in
+                    handleSidebarSearchKey(key)
+                },
+            )
+        }
         let bufferedKeys = editingPanel.bufferedCommandSidebarSearchKeys
         editingPanel.bufferedCommandSidebarSearchKeys = []
         for key in bufferedKeys {
@@ -94,9 +99,13 @@ extension WorkspaceSidebarView {
             searchText = ""
         }
         selectedSearchTarget = nil
+        searchUsesNativeEditor = false
     }
 
     func handleSidebarSearchKey(_ key: WorkspaceSidebarInlineTextKey) {
+        // Only buffered keys and the first hover-search keystroke use this path.
+        // Once the native editor is focused, AppKit handles text editing.
+        if case .text = key { searchUsesNativeEditor = true }
         switch key {
             case .text(let inserted):
                 searchText += inserted
@@ -127,6 +136,15 @@ extension WorkspaceSidebarView {
             case .ignored:
                 break
         }
+    }
+
+    func sidebarSearchEditorReady(on panel: WorkspaceSidebarPanel) {
+        searchUsesNativeEditor = true
+        if !isSearchEditing {
+            adoptCommandSidebarSearchIfNeeded(panel: panel)
+        }
+        searchEditingPanel = panel
+        panel.removeInlineTextEditingKeyEventTap()
     }
 
     func selectFirstSearchTarget() {

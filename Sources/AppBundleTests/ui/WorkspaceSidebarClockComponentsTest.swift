@@ -35,6 +35,22 @@ final class WorkspaceSidebarClockComponentsTest: XCTestCase {
         XCTAssertEqual(lines.monthAndDay, "31. Januar")
     }
 
+    func testCachedDateLinesUpdateAtMidnightAndWhenTimezoneChanges() {
+        let midnight = calendar.date(from: DateComponents(year: 2030, month: 2, day: 1))!
+        let locale = Locale(identifier: "en_US")
+        let before = WorkspaceSidebarExpandedClockDateLines(date: midnight.addingTimeInterval(-1), locale: locale, calendar: calendar)
+        let after = WorkspaceSidebarExpandedClockDateLines(date: midnight, locale: locale, calendar: calendar)
+        XCTAssertEqual(before.monthAndDay, "January 31")
+        XCTAssertEqual(after.monthAndDay, "February 1")
+        XCTAssertEqual(after.weekday, "Friday")
+
+        var westCalendar = calendar
+        westCalendar.timeZone = TimeZone(secondsFromGMT: -8 * 3600)!
+        let west = WorkspaceSidebarExpandedClockDateLines(date: midnight, locale: locale, calendar: westCalendar)
+        XCTAssertEqual(west.monthAndDay, "January 31")
+        XCTAssertEqual(west.weekday, "Thursday")
+    }
+
     func testExpandedClockDateAndWeekdayLinesAreIndependent() {
         XCTAssertEqual(workspaceSidebarExpandedClockDateLineCount(showsDate: false, showsWeekday: false), 0)
         XCTAssertEqual(workspaceSidebarExpandedClockDateLineCount(showsDate: true, showsWeekday: false), 1)

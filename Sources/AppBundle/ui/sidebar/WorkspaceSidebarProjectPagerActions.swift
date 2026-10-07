@@ -116,7 +116,7 @@ extension WorkspaceSidebarProjectPager {
     @ViewBuilder
     var projectMenu: some View {
         Group {
-            if let selectedProject, renamingProjectId == selectedProject.id {
+            if !measuring, let selectedProject, renamingProjectId == selectedProject.id {
                 WorkspaceSidebarProjectRenameField(
                     project: selectedProject,
                     text: $renamingProjectText,
@@ -155,23 +155,16 @@ extension WorkspaceSidebarProjectPager {
     }
 
     private var projectMenuButton: some View {
-        Button {
-            isProjectMenuOpen.toggle()
-        } label: {
-            HStack(spacing: 4) {
-                Text(selectedProject?.displayName ?? "Project")
-                    .font(.system(size: 12.5, weight: .medium))
-                    .foregroundStyle(sidebarColors.text(opacity: isHovered || isProjectMenuOpen ? 0.86 : 0.72))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundStyle(sidebarColors.text(opacity: isHovered || isProjectMenuOpen ? 0.86 : 0.72))
-                    .rotationEffect(.degrees(isProjectMenuOpen ? 180 : 0))
-            }
-            .modifier(WorkspaceSidebarDropdownControlStyle(isActive: isProjectMenuOpen))
-        }
-        .buttonStyle(.plain)
+        WorkspaceSidebarNativeProjectMenu(
+            projects: projects,
+            selectedProjectId: selectedProjectId,
+            title: selectedProject?.displayName ?? "Project",
+            isMenuOpen: $isProjectMenuOpen,
+            onSelect: onSelectProject,
+            onRename: onBeginRenameProject,
+            onSetColor: onSetProjectColor,
+            onDelete: onDeleteProject
+        )
         .frame(height: workspaceSidebarPagerHeight, alignment: .center)
     }
 
@@ -189,49 +182,6 @@ extension WorkspaceSidebarProjectPager {
         .buttonStyle(.plain)
         .help("New Project")
         .frame(height: workspaceSidebarPagerHeight, alignment: .center)
-    }
-
-    @ViewBuilder
-    var projectPopup: some View {
-        if isProjectMenuOpen {
-            WorkspaceSidebarProjectPopup(
-                projects: projects,
-                selectedProjectId: selectedProjectId,
-                onSelect: { projectId in
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        onSelectProject(projectId)
-                    }
-                },
-                onCreate: {
-                    onCreateProject()
-                    isProjectMenuOpen = false
-                },
-                onRename: { project in
-                    onBeginRenameProject(project)
-                    isProjectMenuOpen = false
-                },
-                onSetColor: onSetProjectColor,
-                onDelete: { project in
-                    onDeleteProject(project)
-                    isProjectMenuOpen = false
-                },
-                showsCreateAction: false,
-                menuWidth: projectPopupWidth,
-            )
-            .frame(width: projectPopupWidth)
-            .offset(
-                x: -(projectCreateButtonWidth + 6),
-                y: -(expandedProjectControlsHeight + workspaceSidebarSectionGap)
-            )
-            .transition(.asymmetric(
-                insertion: .opacity.combined(with: .scale(scale: 0.98, anchor: .bottomTrailing)),
-                removal: .opacity,
-            ))
-            .animation(.interactiveSpring(response: 0.22, dampingFraction: 0.88), value: isProjectMenuOpen)
-            .zIndex(100)
-        }
     }
 
     @ViewBuilder

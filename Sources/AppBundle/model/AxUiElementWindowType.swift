@@ -21,7 +21,9 @@ extension AxUiElementMock {
     func isDialogHeuristic(
         _ id: KnownBundleId?,
         _ windowLevel: MacOsWindowLevel?,
+        accessory: Bool,
     ) -> Bool {
+        if accessory { return true }
         // Note: a lot of windows don't have title on startup. So please don't rely on the title
 
         if id == ._1password && windowLevel != .normalWindow {
@@ -197,10 +199,11 @@ extension AxUiElementMock {
         _ id: KnownBundleId?,
         _ activationPolicy: NSApplication.ActivationPolicy,
         _ windowLevel: MacOsWindowLevel?,
+        accessory: Bool,
     ) -> AxUiElementWindowType {
         .new(
             isWindow: isWindowHeuristic(axApp: axApp, id, activationPolicy, windowLevel),
-            isDialog: { isDialogHeuristic(id, windowLevel) },
+            isDialog: { isDialogHeuristic(id, windowLevel, accessory: accessory) },
         )
     }
 }

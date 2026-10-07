@@ -64,7 +64,7 @@ extension TreeNode {
                             window.isFullscreen = false
                         }
                         if !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
-                            WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
+                            try await WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
                         }
                     }
                 }

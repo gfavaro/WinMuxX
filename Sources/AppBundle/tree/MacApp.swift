@@ -10,6 +10,7 @@ final class MacApp: AbstractApp {
     /*conforms*/ let rawAppBundleId: String?
     let appId: KnownBundleId?
     let nsApp: NSRunningApplication
+    let isAccessoryApp: Bool
     private let axApp: ThreadGuardedValue<AXUIElement>
     /// Second app element with a much shorter messaging timeout, for the focused-window query
     /// that fronts every refresh session: when the app is too busy to answer quickly, the
@@ -38,6 +39,7 @@ final class MacApp: AbstractApp {
 
     private init(_ nsApp: NSRunningApplication, _ axApp: AXUIElement, _ axAppFastTimeout: AXUIElement, _ axSubscriptions: [AxSubscription], _ thread: Thread) {
         self.nsApp = nsApp
+        self.isAccessoryApp = appDeclaresAccessory(nsApp.bundleURL.flatMap { Bundle(url: $0)?.infoDictionary })
         self.axApp = .init(axApp)
         self.axAppFastTimeout = .init(axAppFastTimeout)
         self.pid = nsApp.processIdentifier
@@ -317,14 +319,14 @@ final class MacApp: AbstractApp {
     }
 
     func getAxUiElementWindowType(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> AxUiElementWindowType {
-        return try await withWindow(windowId) { [nsApp, axApp, appId] window, job in
-            window.getWindowType(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)
+        return try await withWindow(windowId) { [nsApp, axApp, appId, isAccessoryApp] window, job in
+            window.getWindowType(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel, accessory: isAccessoryApp)
         } ?? .window
     }
 
     func isDialogHeuristic(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> Bool {
-        try await withWindow(windowId) { [appId] window, job in
-            window.isDialogHeuristic(appId, windowLevel)
+        try await withWindow(windowId) { [appId, isAccessoryApp] window, job in
+            window.isDialogHeuristic(appId, windowLevel, accessory: isAccessoryApp)
         } == true
     }
 

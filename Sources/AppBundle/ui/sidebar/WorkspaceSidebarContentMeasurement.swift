@@ -20,7 +20,10 @@ extension WorkspaceSidebarView {
                     let inset = workspaceSidebarOuterLeadingPadding(isCompact: compact)
                     VStack(spacing: 0) {
                         if !compact && shouldShowTopFilterBar {
-                            monitorSelectorSection(expansionProgress: progress, leadingInset: inset, trailingInset: inset)
+                            monitorSelectorSection(expansionProgress: progress, leadingInset: inset, trailingInset: inset, measuring: true)
+                        }
+                        if !compact && (isSearchEditing || !searchText.isEmpty) {
+                            Color.clear.frame(height: workspaceSidebarSearchHeight + workspaceSidebarSectionGap)
                         }
                         workspacePageContent(
                             projectId: projectId, workspaces: groups[projectId] ?? [], expansionProgress: progress,
@@ -29,7 +32,7 @@ extension WorkspaceSidebarView {
                             measuring: true
                         )
                         projectPagerSection(expansionProgress: progress, leadingInset: inset, trailingInset: inset,
-                                            swipeDirection: nil, switchProgress: 0, edgeProgress: 0)
+                                            swipeDirection: nil, switchProgress: 0, measuring: true)
                         if snapshot.configuration.showsClock {
                             statusSection(expansionProgress: progress, isCompact: compact, leadingInset: inset, trailingInset: inset)
                         }

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct WorkspaceSidebarClockComponents {
     let hour: String
@@ -17,6 +18,18 @@ struct WorkspaceSidebarClockComponents {
     }
 }
 
+private struct SidebarClockDateLinesCacheEntry {
+    let day: Date
+    let locale: Locale
+    let calendar: Calendar
+    let weekday: String
+    let monthAndDay: String
+}
+
+// One bounded entry shared by the visible clock and its accessibility label.
+// Include the calendar (and its timezone) so locale and timezone changes invalidate it.
+private let sidebarClockDateLinesCache = OSAllocatedUnfairLock<SidebarClockDateLinesCacheEntry?>(initialState: nil)
+
 struct WorkspaceSidebarExpandedClockDateLines: Equatable {
     let weekday: String
     let monthAndDay: String
@@ -26,17 +39,27 @@ struct WorkspaceSidebarExpandedClockDateLines: Equatable {
         locale: Locale = .autoupdatingCurrent,
         calendar: Calendar = .autoupdatingCurrent
     ) {
-        weekday = Self.format(date, template: "EEEE", locale: locale, calendar: calendar)
-        monthAndDay = Self.format(date, template: "MMMMd", locale: locale, calendar: calendar)
-    }
-
-    private static func format(_ date: Date, template: String, locale: Locale, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = locale
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.setLocalizedDateFormatFromTemplate(template)
-        return formatter.string(from: date)
+        let locale = locale == .autoupdatingCurrent ? Locale.current : locale
+        let calendar = calendar == .autoupdatingCurrent ? Calendar.current : calendar
+        let day = calendar.startOfDay(for: date)
+        let lines = sidebarClockDateLinesCache.withLock { cached in
+            if let cached, cached.day == day, cached.locale == locale, cached.calendar == calendar {
+                return cached
+            }
+            let style = Date.FormatStyle(
+                date: .omitted, time: .omitted, locale: locale,
+                calendar: calendar, timeZone: calendar.timeZone
+            )
+            let lines = SidebarClockDateLinesCacheEntry(
+                day: day, locale: locale, calendar: calendar,
+                weekday: date.formatted(style.weekday(.wide)),
+                monthAndDay: date.formatted(style.month(.wide).day())
+            )
+            cached = lines
+            return lines
+        }
+        weekday = lines.weekday
+        monthAndDay = lines.monthAndDay
     }
 }
 
@@ -59,19 +82,17 @@ func workspaceSidebarExpandedClockAccessibilitySummary(
     locale: Locale = .autoupdatingCurrent,
     calendar: Calendar = .autoupdatingCurrent
 ) -> String {
-    let timeFormatter = DateFormatter()
-    timeFormatter.locale = locale
-    timeFormatter.calendar = calendar
-    timeFormatter.timeZone = calendar.timeZone
-    timeFormatter.dateStyle = .none
-    timeFormatter.timeStyle = showsSeconds ? .medium : .short
+    let timeStyle = Date.FormatStyle(
+        date: .omitted, time: showsSeconds ? .standard : .shortened,
+        locale: locale, calendar: calendar, timeZone: calendar.timeZone
+    )
 
     let dateLines = WorkspaceSidebarExpandedClockDateLines(
         date: date,
         locale: locale,
         calendar: calendar
     )
-    var parts = [timeFormatter.string(from: date)]
+    var parts = [date.formatted(timeStyle)]
     if showsWeekday {
         parts.append(dateLines.weekday)
     }

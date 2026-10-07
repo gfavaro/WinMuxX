@@ -14,12 +14,6 @@ extension WorkspaceSidebarView {
             minimumDistance: 1,
         )
         let activeProjectIndex = projectPagerDisplayIndex
-        let projectSwipeProgress = workspaceSidebarProjectEdgeCreationProgress(
-            currentIndex: activeProjectIndex,
-            projectCount: snapshot.projects.count,
-            direction: projectSwipeDirection,
-            distance: abs(projectSwipeTranslation),
-        )
         let hasSwipeTarget = projectSwipeDirection.flatMap { direction in
             workspaceSidebarProjectIndexAfterSwipe(
                 currentIndex: activeProjectIndex,
@@ -51,7 +45,7 @@ extension WorkspaceSidebarView {
                 )
             }
 
-            if !isCompact, !searchText.isEmpty {
+            if !isCompact, isSearchEditing || !searchText.isEmpty {
                 sidebarSearchSection(
                     expansionProgress: expansionProgress,
                     leadingInset: leadingInset,
@@ -87,7 +81,6 @@ extension WorkspaceSidebarView {
                     trailingInset: trailingInset,
                     swipeDirection: projectSwipeDirection,
                     switchProgress: projectSwitchProgress,
-                    edgeProgress: projectSwipeProgress,
                 )
             }
 

@@ -15,7 +15,7 @@ final class PostCommandRefreshBenchmarkTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = true
 
         var scheduledRefreshCount = 0
-        let refreshDelayNanoseconds: UInt64 = 100_000_000
+        let refreshDelayNanoseconds: UInt64 = ProcessInfo.processInfo.environment["POST_COMMAND_REFRESH_BENCHMARK_LABEL"] == nil ? 0 : 100_000_000
         setScheduledRefreshOverrideForTests { _, _ in
             scheduledRefreshCount += 1
             try await Task.sleep(nanoseconds: refreshDelayNanoseconds)

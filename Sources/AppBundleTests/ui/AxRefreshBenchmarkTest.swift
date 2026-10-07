@@ -36,8 +36,8 @@ final class AxRefreshBenchmarkTest: XCTestCase {
         let (first, second) = setUpFocusScenario()
         var refreshCount = 0
         var normalizeCount = 0
-        let refreshDelayNanoseconds: UInt64 = 80_000_000
-        let normalizeDelayNanoseconds: UInt64 = 40_000_000
+        let refreshDelayNanoseconds: UInt64 = ProcessInfo.processInfo.environment["AX_REFRESH_BENCHMARK_LABEL"] == nil ? 0 : 80_000_000
+        let normalizeDelayNanoseconds: UInt64 = ProcessInfo.processInfo.environment["AX_REFRESH_BENCHMARK_LABEL"] == nil ? 0 : 40_000_000
         setBlockingRefreshOverridesForTests(
             refresh: {
                 refreshCount += 1

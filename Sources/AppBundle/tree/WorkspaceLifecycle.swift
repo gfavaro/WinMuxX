@@ -151,6 +151,12 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace) {
     discardPendingRestartWindows(forWorkspace: workspace.name)
     clearWorkspaceSidebarLabelIfNeeded(workspace.name)
     _ = winMuxWorkspaceState.removeWorkspace(workspace)
+    // Restored numbers preserve the session while its workspaces are rebuilt.
+    // Once a slot disappears, presentation must follow the live project order.
+    for survivor in projectWorkspaces(projectId: workspace.projectId)
+    where survivor.usesAutomaticDisplayName && !survivor.isConfiguredPersistent {
+        survivor.restoredDisplayIndex = nil
+    }
 }
 
 @MainActor

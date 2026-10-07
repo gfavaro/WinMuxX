@@ -87,6 +87,7 @@ private func dumpWindowDebugInfo(_ window: Window) async throws -> String {
     result["WinMux.treeNodeParent"] = .string(String(describing: window.parent))
     result["WinMux.macOS.version"] = .string(ProcessInfo().operatingSystemVersionString) // because built-in apps might behave differently depending on the OS version
     result["WinMux.App.appBundleId"] = .stringOrNull(window.app.rawAppBundleId)
+    result["WinMux.App.LSUIElement"] = .bool(window.macApp.isAccessoryApp)
     result["WinMux.App.pid"] = .int(Int(window.app.pid))
     result["WinMux.App.versionShort"] = .stringOrNull(appInfoDic["CFBundleShortVersionString"] as? String)
     result["WinMux.App.version"] = .stringOrNull(appInfoDic["CFBundleVersion"] as? String)
