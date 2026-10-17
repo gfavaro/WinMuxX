@@ -459,3 +459,47 @@ reported valid configuration, granted permissions and a listening raw-touch
 backend. Post-check window assignments/config were unchanged. A new sign-in
 capture is still required to verify that specific popup; no browser classification
 change or user configuration rule was added.
+
+## Runtime efficiency and TOML ownership (builds 82–83)
+
+The runtime changes and native measurement limits are recorded in
+[RUNTIME_EFFICIENCY.md](RUNTIME_EFFICIENCY.md). The full local check passed **1,131
+Swift tests and 20 Python tests**. Two focused Thread Sanitizer regressions passed
+for cancellation and persistence-worker ordering. The steady six-window layout
+benchmark now requires six frame writes over ten layouts; geometry-triggered
+reassertion still requires sixty.
+
+Seven TOML lifetime regressions cover root release, nested document views, literal
+and encoded temporaries, independent removed copies, value-array ownership,
+repeated parse/release and date-time/error buffers. An isolated optimized fixture
+repeated 1,000 parse/read/format/encode/error cycles against the original pinned
+TOMLKit sources and the local ownership patch. `leaks --atExit` reported 173,000
+leaks / 10,864,000 bytes before and zero leaks after. The patched fixture also
+passed Address Sanitizer with no reports. It only uses synthetic documents.
+
+Build 82 preserved configuration bytes, window/workspace assignments, populated
+display/visibility state and restored focus across installation. Uninstrumented
+100-query runs measured CLI p50 41.72 → 20.79 ms and zero app writes after the
+query fast path, versus 720,896 logical bytes in build 81. These are single local
+runs including CLI process launch. Both builds were quiet when settled; there is
+no measured battery-life claim. Native interaction and external-display/hotplug
+checks remain pending because computer-use access was denied and only the built-in
+display was connected.
+
+Signed build 83 includes the vendored TOML ownership patch and is installed with
+the same designated signing requirement. Strict/deep verification and unchanged
+configuration checks passed. The session locked during installation, leaving AX
+window enumeration empty. After unlock, the five window/workspace assignments,
+populated display ownership, focus and configuration bytes matched the pre-install
+snapshot without corrective window moves.
+
+Extended validation includes a 100,000-cycle optimized TOML fixture (zero detected
+leaks and a passing Address Sanitizer run), 1,000 live CLI queries over 127 seconds,
+and a 1,000-cycle offscreen preview regression that checks panel/controller release
+across 20 lifetimes. Before/after live scans reported the same six allocations /
+432 bytes at identical addresses, with `NSMutableDictionary` roots. The earlier
+locked-process display-link report was absent. Allocation origins remain
+unconfirmed. The query workload overlapped other desktop/test activity, so its
+modest footprint variation and writes cannot be attributed to queries alone.
+Another 500 queries succeeded. A final 30-second settled sample recorded zero
+logical/disk writes, unchanged 72.24 MiB footprint and 0.00047% CPU of one core.
