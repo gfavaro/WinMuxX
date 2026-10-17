@@ -1,4 +1,5 @@
 import Foundation
+import TOMLKit
 
 func settingsQuotedString(_ value: String) -> String {
     let encoder = JSONEncoder()
@@ -32,6 +33,19 @@ struct SettingsRuleDocument {
             let range = statement.start..<end
             return Entry(range: range, text: lines[range].joined(separator: "\n"))
         }
+    }
+
+    func adding(_ block: String, in current: String) throws -> String {
+        let latest = SettingsRuleDocument(current)
+        guard entries.map(\.text) == latest.entries.map(\.text) else { throw ConfigFileStore.Conflict() }
+        var result = current
+        if latest.entries.isEmpty, let value = try TOMLTable(string: current)["on-window-detected"] {
+            // An explicit empty array is the ordinary empty state. Replace only that
+            // assignment when adding the first array-table, retaining its comments.
+            guard value.array?.isEmpty == true else { throw ConfigFileStore.Conflict() }
+            result = removeSettingsConfigValue(in: current, section: nil, key: "on-window-detected")
+        }
+        return result + "\n\n" + block
     }
 
     func replacing(_ index: Int, with replacement: String?, in current: String) throws -> String {

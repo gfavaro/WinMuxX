@@ -51,7 +51,10 @@ controls only when their existing order and options are representable.
 **Add rule** creates an unsaved draft. Save applies it to future window detections;
 existing windows are not reclassified. Revert discards the draft. Save or revert
 before switching rules. Move up/down changes rule order; deletion asks for
-confirmation.
+confirmation. An explicit `on-window-detected = []` is an ordinary empty rule
+list. Adding a draft leaves the file unchanged; saving the first rule removes only
+the empty assignment and appends its rule block, retaining comments and unrelated
+settings. Nonempty inline/custom rule shapes still use the configuration editor.
 
 Custom commands retain their original text and order. Use Configuration editor
 for custom action editing or TOML shapes the form cannot safely represent.

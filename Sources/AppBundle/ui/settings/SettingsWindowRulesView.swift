@@ -122,7 +122,8 @@ final class SettingsWindowRulesModel: ObservableObject {
             document = SettingsRuleDocument(text)
             rows = document.entries.enumerated().map { SettingsRuleRow(id: $0.offset, block: $0.element.text) }
             let table = try TOMLTable(string: text)
-            if table["on-window-detected"] != nil && document.entries.isEmpty {
+            if let value = table["on-window-detected"], document.entries.isEmpty,
+               value.array?.isEmpty != true {
                 throw SettingsDisplayError("These rules use a custom TOML shape. Use the configuration editor to preserve them.")
             }
             if let selection, !document.entries.indices.contains(selection) { self.selection = nil }
@@ -160,10 +161,7 @@ final class SettingsWindowRulesModel: ObservableObject {
             let block = creating ? "[[on-window-detected]]\nrun = 'layout tiling'\n" : baseline.entries[selection].text
             let replacement = try SettingsRuleDocument.editing(block, edits: draft.edits(from: original))
             if creating {
-                guard SettingsRuleDocument(current).entries.map(\.text) == baseline.entries.map(\.text) else { throw ConfigFileStore.Conflict() }
-                if (try TOMLTable(string: current))["on-window-detected"] != nil,
-                   baseline.entries.isEmpty { throw SettingsDisplayError("Use the configuration editor for this TOML shape.") }
-                return current + "\n\n" + replacement
+                return try baseline.adding(replacement, in: current)
             }
             return try baseline.replacing(selection, with: replacement, in: current)
         }

@@ -380,3 +380,24 @@ Signed build 78 adds aggregate stage percentiles and a bounded 128-attempt histo
 with separate cold submission and not-submitted counts. It passed all 1,078 Swift
 and 13 Python tests and settled signature/live state checks. A new 30-completed-warm
 physical run is still pending; do not silently count attempts as successful previews.
+
+
+## Empty rule-list editor regression (build 79)
+
+The user config contained `on-window-detected = []`, but the Rules model treated
+any existing key without array-table blocks as an unsupported custom shape. A new
+regression first reproduced the warning and inability to add a draft on the old
+code. Empty arrays now load as an empty list. The first save removes just that
+assignment using the existing quote-aware edit helper and appends the new rule.
+
+Five tests cover empty and quoted/multiline arrays, unsaved draft/revert behavior,
+comment/unrelated-setting preservation, nonempty inline-rule protection, concurrent
+rule additions and the real model/save-queue path with injected in-memory access.
+No real user config is written by the tests. The full local check passed **1,083
+Swift tests and 20 Python tests**. Signed build 79 was installed and its signature
+verified. Before/after snapshots confirmed identical config bytes, window/workspace
+assignments, populated workspace display/visibility state and restored focus.
+Only the built-in display was connected at this check. Doctor reported valid
+configuration, granted Accessibility/Screen Capture permissions and a listening
+raw-touch backend. Native Settings interaction remains manually unverified; the
+injected model/save-queue regression covers the first-rule save path.

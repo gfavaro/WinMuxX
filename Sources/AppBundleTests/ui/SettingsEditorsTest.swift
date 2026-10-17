@@ -137,6 +137,92 @@ final class SettingsEditorsTest: WorkspaceTestCase {
         XCTAssertFalse(model.isNewRule)
     }
 
+    func testEmptyRuleArrayLoadsAsEmptyListAndAllowsUnsavedFirstRule() {
+        for text in [
+            "config-version = 2\non-window-detected = []\n",
+            "config-version = 2\n\"on-window-detected\" = [\n # No rules yet\n] # keep me\n",
+        ] {
+            let model = SettingsWindowRulesModel(readText: { text })
+            model.load()
+            XCTAssertNil(model.error)
+            XCTAssertTrue(model.rows.isEmpty)
+            XCTAssertFalse(model.isDirty)
+            model.add()
+            XCTAssertNil(model.error)
+            XCTAssertTrue(model.isNewRule)
+            XCTAssertTrue(model.isDirty)
+            model.revert()
+            XCTAssertNil(model.error)
+            XCTAssertFalse(model.isDirty)
+        }
+    }
+
+    func testFirstRuleReplacesEmptyArrayAndPreservesCommentsAndOtherSettings() throws {
+        for declaration in [
+            "on-window-detected = [] # retain this comment",
+            "\"on-window-detected\" = [\n  # no rules yet\n] # retain this comment",
+        ] {
+            let source = "config-version = 2\n# Before rules\n" + declaration + "\n[mode.main.binding]\nalt-h = 'focus left'\n"
+            let edited = try SettingsRuleDocument(source).adding("[[on-window-detected]]\nrun = 'layout floating'\n", in: source)
+            XCTAssertTrue(edited.contains("# Before rules"))
+            XCTAssertTrue(edited.contains("# retain this comment"))
+            if declaration.contains("no rules yet") { XCTAssertTrue(edited.contains("# no rules yet")) }
+            XCTAssertTrue(edited.contains("[mode.main.binding]\nalt-h = 'focus left'\n"))
+            XCTAssertEqual(SettingsRuleDocument(edited).entries.count, 1)
+            let parsed = parseConfig(edited)
+            XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
+            XCTAssertEqual(parsed.config.onWindowDetected.count, 1)
+        }
+    }
+
+    func testFirstRuleRejectsConcurrentInlineOrArrayTableRuleInsertion() {
+        let source = "config-version = 2\non-window-detected = []\n"
+        let baseline = SettingsRuleDocument(source)
+        for current in [
+            "config-version = 2\non-window-detected = [{ run = 'layout floating' }]\n",
+            "config-version = 2\n[[on-window-detected]]\nrun = 'layout floating'\n",
+        ] {
+            XCTAssertThrowsError(try baseline.adding("[[on-window-detected]]\nrun = 'layout tiling'\n", in: current))
+        }
+    }
+
+    func testNonemptyInlineRulesStillRequireConfigurationEditor() {
+        let source = "config-version = 2\non-window-detected = [{ run = 'layout floating' }]\n"
+        let model = SettingsWindowRulesModel(readText: { source })
+        model.load()
+        XCTAssertNotNil(model.error)
+        model.add()
+        XCTAssertFalse(model.isNewRule)
+        XCTAssertFalse(model.isDirty)
+        XCTAssertThrowsError(try SettingsRuleDocument(source).adding("[[on-window-detected]]\nrun = 'layout tiling'\n", in: source))
+    }
+
+    func testFirstRuleSaveFromEmptyArrayUsesNormalSaveQueue() async throws {
+        var text = "config-version = 2\non-window-detected = [] # Keep note\n"
+        let completed = expectation(description: "first rule saved")
+        let model = ShortcutSettingsModel(configAccess: SettingsConfigAccess(edit: { transform in
+            let edited = try transform(text)
+            XCTAssertTrue(parseConfig(edited).errors.isEmpty)
+            text = edited
+            return URL(filePath: "/unused-rule-test-config")
+        }, reload: { _ in
+            config = parseConfig(text).config
+            return true
+        }), drafts: SettingsDraftStore())
+        let rules = SettingsWindowRulesModel(readText: { text })
+        rules.add()
+        rules.draft?.titleRegex = "Preferences"
+        rules.save(using: model)
+        model.saveQueue.enqueue { completed.fulfill() }
+        await fulfillment(of: [completed], timeout: 2)
+        XCTAssertNil(model.errorMessage)
+        XCTAssertNil(rules.error)
+        XCTAssertFalse(rules.isDirty)
+        XCTAssertEqual(rules.rows.count, 1)
+        XCTAssertTrue(text.contains("# Keep note"))
+        XCTAssertEqual(try TOMLTable(string: text)["on-window-detected"]?.array?.first?.table?["if"]?.table?["window-title-regex-substring"]?.string, "Preferences")
+    }
+
     func testDisplaysSnapshotDoesNotMoveOrCreateWorkspaces() {
         let before = Workspace.all.map { ($0.name, $0.workspaceMonitor.name) }
         let focusBefore = focus.workspace.id
