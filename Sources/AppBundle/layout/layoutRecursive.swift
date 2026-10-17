@@ -93,10 +93,11 @@ extension TreeNode {
 private func canReuseLastAppliedWindowFrame(previousPhysicalRect: Rect?, nextPhysicalRect: Rect) -> Bool {
     guard refreshSessionEvent?.canReuseLastAppliedWindowFrames == true else { return false }
     guard let previousPhysicalRect else { return false }
-    return previousPhysicalRect.topLeftX == nextPhysicalRect.topLeftX &&
-        previousPhysicalRect.topLeftY == nextPhysicalRect.topLeftY &&
-        previousPhysicalRect.width == nextPhysicalRect.width &&
-        previousPhysicalRect.height == nextPhysicalRect.height
+    // Repeated weight normalization can change fractions without changing the
+    // whole-point frame sent to AX. Compare the actual native targets.
+    let previous = CGRect(origin: previousPhysicalRect.topLeftCorner, size: previousPhysicalRect.size)
+    let next = CGRect(origin: nextPhysicalRect.topLeftCorner, size: nextPhysicalRect.size)
+    return windowMotionNativeTarget(previous) == windowMotionNativeTarget(next)
 }
 
 private struct LayoutContext {

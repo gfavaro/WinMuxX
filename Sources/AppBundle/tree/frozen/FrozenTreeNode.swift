@@ -1,12 +1,12 @@
 import AppKit
 import Common
 
-enum FrozenTreeNode: Codable, Sendable {
+enum FrozenTreeNode: Codable, Equatable, Sendable {
     case container(FrozenContainer)
     case window(FrozenWindow)
 }
 
-struct FrozenContainer: Codable, Sendable {
+struct FrozenContainer: Codable, Equatable, Sendable {
     let children: [FrozenTreeNode]
     let layout: Layout
     let orientation: Orientation
@@ -35,9 +35,21 @@ struct FrozenContainer: Codable, Sendable {
         dwindleOrientation = container.dwindleOrientation
         dwindleChildRatios = container.dwindleChildRatios
     }
+
+    /// A terminated process can recover assignments, but cannot finish its old
+    /// live-process tree. Keep only the target leaf and constant-size root policy.
+    @MainActor init(assignment: FrozenWindow?, in container: TilingContainer) {
+        children = assignment.map { [.window($0)] } ?? []
+        layout = container.layout
+        orientation = container.orientation
+        weight = getWeightOrNil(container) ?? 1
+        dwindleSplitRatios = nil
+        dwindleOrientation = nil
+        dwindleChildRatios = nil
+    }
 }
 
-struct FrozenWindow: Codable, Sendable {
+struct FrozenWindow: Codable, Equatable, Sendable {
     let id: UInt32
     let restartIdentity: RestartWindowIdentity?
     let weight: CGFloat

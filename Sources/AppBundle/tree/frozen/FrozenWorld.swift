@@ -1,4 +1,4 @@
-struct FrozenWorld: Codable, Sendable {
+struct FrozenWorld: Codable, Equatable, Sendable {
     let workspaces: [FrozenWorkspace]
     let monitors: [FrozenMonitor]
     let windowIds: Set<UInt32>
@@ -8,7 +8,7 @@ struct FrozenWorld: Codable, Sendable {
 func snapshotCurrentFrozenWorld() -> FrozenWorld {
     let workspaces = restorableWorkspaces(Workspace.all)
     return FrozenWorld(
-        workspaces: workspaces.map(FrozenWorkspace.init),
+        workspaces: workspaces.map { FrozenWorkspace($0) },
         monitors: monitors.map(FrozenMonitor.init),
         windowIds: workspaces.flatMap { collectAllWindowIds(workspace: $0) }.toSet(),
     )

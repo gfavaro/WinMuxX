@@ -396,11 +396,11 @@ final class MacApp: AbstractApp {
         }
     }
 
-    /// Upper bound on how long one app may hold up the window-refresh barrier. A CPU-starved
+    /// Cooperative cancellation deadline for one app's window refresh. A CPU-starved
     /// app answers each AX message only at the messaging timeout, so its enumeration can take
-    /// (windows × timeout); every other app's layout would wait behind it. On deadline the app
-    /// falls back to the model's current windows (equivalent to "nothing changed"), and a later
-    /// refresh reconciles once the app responds.
+    /// (windows × timeout); every other app's layout would wait behind it. Cancellation skips
+    /// remaining reads, then falls back to current model windows. An AX call already in flight
+    /// must finish or time out before the thread can acknowledge cancellation.
     private static let singleAppRefreshDeadline: Duration = .milliseconds(1500)
 
     @MainActor
@@ -531,9 +531,11 @@ final class MacApp: AbstractApp {
                 }
             }
 
+            try job.checkCancellation()
             windows.threadGuarded = alive
             return (Array(alive.keys), Array(dead.keys))
         }
+        try checkCancellation()
         windowsCount = alive.count
         for windowId in dead {
             setFrameJobs.removeValue(forKey: windowId)?.cancel()

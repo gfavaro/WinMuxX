@@ -7,8 +7,11 @@ final class DoubleSidedWindowController {
     static let shared = DoubleSidedWindowController()
     private var animationPanel: NSPanel?
     private let backdropPadding: CGFloat = 64
+    private let preparation = WindowFlipPreparation()
 
-    var isAnimating: Bool { animationPanel != nil }
+    var isAnimating: Bool { animationPanel != nil || preparation.isBusy }
+
+    func cancelPreparation() { preparation.cancel() }
 
     func flip(_ window: Window) {
         guard !isAnimating, TrayMenuModel.shared.isEnabled,
@@ -18,29 +21,26 @@ final class DoubleSidedWindowController {
               let other = group.children.compactMap({ $0 as? Window }).first(where: { $0 !== window }),
               let rect = window.lastAppliedLayoutPhysicalRect
         else { return }
-        let canAnimate = !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && CGPreflightScreenCaptureAccess()
-        let front = canAnimate ? snapshot(window.windowId) : nil
-        let back = canAnimate ? snapshot(other.windowId) : nil
-        if let front, let back,
-           let background = CGWindowListCreateImage(
-               CGRect(x: rect.topLeftX, y: rect.topLeftY, width: rect.width, height: rect.height)
-                   .insetBy(dx: -backdropPadding, dy: -backdropPadding),
-               .optionOnScreenBelowWindow, window.windowId, [.nominalResolution]
-           ) {
-            animate(front: front, back: back, background: background, rect: rect)
+        let canAnimate = config.animations.enabled && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && CGPreflightScreenCaptureAccess()
+        guard canAnimate else {
+            focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
+            return
         }
-        focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
-    }
-
-    private func snapshot(_ id: UInt32) -> CGImage? {
-        guard let image = CGWindowListCreateImage(
-            .null, .optionIncludingWindow, id, [.boundsIgnoreFraming, .nominalResolution]
-        ) else { return nil }
-        // Nominal resolution is one pixel per point. Trim the native one-point outline
-        // so it does not become a bright edge when the snapshot rotates.
-        let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
-        guard image.width > 2, image.height > 2 else { return image }
-        return image.cropping(to: bounds.insetBy(dx: 1, dy: 1))
+        let frontId = window.windowId, backId = other.windowId
+        let bounds = CGRect(x: rect.topLeftX, y: rect.topLeftY, width: rect.width, height: rect.height)
+        let padding = backdropPadding
+        preparation.begin(capture: {
+            try await WindowFlipCapture.shared.capture(front: frontId, back: backId, rect: bounds, padding: padding)
+        }) { [weak self, weak window, weak other, weak group] images in
+            guard let self, let window, let other, let group, TrayMenuModel.shared.isEnabled,
+                  group.usesDoubleSidedWindows, group.tabActiveWindow === window,
+                  other.nearestWindowTabGroup === group, window.nodeWorkspace?.isVisible == true else { return }
+            if let images, window.lastAppliedLayoutPhysicalRect == rect,
+               config.animations.enabled, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                self.animate(front: images.front, back: images.back, background: images.background, rect: rect)
+            }
+            focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
+        }
     }
 
     private func animate(front: CGImage, back: CGImage, background: CGImage, rect: Rect) {
@@ -48,6 +48,7 @@ final class DoubleSidedWindowController {
                            width: rect.width, height: rect.height)
             .insetBy(dx: -backdropPadding, dy: -backdropPadding)
         let panel = NSPanel(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
@@ -91,6 +92,9 @@ final class DoubleSidedWindowController {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(duration))
             panel.orderOut(nil)
+            panel.contentView?.layer?.removeAllAnimations()
+            panel.contentView = nil
+            panel.close()
             if animationPanel === panel { animationPanel = nil }
         }
     }

@@ -13,9 +13,13 @@ protocol Command: WinMuxAny, Equatable, Sendable {
     /// Some commands fully update the in-memory model and only need the light-session layout/UI pass.
     /// Native macOS state transitions or arbitrary side effects should keep the follow-up full refresh.
     var canSkipPostCommandRefresh: Bool { get }
+    /// Queries read the established model and do not run layout/UI/persistence passes.
+    var isQuery: Bool { get }
 }
 
 extension Command {
+    var isQuery: Bool { false }
+
     static func == (lhs: Self, rhs: Self) -> Bool {
         return lhs.args.equals(rhs.args)
     }
@@ -97,7 +101,7 @@ extension [Command] {
             try WindowDetectionOperations.current?.check()
             let commandSucc = try await command.run(env, io)
             isSucc = commandSucc && isSucc
-            refreshModel()
+            if !command.isQuery { refreshModel() }
             if commandSucc && command.shouldResetClosedWindowsCache {
                 syncClosedWindowsCacheToCurrentWorld()
             }

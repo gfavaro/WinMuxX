@@ -167,6 +167,16 @@ func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: B
 }
 
 @MainActor
+func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
+                          isQuery: Bool, shouldSchedulePostRefresh: Bool,
+                          body: @MainActor () async throws -> T) async throws -> T {
+    if isQuery {
+        return try await AXReadBudget.$current.withValue(AXReadBudget(), operation: body)
+    }
+    return try await runLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
+}
+
+@MainActor
 func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
                        shouldSchedulePostRefresh: Bool = true,
                        body: @MainActor () async throws -> T) async throws -> T {
@@ -297,6 +307,17 @@ private func performLightSession<T>(
     // follow-up session in the middle of this light session. The post-refresh scheduled at
     // the end of the light session (or any later event) picks the pending request up instead.
     activeScheduledRefreshGeneration += 1
+    let generation = activeScheduledRefreshGeneration
+    // Errors and cancellation must also drain interrupted native work. A newer
+    // session owns its own completion and must not be disturbed by this one.
+    defer {
+        if activeScheduledRefreshGeneration == generation, activeRefreshTask == nil,
+           let pending = pendingRefreshRequest {
+            scheduleRefreshSession(pending.event,
+                optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
+                recordsActivation: false)
+        }
+    }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
     debugFocusLog("runLightSession begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
     return try await $refreshSessionEvent.withValue(event) {

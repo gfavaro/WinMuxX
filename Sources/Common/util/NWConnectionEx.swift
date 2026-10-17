@@ -4,6 +4,10 @@ import Foundation
 extension NWConnection {
     public func writeAtomic(_ msg: Codable, _ encoder: JSONEncoder = JSONEncoder()) async -> ((), error: NWError?) {
         let payload = Result { try encoder.encode(msg) }.getOrDie()
+        return await writeAtomicPayload(payload)
+    }
+
+    public func writeAtomicPayload(_ payload: Data) async -> ((), error: NWError?) {
         guard payload.count <= maximumIPCFrameBytes else { return ((), .posix(.EMSGSIZE)) }
         var data = withUnsafeBytes(of: UInt32(payload.count)) { Data($0) }
         check(data.count == 4)

@@ -1,5 +1,6 @@
 import Common
 import Foundation
+import os
 
 extension Thread {
     @discardableResult
@@ -51,21 +52,19 @@ private final class RunLoopAction: NSObject, Sendable {
     @objc func action() {
         if autoCheckCancelled && job.isCancelled { return }
         $refreshSessionEvent.withValue(_refreshSessionEvent) {
-            AXReadBudget.$current.withValue(readBudget) { _action(job) }
+            AXReadBudget.$current.withValue(readBudget) {
+                RunLoopJob.$current.withValue(job) { _action(job) }
+            }
         }
     }
 }
 
 final class RunLoopJob: Sendable, WinMuxAny {
-    // Alternative 1. In macOS 15, it's possible to use `Atomic<Bool>` from `Synchronization` module
-    // Alternative 2. https://github.com/apple/swift-atomics/tree/main but I don't want to add one more dependency just for
-    //                AtomicBool
-    nonisolated(unsafe) private var _isCancelled: Int32 = 0
-    var isCancelled: Bool { _isCancelled == 1 }
+    @TaskLocal static var current: RunLoopJob?
+    private let state = OSAllocatedUnfairLock(initialState: false)
+    var isCancelled: Bool { state.withLock { $0 } }
     func cancel() {
-        while !isCancelled {
-            OSAtomicCompareAndSwapInt(0, 1, &_isCancelled)
-        }
+        state.withLock { $0 = true }
     }
 
     static let cancelled: RunLoopJob = RunLoopJob().also { $0.cancel() }

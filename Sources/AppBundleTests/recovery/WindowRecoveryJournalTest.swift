@@ -23,6 +23,28 @@ final class WindowRecoveryJournalTest: XCTestCase {
         WindowRecoveryJournal(url: url, owner: owner, isOwnerAlive: { _ in isOwnerAlive })
     }
 
+    func testBatchPersistsAllOriginalsBeforeReturningWithOneWrite() throws {
+        var writes = 0
+        let store = WindowRecoveryJournal(url: url, owner: owner, write: { data, url in
+            writes += 1
+            try data.write(to: url, options: .atomic)
+        }, isOwnerAlive: { _ in false })
+        let entries = (1...100).map { id in
+            RecoveryWindowEntry(identity: .init(windowId: UInt32(id), pid: identity.pid,
+                bundleId: identity.bundleId, applicationLaunchDate: identity.applicationLaunchDate), originalFrame: frame)
+        }
+        store.record(entries)
+        XCTAssertEqual(writes, 1)
+        XCTAssertEqual(journal().entries.count, 100)
+        store.record(entries)
+        XCTAssertEqual(writes, 1)
+        for entry in entries.prefix(99) { store.forget(entry.identity, deferSave: true) }
+        XCTAssertEqual(writes, 1)
+        store.flushPendingChanges()
+        XCTAssertEqual(writes, 2)
+        XCTAssertEqual(journal().entries.count, 1)
+    }
+
     func testOriginalFrameIsPersistedBeforeMutationAndNotReplaced() throws {
         let store = journal()
         store.record(identity: identity, originalFrame: frame)

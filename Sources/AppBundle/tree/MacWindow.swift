@@ -79,7 +79,7 @@ final class MacWindow: Window {
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         window.recordAuthoritativeActualRect(rect)
         allWindowsMap[windowId] = window
-        WindowRecoveryController.shared.recordBeforeMutation(window, originalRect: rect)
+        WindowRecoveryController.shared.stageOriginalFrame(window, originalRect: rect)
 
         try await WindowDetectionOperations.shared.run(window) {
             window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)

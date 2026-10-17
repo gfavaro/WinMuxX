@@ -7,10 +7,26 @@ import QuartzCore
 final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
+    private var borderWindowIds = Set<UInt32>()
+    private let nativeRefresh = NativeWindowRefreshScheduler()
+    private var nativeBorderRefreshRequested = false
     private var movingBorders = WindowBorderMotionTracking()
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
     private(set) var missionControlWindowIds = Set<UInt32>()
+
+    func setEnabled(_ enabled: Bool) {
+        nativeRefresh.cancel()
+        nativeBorderRefreshRequested = false
+        if enabled {
+            // Native events were ignored while disabled; re-observe before
+            // motion/swipes consult the cached Mission Control state.
+            missionControlChanged(refreshBorders: true)
+        } else {
+            missionControlState = MissionControlBorderState()
+            clear()
+        }
+    }
 
     func startMissionControlMonitoring() {
         guard !isUnitTest else { return }
@@ -19,21 +35,23 @@ final class WindowBorderController {
                 let controller = WindowBorderController.shared
                 // Our own reshape/order notifications cannot change Mission Control.
                 // Scanning every border transaction creates a geometry feedback storm.
-                if controller.borders.values.contains(where: { $0.windowIds.contains(windowId) && windowId != 0 }) { return }
+                guard TrayMenuModel.shared.isEnabled else { return }
+                if windowId != 0, controller.borderWindowIds.contains(windowId) { return }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),
                    controller.borders[windowId] != nil {
                     controller.windowGeometryChanged(windowId)
                     return
                 }
-                controller.missionControlChanged()
-                // Native geometry/reorder events finish the overview animation
-                // even when AX doesn't report its intermediate/final frames.
-                // Ignore our border ids to avoid transaction feedback loops.
-                if !controller.missionControlState.active,
-                   MacWindow.allWindowsMap[windowId] != nil,
+                if MacWindow.allWindowsMap[windowId] != nil,
                    [UInt32(723), 806, 807, 808].contains(event) {
-                    controller.refresh()
+                    controller.nativeBorderRefreshRequested = true
+                }
+                controller.nativeRefresh.request { [weak controller] in
+                    guard let controller, TrayMenuModel.shared.isEnabled else { return }
+                    let refreshBorders = controller.nativeBorderRefreshRequested
+                    controller.nativeBorderRefreshRequested = false
+                    controller.missionControlChanged(refreshBorders: refreshBorders)
                 }
             }
         }) {
@@ -42,13 +60,20 @@ final class WindowBorderController {
         missionControlChanged()
     }
 
-    func missionControlChanged() {
+    func missionControlChanged(refreshBorders: Bool = false) {
         guard !isUnitTest else { return }
         // Include ordered-out windows so exit notifications are subscribed too.
         let all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        var bundles: [pid_t: String] = [:]
+        func bundleIdentifier(_ pid: pid_t) -> String? {
+            if let bundle = bundles[pid] { return bundle.isEmpty ? nil : bundle }
+            let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
+            bundles[pid] = bundle ?? ""
+            return bundle
+        }
         let ids = Set(all.compactMap { entry -> UInt32? in
             guard let pid = entry[kCGWindowOwnerPID as String] as? NSNumber,
-                  NSRunningApplication(processIdentifier: pid.int32Value)?.bundleIdentifier == "com.apple.WindowManager",
+                  bundleIdentifier(pid.int32Value) == "com.apple.WindowManager",
                   let id = entry[kCGWindowNumber as String] as? NSNumber else { return nil }
             return id.uint32Value
         })
@@ -59,9 +84,14 @@ final class WindowBorderController {
         }
         let onscreen = all.filter { ($0[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true }
         let active = isMissionControlVisible(onscreen, screenSizes: NSScreen.screens.map { $0.frame.size },
-            bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier })
-        guard let transition = missionControlState.update(active: active) else { return }
-        if transition { WindowMotion.shared.finishAll(); clear() } else { refresh() }
+            bundleIdentifierForPID: bundleIdentifier)
+        let transition = missionControlState.update(active: active)
+        if transition == true {
+            WindowMotion.shared.finishAll()
+            clear()
+        } else if !active, transition != nil || refreshBorders {
+            refresh(nativeSnapshot: onscreen)
+        }
     }
     func windowGeometryChanged(_ windowId: UInt32) {
         guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
@@ -86,37 +116,53 @@ final class WindowBorderController {
         guard winmux_window_frame(windowId, &frame) else { return }
         border.update(frame: frame, active: focus.windowOrNil?.windowId == windowId, settings: config.windowBorders)
     }
-    func refresh() {
+    func refresh(nativeSnapshot: [[String: Any]]? = nil) {
         guard !isUnitTest else { return }
         guard !missionControlState.active else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }
-        let native = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+        let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
         guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else { clear(); return }
         var frames: [UInt32: CGRect] = [:]
-        for entry in native { guard let n = entry[kCGWindowNumber as String] as? NSNumber, let b = entry[kCGWindowBounds as String] as? NSDictionary, let f = CGRect(dictionaryRepresentation: b) else { continue }; frames[n.uint32Value] = f }
+        for entry in native {
+            guard let number = entry[kCGWindowNumber as String] as? NSNumber,
+                  let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+                  let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
+            frames[number.uint32Value] = frame
+        }
         var visible = Set<UInt32>()
-        for workspace in Workspace.all where workspace.isVisible { for window in workspace.allLeafWindowsRecursive {
-            if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
-            guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen, let nf = frames[window.windowId], nf.width > 0, nf.height > 0 else { continue }
-            visible.insert(window.windowId)
-            // CGWindowList reports the transformed overview thumbnail during
-            // Mission Control exit. SkyLight bounds retain the actual frame.
-            var nativeFrame = CGRect.zero
-            let hasNativeFrame = winmux_window_frame(window.windowId, &nativeFrame)
-            let f = resolvedWindowBorderFrame(snapshot: nf, nativeFrame: hasNativeFrame ? nativeFrame : nil)
-            let border = borders[window.windowId] ?? WindowBorder(target: window.windowId); borders[window.windowId] = border
-            border.update(frame: f, active: focus.windowOrNil?.windowId == window.windowId, settings: settings)
-        }}
+        for workspace in Workspace.all where workspace.isVisible {
+            for window in workspace.allLeafWindowsRecursive {
+                if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
+                guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen,
+                      let snapshot = frames[window.windowId], snapshot.width > 0, snapshot.height > 0 else { continue }
+                visible.insert(window.windowId)
+                // Overview thumbnails can have transformed bounds; native bounds
+                // retain the application's actual frame throughout the transition.
+                var nativeFrame = CGRect.zero
+                let hasNativeFrame = winmux_window_frame(window.windowId, &nativeFrame)
+                let frame = resolvedWindowBorderFrame(snapshot: snapshot, nativeFrame: hasNativeFrame ? nativeFrame : nil)
+                let border = borders[window.windowId] ?? WindowBorder(target: window.windowId)
+                borders[window.windowId] = border
+                border.update(frame: frame, active: focus.windowOrNil?.windowId == window.windowId, settings: settings)
+            }
+        }
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
+        borderWindowIds = Set(borders.values.flatMap(\.windowIds))
     }
     func clear() {
         movingBorders = WindowBorderMotionTracking()
         DisplayRefreshDriver.shared.remove(owner: self)
         borders.values.forEach { $0.destroy() }
         borders.removeAll()
+        borderWindowIds.removeAll()
     }
-    func remove(windowId: UInt32) { borders.removeValue(forKey: windowId)?.destroy() }
+    func remove(windowId: UInt32) {
+        if let border = borders.removeValue(forKey: windowId) {
+            borderWindowIds.subtract(border.windowIds)
+            border.destroy()
+        }
+    }
 }
 
 /// A short lease keeps tracking alive between drag notifications, then stops at rest.

@@ -79,6 +79,7 @@ enum GlobalObserver {
     private static func onKeyDown(_ event: NSEvent) {
         runOnMainActor {
             WorkspaceSwipeController.shared.cancelVisualInteraction()
+            DoubleSidedWindowController.shared.cancelPreparation()
             noteTapBindingKeyDown()
         }
     }
@@ -99,7 +100,10 @@ enum GlobalObserver {
         let screenPoint = NSEvent.mouseLocation
         let point = normalizeAppKitScreenPoint(screenPoint)
         runOnMainActor {
-            if isClick { WorkspaceSwipeController.shared.cancelVisualInteraction() }
+            if isClick {
+                WorkspaceSwipeController.shared.cancelVisualInteraction()
+                DoubleSidedWindowController.shared.cancelPreparation()
+            }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
@@ -124,13 +128,15 @@ enum GlobalObserver {
     private static func scheduleFocusFollowsMouse(point: CGPoint, timestamp: TimeInterval) {
         guard TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
               !isMouseManipulationActive,
-              let window = point.findIn(tree: focus.workspace.rootTilingContainer, virtual: false),
-              window.participatesInWorkspaceFocus,
-              window != focus.windowOrNil else {
+              let window = pointerFocusCandidate(at: point),
+              window.participatesInWorkspaceFocus else {
             cancelFocusFollowsMouse()
             return
         }
-        _ = FocusFollowsMouseController.shared.notePointer(windowId: window.windowId, point: point, timestamp: timestamp)
+        let controller = FocusFollowsMouseController.shared
+        let previous = controller.candidate
+        _ = controller.notePointer(windowId: window.windowId, point: point, timestamp: timestamp)
+        if previous == controller.candidate, focusFollowsMouseTask != nil { return }
         focusFollowsMouseTask?.cancel()
         let dwell = max(config.focusFollowsMouseDwell, 0)
         focusFollowsMouseTask = Task { @MainActor in
@@ -138,13 +144,16 @@ enum GlobalObserver {
             guard !Task.isCancelled, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive,
                   !isLeftMouseButtonDown,
-                  let target = Window.get(byId: window.windowId), target.nodeWorkspace == focus.workspace,
-                  target.participatesInWorkspaceFocus,
                   let ready = FocusFollowsMouseController.shared.isReady(dwell: Double(dwell) / 1000, timestamp: ProcessInfo.processInfo.systemUptime),
                   ready == window.windowId else { return }
+            let id = await PointerFocusNativeHitTester.shared.windowId(at: point)
+            guard !Task.isCancelled, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+                  !isMouseManipulationActive, !isLeftMouseButtonDown,
+                  let target = pointerFocusTarget(at: point, frontmostWindowId: id),
+                  target != focus.windowOrNil else { return }
             _ = target.focusWindow()
             target.nativeFocus()
-            FocusFollowsMouseController.shared.markFocused(window.windowId)
+            FocusFollowsMouseController.shared.markFocused(target.windowId)
         }
     }
 

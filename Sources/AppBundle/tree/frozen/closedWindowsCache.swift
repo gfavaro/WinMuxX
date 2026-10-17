@@ -1,6 +1,6 @@
 import AppKit
 
-struct FrozenMonitor: Codable, Sendable {
+struct FrozenMonitor: Codable, Equatable, Sendable {
     let displayUUID: String?
     let topLeftCorner: CGPoint
     let visibleWorkspace: String
@@ -24,7 +24,7 @@ struct FrozenMonitor: Codable, Sendable {
     }
 }
 
-struct FrozenWorkspace: Codable, Sendable {
+struct FrozenWorkspace: Codable, Equatable, Sendable {
     let name: String
     let projectId: WorkspaceProjectId
     let namingStyle: WorkspaceNamingStyle
@@ -45,12 +45,21 @@ struct FrozenWorkspace: Codable, Sendable {
         case macosUnconventionalWindows
     }
 
-    @MainActor init(_ workspace: Workspace) {
+    @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
         name = workspace.name
         projectId = workspace.projectId
         namingStyle = workspace.namingStyle
         displayIndex = workspace.usesAutomaticDisplayName ? automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focus.workspace) : nil
         monitor = FrozenMonitor(workspace.workspaceMonitor)
+        if let window {
+            let frozen = FrozenWindow(window)
+            let floating = window.parent is Workspace
+            let tiled = window.parent is TilingContainer
+            rootTilingNode = FrozenContainer(assignment: tiled ? frozen : nil, in: workspace.rootTilingContainer)
+            floatingWindows = floating ? [frozen] : []
+            macosUnconventionalWindows = !floating && !tiled ? [frozen] : []
+            return
+        }
         rootTilingNode = FrozenContainer(workspace.rootTilingContainer)
         floatingWindows = workspace.floatingWindows.map(FrozenWindow.init)
         macosUnconventionalWindows =

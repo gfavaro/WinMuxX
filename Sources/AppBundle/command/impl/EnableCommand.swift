@@ -23,11 +23,12 @@ struct EnableCommand: Command {
             return !args.failIfNoop
         }
         TrayMenuModel.shared.isEnabled = newState
+        WindowBorderController.shared.setEnabled(newState)
         if newState { WindowRecoveryController.shared.resumeTiling() }
         if !newState {
             runtime.displays.displayChangeTask?.cancel()
             WindowMotion.shared.cancelAll()
-            WindowBorderController.shared.clear()
+            DoubleSidedWindowController.shared.cancelPreparation()
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()
             WorkspaceSwipeController.shared.reset()

@@ -7,6 +7,7 @@ final class WindowRecoveryController {
     private var journal: WindowRecoveryJournal?
     private var didInitialize = false
     private var initializationError: String?
+    private var stagedOriginals: [UInt32: RecoveryWindowEntry] = [:]
     private(set) var isRecovering = false
     private(set) var isGeometryPaused = false
 
@@ -45,16 +46,28 @@ final class WindowRecoveryController {
                                       bundleId: window.macApp.rawAppBundleId, applicationLaunchDate: launchDate)
     }
 
-    func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
+    func stageOriginalFrame(_ window: MacWindow, originalRect: Rect?) {
         guard TrayMenuModel.shared.isEnabled, !isRecovering, window.nodeWorkspace != nil,
               let rect = originalRect, let identity = identity(for: window) else { return }
+        guard journal?.entries[window.windowId]?.identity != identity else { return }
+        guard stagedOriginals[window.windowId]?.identity != identity else { return }
+        stagedOriginals[window.windowId] = RecoveryWindowEntry(identity: identity,
+            originalFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+    }
+
+    func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
+        guard TrayMenuModel.shared.isEnabled, !isRecovering else { return }
+        stageOriginalFrame(window, originalRect: originalRect)
+        guard !stagedOriginals.isEmpty else { journal?.retryFailedSaveIfNeeded(); return }
         initializeIfNeeded()
-        journal?.record(identity: identity, originalFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+        journal?.record(Array(stagedOriginals.values))
+        stagedOriginals.removeAll(keepingCapacity: true)
     }
 
     func forget(_ window: MacWindow) {
         guard let identity = identity(for: window) else { return }
-        journal?.forget(identity)
+        if stagedOriginals[window.windowId]?.identity == identity { stagedOriginals[window.windowId] = nil }
+        journal?.forget(identity, deferSave: true)
     }
 
     var recoverableEntries: [RecoveryWindowEntry] {

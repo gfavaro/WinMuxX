@@ -44,10 +44,15 @@ final class WindowRecoveryJournal {
     private(set) var lastError: String?
     private(set) var canWrite = true
     private var lastSaveAttempt = Date.distantPast
+    private var pendingSave: Task<Void, Never>?
+    private let write: (Data, URL) throws -> Void
 
-    init(url: URL, owner: RecoveryJournalOwner, isOwnerAlive: (RecoveryJournalOwner) -> Bool) {
+    init(url: URL, owner: RecoveryJournalOwner,
+         write: @escaping (Data, URL) throws -> Void = { try $0.write(to: $1, options: .atomic) },
+         isOwnerAlive: (RecoveryJournalOwner) -> Bool) {
         self.url = url
         self.owner = owner
+        self.write = write
         guard FileManager.default.fileExists(atPath: url.path) else { return }
         do {
             let file = try JSONDecoder().decode(RecoveryJournalFile.self, from: Data(contentsOf: url))
@@ -78,16 +83,22 @@ final class WindowRecoveryJournal {
     /// Persist synchronously before the first frame write, not after a debounce that a crash
     /// could interrupt. Keep the original frame across repeated layout passes and restarts.
     func record(identity: RecoveryWindowIdentity, originalFrame: CGRect) {
+        record([RecoveryWindowEntry(identity: identity, originalFrame: originalFrame)])
+    }
+
+    /// Flush all staged originals together before the first corresponding native
+    /// mutation. Existing entries keep their original frame.
+    func record(_ originals: [RecoveryWindowEntry]) {
         guard canWrite else { return }
-        if let existing = entries[identity.windowId], existing.identity == identity {
-            if lastError != nil, Date().timeIntervalSince(lastSaveAttempt) >= 1 { save() }
-            return
+        var changed = false
+        for entry in originals where entry.hasValidFrame {
+            let id = entry.identity.windowId
+            guard entries[id]?.identity != entry.identity else { continue }
+            carriedIds.remove(id)
+            entries[id] = entry
+            changed = true
         }
-        let entry = RecoveryWindowEntry(identity: identity, originalFrame: originalFrame)
-        guard entry.hasValidFrame else { return }
-        carriedIds.remove(identity.windowId)
-        entries[identity.windowId] = entry
-        save()
+        if changed || (lastError != nil && Date().timeIntervalSince(lastSaveAttempt) >= 1) { save() }
     }
 
     func recoverableEntries(liveIdentities: [RecoveryWindowIdentity]) -> [RecoveryWindowEntry] {
@@ -98,12 +109,29 @@ final class WindowRecoveryJournal {
         }
     }
 
-    func forget(_ identity: RecoveryWindowIdentity) {
+    func forget(_ identity: RecoveryWindowIdentity, deferSave: Bool = false) {
         guard canWrite, entries[identity.windowId]?.identity == identity else { return }
         entries.removeValue(forKey: identity.windowId)
         carriedIds.remove(identity.windowId)
-        save()
+        if deferSave {
+            guard pendingSave == nil else { return }
+            pendingSave = Task { @MainActor [weak self] in
+                do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
+                guard !Task.isCancelled else { return }
+                self?.save()
+            }
+        } else { save() }
     }
+
+    func flushPendingChanges() {
+        if pendingSave != nil { save() }
+    }
+
+    func retryFailedSaveIfNeeded() {
+        if lastError != nil, Date().timeIntervalSince(lastSaveAttempt) >= 1 { save() }
+    }
+
+    isolated deinit { pendingSave?.cancel() }
 
     /// A clean quit doesn't need crash recovery for this session. Unresolved entries from
     /// an older crash remain available, including failures or disconnected displays.
@@ -114,6 +142,8 @@ final class WindowRecoveryJournal {
     }
 
     private func save() {
+        pendingSave?.cancel()
+        pendingSave = nil
         guard canWrite else { return }
         lastSaveAttempt = Date()
         do {
@@ -123,7 +153,7 @@ final class WindowRecoveryJournal {
                 try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 let file = RecoveryJournalFile(version: 1, sessionId: sessionId, owner: owner,
                                                entries: entries.values.sorted { $0.identity.windowId < $1.identity.windowId })
-                try JSONEncoder().encode(file).write(to: url, options: .atomic)
+                try write(JSONEncoder().encode(file), url)
             }
             lastError = nil
         } catch {

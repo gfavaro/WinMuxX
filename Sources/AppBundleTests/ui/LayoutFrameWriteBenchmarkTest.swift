@@ -46,8 +46,8 @@ final class LayoutFrameWriteBenchmarkTest: XCTestCase {
         )
         print("LAYOUT_FRAME_BENCHMARK \(result.json)")
 
-        XCTAssertGreaterThanOrEqual(BenchmarkFrameWindow.frameWriteCount, windowCount)
-        XCTAssertLessThanOrEqual(BenchmarkFrameWindow.frameWriteCount, windowCount * iterations)
+        let expectedWrites = event.canReuseLastAppliedWindowFrames ? windowCount : windowCount * iterations
+        XCTAssertEqual(BenchmarkFrameWindow.frameWriteCount, expectedWrites)
     }
 }
 

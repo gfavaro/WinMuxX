@@ -3,6 +3,7 @@ import Common
 import Foundation
 
 struct AgentCommand: Command {
+    var isQuery: Bool { args.subcommand.val != .apply }
     let args: AgentCmdArgs
     var shouldResetClosedWindowsCache: Bool { args.subcommand.val == .apply }
     var canSkipPostCommandRefresh: Bool { args.subcommand.val != .apply }

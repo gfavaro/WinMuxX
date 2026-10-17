@@ -124,7 +124,7 @@ final class DoubleSidedWindowGesture {
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &focused) == .success,
               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID(),
-              let id = (focused as! AXUIElement).containingWindowId(),
+              let id = (focused as! AXUIElement).containingWindowIdWithError(timeout: 0.05).windowId,
               let window = Window.get(byId: id),
               let group = window.nearestWindowTabGroup,
               group.usesDoubleSidedWindows, group.tabActiveWindow === window

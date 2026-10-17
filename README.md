@@ -178,7 +178,9 @@ and native fullscreen/minimized windows, and retains failed entries for another 
 **Enabled** back on to resume tiling. The recovery journal is separate from the saved managed layout.
 
 Workspace assignments are also saved during use (with a one-second delay) and on
-normal quit. Restarting WinMuxX or updating it preserves workspace names, projects
+normal quit. Routine saves use a bounded background writer and skip unchanged
+snapshots; normal quit waits for the final snapshot. Restarting WinMuxX or updating
+it preserves workspace names, projects
 and automatic display numbers. Existing windows are verified against their app
 and process launch; after an app or computer restart, matching prefers the document
 URL and AX window identifier exposed by the app. A unique nonempty title is the
@@ -345,6 +347,9 @@ the strip for two-window groups when enabled; three or more windows continue to
 use tabs. Option-click or Option-Tab flips between the two sides. This preference
 requires Show tab strips and Screen Recording access, and respects Reduce Motion.
 Tab chrome follows the sidebar's glass or solid style.
+
+Flip images are captured off the main thread at a bounded resolution. If capture
+is not ready within 80 ms, the window switches without a delayed animation.
 
 <a id="managed-tiling-mode"></a>
 
