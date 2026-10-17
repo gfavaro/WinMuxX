@@ -82,6 +82,9 @@ private let testMonitor = MonitorImpl(
 /// Native lookup remains available off-main; only main-actor access uses runtime caches.
 @MainActor
 final class MonitorState {
+    var changes = DisplayChangeTracker()
+    var displayHookPending = false
+    var displayChangeTask: Task<Void, Never>?
     private(set) var overrideForTests: [Monitor]?
     private var cached: [Monitor]?
     private var mainCache: Monitor?
@@ -102,6 +105,7 @@ final class MonitorState {
     }
 
     isolated deinit {
+        displayChangeTask?.cancel()
         if let observer { notifications.removeObserver(observer) }
     }
 

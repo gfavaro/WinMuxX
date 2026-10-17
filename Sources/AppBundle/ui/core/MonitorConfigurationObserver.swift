@@ -10,6 +10,7 @@ final class MonitorConfigurationObserver {
     private init() {}
 
     func prepareForStartup() {
+        runtime.displays.changes.seed(displayTopologyIdentities(monitors))
         refreshMonitorPolicy(refreshReason: "MonitorConfigurationObserver.prepareForStartup")
     }
 
@@ -27,6 +28,7 @@ final class MonitorConfigurationObserver {
     }
 
     private func handleScreenParametersChanged() {
+        runtime.displays.displayHookPending = false
         WindowMotion.shared.screensChanged()
         // AppKit can emit this notification while the display topology is still changing.
         // Refresh panels immediately, but wait for the settled pass before reconciling
@@ -54,6 +56,11 @@ final class MonitorConfigurationObserver {
             try? await Task.sleep(nanoseconds: 750_000_000)
             guard generation == screenChangeGeneration else { return }
             WindowMotion.shared.screensSettled()
+            if TrayMenuModel.shared.isEnabled {
+                runtime.displays.displayHookPending = true
+            } else {
+                runtime.displays.changes.seed(displayTopologyIdentities(monitors))
+            }
             refreshMonitorPolicy(refreshReason: "\(NSApplication.didChangeScreenParametersNotification.rawValue).settled")
         }
     }

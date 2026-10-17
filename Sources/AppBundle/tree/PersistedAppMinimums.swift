@@ -4,11 +4,13 @@ import AppKit
 @MainActor final class PersistedAppMinimums {
     static let shared = PersistedAppMinimums(defaults: .standard)
     private let defaults: UserDefaults
-    private let key = "confirmedAppMinimumSizes.v1"
+    private let key = "confirmedAppMinimumSizes.v2"
     private var sizes: [String: [Double]]
 
     init(defaults: UserDefaults) {
         self.defaults = defaults
+        // Earlier evidence could mistake a repeated grid snap for a minimum.
+        defaults.removeObject(forKey: "confirmedAppMinimumSizes.v1")
         sizes = defaults.dictionary(forKey: key) as? [String: [Double]] ?? [:]
     }
 

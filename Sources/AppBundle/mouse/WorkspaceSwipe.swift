@@ -35,7 +35,7 @@ struct WorkspaceSwipeDependencies {
                      !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress()
              }, reversed: { config.workspaceSwipe.reverseDirection }, navigate: { activate in
                  guard let token: RunSessionGuard = .isServerEnabled else { return false }
-                 return try await runLightSession(.globalObserver("workspaceSwipe"), token, body: activate)
+                 return try await runLightSession(.globalObserver("workspaceSwipe"), token, shouldSchedulePostRefresh: false, body: activate)
              }, navigationFailed: { error in
                  if TrayMenuModel.shared.isEnabled { scheduleRefreshSession(.globalObserver("workspaceSwipeInterrupted")) }
                  if !(error is CancellationError) { debugFocusLog("workspaceSwipe navigation failed: \(error)") }

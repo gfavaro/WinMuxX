@@ -348,7 +348,9 @@ extension AXUIElement: AxUiElementMock {
             switch AXUIElementCopyAttributeValue(self, attr.key as CFString, &raw) {
                 case .success: return .success(raw.flatMap(attr.getter))
                 case .noValue, .attributeUnsupported: return .success(nil)
-                case let error: return .failure(AXReadFailure(code: error))
+                case let error:
+                    AXWindowOperation.current?.record(error)
+                    return .failure(AXReadFailure(code: error))
             }
         }
         if let budget = AXReadBudget.current, let pid = axTaskLocalAppThreadToken?.pid { return budget.read(pid: pid, perform) }
@@ -363,6 +365,7 @@ extension AXUIElement: AxUiElementMock {
         defer { signposter.endInterval(#function, state) }
         guard let value = attr.setter(value) else { return false }
         let error = AXUIElementSetAttributeValue(self, attr.key as CFString, value)
+        AXWindowOperation.current?.record(error)
         if let pid { AXReadBudget.current?.record(error, pid: pid) }
         return error == .success
     }

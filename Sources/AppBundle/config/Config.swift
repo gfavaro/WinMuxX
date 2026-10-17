@@ -72,6 +72,7 @@ struct Config: ConvenienceCopyable {
     var onFocusChanged: [any Command] = []
     // var onFocusedWorkspaceChanged: [any Command] = []
     var onFocusedMonitorChanged: [any Command] = []
+    var onDisplayChanged: [any Command] = []
 
     var autoAddNewWindowsToTabGroup: Bool = false
     var singleWindowAlignment: SingleWindowAlignment = .center
@@ -81,6 +82,7 @@ struct Config: ConvenienceCopyable {
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
     var animations = AnimationsConfig()
+    var workspaceLayouts: [String: WorkspaceLayoutConfig] = [:]
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []

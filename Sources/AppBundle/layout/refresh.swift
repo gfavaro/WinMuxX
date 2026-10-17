@@ -161,6 +161,9 @@ func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: B
         try await performRefreshSession(event, layoutWorkspaces: layoutWorkspaces,
                                         optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
     }
+    // Settled topology work can coalesce with another native event. Its pending
+    // state belongs to the display owner, rather than the winning event's name.
+    if layoutWorkspaces, event.requiresWindowRefreshBarrier { runSettledDisplayChangeHook() }
 }
 
 @MainActor
@@ -281,6 +284,13 @@ private func performLightSession<T>(
     }
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
+    // Keep work that a native event already requested. A cheap command/swipe may
+    // skip its own follow-up, but must not lose an interrupted creation/wake pass.
+    if activeRefreshTask != nil, let event = activeScheduledRefreshEvent {
+        pendingRefreshRequest = pendingRefreshRequest.map {
+            (mergeRefreshEvents($0.event, event), $0.optimisticallyPreLayoutWorkspaces)
+        } ?? (event, false)
+    }
     activeRefreshTask?.cancel() // Give priority to runSession
     activeRefreshTask = nil
     // Invalidate the cancelled task's generation so its defer doesn't spawn a coalesced
@@ -320,7 +330,7 @@ private func performLightSession<T>(
                 await updateWorkspaceSidebarModel()
                 await updateWindowTabModel()
                 schedulePersistedFrozenWorldSave()
-                if shouldSchedulePostRefresh {
+                if shouldSchedulePostRefresh || pendingRefreshRequest != nil {
                     scheduleRefreshSession(event)
                 }
                 debugFocusLog("runLightSession end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focusBefore=\(focusBefore?.windowId.description ?? "nil") focusAfter=\(focusAfter?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")

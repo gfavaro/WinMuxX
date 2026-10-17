@@ -59,6 +59,9 @@ extension WindowDetectedCallback {
         if let appId = matcher.appId, appId != window.app.rawAppBundleId {
             return false
         }
+        if let regex = matcher.appIdRegex, !(window.app.rawAppBundleId ?? "").contains(regex) {
+            return false
+        }
         if let regex = matcher.appNameRegexSubstring, !(window.app.name ?? "").contains(regex) {
             return false
         }

@@ -161,6 +161,10 @@ extra container operations, utilities and maintenance tools stay in Settings or 
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
 
+Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
+rules, optional workspace layouts per display, settled display-change actions,
+and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).
+
 Run `winmuxx doctor` to inspect the loaded config path, file validation, effective default layout,
 permissions, monitors, potentially conflicting window managers and per-app accessibility latency.
 The report uses the same diagnostics generator as the app.

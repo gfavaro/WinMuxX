@@ -7,7 +7,7 @@ import Common
 func applyDwindleToExistingTiledWorkspaces() -> Bool {
     guard config.defaultRootContainerLayout == .dwindle else { return false }
     var changed = false
-    for workspace in Workspace.all {
+    for workspace in Workspace.all where config.workspaceLayouts[workspace.name]?.settings(on: workspace.workspaceMonitor).layout == nil {
         let root = workspace.rootTilingContainer
         if root.layout == .tiles {
             root.layout = .dwindle

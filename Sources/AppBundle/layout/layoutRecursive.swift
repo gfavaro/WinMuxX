@@ -4,6 +4,7 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
+        applyConfiguredLayout()
         if isEffectivelyEmpty { return }
         let rect = workspaceTilingRect(self)
         let context = LayoutContext(self)

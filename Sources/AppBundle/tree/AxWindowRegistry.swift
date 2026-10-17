@@ -18,8 +18,8 @@ extension [UInt32: AxWindow] {
         _ nsApp: NSRunningApplication,
         _ job: RunLoopJob,
     ) throws -> AxWindow? {
-        if let existing = self[id] { return existing }
-        if isLeftMouseButtonDown { return nil }
+        if let existing = self[id], CFEqual(existing.ax, axWindow) { return existing }
+        if isLeftMouseButtonDown { return self[id] }
 
         if let window = try AxWindow.new(windowId: id, axWindow, nsApp, job) {
             self[id] = window

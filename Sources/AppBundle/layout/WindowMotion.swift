@@ -79,6 +79,11 @@ final class WindowMotion: NSObject {
         }
     }
 
+    func cancelAll() {
+        for id in Array(jobs.keys) { cancel(id) }
+        for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }
+    }
+
     func finishAll() {
         for (id, target) in targets {
             MacWindow.allWindowsMap[id]?.setAxFrame(target.origin, target.size)

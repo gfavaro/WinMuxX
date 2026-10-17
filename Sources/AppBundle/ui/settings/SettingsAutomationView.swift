@@ -14,6 +14,7 @@ struct ShortcutAutomationSettingsView: View {
     @SettingsDraft("exec-on-workspace-change", load: { config.execOnWorkspaceChange.joined(separator: "\n") }) private var workspaceCommands: String
     @SettingsDraft("on-focus-changed", load: { config.onFocusChanged.map { $0.args.description }.joined(separator: "\n") }) private var focusCommands: String
     @SettingsDraft("on-focused-monitor-changed", load: { config.onFocusedMonitorChanged.map { $0.args.description }.joined(separator: "\n") }) private var monitorCommands: String
+    @SettingsDraft("on-display-changed", load: { config.onDisplayChanged.map { $0.args.description }.joined(separator: "\n") }) private var displayCommands: String
     @SettingsDraft("on-mode-changed", load: { config.onModeChanged.map { $0.args.description }.joined(separator: "\n") }) private var modeCommands: String
 
     var body: some View {
@@ -35,6 +36,7 @@ struct ShortcutAutomationSettingsView: View {
                 SettingsMultilineField("On workspace change", id: "exec-on-workspace-change", text: $workspaceCommands, help: "One command per line. Commands run after changing workspaces.", savedValue: config.execOnWorkspaceChange.joined(separator: "\n")) { onSaved in saveCommands("exec-on-workspace-change", workspaceCommands, onSaved: onSaved) }
                 SettingsMultilineField("On focus change", id: "on-focus-changed", text: $focusCommands, help: "One command per line. Commands run after the focused window changes.", savedValue: config.onFocusChanged.map { $0.args.description }.joined(separator: "\n")) { onSaved in saveCommands("on-focus-changed", focusCommands, onSaved: onSaved) }
                 SettingsMultilineField("On focused monitor change", id: "on-focused-monitor-changed", text: $monitorCommands, help: "One command per line. Commands run after the active display changes.", savedValue: config.onFocusedMonitorChanged.map { $0.args.description }.joined(separator: "\n")) { onSaved in saveCommands("on-focused-monitor-changed", monitorCommands, onSaved: onSaved) }
+                SettingsMultilineField("On display connect/disconnect", id: "on-display-changed", text: $displayCommands, help: "Runs after displays settle and workspaces are reassigned. Shell commands receive WINMUX_DISPLAYS and WINMUX_PREV_DISPLAYS.", savedValue: config.onDisplayChanged.map { $0.args.description }.joined(separator: "\n")) { onSaved in saveCommands("on-display-changed", displayCommands, onSaved: onSaved) }
                 SettingsMultilineField("On mode change", id: "on-mode-changed", text: $modeCommands, help: "One command per line. Commands run after a mode changes.", savedValue: config.onModeChanged.map { $0.args.description }.joined(separator: "\n")) { onSaved in saveCommands("on-mode-changed", modeCommands, onSaved: onSaved) }
             }
             SettingsSection("Startup") {

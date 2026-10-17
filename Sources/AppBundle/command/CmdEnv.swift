@@ -1,6 +1,7 @@
 import Common
 
 struct CmdEnv: ConvenienceCopyable {
+    var extraEnvironment: [String: String] = [:]
     var windowId: UInt32?
     var workspaceName: String?
 
@@ -13,7 +14,7 @@ struct CmdEnv: ConvenienceCopyable {
     }
 
     var asMap: [String: String] {
-        var result = [String: String]()
+        var result = extraEnvironment
         if let windowId {
             result[WINMUX_WINDOW_ID] = windowId.description
         }

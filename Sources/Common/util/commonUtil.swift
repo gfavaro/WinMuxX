@@ -101,6 +101,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     case socketServer(any CmdArgs)
     case resetManipulatedWithMouse
     case ax(String)
+    case onDisplayChanged
     case onFocusedMonitorChanged
     case onFocusChanged
     case onModeChanged
@@ -117,10 +118,10 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .ax(let notif):
                 notif == kAXFocusedWindowChangedNotification as String
             case .globalObserver(let notif):
-                notif == NSWorkspace.didActivateApplicationNotification.rawValue
+                notif == NSWorkspace.didActivateApplicationNotification.rawValue || notif == "workspaceSwipe"
             case .hotkeyBinding, .menuBarButton, .socketServer, .onModeChanged:
                 true
-            case .onFocusedMonitorChanged, .onFocusChanged, .onTabSwitched:
+            case .onDisplayChanged, .onFocusedMonitorChanged, .onFocusChanged, .onTabSwitched:
                 true
             case .configAutoReload, .globalObserverLeftMouseUp, .startup, .workspaceRestoration,
                  .resetManipulatedWithMouse:
@@ -133,8 +134,8 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .ax(let notif):
                 notif != kAXFocusedWindowChangedNotification as String
             case .globalObserver(let notif):
-                notif != NSWorkspace.didActivateApplicationNotification.rawValue
-            case .onTabSwitched:
+                notif != NSWorkspace.didActivateApplicationNotification.rawValue && notif != "workspaceSwipe"
+            case .onDisplayChanged, .onTabSwitched:
                 false
             case .configAutoReload, .globalObserverLeftMouseUp, .menuBarButton, .hotkeyBinding,
                  .startup, .workspaceRestoration, .socketServer, .resetManipulatedWithMouse, .onFocusedMonitorChanged,
@@ -174,6 +175,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .socketServer(let args): "socketServer: \(args)"
             case .startup: "startup"
             case .workspaceRestoration: "workspaceRestoration"
+            case .onDisplayChanged: "onDisplayChanged"
             case .onFocusedMonitorChanged: "onFocusedMonitorChanged"
             case .onFocusChanged: "onFocusChanged"
             case .onModeChanged: "onModeChanged"

@@ -80,3 +80,8 @@ Dinky 0.12's selected-window raise already existed here. Activation context now 
 References: [classification](https://github.com/mikker/Dinky/blob/main/Sources/dinky/WindowRules.swift), [activation](https://github.com/mikker/Dinky/blob/main/Sources/dinky/ActivationFollower.swift). Manual Cmd-Tab/Dock checks with multiple windows and one/two monitors, Finder copy progress, Calculator and hidden-titlebar terminals remain pending.
 
 Historical validation: the then-current Swift suite passed (803 tests), followed by all nine focus regression tests including two added checks for superseding activation during refresh and native selection across workspaces. The Debug `WinMuxApp` product build and `git diff --check` passed. The runtime checks listed above have not been performed.
+
+## Dinky 0.19 follow-up
+
+Implementation and validation are tracked in [the 0.19 comparison](DINKY_019_ADOPTION.md).
+This preserves explicit workspace display moves and excludes scrolling/fixed grids.

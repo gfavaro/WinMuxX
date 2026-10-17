@@ -401,3 +401,28 @@ Only the built-in display was connected at this check. Doctor reported valid
 configuration, granted Accessibility/Screen Capture permissions and a listening
 raw-touch backend. Native Settings interaction remains manually unverified; the
 injected model/save-queue regression covers the first-rule save path.
+
+
+## Dinky 0.19 adoption (build 80)
+
+The final `make check` passed **1,102 Swift tests and 20 Python tests**, including
+19 new regressions. The comparison, decisions, configuration examples and limits
+are recorded in [DINKY_019_ADOPTION.md](DINKY_019_ADOPTION.md).
+
+The new tests cover Hyper/Meh duplicate detection and modifier-side filtering,
+case-insensitive bundle-ID rules and editor round trips, configured and empty
+exec environments, settled/coalesced topology hooks with scoped display counts,
+layout inheritance and display ownership, retained explicit command failures,
+disabled drag cleanup, legacy minimum evidence migration and single-retry AX
+recovery. Thirty navigations through the live session boundary schedule zero
+redundant post-refreshes; an interrupted native creation refresh still runs.
+These are operation-count assertions, not physical gesture latency measurements.
+
+Signed build 80 installed successfully. Strict/deep signature verification,
+config byte equality, window/workspace assignments, populated workspace display
+ownership/visibility and restored focus all passed. Doctor reported valid config,
+granted Accessibility/Screen Capture and a listening raw-touch backend. Only the
+built-in display was connected during installation validation. The bundled CLI
+alias resolved in a clean shell environment and queried the running server.
+Native Settings, Slack reopen, Terminal rounding and physical docking/swipe
+validation remain manual checks; no such result is claimed by the automated suite.

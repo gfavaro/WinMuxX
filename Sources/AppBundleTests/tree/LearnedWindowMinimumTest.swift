@@ -15,6 +15,10 @@ final class LearnedWindowMinimumTest: XCTestCase {
         minimum.observe(requested: CGSize(width: 200, height: 300),
                         first: CGSize(width: 400, height: 300),
                         confirmed: CGSize(width: 400, height: 300))
+        XCTAssertTrue(minimum.isEmpty)
+        minimum.observe(requested: CGSize(width: 220, height: 300),
+                        first: CGSize(width: 400, height: 300),
+                        confirmed: CGSize(width: 400, height: 300))
         XCTAssertEqual(minimum.size, CGSize(width: 400, height: 0))
     }
 
@@ -34,6 +38,9 @@ final class LearnedWindowMinimumTest: XCTestCase {
         minimum.observe(requested: CGSize(width: 200, height: 200),
                         first: CGSize(width: 400, height: 400),
                         confirmed: CGSize(width: 400, height: 400))
+        minimum.observe(requested: CGSize(width: 220, height: 220),
+                        first: CGSize(width: 400, height: 400),
+                        confirmed: CGSize(width: 400, height: 400))
         minimum.observe(requested: CGSize(width: 300, height: 300),
                         first: CGSize(width: 300, height: 300),
                         confirmed: CGSize(width: 300, height: 300))
@@ -46,10 +53,37 @@ final class LearnedWindowMinimumTest: XCTestCase {
         first.observe(requested: CGSize(width: 200, height: 200),
                       first: CGSize(width: 400, height: 400),
                       confirmed: CGSize(width: 400, height: 400))
+        first.observe(requested: CGSize(width: 220, height: 220),
+                      first: CGSize(width: 400, height: 400),
+                      confirmed: CGSize(width: 400, height: 400))
         XCTAssertTrue(second.isEmpty)
         first.observe(requested: CGSize(width: CGFloat.nan, height: 200),
                       first: CGSize(width: 900, height: 900),
                       confirmed: CGSize(width: 900, height: 900))
         XCTAssertEqual(first.size, CGSize(width: 400, height: 400))
     }
+    func testRepeatingSameRefusalNeverConfirmsMinimum() {
+        var minimum = LearnedWindowMinimum()
+        for _ in 0..<30 {
+            minimum.observe(requested: CGSize(width: 200, height: 200),
+                            first: CGSize(width: 400, height: 400),
+                            confirmed: CGSize(width: 400, height: 400))
+        }
+        XCTAssertTrue(minimum.isEmpty)
+        minimum.observe(requested: CGSize(width: 240, height: 240),
+                        first: CGSize(width: 400, height: 400),
+                        confirmed: CGSize(width: 400, height: 400))
+        XCTAssertEqual(minimum.size, CGSize(width: 400, height: 400))
+    }
+
+    func testGridRoundingFollowsRequestInsteadOfTeachingAnAppWideFloor() {
+        var minimum = LearnedWindowMinimum()
+        for requested in [200, 280, 360, 200, 280] {
+            minimum.observe(requested: CGSize(width: requested, height: 200),
+                            first: CGSize(width: requested + 40, height: 200),
+                            confirmed: CGSize(width: requested + 40, height: 200))
+        }
+        XCTAssertTrue(minimum.isEmpty)
+    }
+
 }

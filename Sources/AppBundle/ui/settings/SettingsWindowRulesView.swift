@@ -12,7 +12,7 @@ struct SettingsRuleRow: Identifiable, Equatable {
     init(id: Int, block: String) {
         self.id = id
         if let draft = try? SettingsRuleDraft(block: block) {
-            var parts = [draft.appId, draft.appRegex, draft.titleRegex].filter { !$0.isEmpty }
+            var parts = [draft.appId, draft.appIdRegex, draft.appRegex, draft.titleRegex].filter { !$0.isEmpty }
             if !draft.workspace.isEmpty { parts.append("Workspace " + draft.workspace) }
             if draft.timing != "any" { parts.append(draft.timing.capitalized) }
             matches = parts.isEmpty ? "Any window" : parts.joined(separator: " · ")
@@ -55,6 +55,7 @@ struct GuidedRuleActions: Equatable {
 
 struct SettingsRuleDraft: Equatable {
     var appId = ""
+    var appIdRegex = ""
     var appRegex = ""
     var titleRegex = ""
     var workspace = ""
@@ -68,6 +69,7 @@ struct SettingsRuleDraft: Equatable {
         }
         let match = row["if"]?.table
         appId = match?["app-id"]?.string ?? ""
+        appIdRegex = match?["app-id-regex"]?.string ?? ""
         appRegex = match?["app-name-regex-substring"]?.string ?? ""
         titleRegex = match?["window-title-regex-substring"]?.string ?? ""
         workspace = match?["workspace"]?.string ?? ""
@@ -81,6 +83,7 @@ struct SettingsRuleDraft: Equatable {
         var edits: [SettingsConfigEdit] = []
         for (key, value, old) in [
             ("app-id", appId, original.appId),
+            ("app-id-regex", appIdRegex, original.appIdRegex),
             ("app-name-regex-substring", appRegex, original.appRegex),
             ("window-title-regex-substring", titleRegex, original.titleRegex),
             ("workspace", workspace, original.workspace),
@@ -252,6 +255,7 @@ struct SettingsWindowRulesView: View {
             Form {
                 Section("Match windows") {
                     SettingsEditorField("App ID", prompt: "Any app", text: field(\.appId))
+                    SettingsEditorField("App ID regex", prompt: "Any bundle ID", text: field(\.appIdRegex))
                     Button("Choose app…") { chooseApp() }
                     SettingsEditorField("App name regex", prompt: "Any app name", text: field(\.appRegex))
                     SettingsEditorField("Window title regex", prompt: "Any window title", text: field(\.titleRegex))

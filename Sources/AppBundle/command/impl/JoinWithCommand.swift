@@ -11,8 +11,12 @@ struct JoinWithCommand: Command {
         guard let currentWindow = target.windowOrNil else {
             return io.err(noWindowIsFocused)
         }
+        guard currentWindow.parent is TilingContainer else {
+            return io.err("join-with does not support non-tiling windows")
+        }
         guard let (parent, ownIndex) = currentWindow.closestParent(hasChildrenInDirection: direction, withLayout: nil) else {
-            return io.err("No windows in the specified direction")
+            io.out("join-with: nothing to do")
+            return true
         }
         let joinWithTarget = parent.children[ownIndex + direction.focusOffset]
         let prevBinding = joinWithTarget.unbindFromParent()

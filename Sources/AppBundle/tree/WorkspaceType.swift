@@ -10,6 +10,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var restoredDisplayIndex: Int?
     var preferredMonitorPoint: CGPoint?
     var lifecycle: WorkspaceLifecycle = .durable
+    var lastConfiguredLayout: WorkspaceLayoutSettings?
 
     @MainActor
     private init(_ name: String) {

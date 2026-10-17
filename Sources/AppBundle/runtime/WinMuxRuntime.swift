@@ -39,6 +39,7 @@ final class WinMuxRuntime {
         precondition(isUnitTest)
         precondition(bound == nil, "Replace the fixture outside a scoped runtime binding")
         process.recovery.reset()
+        process.displays.displayChangeTask?.cancel()
         process.configuration.reloadScheduler?.cancelPending()
         process = WinMuxRuntime()
     }

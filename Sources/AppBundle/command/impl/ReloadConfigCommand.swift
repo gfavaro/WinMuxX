@@ -151,7 +151,8 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 @MainActor
 func applyUpdatedDwindleOrientation(previousOrientation: DefaultContainerOrientation) {
     guard isWinMuxRuntimeReady, previousOrientation != config.defaultRootContainerOrientation else { return }
-    for workspace in Workspace.all where workspace.rootTilingContainer.layout == .dwindle {
+    for workspace in Workspace.all where workspace.rootTilingContainer.layout == .dwindle &&
+        config.workspaceLayouts[workspace.name]?.settings(on: workspace.workspaceMonitor).orientation == nil {
         workspace.rootTilingContainer.dwindleOrientation = switch config.defaultRootContainerOrientation {
             case .auto: nil
             case .horizontal: .h

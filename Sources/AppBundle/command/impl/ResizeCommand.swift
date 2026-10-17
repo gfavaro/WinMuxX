@@ -37,9 +37,17 @@ struct ResizeCommand: Command {
                 selected = candidates.first { $0.orientation == candidates.first?.orientation.opposite }
         }
         guard let selected else {
+            guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
+            if window.parent is TilingContainer {
+                io.out("resize: nothing to do")
+                return true
+            }
             return io.err("resize command doesn't support floating windows yet https://github.com/nikitabobko/WinMux/issues/9")
         }
-        if case .dwindle(let split) = selected { return split.resize(args.units.val) }
+        if case .dwindle(let split) = selected {
+            if !split.resize(args.units.val) { io.out("resize: nothing to do") }
+            return true
+        }
         guard case .tiles(let node, let parent) = selected else { return false }
         let orientation = parent.orientation
         let requestedDiff: CGFloat = switch args.units.val {
@@ -49,7 +57,7 @@ struct ResizeCommand: Command {
         }
 
         let siblings = parent.children.filter { $0 != node }
-        guard !siblings.isEmpty else { return false }
+        guard !siblings.isEmpty else { io.out("resize: nothing to do"); return true }
         let siblingMultiplier = -CGFloat(1).div(siblings.count).orDie()
         let diff = constrainedTiledResizeDiff(
             requestedDiff,

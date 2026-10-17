@@ -27,7 +27,7 @@ var configurationReferenceSections: [ConfigurationReferenceSection] {
         .init(id: "workspace-swipe", title: "[workspace-swipe]", description: "Experimental raw-touch recognition: exactly three fingers, horizontal only. enabled opts in; reverse-direction swaps left/right. Finger-tracked previews navigate existing workspaces on the pointer display and stop at boundaries. Release past halfway to commit, otherwise cancel. animation-duration-ms controls settling (220 ms by default; zero disables visuals). Native macOS gestures should use another finger count.", defaults: "enabled = false, reverse-direction = false", example: "[workspace-swipe]\nenabled = false\nreverse-direction = false", pane: .windows),
         .init(id: "modifier-sides", title: "Modifier sides", description: "[modifiers] accepts alt, cmd, ctrl and shift with both, left or right. Applies to shortcut chords; modifier taps retain their explicit sides. The unused side passes through for normal typing.", defaults: "All modifiers use both sides.", example: "[modifiers]\nalt = 'left'"),
         .init(id: "padding", title: "tab-group-padding", description: "Root-level spacing for tab-group containers, in points. This is separate from window-tabs.height, which sets the tab strip height.", defaults: "\(defaults.tabGroupPadding)", example: "tab-group-padding = \(defaults.tabGroupPadding)"),
-        .init(id: "rules", title: "[[on-window-detected]]", description: "Match app-id, workspace, app-name-regex-substring, window-title-regex-substring or during-winmux-startup. Regex matches are case-insensitive. Rules run in file order; check-further-callbacks = true continues after a match. Restored windows keep their saved placement instead of replaying these rules.", defaults: "No rules; check-further-callbacks = false.", example: """
+        .init(id: "rules", title: "[[on-window-detected]]", description: "Match exact app-id, app-id-regex, workspace, app-name-regex-substring, window-title-regex-substring or during-winmux-startup. Regex matches are case-insensitive; every supplied condition must match. Rules run in file order; check-further-callbacks = true continues after a match. Restored windows keep their saved placement instead of replaying these rules.", defaults: "No rules; check-further-callbacks = false.", example: """
         [[on-window-detected]]
         if.app-id = 'com.apple.finder'
         check-further-callbacks = false
@@ -38,12 +38,19 @@ var configurationReferenceSections: [ConfigurationReferenceSection] {
         '1' = 'main'
         '2' = 'secondary'
         """),
+        .init(id: "workspace-layouts", title: "Per-display workspace layouts", description: "[workspace.<internal-name>] sets layout and orientation defaults. Nested display.<selector> tables override them on matching displays. Omitted keys inherit workspace/global defaults. Explicit selectors win over name regexes; longer regexes win, then lexical order. Manual commands survive refreshes until resolved settings change. These settings never relocate workspaces.", example: """
+        [workspace.1]
+        layout = 'dwindle'
+        [workspace.1.display.'Built-in']
+        layout = 'accordion'
+        orientation = 'vertical'
+        """),
         .init(id: "gaps", title: "Per-display gaps", description: "Each [gaps] value accepts a constant or an ordered list of display overrides followed by a fallback. Values are measured in points. Replace the existing key inside [gaps].", defaults: "See Appearance for the default inner and outer spacing.", example: """
         [gaps]
         inner.horizontal = [{ monitor.main = 4 }, 8]
         outer.left = [{ monitor.secondary = 12 }, 8]
         """, pane: .appearance),
-        .init(id: "keyboard", title: "[key-mapping] and shortcut modes", description: "Keyboard presets: qwerty, dvorak or colemak. [key-mapping.key-notation-to-key-code] adds custom key names. [mode.<name>.binding] defines command shortcuts and sequences; [mode.<name>.binding-tap] defines tap-only shortcuts.", defaults: "qwerty; no custom key mappings.", example: """
+        .init(id: "keyboard", title: "[key-mapping] and shortcut modes", description: "Keyboard presets: qwerty, dvorak or colemak. [key-mapping.key-notation-to-key-code] adds custom key names. [mode.<name>.binding] defines command shortcuts and sequences; hyper means alt-ctrl-cmd-shift and meh means alt-ctrl-shift; [mode.<name>.binding-tap] defines tap-only shortcuts.", defaults: "qwerty; no custom key mappings.", example: """
         [key-mapping]
         preset = 'qwerty'
 
@@ -57,14 +64,15 @@ var configurationReferenceSections: [ConfigurationReferenceSection] {
         [mode.main.binding]
         alt-shift-n = 'layout floating --for-next-detected-window'
         """, pane: .shortcuts),
-        .init(id: "automation", title: "Automation callbacks", description: "after-startup-command runs after startup. on-focus-changed, on-focused-monitor-changed and on-mode-changed run after the corresponding focus or mode changes. They accept a WinMuxX command or an array of commands. exec-on-workspace-change instead accepts an executable followed by its arguments.", defaults: "on-focused-monitor-changed = \(tomlStringArray(defaults.onFocusedMonitorChanged.map { $0.args.description }.joined(separator: "\n"))); other callbacks are empty.", example: """
+        .init(id: "automation", title: "Automation callbacks", description: "after-startup-command runs after startup. on-focus-changed, on-focused-monitor-changed and on-mode-changed run after the corresponding focus or mode changes. on-display-changed runs after a settled display topology change; shell commands receive WINMUX_DISPLAYS and WINMUX_PREV_DISPLAYS. They accept a WinMuxX command or an array of commands. exec-on-workspace-change instead accepts an executable followed by its arguments.", defaults: "on-focused-monitor-changed = \(tomlStringArray(defaults.onFocusedMonitorChanged.map { $0.args.description }.joined(separator: "\n"))); other callbacks are empty.", example: """
+        on-display-changed = []
         on-focus-changed = []
         on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
         on-mode-changed = []
         after-startup-command = []
         exec-on-workspace-change = []
         """, pane: .automation),
-        .init(id: "exec", title: "[exec] and [exec.env-vars]", description: "Commands inherit the app’s environment. When [exec] is omitted, PATH receives /opt/homebrew/bin:/opt/homebrew/sbin before the inherited PATH. Defining [exec] replaces that implicit configuration; add PATH explicitly to retain the prefix. Variables support ${NAME} interpolation.", defaults: "inherit-env-vars = true; Homebrew PATH prefix when [exec] is absent.", example: """
+        .init(id: "exec", title: "[exec] and [exec.env-vars]", description: "Commands inherit the app’s environment. When [exec] is omitted, PATH receives /opt/homebrew/bin:/opt/homebrew/sbin before the inherited PATH. Defining [exec] replaces that implicit configuration; add PATH explicitly to retain the prefix. Variables support ${NAME} interpolation. exec-and-forget prepends this app’s bundled CLI directory to PATH so hooks can call winmuxx after a Finder launch.", defaults: "inherit-env-vars = true; Homebrew PATH prefix when [exec] is absent.", example: """
         [exec]
         inherit-env-vars = true
 

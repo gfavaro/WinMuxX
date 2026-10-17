@@ -51,6 +51,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "after-login-command": Parser(\.afterLoginCommand, parseAfterLoginCommand),
     "after-startup-command": Parser(\.afterStartupCommand) { parseCommandOrCommands($0).toParsedToml($1) },
 
+    "on-display-changed": Parser(\.onDisplayChanged) { parseCommandOrCommands($0).toParsedToml($1) },
     "on-focus-changed": Parser(\.onFocusChanged) { parseCommandOrCommands($0).toParsedToml($1) },
     "on-mode-changed": Parser(\.onModeChanged) { parseCommandOrCommands($0).toParsedToml($1) },
     "on-focused-monitor-changed": Parser(\.onFocusedMonitorChanged) { parseCommandOrCommands($0).toParsedToml($1) },
@@ -103,6 +104,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "borders": Parser(\.windowBorders, parseWindowBorders),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
     "animations": Parser(\.animations, parseAnimations),
+    "workspace": Parser(\.workspaceLayouts, parseWorkspaceLayouts),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
 

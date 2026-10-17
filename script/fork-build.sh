@@ -40,6 +40,8 @@ fork_bin="$(swift build -c release --show-bin-path | tail -n 1)"
 test -d "$fork_bin"
 # macOS normally uses case-insensitive volumes: winmuxx would overwrite WinMuxX.
 ditto "$fork_bin/winmuxx" "$fork_app/Contents/MacOS/winmuxx-cli"
+mkdir -p "$fork_app/Contents/Helpers"
+ln -sfn ../MacOS/winmuxx-cli "$fork_app/Contents/Helpers/winmuxx"
 codesign --force --deep --sign "$fork_signing_identity" "$fork_app"
 codesign --verify --deep --strict "$fork_app"
 "$fork_app/Contents/MacOS/WinMuxX" --help | grep -q -- '--config-path'
