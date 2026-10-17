@@ -122,10 +122,17 @@ CI tests PRs and `main`; trusted `main` builds also upload the app ZIP as an art
 Signing import has a two-minute timeout. Hosted runners install certificate trust
 in the admin domain with passwordless, noninteractive `sudo -n`; user-domain trust
 can display a prompt and stall headless jobs. Both CI and release workflows call
-`script/cleanup-signing-identity.sh` even after failed/canceled imports. Cleanup
-tolerates absent trust entries, still attempts keychain deletion after trust errors,
-removes temporary certificate/archive files, and reports unexpected failures.
-Its regression tests use fake commands and synthetic files, never local keychains.
+`script/cleanup_signing_identity.py` even after failed/canceled imports. It is
+restricted to disposable GitHub-hosted runners. It deletes only our temporary
+keychain, certificate/archive and database sidecars. Keychain API deletion has a
+30-second timeout and direct file removal as fallback; inability to remove files
+still fails cleanup. Both workflows also bound the cleanup step to two minutes.
+
+`remove-trusted-cert` is deliberately avoided: it can hang even with sudo, as
+reported in [runner-images#12116](https://github.com/actions/runner-images/issues/12116).
+The remaining public trust metadata is discarded with the runner VM, whose disposal
+is documented in [GitHub's runner lifecycle](https://docs.github.com/en/actions/how-tos/manage-runners/github-hosted-runners/use-github-hosted-runners).
+Tests use fake commands and synthetic files, never local keychains.
 Bot-created synchronization PRs do not rely on the normal PR event: synchronization
 explicitly dispatches CI on its branch. Check that run in Actions before merging.
 If dispatch fails, run CI manually on that branch. GitHub Actions must be allowed

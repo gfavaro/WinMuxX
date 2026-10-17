@@ -1,77 +1,82 @@
-"""Run signing cleanup against fake commands, never the developer's keychains."""
+"""Signing cleanup tests use fake commands, never the developer's keychains."""
+import contextlib
+import io
 import os
 import pathlib
 import subprocess
+import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-SCRIPT = pathlib.Path(__file__).resolve().with_name("cleanup-signing-identity.sh")
+from script.cleanup_signing_identity import cleanup
+
+SCRIPT = pathlib.Path(__file__).resolve().with_name("cleanup_signing_identity.py")
 
 
 class SigningCleanupTests(unittest.TestCase):
-    def run_cleanup(self, *, trust="success", deletion="success", present=True):
+    def run_cleanup(self, *, deletion="success", present=True, partial=False, hosted=True):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             commands = root / "bin"
             commands.mkdir()
             security = commands / "security"
-            security.write_text('''#!/bin/bash
-printf '%s\\n' "$*" >> "$COMMAND_LOG"
-case "$1" in
-  remove-trusted-cert) outcome="$TRUST_RESULT" ;;
-  delete-keychain) outcome="$DELETE_RESULT" ;;
-  *) exit 99 ;;
-esac
-case "$outcome" in
-  missing) echo 'The specified item could not be found in the keychain.' >&2; exit 1 ;;
-  denied) echo 'Authorization was denied.' >&2; exit 1 ;;
-esac
-if [[ "$1" == delete-keychain ]]; then rm -f "$2"; fi
+            security.write_text('''#!/usr/bin/env python3
+import os, pathlib, sys, time
+with open(os.environ['COMMAND_LOG'], 'a') as log:
+    log.write(' '.join(sys.argv[1:]) + '\\n')
+if sys.argv[1] != 'delete-keychain': sys.exit(99)
+if os.environ['DELETE_RESULT'] == 'hang': time.sleep(10)
+if os.environ['DELETE_RESULT'] == 'denied':
+    print('Authorization was denied.', file=sys.stderr)
+    sys.exit(1)
+pathlib.Path(sys.argv[2]).unlink(missing_ok=True)
 ''')
             security.chmod(0o755)
-            sudo = commands / "sudo"
-            sudo.write_text('#!/bin/bash\n[[ "$1" == -n ]] || exit 99\nshift\nexec "$@"\n')
-            sudo.chmod(0o755)
-            names = ["winmuxx-signing.cer", "winmuxx-signing.keychain-db", "winmuxx-signing.p12"]
+            names = ["winmuxx-signing.cer", "winmuxx-signing.p12"]
+            if not partial:
+                names += ["winmuxx-signing.keychain-db", "winmuxx-signing.keychain-db-wal",
+                          "winmuxx-signing.keychain-db-shm"]
             if present:
                 for name in names:
                     (root / name).write_text("synthetic fixture")
             log = root / "commands.log"
             environment = {**os.environ, "RUNNER_TEMP": str(root),
+                           "RUNNER_ENVIRONMENT": "github-hosted" if hosted else "self-hosted",
                            "PATH": str(commands) + os.pathsep + os.environ["PATH"],
-                           "COMMAND_LOG": str(log), "TRUST_RESULT": trust, "DELETE_RESULT": deletion}
-            first = subprocess.run(["bash", str(SCRIPT)], env=environment, capture_output=True, text=True, timeout=5)
+                           "COMMAND_LOG": str(log), "DELETE_RESULT": deletion}
+            command = [sys.executable, str(SCRIPT), "--command-timeout", "0.2" if deletion == "hang" else "2"]
+            first = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
             calls = log.read_text().splitlines() if log.exists() else []
             remaining = [name for name in names if (root / name).exists()]
-            second = subprocess.run(["bash", str(SCRIPT)], env=environment, capture_output=True, text=True, timeout=5)
+            second = subprocess.run(command, env=environment, capture_output=True, text=True, timeout=5)
             return first, calls, remaining, second
 
-    def test_completed_import_is_cleaned_and_repeated_cleanup_is_harmless(self):
+    def test_completed_import_and_repeated_cleanup(self):
         first, calls, remaining, second = self.run_cleanup()
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertEqual(remaining, [])
-        self.assertEqual(len(calls), 2)
-        self.assertTrue(calls[0].startswith("remove-trusted-cert -d "))
-        self.assertTrue(calls[1].startswith("delete-keychain "))
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0].startswith("delete-keychain "))
         self.assertEqual(second.returncode, 0, second.stderr)
 
-    def test_missing_trust_after_interrupted_import_still_deletes_keychain(self):
-        first, calls, remaining, _ = self.run_cleanup(trust="missing")
+    def test_interrupted_import_removes_certificate_and_archive_without_trust_commands(self):
+        first, calls, remaining, _ = self.run_cleanup(partial=True)
         self.assertEqual(first.returncode, 0, first.stderr)
         self.assertEqual(remaining, [])
-        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls, [])
 
-    def test_unexpected_trust_error_does_not_skip_private_key_cleanup(self):
-        first, calls, remaining, _ = self.run_cleanup(trust="denied")
-        self.assertNotEqual(first.returncode, 0)
-        self.assertEqual(remaining, [])
-        self.assertEqual(len(calls), 2)
-        self.assertIn("Authorization was denied", first.stderr)
-
-    def test_keychain_failure_is_reported_but_certificate_and_archive_are_removed(self):
+    def test_keychain_api_failure_falls_back_to_removing_private_files(self):
         first, _, remaining, _ = self.run_cleanup(deletion="denied")
-        self.assertNotEqual(first.returncode, 0)
-        self.assertEqual(remaining, ["winmuxx-signing.keychain-db"])
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(remaining, [])
+        self.assertIn("::warning::", first.stdout)
+
+    def test_hung_keychain_api_is_bounded_and_private_files_are_removed(self):
+        first, _, remaining, _ = self.run_cleanup(deletion="hang")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        self.assertEqual(remaining, [])
+        self.assertIn("::warning::", first.stdout)
 
     def test_no_import_does_not_call_security(self):
         first, calls, remaining, second = self.run_cleanup(present=False)
@@ -79,6 +84,18 @@ if [[ "$1" == delete-keychain ]]; then rm -f "$2"; fi
         self.assertEqual(calls, [])
         self.assertEqual(remaining, [])
         self.assertEqual(second.returncode, 0)
+
+    def test_refuses_persistent_or_local_runners_without_touching_files(self):
+        first, calls, remaining, _ = self.run_cleanup(hosted=False)
+        self.assertNotEqual(first.returncode, 0)
+        self.assertEqual(calls, [])
+        self.assertEqual(len(remaining), 5)
+
+    def test_failure_to_remove_files_is_not_silenced(self):
+        with patch("pathlib.Path.exists", return_value=False), \
+             patch("pathlib.Path.unlink", side_effect=PermissionError("fixture denied")), \
+             contextlib.redirect_stderr(io.StringIO()):
+            self.assertNotEqual(cleanup(pathlib.Path("/synthetic-not-touched")), 0)
 
 
 if __name__ == "__main__":

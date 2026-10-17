@@ -65,4 +65,5 @@ jobs:
             --notes 'Personal fork build. Signed with the persistent WinMuxX identity, not notarized. Automatic updates are disabled.'
       - name: Remove signing keychain
         if: always()
-        run: bash script/cleanup-signing-identity.sh
+        timeout-minutes: 2
+        run: python3 script/cleanup_signing_identity.py
