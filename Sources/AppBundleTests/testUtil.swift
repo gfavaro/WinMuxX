@@ -34,6 +34,11 @@ func setUpWorkspacesForTests() {
             child.unbindFromParent()
         }
     }
+    // These roots have process lifetimes and are outside every workspace/runtime.
+    // Otherwise a minimized or popup test window survives into later fixtures.
+    for child in macosMinimizedWindowsContainer.children + macosPopupWindowsContainer.children {
+        child.unbindFromParent()
+    }
 
     WinMuxRuntime.replaceForTests()
     resetCachedWindowTitles()
