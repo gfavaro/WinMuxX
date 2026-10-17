@@ -33,8 +33,7 @@ These are the defaults and features maintained here:
 - Sidebar, tab groups and the switcher share glass or solid styling. Expanded glass
   surfaces use a frosted background.
 - Selecting a workspace already visible on another display focuses it there.
-  Sidebar clicks offer an explicit override; an unused override dismisses when
-  the pointer or focus leaves the workspace button.
+  Sidebar clicks on another display ask before bringing the workspace there.
 - Learned application minimum sizes constrain layouts. Borders use an AppKit
   fallback when the private renderer is unavailable.
 - The native menu includes diagnostics and recovery of original window frames
@@ -142,24 +141,37 @@ focused monitor and shows the label initial, or the workspace number when there
 is no label. Icon supports color or monochrome appearance. Both open the same
 native action menu. These choices persist locally, outside the TOML config.
 
+### Layout for the next window
+
+Run `winmuxx layout floating --for-next-detected-window` before opening a window
+(or use `tiling` instead of `floating`). This changes only the next newly detected
+normal window; existing windows keep their layout. The request applies once,
+overrides automatic layout rules, and a second request replaces the first.
+Popups, native fullscreen/minimized/hidden windows and windows restored from saved
+state do not consume it. The request stays in memory until used or WinMuxX quits.
+Only one `floating` or `tiling` argument is allowed, without `--window-id`.
+
 ### Menu-bar actions and diagnostics
 
-Click the WinMuxX menu-bar icon for window, layout, workspace, project and monitor actions.
+The tray menu follows Dinky’s everyday actions: workspace navigation and moves,
+Focus, Move Window, Join With, Resize, Layout, Fullscreen and Balance Sizes.
+Display and Mode menus appear only when there is more than one choice. Settings,
+Reload Config, Enabled and Quit remain directly accessible. Projects, tab controls,
+extra container operations, utilities and maintenance tools stay in Settings or the CLI.
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
-it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and
-key sequences are available under **Other Key Bindings** when not represented by a catalog action.
+it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
 
-Choose **Diagnostics…** to inspect the loaded config path, file validation, effective default layout,
+Run `winmuxx doctor` to inspect the loaded config path, file validation, effective default layout,
 permissions, monitors, potentially conflicting window managers and per-app accessibility latency.
-The window offers **Refresh** and **Copy Diagnostics**; `winmux doctor` uses the same report generator.
+The report uses the same diagnostics generator as the app.
 Checks do not change macOS preferences or stop other apps. Review local paths and app names before
 sharing a report. Upcoming improvements are tracked in [the roadmap](docs/ROADMAP.md).
 
 After an interrupted session, the menu can offer **Recover N Windows from Previous Session…**.
 Recovery pauses tiling and restores the original positions and sizes recorded before WinMux moved
 the windows. It validates the owning app's process and launch identity, skips disconnected displays
-and native fullscreen/minimized windows, and retains failed entries for another attempt. Choose
-**Enable** to resume tiling. The recovery journal is separate from the saved managed layout.
+and native fullscreen/minimized windows, and retains failed entries for another attempt. Turn
+**Enabled** back on to resume tiling. The recovery journal is separate from the saved managed layout.
 
 Workspace assignments are also saved during use (with a one-second delay) and on
 normal quit. Restarting WinMuxX or updating it preserves workspace names, projects
@@ -174,8 +186,10 @@ does not reopen apps or documents itself. During startup, available windows reco
 Tiled sizes follow saved layout proportions on the current monitor. Floating sizes
 and the manual width of a single tiled window are saved too; oversized floating
 windows fit the available screen, and fullscreen/minimized windows are not resized.
-Later arrivals recover their workspace without replaying old layouts over current
-user changes. State lives in `window-state.json` in the fork's Application Support
+For 30 seconds after startup, delayed windows from the same app process also
+recover their saved tree slots and split ratios, provided no layout-changing command,
+mouse edit, or unrelated new window has intervened. Later arrivals recover their
+workspace without replaying old layouts over current user changes. State lives in `window-state.json` in the fork's Application Support
 directory, with a previous valid snapshot as backup. Monitor matching uses display
 UUIDs when available, with coordinates as fallback for older snapshots. Deleted
 workspaces discard pending assignments, and late arrivals respect current project
@@ -196,6 +210,16 @@ Occupied workspaces count. Each project and active display retains its required
 workspace even with a minimum of zero. Existing empty slots are reused; missing
 slots are created in the default project without changing focus. Reducing the
 minimum allows excess empty slots to be collected.
+
+With an explicit minimum, saved restart assignments do not keep additional empty
+workspaces alive after startup. Only live windows, the minimum empty slots, and
+required display/project slots retain a workspace. Minimized and hidden windows
+still count as live windows.
+
+Restart restoration uses the latest saved placement of each window from a verified
+app process. Older copies of the same window do not compete with its current
+placement when its title changes. Window IDs from different process launches
+remain separate.
 
 Older configurations retain their named `persistent-workspaces` behavior until
 the quantity is saved in Settings. Saving replaces that list with
@@ -320,6 +344,16 @@ Tab chrome follows the sidebar's glass or solid style.
 
 <a id="managed-tiling-mode"></a>
 
+### Stacked layouts
+
+Stacked windows have two variants: **Tabbed** keeps the current tab strip and
+shows one window at a time; **Accordion** keeps overlapping windows visible with
+peeking edges, like AeroSpace. Choose either in Settings → Windows for new roots,
+or use `winmuxx layout tabbed accordion` to toggle the focused container.
+`layout tab-group` remains supported. `layout horizontal` and `layout vertical`
+choose the accordion axis; `tab-group-padding` controls its peeking edges.
+Accordion never shows tab strips or uses double-sided windows.
+
 ### Tiling and floating
 
 With `default-root-container-layout = 'dwindle'`, existing tiled windows also use dwindle at startup,
@@ -355,14 +389,30 @@ winmux workspace 2 --monitor secondary
 winmux workspace --name 9
 ```
 
-Workspace commands activate on the focused monitor unless `--monitor` specifies another display.
-Selecting a workspace already visible elsewhere focuses it on its existing display without
-moving either workspace or changing monitor history. Hidden workspace activation still respects
-`workspace-to-monitor-force-assignment`.
-`workspace next` and `workspace prev` skip workspaces visible on other displays; numbering stays
+Workspace commands resolve navigation and new slots on the focused monitor unless
+`--monitor` specifies another display. Existing workspaces retain their owning display.
+Selecting a workspace focuses it on its owning display, whether visible or hidden,
+without relocating it. Use `move-workspace-to-monitor` or `summon-workspace` explicitly
+to move it; subsequent switches remember that display. New, unassigned workspaces
+use the focused display or an explicit `--monitor` target.
+`workspace next` and `workspace prev` skip workspaces owned by other displays; numbering stays
 project-wide. `workspace-back-and-forth` and `--auto-back-and-forth` use each display's own history.
-Clicking a sidebar activates hidden workspaces on that sidebar's display. A workspace
-already visible on another display offers override confirmation before being brought here.
+Clicking a workspace assigned to another display in a sidebar offers Override / Cancel,
+whether the workspace is visible or hidden. Override brings it to that sidebar’s display;
+Cancel changes nothing.
+For a workspace on another display, its sidebar context menu offers **Bring Here**:
+bring it to the display containing that sidebar. On a secondary display, the previous
+workspace returns to main, hidden and reachable by shortcuts or swipes. Main can own
+multiple workspaces; each secondary is replaced by the explicitly brought workspace.
+Forced assignments still apply. The source gets a local fallback or empty workspace;
+other displays keep their current workspace.
+
+At launch, display ownership is restored by default. Enable **Settings → General →
+Startup → Start workspaces on main display** (`start-workspaces-on-main-monitor = true`)
+to start existing workspaces on main instead. Secondary displays receive empty
+workspaces. Explicit forced assignments still apply; **Automation → After startup**
+can run existing `move-workspace-to-monitor` commands for optional startup placement.
+The toggle only affects launch, not configuration reloads or normal switching.
 
 ### Multiple monitors
 
@@ -391,6 +441,46 @@ use separate Chrome profiles and scripts for cmux and Finder:
     cmd-d = 'exec-and-forget osascript ~/Documents/scripts/launchTerminalWindow.scpt'
     cmd-e = 'exec-and-forget osascript ~/Documents/scripts/launchFinderWindow.scpt'
 ```
+
+### Shortcut modifier sides
+
+Settings → Shortcuts → Modifier keys chooses Both, Left or Right independently
+for Option, Command, Control and Shift. The default is Both. For example:
+
+```toml
+[modifiers]
+alt = 'left'
+cmd = 'both'
+ctrl = 'both'
+shift = 'both'
+```
+
+Left Option then runs Option shortcuts; right Option remains available for typing.
+Pressing both sides of a restricted modifier passes through too. Modifier-only tap
+bindings keep their explicitly configured sides. Accessibility access is required.
+
+Confirmed application minimum sizes persist across restarts. Use **Clear Saved
+Minimum Sizes…** in the menu to clear saved and current observations.
+
+### Window overview
+
+WinMuxX includes a window overview that works like a lightweight Mission Control
+view. It lists windows from the available workspaces and monitors. Use the
+search field to filter the list, then select a window to focus it.
+
+You can open the overview with a normal shortcut or with a tap-only shortcut:
+
+```toml
+[mode.main.binding]
+    alt-o = 'palette'
+
+[mode.main.binding-tap]
+    right-cmd = 'palette'
+```
+
+The right Command tap opens the overview when it is closed and closes it when
+it is open. Press `Escape` to close it. A modifier tap does not run when you
+use that modifier as part of another shortcut.
 
 ```applescript
 # ~/Documents/scripts/launchTerminalWindow.scpt
@@ -426,10 +516,20 @@ and extract `WinMuxX.app`, or build this fork with
 the configured local signing identity, are not notarized, and have automatic
 upstream updates disabled. The upstream Homebrew cask installs WinMux, not WinMuxX.
 
+The `winmuxx` command can be linked into your PATH after installation:
+
+```sh
+ln -s /Applications/WinMuxX.app/Contents/MacOS/winmuxx-cli /opt/homebrew/bin/winmuxx
+```
+
+The link follows future app updates. Choose another existing directory in PATH
+if Homebrew is not installed.
+
 ## Migrating
 
-The fork owns `${XDG_CONFIG_HOME:-~/.config}/winmux-gf/winmux.toml`. On first launch
-it copies an existing original WinMux config without modifying it. If no original
+The fork owns `${XDG_CONFIG_HOME:-~/.config}/winmuxx/winmux.toml`. On first launch
+it copies the previous `winmux-gf/winmux.toml`, or an original WinMux config if no
+previous fork config exists, without modifying the source. If no original
 config is found, AeroSpace import remains available; otherwise it generates a
 starter config. `--config-path` selects an explicit file. See
 [fork configuration ownership](docs/FORK.md#app-isolation) for details.
@@ -438,3 +538,57 @@ starter config. `--config-path` selects an explicit file. See
 
 WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
 build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
+
+The **Windows → Default layout → Default drag stack** setting chooses Accordion or
+Tabbed for new groups created by dragging (`drag-stack-layout = 'accordion'` or
+`'tab-group'`). Existing groups keep their layout; edge drops still split normally.
+
+### Experimental workspace swipes
+
+**Settings → Windows → Workspace swipes — experimental** enables raw trackpad
+recognition. It is off by default:
+
+```toml
+[workspace-swipe]
+enabled = false
+reverse-direction = false
+animation-duration-ms = 220
+```
+
+Exactly three touching fingers moving horizontally select the next/previous existing
+workspace on the display under the pointer. Left means next, right means previous;
+reverse direction is optional. Navigation stays within that display and project,
+stops at either end, and never creates, moves or swaps workspaces.
+
+Previews follow your three fingers with progressive resistance after a small
+horizontal movement. A short quick flick or a longer drag followed by release
+commits the switch. Pulling back before release reduces progress and can cancel it. Each gesture selects at most one adjacent
+workspace. Partial lifts finish the gesture using its last three-finger position;
+extra/replaced contacts and invalid frames cancel it. Window dragging/resizing blocks it.
+
+Only snapshots move during the gesture; real workspace activation waits for release.
+The preview is clipped to the target display and leaves its sidebar fixed. Snapshot
+images are cached in memory (up to four images / 64 MiB), while fresh incoming
+images are prepared off the main thread. Cached content refreshes while dragging
+and freezes on release. A cold preview appears only if ready before release;
+otherwise navigation proceeds without a delayed animation. Incoming previews use
+windows' last visible positions. Perceptual settling defaults to 220 ms and follows
+the remaining distance; the spring can take longer to settle completely. Global animations,
+Reduce Motion, a zero settle duration or missing Screen Recording access disable the
+visual preview while retaining release-to-switch navigation. Keyboard/mouse actions,
+disabling, sleep and display changes clear the preview. No screen images are saved.
+Ordinary one/two-finger movement is not turned into workspace navigation and does
+not dispatch main-thread work on every raw frame.
+
+The backend loads macOS's private MultitouchSupport API dynamically. Missing symbols
+or unavailable devices leave gestures unavailable without affecting tiling. Driver
+callbacks copy only scalar summaries into a bounded queue; pointer data never escapes
+the callback. Wake and device topology changes re-register the devices. Disable the
+feature to unregister the callbacks. The binding and recognizer are independently
+implemented; OmniWM's raw-touch architecture was reviewed as a reference.
+
+Set **System Settings → Trackpad → More Gestures → Swipe between full-screen apps**
+to four fingers or off so the native gesture does not run alongside WinMuxX. This
+backend does not change system preferences or suppress macOS gestures. Test in Safari,
+Ghostty and another app before keeping it enabled. Settings shows backend registration
+and the highest finger count detected; `winmuxx doctor` also reports received frames.

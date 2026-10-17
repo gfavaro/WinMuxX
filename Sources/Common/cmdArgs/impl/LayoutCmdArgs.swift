@@ -7,9 +7,13 @@ public struct LayoutCmdArgs: CmdArgs {
         help: layout_help_generated,
         flags: [
             "--window-id": optionalWindowIdFlag(),
+            "--for-next-detected-window": trueBoolFlag(\.forNextDetectedWindow),
         ],
         posArgs: [newMandatoryPosArgParser(\.toggleBetween, parseToggleBetween, placeholder: LayoutDescription.unionLiteral)],
+        conflictingOptions: [["--for-next-detected-window", "--window-id"]],
     )
+
+    public var forNextDetectedWindow = false
 
     public var toggleBetween: Lateinit<[LayoutDescription]> = .uninitialized
 
@@ -21,6 +25,7 @@ public struct LayoutCmdArgs: CmdArgs {
     public enum LayoutDescription: String, CaseIterable, Equatable, Sendable {
         case tabGroup = "tab-group"
         case dwindle
+        case stacked = "accordion"
         case tiles
         case horizontal, vertical, auto
         case hTabGroup = "h_tab_group"
@@ -54,11 +59,14 @@ func parseLayoutCmdArgs(_ args: StrArrSlice) -> ParsedCmd<LayoutCmdArgs> {
     parseSpecificCmdArgs(LayoutCmdArgs(rawArgs: args), args).map {
         check(!$0.toggleBetween.val.isEmpty)
         return $0
+    }.filter("--for-next-detected-window allows exactly one tiling|floating argument") {
+        !$0.forNextDetectedWindow || ($0.toggleBetween.val.count == 1 &&
+            ($0.toggleBetween.val[0] == .tiling || $0.toggleBetween.val[0] == .floating))
     }
 }
 
 extension String {
     fileprivate func parseLayoutDescription() -> LayoutCmdArgs.LayoutDescription? {
-        LayoutCmdArgs.LayoutDescription(rawValue: self)
+        LayoutCmdArgs.LayoutDescription(rawValue: self == "stacked" ? "accordion" : self == "tabbed" ? "tab-group" : self)
     }
 }

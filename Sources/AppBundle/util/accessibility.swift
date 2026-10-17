@@ -338,21 +338,33 @@ private func windowOrNil(_ any: Any?) -> WindowIdAndAxUiElementMock? {
 }
 
 extension AXUIElement: AxUiElementMock {
-    func get<Attr: ReadableAttr>(_ attr: Attr) -> Attr.T? {
-        let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
-        defer { signposter.endInterval(#function, state) }
-        var raw: AnyObject?
-        return AXUIElementCopyAttributeValue(self, attr.key as CFString, &raw) == .success
-            ? raw.flatMap(attr.getter)
-            : nil
+    func get<Attr: ReadableAttr>(_ attr: Attr) -> Attr.T? { try? read(attr).get() }
+
+    func read<Attr: ReadableAttr>(_ attr: Attr) -> Result<Attr.T?, AXReadFailure> {
+        func perform() -> Result<Attr.T?, AXReadFailure> {
+            let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
+            defer { signposter.endInterval(#function, state) }
+            var raw: AnyObject?
+            switch AXUIElementCopyAttributeValue(self, attr.key as CFString, &raw) {
+                case .success: return .success(raw.flatMap(attr.getter))
+                case .noValue, .attributeUnsupported: return .success(nil)
+                case let error: return .failure(AXReadFailure(code: error))
+            }
+        }
+        if let budget = AXReadBudget.current, let pid = axTaskLocalAppThreadToken?.pid { return budget.read(pid: pid, perform) }
+        return perform()
     }
 
     @discardableResult func set<Attr: WritableAttr>(_ attr: Attr, _ value: Attr.T) -> Bool {
         if serverArgs.isReadOnly { return false }
+        let pid = axTaskLocalAppThreadToken?.pid
+        if let pid, AXReadBudget.current?.permits(pid) == false { return false }
         let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
         defer { signposter.endInterval(#function, state) }
         guard let value = attr.setter(value) else { return false }
-        return AXUIElementSetAttributeValue(self, attr.key as CFString, value) == .success
+        let error = AXUIElementSetAttributeValue(self, attr.key as CFString, value)
+        if let pid { AXReadBudget.current?.record(error, pid: pid) }
+        return error == .success
     }
 
     func containingWindowId() -> CGWindowID? {
@@ -368,8 +380,11 @@ extension AXUIElement: AxUiElementMock {
     func containingWindowIdWithError() -> (windowId: CGWindowID?, error: AXError) {
         let state = signposter.beginInterval(#function, "axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
         defer { signposter.endInterval(#function, state) }
+        let pid = axTaskLocalAppThreadToken?.pid
+        if let pid, AXReadBudget.current?.permits(pid) == false { return (nil, .cannotComplete) }
         var cgWindowId = CGWindowID()
         let error = _AXUIElementGetWindow(self, &cgWindowId)
+        if let pid { AXReadBudget.current?.record(error, pid: pid) }
         return error == .success ? (cgWindowId, error) : (nil, error)
     }
 }

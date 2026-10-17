@@ -17,12 +17,7 @@ extension DynamicConfigValue where Value == Double {
 
 func renderedAspectRatio(_ value: DynamicConfigValue<Double>) -> String {
     let rules = value.aspectRatioRules.map { rule in
-        let pattern: String = switch rule.description {
-            case .main: "main"
-            case .secondary: "secondary"
-            case .sequenceNumber(let number): String(number)
-            case .pattern(let pattern, _): pattern
-        }
+        let pattern = rule.description.selector
         let escaped = pattern.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
         return "{ monitor.\"\(escaped)\" = \(rule.value) }"
     }

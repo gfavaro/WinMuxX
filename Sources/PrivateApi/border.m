@@ -149,7 +149,7 @@ CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, 
     size.width = ceil(size.width * scale) / scale;
     size.height = ceil(size.height * scale) / scale;
     // Shared boundaries land on backing pixels. Corner bands contain all curvature.
-    CGFloat requestedBand = ceil((MAX(0, radius) + width + 1 / scale) * scale) / scale;
+    CGFloat requestedBand = ceil((2 * (MAX(0, radius) + width) + 1 / scale) * scale) / scale;
     CGFloat band = MIN(requestedBand, floor(size.height * scale / 2) / scale);
     CGFloat bottomStart = size.height <= requestedBand * 2 ? band : floor((size.height - band) * scale) / scale;
     CGFloat bottomBand = size.height - bottomStart;
@@ -226,6 +226,19 @@ void winmux_border_draw(CGContextRef context, CGSize size, CGRect piece, float r
     CGContextRestoreGState(context);
 }
 
+void winmux_border_draw_path(CGContextRef context, CGRect piece, CGPathRef path, uint32_t rgba) {
+    CGRect local = { CGPointZero, piece.size };
+    CGContextClearRect(context, local);
+    CGContextSaveGState(context);
+    CGContextClipToRect(context, local);
+    CGContextTranslateCTM(context, -piece.origin.x, -piece.origin.y);
+    CGContextSetRGBFillColor(context, ((rgba >> 24) & 255) / 255.0,
+        ((rgba >> 16) & 255) / 255.0, ((rgba >> 8) & 255) / 255.0, (rgba & 255) / 255.0);
+    CGContextAddPath(context, path);
+    CGContextEOFillPath(context);
+    CGContextRestoreGState(context);
+}
+
 static void syncBorderSpace(WinMuxBorderHandle border, uint32_t target) {
     typedef CFArrayRef (*Spaces)(int, int, CFArrayRef);
     typedef int (*MoveSpace)(int, CFArrayRef, uint64_t);
@@ -271,8 +284,8 @@ static bool placeBorder(WinMuxBorderHandle border, uint32_t target, CGPoint orig
 }
 
 bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect frame,
-                          float radius, uint32_t rgba, float width, bool above) {
-    if (!border) return false;
+                          float radius, uint32_t rgba, float width, bool above, CGPathRef path) {
+    if (!border || !path) return false;
     CGRect outer = CGRectInset(frame, -width, -width);
     CGRect bounds = { CGPointZero, outer.size };
     typedef int (*Shape)(int, uint32_t, float, float, CFTypeRef);
@@ -293,7 +306,7 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
         // Allocate only this edge's backing surface, after reshaping.
         CGContextRef context = SYM("SLWindowContextCreate", Context)(cid(), border->windows[i], NULL);
         if (!context) { success = false; break; }
-        winmux_border_draw(context, bounds.size, piece, radius, rgba, width);
+        winmux_border_draw_path(context, piece, path, rgba);
         CGContextFlush(context);
         CGContextRelease(context);
         success = !SYM("SLSFlushWindowContentRegion", Flush)(cid(), border->windows[i], NULL);

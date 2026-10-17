@@ -38,7 +38,7 @@ extension ShortcutSettingsModel {
                 )
             }
         }
-        SettingsDraftStore.shared.refreshSavedValues()
+        drafts.refreshSavedValues()
         settingsRevision += 1
     }
 

@@ -2,11 +2,21 @@
 # Build a personal app without the upstream identity, update feed, or signing team.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source ./script/setup.sh
+if /usr/bin/which swiftly &>/dev/null; then
+  fork_swift_compiler="$(swiftly run /usr/bin/which swiftc)"
+else
+  fork_swift_compiler="$(/usr/bin/xcrun --find swiftc)"
+fi
+./script/check-swift-version.sh "$("$fork_swift_compiler" --version)"
 fork_version="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
 fork_build_number="${BUILD_NUMBER:-1}"
 fork_signing_identity="${CODESIGN_IDENTITY:-}"
 if [[ -z "$fork_signing_identity" ]]; then
-  fork_identity_config="${XDG_CONFIG_HOME:-$HOME/.config}/winmux-gf/signing-identity"
+  fork_identity_config="${XDG_CONFIG_HOME:-$HOME/.config}/winmuxx/signing-identity"
+  if [[ ! -f "$fork_identity_config" ]]; then
+    fork_identity_config="${XDG_CONFIG_HOME:-$HOME/.config}/winmux-gf/signing-identity"
+  fi
   if [[ -f "$fork_identity_config" ]]; then
     IFS= read -r fork_signing_identity < "$fork_identity_config" || true
   fi
@@ -20,12 +30,11 @@ fork_stage="$(mktemp -d "$PWD/.release/fork-build.XXXXXX")"
 trap 'echo "Build intermediates retained at: $fork_stage"' EXIT
 xcodebuild -project WinMux.xcodeproj -scheme WinMux -configuration Release \
   -derivedDataPath "$PWD/.release/fork-derived" CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= build > "$fork_stage/xcodebuild.log" 2>&1 || {
+  CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= SWIFT_EXEC="$fork_swift_compiler" build > "$fork_stage/xcodebuild.log" 2>&1 || {
     tail -80 "$fork_stage/xcodebuild.log" >&2; exit 1;
   }
 fork_app="$PWD/.release/fork-derived/Build/Products/Release/WinMuxX.app"
 test -d "$fork_app"
-source ./script/setup.sh
 swift build -c release --product winmuxx
 fork_bin="$(swift build -c release --show-bin-path | tail -n 1)"
 test -d "$fork_bin"

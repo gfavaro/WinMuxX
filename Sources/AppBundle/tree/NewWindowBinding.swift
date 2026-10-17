@@ -3,8 +3,13 @@ import Common
 
 @MainActor
 func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?) async throws -> BindingData {
+    let parent = window?.parent
     let windowLevel = getWindowLevel(for: windowId)
     let type = try await macApp.getAxUiElementWindowType(windowId, windowLevel)
+    try checkCancellation()
+    if let window {
+        guard window.parent === parent, Window.get(byId: windowId) === window else { throw CancellationError() }
+    }
     return bindingDataForNewWindow(type: type, workspace: workspace, window: window)
 }
 

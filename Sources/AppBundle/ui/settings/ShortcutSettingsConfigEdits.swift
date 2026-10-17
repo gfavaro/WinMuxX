@@ -55,12 +55,6 @@ func updateModeBindingConfig(
     return resultLines.joined(separator: "\n")
 }
 
-@MainActor
-func readMainModeBindingEntries() -> [String: String] {
-    let targetUrl = preferredShortcutSettingsConfigUrl()
-    let currentText = currentShortcutSettingsConfigText(for: targetUrl)
-    return readModeBindingEntries(in: currentText, modeName: mainModeId, tableKey: "binding")
-}
 
 func readModeBindingEntries(
     in configText: String,
@@ -84,24 +78,6 @@ func readModeBindingEntries(
     return result
 }
 
-@MainActor
-func persistMainModeBindings(assignments: [String: String], managedCommands: Set<String>) throws -> URL {
-    let targetUrl = preferredShortcutSettingsConfigUrl()
-    let currentText = currentShortcutSettingsConfigText(for: targetUrl)
-    let updatedText = updateModeBindingConfig(
-        in: currentText,
-        modeName: mainModeId,
-        tableKey: "binding",
-        managedCommands: managedCommands,
-        assignments: assignments,
-    )
-    if let parent = targetUrl.deletingLastPathComponent().takeIf({ $0.path != targetUrl.path }) {
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
-    }
-    try updatedText.write(to: targetUrl, atomically: true, encoding: String.Encoding.utf8)
-    return targetUrl
-}
-
 func canonicalConfigCommandScript(_ raw: String) -> String? {
     switch parseCommand(raw) {
         case .cmd(let command):
@@ -111,18 +87,7 @@ func canonicalConfigCommandScript(_ raw: String) -> String? {
     }
 }
 
-@MainActor
-private func preferredShortcutSettingsConfigUrl() -> URL {
-    preferredEditableConfigUrl()
-}
 
-@MainActor
-private func currentShortcutSettingsConfigText(for targetUrl: URL) -> String {
-    if let text = try? String(contentsOf: targetUrl, encoding: .utf8) {
-        return text
-    }
-    return starterConfigText()
-}
 
 private struct TomlStringAssignment {
     let key: String

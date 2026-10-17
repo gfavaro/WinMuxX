@@ -44,13 +44,23 @@ struct ListWindowsCommand: Command {
         if args.outputOnlyCount {
             return io.out("\(windows.count)")
         }
+        let needsTitle = args.format.contains { token in
+            if case .interVar(FormatVar.WindowFormatVar.windowTitle.rawValue) = token { return true }
+            return false
+        }
         var windowInfos: [(window: Window, title: String)] = []
         for window in windows {
-            windowInfos.append((window, try await window.title))
+            windowInfos.append((window, needsTitle ? try await window.title : ""))
         }
         windowInfos = windowInfos
             .filter { $0.window.isBound }
-            .sortedBy([{ $0.window.app.name ?? "" }, \.title])
+            .sorted { lhs, rhs in
+                let lhsApp = lhs.window.app.name ?? ""
+                let rhsApp = rhs.window.app.name ?? ""
+                if lhsApp != rhsApp { return lhsApp < rhsApp }
+                if lhs.title != rhs.title { return lhs.title < rhs.title }
+                return lhs.window.windowId < rhs.window.windowId
+            }
 
         return windowInfos.map { FormatObject.window(window: $0.window, title: $0.title) }.writeFormattedOutput(
             to: io,

@@ -5,6 +5,7 @@ import HotKey
 import XCTest
 
 struct TestMonitor: Monitor {
+    var hardwareIdentity: MonitorHardwareIdentity? = nil
     var displayUUID: String? = nil
     let monitorAppKitNsScreenScreensId: Int
     let name: String
@@ -27,11 +28,14 @@ let projectRoot: URL = {
 
 @MainActor
 func setUpWorkspacesForTests() {
-    resetPersistedFrozenWorldForTests()
-    config = defaultConfig
-    setMonitorsForTests(nil)
-    configUrl = defaultConfigUrl
-    resetWorkspaceNameGenerationStateForTests()
+    layoutForNextDetectedWindow = nil
+    for workspace in Workspace.all {
+        for child in workspace.children {
+            child.unbindFromParent()
+        }
+    }
+
+    WinMuxRuntime.replaceForTests()
     resetCachedWindowTitles()
     config.enableNormalizationFlattenContainers = false // Make layout tests more predictable
     config.enableNormalizationOppositeOrientationForNestedContainers = false // Make layout tests more predictable
@@ -43,19 +47,12 @@ func setUpWorkspacesForTests() {
     config.minimumWorkspaceCount = nil
     config.persistentWorkspaces = []
 
-    for workspace in Workspace.all {
-        for child in workspace.children {
-            child.unbindFromParent()
-        }
-    }
-    resetWinMuxWorkspaceStateForTests()
     check(Workspace.get(byName: "setUpWorkspacesForTests").focusWorkspace())
     Workspace.reconcileWorkspaceState()
     check(focus.workspace.isEffectivelyEmpty)
     check(focus.workspace === Workspace.all.singleOrNil(), Workspace.all.map(\.description).joined(separator: ", "))
     check(mainMonitor.setActiveWorkspace(focus.workspace))
 
-    resetFocusCacheForTests()
     shouldSuppressChromeForNativeFullscreenContent = false
     setScheduledRefreshOverrideForTests(nil)
     setBlockingRefreshOverridesForTests()
@@ -114,5 +111,37 @@ extension HotkeyBinding {
             ? keyCode.toString()
             : modifiers.toString() + "-" + keyCode.toString()
         self.init(modifiers, keyCode, commands, descriptionWithKeyNotation: descriptionWithKeyNotation)
+    }
+}
+
+/// A paired workspace world for navigation tests. Call cleanUp from teardown.
+@MainActor
+final class WorkspaceNavigationFixture {
+    private(set) var displays: [TestMonitor] = []
+    private(set) var spaces: [Workspace] = []
+
+    init() {
+        setUpWorkspacesForTests()
+        displays = (0..<3).map { index in
+            let rect = Rect(topLeftX: Double(index * 1920), topLeftY: 0, width: 1920, height: 1080)
+            return TestMonitor(monitorAppKitNsScreenScreensId: index + 1, name: "Display\(index + 1)",
+                               rect: rect, visibleRect: rect, isMain: index == 0)
+        }
+        setMonitorsForTests(displays)
+        spaces = (1...5).map { index in
+            let workspace = Workspace.get(byName: String(index))
+            TestWindow.new(id: UInt32(900 + index), parent: workspace.rootTilingContainer).markAsMostRecentChild()
+            return workspace
+        }
+        XCTAssertTrue(displays[0].setActiveWorkspace(spaces[0]))
+        XCTAssertTrue(displays[1].setActiveWorkspace(spaces[1]))
+        XCTAssertTrue(displays[2].setActiveWorkspace(spaces[4]))
+        XCTAssertTrue(spaces[0].focusWorkspace())
+    }
+
+    func cleanUp() {
+        setUpWorkspacesForTests()
+        spaces.removeAll()
+        displays.removeAll()
     }
 }

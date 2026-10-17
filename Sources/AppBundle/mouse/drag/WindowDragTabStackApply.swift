@@ -1,13 +1,24 @@
 import Common
 
 @MainActor
-func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Window) {
+func dragStackLayout(for targetWindow: Window, defaultLayout: Layout? = nil) -> Layout {
+    if let parent = targetWindow.parent as? TilingContainer,
+       parent.layout == .tabGroup || parent.layout == .stacked {
+        return parent.layout
+    }
+    return defaultLayout ?? config.dragStackLayout
+}
+
+@MainActor
+func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Window, newGroupLayout: Layout = .tabGroup) {
     guard sourceWindow != targetWindow else { return }
-    let targetRect = normalizeTabStackSourceWindowFrame(sourceWindow: sourceWindow, targetWindow: targetWindow)
+    let layout = dragStackLayout(for: targetWindow, defaultLayout: newGroupLayout)
+    let targetRect = layout == .tabGroup
+        ? normalizeTabStackSourceWindowFrame(sourceWindow: sourceWindow, targetWindow: targetWindow) : nil
     if let targetParent = targetWindow.parent as? TilingContainer,
-       targetParent.layout == .tabGroup
+       targetParent.layout == .tabGroup || targetParent.layout == .stacked
     {
-        appendWindowToExistingTabGroup(
+        appendWindowToExistingStack(
             sourceWindow: sourceWindow,
             targetWindow: targetWindow,
             targetParent: targetParent,
@@ -22,7 +33,7 @@ func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Windo
         parent: targetBinding.parent,
         adaptiveWeight: targetBinding.adaptiveWeight,
         newOrientation,
-        .tabGroup,
+        layout,
         index: targetBinding.index,
     )
     sourceWindow.unbindFromParent()
@@ -52,7 +63,7 @@ func reorderWindowTabInCurrentGroup(_ sourceWindow: Window, toIndex targetIndex:
 }
 
 @MainActor
-private func appendWindowToExistingTabGroup(
+private func appendWindowToExistingStack(
     sourceWindow: Window,
     targetWindow: Window,
     targetParent: TilingContainer,

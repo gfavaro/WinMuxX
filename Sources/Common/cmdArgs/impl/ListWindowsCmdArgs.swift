@@ -157,6 +157,7 @@ public enum FormatVar: Equatable {
     public enum MonitorFormatVar: String, Equatable, CaseIterable {
         case monitorId_oneBased = "monitor-id"
         case monitorAppKitNsScreenScreensId = "monitor-appkit-nsscreen-screens-id"
+        case monitorUuid = "monitor-uuid"
         case monitorName = "monitor-name"
         case monitorIsMain = "monitor-is-main"
     }

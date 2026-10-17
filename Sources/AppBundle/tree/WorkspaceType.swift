@@ -13,28 +13,28 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
 
     @MainActor
     private init(_ name: String) {
-        self.id = winMuxWorkspaceState.nextWorkspaceId()
+        self.id = runtime.workspaces.nextWorkspaceId()
         self.name = name
         self.nameLogicalSegments = name.toLogicalSegments()
         super.init(parent: NilTreeNode.instance, adaptiveWeight: 0, index: 0)
     }
 
     @MainActor static var all: [Workspace] {
-        winMuxWorkspaceState.sortedWorkspaces()
+        runtime.workspaces.sortedWorkspaces()
     }
 
     @MainActor static func get(byName name: String) -> Workspace {
-        if let existing = winMuxWorkspaceState.workspace(named: name) {
+        if let existing = runtime.workspaces.workspace(named: name) {
             return existing
         } else {
             let workspace = Workspace(name)
-            winMuxWorkspaceState.registerWorkspace(workspace)
+            runtime.workspaces.registerWorkspace(workspace)
             return workspace
         }
     }
 
     @MainActor static func existing(byName name: String) -> Workspace? {
-        winMuxWorkspaceState.workspace(named: name)
+        runtime.workspaces.workspace(named: name)
     }
 
     nonisolated static func < (lhs: Workspace, rhs: Workspace) -> Bool {
@@ -66,10 +66,10 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     @MainActor
     static func reconcileWorkspaceState() {
         materializePersistedWorkspaces()
-        for workspace in winMuxWorkspaceState.workspaceById.values {
+        for workspace in runtime.workspaces.workspaceById.values {
             workspace.refreshEmptyLifecycle()
         }
-        winMuxWorkspaceState.pruneProjectWorkspaceIndexes()
+        runtime.workspaces.pruneProjectWorkspaceIndexes()
         repairInvalidVisibleWorkspaceAssignments()
         rearrangeWorkspacesOnMonitors()
         ensureMinimumWorkspaceForAllProjects()
@@ -81,7 +81,6 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     }
 
     nonisolated static func == (lhs: Workspace, rhs: Workspace) -> Bool {
-        check((lhs === rhs) == (lhs.id == rhs.id), "lhs: \(lhs) rhs: \(rhs)")
         return lhs === rhs
     }
 
@@ -101,7 +100,7 @@ extension Workspace {
     func assignProject(_ projectId: WorkspaceProjectId) {
         guard self.projectId != projectId else { return }
         restoredDisplayIndex = nil
-        winMuxWorkspaceState.assignWorkspace(self, to: projectId)
+        runtime.workspaces.assignWorkspace(self, to: projectId)
     }
 
     @MainActor
@@ -149,20 +148,21 @@ extension Workspace {
 
     @MainActor
     var isVisible: Bool {
-        winMuxWorkspaceState.monitorViewportsById.values.contains { $0.activeWorkspaceId == id }
+        runtime.workspaces.monitorViewportsById.values.contains { $0.activeWorkspaceId == id }
     }
     @MainActor
+    var assignedMonitor: Monitor? {
+        visibleMonitor ?? forceAssignedMonitor ?? preferredMonitorPoint?.monitorApproximation
+    }
+
+    @MainActor
     var workspaceMonitor: Monitor {
-        visibleMonitor ??
-            forceAssignedMonitor ??
-            preferredMonitorPoint?.monitorApproximation ??
-            focus.workspace.visibleMonitor ??
-            mainMonitor
+        assignedMonitor ?? focus.workspace.visibleMonitor ?? mainMonitor
     }
 
     @MainActor
     var visibleMonitor: Monitor? {
-        winMuxWorkspaceState.monitorViewportsById.first { _, viewport in
+        runtime.workspaces.monitorViewportsById.first { _, viewport in
             viewport.activeWorkspaceId == id
         }?.key.topLeftCorner.monitorApproximation
     }

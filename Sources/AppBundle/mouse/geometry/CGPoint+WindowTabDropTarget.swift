@@ -32,7 +32,7 @@ extension CGPoint {
         switch container.layout {
             case .tiles, .dwindle:
                 return findWindowTabDropDestinationInChildren(container, excluding: sourceWindow)
-            case .tabGroup:
+            case .tabGroup, .stacked:
                 guard !container.usesWindowTabBehavior else { return nil }
                 return findWindowTabDropDestinationInChildren(container, excluding: sourceWindow)
         }

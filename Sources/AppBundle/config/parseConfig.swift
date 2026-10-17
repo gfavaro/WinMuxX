@@ -62,6 +62,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
 
+    "start-workspaces-on-main-monitor": Parser(\.startWorkspacesOnMainMonitor, parseBool),
     "start-at-login": Parser(\.startAtLogin, parseBool),
     "auto-reload-config": Parser(\.autoReloadConfig, parseBool),
     "automatically-unhide-macos-hidden-apps": Parser(\.automaticallyUnhideMacosHiddenApps, parseBool),
@@ -70,6 +71,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
+    "drag-stack-layout": Parser(\.dragStackLayout) { raw, backtrace in
+        parseLayout(raw, backtrace).filter(.semantic(backtrace, "Expected accordion or tab-group")) {
+            $0 == .stacked || $0 == .tabGroup
+        }
+    },
     "tab-group-padding": Parser(\.tabGroupPadding, parseInt),
     "minimum-workspace-count": Parser(\.minimumWorkspaceCount) { raw, backtrace in
         parseInt(raw, backtrace)
@@ -91,9 +97,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     },
     "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
     "gaps": Parser(\.gaps, parseGaps),
+    "workspace-swipe": Parser(\.workspaceSwipe, parseWorkspaceSwipe),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
+    "modifiers": Parser(\.modifierSides, parseModifierSides),
     "animations": Parser(\.animations, parseAnimations),
     "workspace-to-monitor-force-assignment": Parser(\.workspaceToMonitorForceAssignment, parseWorkspaceToMonitorAssignment),
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),

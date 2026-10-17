@@ -23,7 +23,9 @@ extension AxUiElementMock {
         _ windowLevel: MacOsWindowLevel?,
         accessory: Bool,
     ) -> Bool {
-        if accessory { return true }
+        // Windows App declares LSUIElement but presents regular remote desktop windows.
+        // Let its window controls distinguish sessions from dialogs below.
+        if accessory && id != .windowsApp { return true }
         // Note: a lot of windows don't have title on startup. So please don't rely on the title
 
         if id == ._1password && windowLevel != .normalWindow {

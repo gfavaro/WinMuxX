@@ -9,6 +9,15 @@ enum GlobalObserver {
     @MainActor private static var eventMonitorTokens: [Any] = []
     @MainActor private static var focusFollowsMouseTask: Task<Void, Never>?
 
+    @MainActor
+    static func desktopWorkspaceToFocus(at point: CGPoint) -> Workspace? {
+        let monitor = point.monitorApproximation
+        // Exclude menu bar, Dock and points outside the desktop. Their clicks
+        // must not select the workspace on another monitor.
+        guard monitor.visibleRect.contains(point), monitor.activeWorkspace != focus.workspace else { return nil }
+        return monitor.activeWorkspace
+    }
+
     private static func onNotif(_ notification: Notification) {
         // Third line of defence against lock screen window. See: closedWindowsCache
         // Second and third lines of defence are technically needed only to avoid potential flickering
@@ -16,7 +25,13 @@ enum GlobalObserver {
             return
         }
         let notifName = notification.name.rawValue
+        let terminatedPid = notification.name == NSWorkspace.didTerminateApplicationNotification
+            ? (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier : nil
         Task { @MainActor in
+            if let terminatedPid {
+                MacApp.registrationRetries.cancel(pid: terminatedPid)
+                WindowDetectionOperations.shared.cancel(pid: terminatedPid)
+            }
             if !TrayMenuModel.shared.isEnabled { return }
             if notifName == NSWorkspace.didActivateApplicationNotification.rawValue {
                 scheduleRefreshSession(.globalObserver(notifName), optimisticallyPreLayoutWorkspaces: true)
@@ -63,6 +78,7 @@ enum GlobalObserver {
 
     private static func onKeyDown(_ event: NSEvent) {
         runOnMainActor {
+            WorkspaceSwipeController.shared.cancelVisualInteraction()
             noteTapBindingKeyDown()
         }
     }
@@ -78,10 +94,12 @@ enum GlobalObserver {
 
     private static func onPointerActivity(_ event: NSEvent) {
         let isLeftMouseDownEvent = event.type == .leftMouseDown
+        let isClick = event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown
         let timestamp = event.timestamp
         let screenPoint = NSEvent.mouseLocation
         let point = normalizeAppKitScreenPoint(screenPoint)
         runOnMainActor {
+            if isClick { WorkspaceSwipeController.shared.cancelVisualInteraction() }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
@@ -151,6 +169,7 @@ enum GlobalObserver {
             print("WinMuxX: WindowServer close notifications unavailable; using AX fallback")
         }
         DoubleSidedWindowGesture.shared.install()
+        WorkspaceSwipeController.shared.syncConfiguration()
 
         let nc = NSWorkspace.shared.notificationCenter
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: onNotif))
@@ -174,17 +193,13 @@ enum GlobalObserver {
                 // hover must be re-evaluated for a stationary cursor.
                 WorkspaceSidebarPanel.scheduleHoverRecheckForVisiblePanels()
                 let mouseLocation = mouseLocation
-                let clickedMonitor = mouseLocation.monitorApproximation
-                switch true {
-                    // Detect clicks on desktop of different monitors
-                    case clickedMonitor.activeWorkspace != focus.workspace:
-                        _ = try await runLightSession(.globalObserverLeftMouseUp, token) {
-                            clickedMonitor.activeWorkspace.focusWorkspace()
-                        }
-                    // Detect close button clicks for unfocused windows. Yes, kAXUIElementDestroyedNotification is that unreliable
-                    //  And trigger new window detection that could be delayed due to mouseDown event
-                    default:
-                        scheduleRefreshSession(.globalObserverLeftMouseUp)
+                if let workspace = desktopWorkspaceToFocus(at: mouseLocation) {
+                    _ = try await runLightSession(.globalObserverLeftMouseUp, token) {
+                        workspace.focusWorkspace()
+                    }
+                } else {
+                    // Detect close button clicks for unfocused windows and delayed new windows.
+                    scheduleRefreshSession(.globalObserverLeftMouseUp)
                 }
             }
         })

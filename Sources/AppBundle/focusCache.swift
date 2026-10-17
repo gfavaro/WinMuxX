@@ -1,33 +1,36 @@
 import Common
 import Foundation
 
-@MainActor private var lastKnownNativeFocusedWindowId: UInt32? = nil
 
-@MainActor private struct WorkspaceProjectFocusHold {
+@MainActor struct WorkspaceProjectFocusHold {
     let projectId: WorkspaceProjectId
     let expiresAt: Date
 }
 
-@MainActor private var workspaceProjectFocusHold: WorkspaceProjectFocusHold? = nil
 
-@MainActor private struct WindowClosureFocusHold {
+@MainActor struct WindowClosureFocusHold {
     let workspaceId: WorkspaceId
     let appPid: Int32
     let expiresAt: Date
 }
 
-@MainActor private var windowClosureFocusHold: WindowClosureFocusHold?
+@MainActor
+final class NativeFocusState {
+    var lastKnownWindowID: UInt32?
+    var projectHold: WorkspaceProjectFocusHold?
+    var windowClosureHold: WindowClosureFocusHold?
+}
 
 @MainActor
 func holdFocusAfterLastWindowClosure(on workspace: Workspace, appPid: Int32, now: Date = .now) {
-    windowClosureFocusHold = WindowClosureFocusHold(workspaceId: workspace.id, appPid: appPid, expiresAt: now.addingTimeInterval(0.25))
+    runtime.nativeFocus.windowClosureHold = WindowClosureFocusHold(workspaceId: workspace.id, appPid: appPid, expiresAt: now.addingTimeInterval(0.25))
 }
 
 @MainActor
 private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?, now: Date) -> Bool {
-    guard let hold = windowClosureFocusHold else { return false }
+    guard let hold = runtime.nativeFocus.windowClosureHold else { return false }
     guard now < hold.expiresAt, focus.workspace.id == hold.workspaceId else {
-        windowClosureFocusHold = nil
+        runtime.nativeFocus.windowClosureHold = nil
         return false
     }
     guard let nativeFocused, let workspace = nativeFocused.visualWorkspace else { return false }
@@ -37,15 +40,8 @@ private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?,
 }
 
 @MainActor
-func resetFocusCacheForTests() {
-    lastKnownNativeFocusedWindowId = nil
-    workspaceProjectFocusHold = nil
-    windowClosureFocusHold = nil
-}
-
-@MainActor
 func holdFocusOnWorkspaceProject(_ projectId: WorkspaceProjectId, for duration: TimeInterval) {
-    workspaceProjectFocusHold = WorkspaceProjectFocusHold(
+    runtime.nativeFocus.projectHold = WorkspaceProjectFocusHold(
         projectId: projectId,
         expiresAt: Date().addingTimeInterval(duration),
     )
@@ -53,15 +49,15 @@ func holdFocusOnWorkspaceProject(_ projectId: WorkspaceProjectId, for duration: 
 
 @MainActor
 func clearFocusOnWorkspaceProjectHold(_ projectId: WorkspaceProjectId? = nil) {
-    guard projectId == nil || workspaceProjectFocusHold?.projectId == projectId else { return }
-    workspaceProjectFocusHold = nil
+    guard projectId == nil || runtime.nativeFocus.projectHold?.projectId == projectId else { return }
+    runtime.nativeFocus.projectHold = nil
 }
 
 @MainActor
 private func activeWorkspaceProjectFocusHold(now: Date = .now) -> WorkspaceProjectFocusHold? {
-    guard let hold = workspaceProjectFocusHold else { return nil }
+    guard let hold = runtime.nativeFocus.projectHold else { return nil }
     if hold.expiresAt <= now {
-        workspaceProjectFocusHold = nil
+        runtime.nativeFocus.projectHold = nil
         return nil
     }
     return hold
@@ -78,31 +74,31 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 }
 
 /// The data should flow (from nativeFocused to focused) and
-///                      (from nativeFocused to lastKnownNativeFocusedWindowId)
+///                      (from nativeFocused to runtime.nativeFocus.lastKnownWindowID)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
     if nativeFocused?.parent is MacosPopupWindowsContainer {
         return
     }
-    let lastKnownNativeFocusedWindowIdBefore = lastKnownNativeFocusedWindowId
+    let lastKnownNativeFocusedWindowIdBefore = runtime.nativeFocus.lastKnownWindowID
     if shouldIgnoreNativeFocusAfterWindowClosure(nativeFocused, now: now) {
-        lastKnownNativeFocusedWindowId = nil
+        runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog("updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
         return
     }
     if shouldIgnoreNativeFocusDuringProjectHold(nativeFocused) {
-        lastKnownNativeFocusedWindowId = nil
+        runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog(
             "updateFocusCache ignoredProjectHold event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") heldProject=\(activeWorkspaceProjectFocusHold()?.projectId.rawValue ?? "nil") logicalFocus=\(debugDescribe(focus))"
         )
         return
     }
-    if nativeFocused?.windowId != lastKnownNativeFocusedWindowId {
+    if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
         _ = nativeFocused?.focusWindow()
-        lastKnownNativeFocusedWindowId = nativeFocused?.windowId
+        runtime.nativeFocus.lastKnownWindowID = nativeFocused?.windowId
     }
     (nativeFocused?.app as? MacApp)?.lastNativeFocusedWindowId = nativeFocused?.windowId
     debugFocusLog(
-        "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(lastKnownNativeFocusedWindowId?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
+        "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(runtime.nativeFocus.lastKnownWindowID?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
     )
 }

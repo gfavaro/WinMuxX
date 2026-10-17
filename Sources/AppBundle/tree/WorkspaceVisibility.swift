@@ -31,7 +31,12 @@ func workspaceHasLifecycleWindows(_ workspace: Workspace) -> Bool {
 
 @MainActor
 func isUserFacingWorkspace(_ workspace: Workspace, focusedWorkspace: Workspace? = nil) -> Bool {
-    !workspace.isArchived &&
+    if config.minimumWorkspaceCount != nil {
+        return !workspace.isArchived &&
+            (workspaceShouldSurviveReconciliation(workspace, retainedEmptyWorkspaceIds: [:]) ||
+                minimumWorkspaceRetentionIds().contains(workspace.id))
+    }
+    return !workspace.isArchived &&
         (
             workspaceHasSidebarVisibleWindows(workspace) ||
                 workspace.isVisible ||

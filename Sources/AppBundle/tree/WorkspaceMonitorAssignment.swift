@@ -4,7 +4,7 @@ import Common
 extension Monitor {
     @MainActor
     var activeWorkspace: Workspace {
-        if let existing = winMuxWorkspaceState.visibleWorkspace(for: self) {
+        if let existing = runtime.workspaces.visibleWorkspace(for: self) {
             return existing
         }
         rearrangeWorkspacesOnMonitors()
@@ -17,8 +17,45 @@ extension Monitor {
     }
 }
 
+// Selection preserves ownership; only explicit moves replace a secondary display's slot.
+// Startup/restoration may seed ownership, but never choose the destination for user input.
+@MainActor
+func workspaceIsAvailableForMonitor(_ workspace: Workspace, monitor: Monitor) -> Bool {
+    isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) &&
+        workspaceMonitorForUserActivation(workspace, on: monitor).rect.topLeftCorner == monitor.rect.topLeftCorner
+}
+
+/// Existing workspaces keep their display; only unassigned/new slots use the request.
+@MainActor
+func workspaceMonitorForUserActivation(_ workspace: Workspace, on requested: Monitor) -> Monitor {
+    workspace.assignedMonitor ?? requested
+}
+
+@MainActor
+@discardableResult
+func activateWorkspaceForUser(
+    _ workspace: Workspace,
+    on targetMonitor: Monitor,
+) -> Bool {
+    // Ordinary selection never relocates an owned workspace, visible or hidden.
+    if workspace.isVisible {
+        guard workspace.visibleMonitor != nil else { return false }
+        return workspace.focusWorkspace()
+    }
+    let monitor = workspaceMonitorForUserActivation(workspace, on: targetMonitor)
+    guard isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) else {
+        return false
+    }
+
+    guard monitor.setActiveWorkspace(workspace) else { return false }
+    return workspace.focusWorkspace()
+}
+
 @MainActor
 func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, targetMonitor: Monitor) -> Bool {
+    guard isValidAssignment(workspace: workspace, screen: targetMonitor.rect.topLeftCorner) else { return false }
+    // A later AX recovery must not undo an explicit display move from any entry point.
+    resetClosedWindowsCache()
     let sourceMonitor = workspace.isVisible ? workspace.workspaceMonitor : nil
     let sourceProjectId = workspace.projectId
     if let sourceMonitor,
@@ -35,27 +72,16 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
         )
     }
     guard targetMonitor.setActiveWorkspace(workspace) else { return false }
-    return true
-}
-
-@MainActor
-func overrideWorkspaceOnMonitorBySwappingActiveViewports(_ workspace: Workspace, targetMonitor: Monitor) -> Bool {
-    guard isValidAssignment(workspace: workspace, screen: targetMonitor.rect.topLeftCorner) else {
-        return false
+    // An explicit move replaces the secondary display's slot. Keep the displaced
+    // workspaces hidden on main, where ordinary shortcuts and swipes can reach them.
+    if targetMonitor.rect.topLeftCorner != mainMonitor.rect.topLeftCorner {
+        for displaced in Workspace.all where displaced !== workspace && !displaced.isVisible &&
+            displaced.workspaceMonitor.rect.topLeftCorner == targetMonitor.rect.topLeftCorner &&
+            isValidAssignment(workspace: displaced, screen: mainMonitor.rect.topLeftCorner)
+        {
+            displaced.preferredMonitorPoint = mainMonitor.rect.topLeftCorner
+        }
     }
-    guard workspace.isVisible else {
-        return targetMonitor.setActiveWorkspace(workspace)
-    }
-
-    let sourceMonitor = workspace.workspaceMonitor
-    guard sourceMonitor.rect.topLeftCorner != targetMonitor.rect.topLeftCorner else {
-        return true
-    }
-
-    guard winMuxWorkspaceState.swapActiveWorkspaces(between: MonitorViewportId(sourceMonitor), and: MonitorViewportId(targetMonitor)) else {
-        return false
-    }
-    checkWorkspaceHierarchyInvariants()
     return true
 }
 
@@ -71,10 +97,10 @@ extension CGPoint {
             return false
         }
         let viewportId = MonitorViewportId(topLeftCorner: self)
-        guard !winMuxWorkspaceState.isWorkspaceActive(workspace.id, outside: viewportId) else {
+        guard !runtime.workspaces.isWorkspaceActive(workspace.id, outside: viewportId) else {
             return false
         }
-        _ = winMuxWorkspaceState.setActiveWorkspace(workspace, on: viewportId)
+        _ = runtime.workspaces.setActiveWorkspace(workspace, on: viewportId)
         checkWorkspaceHierarchyInvariants()
         return true
     }
@@ -83,14 +109,14 @@ extension CGPoint {
 @MainActor
 func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = false) {
     for workspace in Workspace.all {
-        check(winMuxWorkspaceState.projectsById[workspace.projectId] != nil, "Workspace '\(workspace.name)' references missing project '\(workspace.projectId)'")
+        check(runtime.workspaces.projectsById[workspace.projectId] != nil, "Workspace '\(workspace.name)' references missing project '\(workspace.projectId)'")
     }
 
-    for (viewportId, viewport) in winMuxWorkspaceState.monitorViewportsById {
+    for (viewportId, viewport) in runtime.workspaces.monitorViewportsById {
         if let activeWorkspaceId = viewport.activeWorkspaceId {
-            check(winMuxWorkspaceState.workspaceById[activeWorkspaceId] != nil, "Display viewport '\(viewportId)' references missing workspace '\(activeWorkspaceId)'")
-            check(!winMuxWorkspaceState.isWorkspaceActive(activeWorkspaceId, outside: viewportId), "Workspace '\(activeWorkspaceId)' is active on more than one display viewport")
-            if let workspace = winMuxWorkspaceState.workspaceById[activeWorkspaceId] {
+            check(runtime.workspaces.workspaceById[activeWorkspaceId] != nil, "Display viewport '\(viewportId)' references missing workspace '\(activeWorkspaceId)'")
+            check(!runtime.workspaces.isWorkspaceActive(activeWorkspaceId, outside: viewportId), "Workspace '\(activeWorkspaceId)' is active on more than one display viewport")
+            if let workspace = runtime.workspaces.workspaceById[activeWorkspaceId] {
                 check(isValidAssignment(workspace: workspace, screen: viewportId.topLeftCorner), "Display viewport '\(viewportId)' has incompatible active workspace '\(workspace.name)'")
             }
         }
@@ -99,9 +125,9 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
     guard requireActiveMonitorViewports else { return }
     for monitor in monitors {
         let viewportId = MonitorViewportId(monitor)
-        guard let viewport = winMuxWorkspaceState.monitorViewportsById[viewportId],
+        guard let viewport = runtime.workspaces.monitorViewportsById[viewportId],
               let activeWorkspaceId = viewport.activeWorkspaceId,
-              let workspace = winMuxWorkspaceState.workspaceById[activeWorkspaceId]
+              let workspace = runtime.workspaces.workspaceById[activeWorkspaceId]
         else {
             check(false, "Current monitor viewport '\(viewportId)' has no active workspace after reconciliation")
             continue
@@ -112,11 +138,11 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
 
 @MainActor
 func rearrangeWorkspacesOnMonitors() {
-    let oldViewportsById = winMuxWorkspaceState.monitorViewportsById
+    let oldViewportsById = runtime.workspaces.monitorViewportsById
     let currentMonitorIds = Set(monitors.map(MonitorViewportId.init))
     let activeViewportIds = Set(oldViewportsById.compactMap { viewportId, viewport -> MonitorViewportId? in
         guard let workspaceId = viewport.activeWorkspaceId,
-              let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+              let workspace = runtime.workspaces.workspaceById[workspaceId],
               isValidAssignment(workspace: workspace, screen: viewportId.topLeftCorner)
         else { return nil }
         return viewportId
@@ -127,7 +153,7 @@ func rearrangeWorkspacesOnMonitors() {
 
     var oldVisibleMonitors: Set<MonitorViewportId> = oldViewportsById.compactMap { viewportId, viewport in
         guard let activeWorkspaceId = viewport.activeWorkspaceId,
-              winMuxWorkspaceState.workspaceById[activeWorkspaceId] != nil
+              runtime.workspaces.workspaceById[activeWorkspaceId] != nil
         else { return nil }
         return viewportId
     }.toSet()
@@ -146,7 +172,7 @@ func rearrangeWorkspacesOnMonitors() {
         }
     }
 
-    winMuxWorkspaceState.monitorViewportsById = [:]
+    runtime.workspaces.monitorViewportsById = [:]
 
     for newMonitor in newMonitors {
         let newScreen = newMonitor.topLeftCorner
@@ -159,16 +185,16 @@ func rearrangeWorkspacesOnMonitors() {
                 previousWorkspaceId: preservedViewport.previousWorkspaceId,
                 lastActiveWorkspaceByProject: preservedViewport.lastActiveWorkspaceByProject,
             )
-            winMuxWorkspaceState.monitorViewportsById[newMonitor] = preservedViewport
+            runtime.workspaces.monitorViewportsById[newMonitor] = preservedViewport
         }
         let existingVisibleWorkspace = mappedOldMonitor
             .flatMap { oldViewportsById[$0]?.activeWorkspaceId }
-            .flatMap { winMuxWorkspaceState.workspaceById[$0] }
+            .flatMap { runtime.workspaces.workspaceById[$0] }
         if let existingVisibleWorkspace,
            newScreen.setActiveWorkspace(existingVisibleWorkspace)
         {
             // Restoring a viewport is not a user switch: retain its local navigation history.
-            winMuxWorkspaceState.monitorViewportsById[newMonitor]?.previousWorkspaceId = preservedViewport?.previousWorkspaceId
+            runtime.workspaces.monitorViewportsById[newMonitor]?.previousWorkspaceId = preservedViewport?.previousWorkspaceId
             continue
         }
         let projectId = existingVisibleWorkspace?.projectId ?? workspaceProjectDefaultId

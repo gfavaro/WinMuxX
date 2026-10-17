@@ -5,7 +5,7 @@ import Common
 func workspaceProjects() -> [WorkspaceProject] {
     materializePersistedWorkspaceProjects()
     ensureMinimumWorkspaceForAllProjects()
-    let projects = winMuxWorkspaceState.projectsById.values.sorted {
+    let projects = runtime.workspaces.projectsById.values.sorted {
         if $0.id == workspaceProjectDefaultId { return true }
         if $1.id == workspaceProjectDefaultId { return false }
         return workspaceProjectOrderPrecedes($0, $1)
@@ -47,16 +47,16 @@ func workspaceProjectDisplayName(_ projectId: WorkspaceProjectId, fallbackName: 
 @MainActor
 func activeWorkspaceProjectId(for monitor: Monitor) -> WorkspaceProjectId {
     materializePersistedWorkspaceProjects()
-    return winMuxWorkspaceState.activeProjectId(for: monitor)
+    return runtime.workspaces.activeProjectId(for: monitor)
 }
 
 @MainActor
 func createWorkspaceProject() -> WorkspaceProject {
     materializePersistedWorkspaceProjects()
-    let identity = winMuxWorkspaceState.nextGeneratedProjectIdentity()
-    let order = winMuxWorkspaceState.nextProjectOrder()
+    let identity = runtime.workspaces.nextGeneratedProjectIdentity()
+    let order = runtime.workspaces.nextProjectOrder()
     let project = WorkspaceProject(id: identity.id, name: identity.name, order: order)
-    winMuxWorkspaceState.registerProject(project)
+    runtime.workspaces.registerProject(project)
     ensureMinimumWorkspace(for: project.id)
     config.workspaceSidebar.projectLabels[project.id.rawValue] = project.id.rawValue
     if !isUnitTest {
@@ -77,9 +77,9 @@ func materializePersistedWorkspaceProjects() {
     for (rawProjectId, label) in config.workspaceSidebar.projectLabels {
         let projectId = WorkspaceProjectId(rawProjectId)
         let name = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !name.isEmpty, winMuxWorkspaceState.projectsById[projectId] == nil else { continue }
-        let order = winMuxWorkspaceState.nextProjectOrder()
-        winMuxWorkspaceState.registerProject(WorkspaceProject(id: projectId, name: name, order: order))
+        guard !name.isEmpty, runtime.workspaces.projectsById[projectId] == nil else { continue }
+        let order = runtime.workspaces.nextProjectOrder()
+        runtime.workspaces.registerProject(WorkspaceProject(id: projectId, name: name, order: order))
     }
     ensureMinimumWorkspaceForAllProjects()
 }
@@ -98,14 +98,14 @@ func materializePersistedWorkspaces() {
 
 @MainActor
 func ensureMinimumWorkspaceForAllProjects(monitor: Monitor = mainMonitor) {
-    for projectId in winMuxWorkspaceState.projectsById.keys {
+    for projectId in runtime.workspaces.projectsById.keys {
         ensureMinimumWorkspace(for: projectId, monitor: monitor)
     }
 }
 
 @MainActor
 func ensureMinimumWorkspace(for projectId: WorkspaceProjectId, monitor: Monitor = mainMonitor) {
-    guard winMuxWorkspaceState.projectsById[projectId] != nil else { return }
+    guard runtime.workspaces.projectsById[projectId] != nil else { return }
     guard !Workspace.all.contains(where: { $0.projectId == projectId && !$0.isArchived }) else { return }
     _ = createBlankWorkspace(projectId: projectId, monitor: monitor)
 }
@@ -143,7 +143,7 @@ func resetWorkspaceSidebarName(workspaceName: String) throws {
 @MainActor
 func renameWorkspaceProject(_ projectId: WorkspaceProjectId, displayName: String) throws {
     materializePersistedWorkspaceProjects()
-    guard winMuxWorkspaceState.projectsById[projectId] != nil else {
+    guard runtime.workspaces.projectsById[projectId] != nil else {
         throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
     }
     let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -157,7 +157,7 @@ func renameWorkspaceProject(_ projectId: WorkspaceProjectId, displayName: String
 @MainActor
 func canDeleteWorkspaceProject(_ projectId: WorkspaceProjectId) -> Bool {
     materializePersistedWorkspaceProjects()
-    return projectId != workspaceProjectDefaultId && winMuxWorkspaceState.projectsById[projectId] != nil
+    return projectId != workspaceProjectDefaultId && runtime.workspaces.projectsById[projectId] != nil
 }
 
 @MainActor
@@ -201,7 +201,7 @@ func deleteWorkspaceProjectFromSidebar(_ projectId: WorkspaceProjectId) async th
 @MainActor
 private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: WorkspaceProjectId) throws {
     materializePersistedWorkspaceProjects()
-    guard let project = winMuxWorkspaceState.projectsById[projectId] else {
+    guard let project = runtime.workspaces.projectsById[projectId] else {
         throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
     }
     guard canDeleteWorkspaceProject(projectId) else {
@@ -209,9 +209,9 @@ private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: Workspac
     }
 
     let fallbackId = workspaceProjectFallbackForDeletion(excluding: projectId)
-    let viewportsShowingDeletedProject = winMuxWorkspaceState.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
+    let viewportsShowingDeletedProject = runtime.workspaces.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
         guard let activeWorkspaceId = viewport.activeWorkspaceId,
-              winMuxWorkspaceState.workspaceById[activeWorkspaceId]?.projectId == projectId
+              runtime.workspaces.workspaceById[activeWorkspaceId]?.projectId == projectId
         else { return nil }
         return viewport.id
     }
@@ -229,7 +229,7 @@ private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: Workspac
         removeWorkspaceFromRegistry(workspace)
     }
 
-    winMuxWorkspaceState.projectsById.removeValue(forKey: projectId)
+    runtime.workspaces.projectsById.removeValue(forKey: projectId)
     try clearWorkspaceSidebarProjectMetadata(projectId)
     ensureVisibleActiveProjectWorkspaces()
     checkWorkspaceHierarchyInvariants()
@@ -238,7 +238,7 @@ private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: Workspac
 @MainActor
 private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProjectId) async throws {
     materializePersistedWorkspaceProjects()
-    guard let project = winMuxWorkspaceState.projectsById[projectId] else {
+    guard let project = runtime.workspaces.projectsById[projectId] else {
         throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
     }
     guard canDeleteWorkspaceProject(projectId) else {
@@ -254,9 +254,9 @@ private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProject
     }
 
     let fallbackId = workspaceProjectFallbackForDeletion(excluding: projectId)
-    let viewportsShowingDeletedProject = winMuxWorkspaceState.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
+    let viewportsShowingDeletedProject = runtime.workspaces.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
         guard let activeWorkspaceId = viewport.activeWorkspaceId,
-              winMuxWorkspaceState.workspaceById[activeWorkspaceId]?.projectId == projectId
+              runtime.workspaces.workspaceById[activeWorkspaceId]?.projectId == projectId
         else { return nil }
         return viewport.id
     }
@@ -268,7 +268,7 @@ private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProject
         removeWorkspaceFromRegistry(workspace)
     }
 
-    winMuxWorkspaceState.projectsById.removeValue(forKey: projectId)
+    runtime.workspaces.projectsById.removeValue(forKey: projectId)
     try clearWorkspaceSidebarProjectMetadata(projectId)
     ensureVisibleActiveProjectWorkspaces()
     checkWorkspaceHierarchyInvariants()

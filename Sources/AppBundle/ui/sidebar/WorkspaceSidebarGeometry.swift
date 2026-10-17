@@ -50,7 +50,7 @@ extension WorkspaceSidebarPanel {
         let collapsedWidth = workspaceSidebarRestingWidth(sidebarConfig)
         guard expandedWidth > 0, collapsedWidth >= 0 else { return nil }
 
-        let menuBarHeight = max(screen.frame.maxY - screen.visibleFrame.maxY, screen.safeAreaInsets.top, NSStatusBar.system.thickness)
+        let menuBarHeight = WorkspaceSidebarMenuBarGeometry.height(on: screen)
         return WorkspaceSidebarPanelLayout(
             frame: workspaceSidebarPanelFrame(screen: screen.frame, menuBarHeight: menuBarHeight, config: sidebarConfig, contentHeight: measuredContentHeight > 0 ? measuredContentHeight : screen.frame.height * 0.6,
                 backingWidth: workspaceSidebarBackingWidth(
@@ -73,6 +73,51 @@ extension WorkspaceSidebarPanel {
         NSScreen.screens.getOrNil(
             atIndex: monitor.monitorAppKitNsScreenScreensId - 1
         ) ?? NSScreen.screens.first
+    }
+}
+
+/// visibleFrame includes system clearance below the menu bar. Prefer the rendered
+/// menu's bounds on this display so that clearance does not become a wallpaper seam.
+func workspaceSidebarRenderedMenuBarHeight(screen: CGRect, safeAreaTop: CGFloat,
+                                           fallback: CGFloat, menuBars: [CGRect]) -> CGFloat {
+    menuBars.first {
+        abs($0.minX - screen.minX) <= 1 && abs($0.minY - screen.minY) <= 1 &&
+            abs($0.width - screen.width) <= 1 && $0.height >= safeAreaTop &&
+            $0.height > 0 && $0.height < screen.height
+    }?.height ?? fallback
+}
+
+@MainActor
+private enum WorkspaceSidebarMenuBarGeometry {
+    private struct Signature: Equatable {
+        let frame: CGRect
+        let visibleFrame: CGRect
+        let safeAreaTop: CGFloat
+        let statusBarHeight: CGFloat
+    }
+    private static var cache: [UInt32: (Signature, CGFloat)] = [:]
+
+    static func height(on screen: NSScreen) -> CGFloat {
+        let signature = Signature(frame: screen.frame, visibleFrame: screen.visibleFrame,
+            safeAreaTop: screen.safeAreaInsets.top, statusBarHeight: NSStatusBar.system.thickness)
+        let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value
+        if let id, let cached = cache[id], cached.0 == signature { return cached.1 }
+        let fallback = max(screen.frame.maxY - screen.visibleFrame.maxY,
+            signature.safeAreaTop, signature.statusBarHeight)
+        let mainTop = NSScreen.screens.first?.frame.maxY ?? screen.frame.maxY
+        let cgScreen = CGRect(x: screen.frame.minX, y: mainTop - screen.frame.maxY,
+            width: screen.frame.width, height: screen.frame.height)
+        let windows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] ?? []
+        let level = Int(CGWindowLevelForKey(.mainMenuWindow))
+        let bars = windows.compactMap { info -> CGRect? in
+            guard info[kCGWindowLayer as String] as? Int == level,
+                  let bounds = info[kCGWindowBounds as String] as? [String: Any] else { return nil }
+            return CGRect(dictionaryRepresentation: bounds as CFDictionary)
+        }
+        let height = workspaceSidebarRenderedMenuBarHeight(screen: cgScreen,
+            safeAreaTop: signature.safeAreaTop, fallback: fallback, menuBars: bars)
+        if let id { cache[id] = (signature, height) }
+        return height
     }
 }
 

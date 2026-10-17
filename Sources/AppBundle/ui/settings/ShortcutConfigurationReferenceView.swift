@@ -1,88 +1,54 @@
+import AppKit
 import SwiftUI
 
 struct ShortcutConfigurationReferenceView: View {
+    var onNavigate: (SettingsSidebarItem) -> Void = { _ in }
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("Configuration Reference")
-                    .font(.headline)
-                Text("Use Configuration to edit the complete winmux.toml file. The settings panes cover the everyday options; this reference lists the remaining advanced sections.")
+            VStack(alignment: .leading, spacing: 20) {
+                Text("Configuration Reference").font(.title2.bold())
+                Text("Edit the complete winmux.toml file in Configuration → Editor. Examples are independent snippets: merge them into existing sections instead of adding duplicate tables or keys. Defaults below come from the app’s default configuration, not your current settings.")
                     .foregroundStyle(.secondary)
+                ForEach(configurationReferenceSections) { section in
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text(section.title).font(.headline)
+                            Spacer()
+                            if let pane = section.pane {
+                                Button("Open \(pane.label)") { onNavigate(pane) }
+                            }
+                        }
+                        Text(section.description).foregroundStyle(.secondary)
+                        if let defaults = section.defaults {
+                            Text("Defaults: \(defaults)").font(.callout)
+                                .textSelection(.enabled)
+                        }
+                        if let example = section.example {
+                            HStack {
+                                Text("Example").font(.subheadline.bold())
+                                Spacer()
+                                Button("Copy") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(example, forType: .string)
+                                }
+                                .accessibilityLabel("Copy \(section.title) example")
+                            }
+                            Text(example).font(.system(.callout, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(12)
+                                .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 8))
+                        }
+                    }
                     .fixedSize(horizontal: false, vertical: true)
-
-                ReferenceSection("Keyboard") {
-                    ReferenceRow("[key-mapping]", "Keyboard layout preset and custom key notation mappings.")
-                    ReferenceRow("[mode.<name>.binding]", "Chord and sequence shortcuts for any mode.")
-                    ReferenceRow("[mode.<name>.binding-tap]", "Tap-only shortcut bindings.")
+                    Divider()
                 }
-                ReferenceSection("Rules and integrations") {
-                    ReferenceRow("[exec]", "Inherited environment and explicit environment variables for commands.")
-                    ReferenceRow("[workspace-to-monitor-force-assignment]", "Workspace-to-display assignments.")
-                    ReferenceRow("on-window-detected", "Window matching rules and commands to run.")
-                    ReferenceRow("on-focus-changed", "Commands that run after the focused window changes.")
-                    ReferenceRow("on-focused-monitor-changed", "Commands that run after the active display changes.")
-                    ReferenceRow("on-mode-changed", "Commands that run after switching modes.")
-                }
-                ReferenceSection("Named sidebar items") {
-                    ReferenceRow("workspace-labels", "Override visible workspace names.")
-                    ReferenceRow("project-labels", "Override visible project names.")
-                    ReferenceRow("project-colors", "Assign project colors using #RRGGBB values.")
-                }
-                Text("The Configuration editor validates the entire file before saving and shows parser errors inline.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text("The Editor validates the entire file before saving. Changes apply after a successful reload. A TOML key belongs to the most recent table header; put root-level options before the first table.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
         }
-    }
-}
-
-private struct ReferenceSection<Content: View>: View {
-    let title: String
-    @ViewBuilder let content: Content
-
-    init(_ title: String, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title).font(.headline)
-            content
-        }
-    }
-}
-
-private struct ReferenceRow: View {
-    let key: String
-    let description: String
-
-    init(_ key: String, _ description: String) {
-        self.key = key
-        self.description = description
-    }
-
-    var body: some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                keyLabel.fixedSize()
-                descriptionLabel
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                keyLabel
-                descriptionLabel
-            }
-        }
-    }
-
-    private var keyLabel: some View {
-        Text(key).font(.system(.body, design: .monospaced))
-            .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
-    }
-    private var descriptionLabel: some View {
-        Text(description).foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
     }
 }

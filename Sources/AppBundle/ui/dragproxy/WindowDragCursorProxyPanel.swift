@@ -50,9 +50,12 @@ final class WindowDragCursorProxyPanel: NSPanelHud {
         guard currentContent != nil || isVisible else { return }
         stopFollowingMouse()
         currentContent = nil
+        hostingView.rootView = AnyView(EmptyView())
+        proxySize = .zero
         if isVisible {
             orderOut(nil)
         }
+        setContentSize(CGSize(width: 1, height: 1))
     }
 }
 struct WindowDragCursorProxyContent: Equatable {

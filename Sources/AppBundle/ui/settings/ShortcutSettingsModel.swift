@@ -5,7 +5,6 @@ import Foundation
 public final class ShortcutSettingsModel: ObservableObject {
     public static let shared = ShortcutSettingsModel()
 
-    @Published var selectedTab: Tab = .shortcuts
     @Published var sections: [Section] = []
     @Published var assignments: [String: String] = [:]
     @Published var tapBindings: [Summary] = []
@@ -20,20 +19,23 @@ public final class ShortcutSettingsModel: ObservableObject {
     @Published var savingSettingIDs: Set<String> = []
     @Published var failedSettingID: String? = nil
     var retrySettingsSave: (() -> Void)?
-    var configurationDraft: String?
+    var configurationDraft: RawConfigDraft?
     @Published var failedSettingTitle: String? = nil
     var activeSettingTitle: String? = nil
     @Published var errorMessage: String? = nil
 
-    var automationDrafts: [String: String] = [:]
-    var pendingSettingsSave: Task<Void, Never>?
+    let saveQueue = SettingsSaveQueue()
+    let configAccess: SettingsConfigAccess
+    let drafts: SettingsDraftStore
     var bindingsDraftRevision = 0
     var savedBindingsRevision = 0
 
     var actionsById: [String: Action] = [:]
     var actionIdByCommand: [String: String] = [:]
 
-    private init() {
+    init(configAccess: SettingsConfigAccess = .native, drafts: SettingsDraftStore = .shared) {
+        self.configAccess = configAccess
+        self.drafts = drafts
         reload()
     }
 }

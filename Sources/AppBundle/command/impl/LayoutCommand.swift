@@ -3,9 +3,17 @@ import Common
 
 struct LayoutCommand: Command {
     let args: LayoutCmdArgs
-    /*conforms*/ let shouldResetClosedWindowsCache = true
+    /*conforms*/ var shouldResetClosedWindowsCache: Bool { !args.forNextDetectedWindow }
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        if args.forNextDetectedWindow {
+            guard args.toggleBetween.val.count == 1,
+                  let layout = args.toggleBetween.val.first, layout == .floating || layout == .tiling else {
+                return io.err("--for-next-detected-window allows exactly one tiling|floating argument")
+            }
+            layoutForNextDetectedWindow = layout
+            return true
+        }
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)
@@ -24,6 +32,8 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: .v, window: window)
             case .tabGroup:
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: nil, window: window)
+            case .stacked:
+                return changeTilingLayout(io, targetLayout: .stacked, targetOrientation: nil, window: window)
             case .dwindle:
                 return changeTilingLayout(io, targetLayout: .dwindle, targetOrientation: nil, window: window)
             case .tiles:
@@ -61,6 +71,8 @@ struct LayoutCommand: Command {
     }
 }
 
+@MainActor var layoutForNextDetectedWindow: LayoutCmdArgs.LayoutDescription?
+
 @MainActor private func changeTilingLayout(_ io: CmdIo, targetLayout: Layout?, targetOrientation: Orientation?, window: Window) -> Bool {
     guard let parent = window.parent else { return false }
     switch parent.cases {
@@ -83,6 +95,7 @@ struct LayoutCommand: Command {
 extension Window {
     fileprivate func matchesDescription(_ layout: LayoutCmdArgs.LayoutDescription) -> Bool {
         return switch layout {
+            case .stacked: (parent as? TilingContainer)?.layout == .stacked
             case .tabGroup:   (parent as? TilingContainer)?.layout == .tabGroup
             case .dwindle:    (parent as? TilingContainer)?.layout == .dwindle
             case .tiles:       (parent as? TilingContainer)?.layout == .tiles

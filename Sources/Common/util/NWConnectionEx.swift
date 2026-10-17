@@ -4,6 +4,7 @@ import Foundation
 extension NWConnection {
     public func writeAtomic(_ msg: Codable, _ encoder: JSONEncoder = JSONEncoder()) async -> ((), error: NWError?) {
         let payload = Result { try encoder.encode(msg) }.getOrDie()
+        guard payload.count <= maximumIPCFrameBytes else { return ((), .posix(.EMSGSIZE)) }
         var data = withUnsafeBytes(of: UInt32(payload.count)) { Data($0) }
         check(data.count == 4)
         data.append(payload)
@@ -25,7 +26,8 @@ extension NWConnection {
                 Task {
                     let error: NWError?
                     switch state {
-                        case .cancelled, .preparing, .setup: return
+                        case .cancelled: error = .posix(.ECANCELED)
+                        case .preparing, .setup: return
                         case .ready: error = nil
                         case .failed(let e), .waiting(let e): error = e
                         @unknown default: die("Unknown NWConnection.State: \(state)")
@@ -42,47 +44,39 @@ extension NWConnection {
         }
     }
 
-    private func read(bytes size: Int) async -> Result<Data, NWError> {
-        var data = Data(capacity: size)
-        while data.count < size {
-            let remaining = size - data.count
-            let chunk: Result<Data, NWError> = await withCheckedContinuation { cont in
-                receive(minimumIncompleteLength: remaining, maximumLength: remaining) { data, context, isComplete, error in
-                    if let error {
-                        cont.resume(returning: .failure(error))
-                    } else {
-                        cont.resume(returning: .success(data ?? Data()))
+    public func readTillError() async {
+        await withTaskCancellationHandler {
+            while !Task.isCancelled {
+                let isError = await withCheckedContinuation { continuation in
+                    receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, complete, error in
+                        continuation.resume(returning: error != nil || complete || data == nil || data?.isEmpty == true)
+                    }
+                }
+                if isError { return }
+            }
+        } onCancel: { self.cancel() }
+    }
+
+    public func readNonAtomic(timeout: Duration? = nil) async -> Result<Data, NWError> {
+        let deadline = timeout.map { timeout in
+            Task {
+                do { try await Task.sleep(for: timeout) } catch { return }
+                self.cancel()
+            }
+        }
+        defer { deadline?.cancel() }
+        return await withTaskCancellationHandler {
+            await readIPCFrame { minimum, maximum in
+                await withCheckedContinuation { continuation in
+                    self.receive(minimumIncompleteLength: minimum, maximumLength: maximum) { data, _, complete, error in
+                        if let error { continuation.resume(returning: .failure(error)) }
+                        else { continuation.resume(returning: .success(IPCReadChunk(data: data ?? Data(), complete: complete))) }
                     }
                 }
             }
-            switch chunk {
-                case .success(let chunk): data.append(chunk)
-                case .failure: return chunk
-            }
-        }
-        return .success(data)
+        } onCancel: { self.cancel() }
     }
 
-    public func readTillError() async {
-        while true {
-            let isError = await withCheckedContinuation { cont in
-                receive(minimumIncompleteLength: 1, maximumLength: Int.max) { data, context, isComplete, error in
-                    cont.resume(returning: error != nil || data == nil || data?.count == 0)
-                }
-            }
-            if isError { return }
-        }
-    }
-
-    public func readNonAtomic() async -> Result<Data, NWError> {
-        switch await read(bytes: 4) {
-            case .success(let header):
-                let count = header.withUnsafeBytes { $0.load(as: UInt32.self) }
-                return await read(bytes: Int(count))
-            case .failure(let e):
-                return .failure(e)
-        }
-    }
 }
 
 private actor IsDone {

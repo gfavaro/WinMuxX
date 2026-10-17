@@ -54,7 +54,13 @@ struct SettingsDraft<Value: Equatable>: DynamicProperty {
 
 struct SettingsSaveSummary: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject private var drafts = SettingsDraftStore.shared
+    var additionalUnsaved = false
+    @ObservedObject private var drafts: SettingsDraftStore
+    init(model: ShortcutSettingsModel, additionalUnsaved: Bool = false) {
+        self.model = model
+        self.additionalUnsaved = additionalUnsaved
+        self._drafts = ObservedObject(wrappedValue: model.drafts)
+    }
     var body: some View {
         if !model.savingSettingIDs.isEmpty {
             Label("Saving settings…", systemImage: "arrow.triangle.2.circlepath")
@@ -70,7 +76,7 @@ struct SettingsSaveSummary: View {
                 DisclosureGroup("Error details") { Text(error).textSelection(.enabled) }
             }
             .accessibilityElement(children: .contain)
-        } else if !drafts.entries.isEmpty || model.bindingsDraftRevision != model.savedBindingsRevision || model.configurationDraft != nil {
+        } else if additionalUnsaved || !drafts.entries.isEmpty || model.bindingsDraftRevision != model.savedBindingsRevision || model.configurationDraft != nil {
             Label("Unsaved changes", systemImage: "pencil").foregroundStyle(.secondary)
         }
     }

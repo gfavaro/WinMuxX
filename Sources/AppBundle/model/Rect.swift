@@ -1,7 +1,7 @@
 import AppKit
 import Common
 
-struct Rect: ConvenienceCopyable, WinMuxAny, Equatable {
+struct Rect: ConvenienceCopyable, WinMuxAny, Equatable, Sendable {
     var topLeftX: CGFloat
     var topLeftY: CGFloat
 
@@ -27,9 +27,14 @@ struct Rect: ConvenienceCopyable, WinMuxAny, Equatable {
 
 extension CGRect {
     func monitorFrameNormalized() -> Rect {
-        let mainMonitorHeight: CGFloat = mainMonitor.height
+        monitorFrameNormalized(mainHeight: mainMonitor.height)
+    }
+
+    /// Passing the height explicitly lets the main monitor be built without recursively
+    /// asking for mainMonitor while normalizing its own frame.
+    func monitorFrameNormalized(mainHeight: CGFloat) -> Rect {
         let rect = toRect()
-        return rect.copy(\.topLeftY, mainMonitorHeight - rect.topLeftY)
+        return rect.copy(\.topLeftY, mainHeight - rect.topLeftY)
     }
 }
 

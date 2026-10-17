@@ -35,11 +35,12 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                         .padding(.horizontal, 12)
                 }
 
-                HStack(spacing: 8) {
+                let buttons = isCompact ? AnyLayout(VStackLayout(spacing: 4)) : AnyLayout(HStackLayout(spacing: 8))
+                buttons {
                     Button(action: onOverride) {
                         Group {
                             if isCompact {
-                                Image(systemName: "arrow.left.arrow.right")
+                                Image(systemName: "arrow.down.forward")
                                     .resizable()
                                     .scaledToFit()
                                     .frame(width: 10, height: 10)
@@ -56,7 +57,7 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Override")
-                    .help(text + ". Swap workspaces between displays.")
+                    .help("Bring this workspace to this display")
                     .background {
                         RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .fill(Color(nsColor: .systemRed).opacity(isOverrideHovered ? 1 : 0.88))
@@ -70,11 +71,17 @@ struct WorkspaceSidebarInUseOverrideOverlay: View {
                     .onHover { hovering in
                         isOverrideHovered = hovering
                     }
-                    if !isCompact {
-                        Button("Cancel", action: onCancel)
-                            .font(.system(size: 10))
-                            .buttonStyle(.plain)
+                    Button(action: onCancel) {
+                        if isCompact {
+                            Image(systemName: "xmark")
+                                .frame(maxWidth: .infinity, minHeight: 20)
+                        } else {
+                            Text("Cancel")
+                        }
                     }
+                    .font(.system(size: 10))
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Cancel")
                 }
             }
             .padding(isCompact ? 4 : 10)
@@ -111,7 +118,7 @@ func workspaceSidebarOverrideConfirmationState(
     return WorkspaceSidebarOverrideConfirmationState(
         requestedWorkspaceName: requestedWorkspaceName,
         visibleWorkspaceNames: Set(workspaces.filter {
-            workspaceSidebarWorkspaceIsInUseOnOtherDisplay($0, selectedScopeId: snapshot.targetMonitorScopeId)
+            workspaceSidebarWorkspaceIsOnOtherDisplay($0, selectedScopeId: snapshot.targetMonitorScopeId)
         }.map(\.name)),
         isCompact: progress < workspaceSidebarRowsRevealProgress
     )

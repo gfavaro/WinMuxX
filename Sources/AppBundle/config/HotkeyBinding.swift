@@ -4,20 +4,36 @@ import Foundation
 import HotKey
 import TOMLKit
 
-@MainActor private var hotkeys: [String: HotKey] = [:]
-@MainActor private var activeTapBindings: [TapModifierKey: TapBinding] = [:]
-@MainActor private var pendingTapBindings: [TapModifierKey: TapBinding] = [:]
-@MainActor private var pressedTapModifiers: Set<TapModifierKey> = []
-@MainActor private var pendingTapTriggerTasks: [TapModifierKey: Task<Void, Never>] = [:]
-@MainActor private var pendingTapTriggerTokens: [TapModifierKey: Int] = [:]
-@MainActor private var nextTapTriggerToken = 0
-@MainActor private var hotkeysSuspended = false
-@MainActor private var sequenceBindingsByPrefix: [Key: [SequenceBinding]] = [:]
-@MainActor var sequenceBindingsPrefixKeys: Set<Key> = []
-/// Timestamp of the last Escape press, used for sequence detection via local monitor
-@MainActor private var lastSequencePrefixTime: DispatchTime? = nil
-/// Which prefix key was pressed last
-@MainActor private var lastSequencePrefixKey: Key? = nil
+@MainActor
+final class HotkeyState {
+    var hotkeys: [String: HotKey] = [:]
+    var sideFilteredBindings: [Int64: [HotkeyBinding]] = [:]
+    var activeTapBindings: [TapModifierKey: TapBinding] = [:]
+    var pendingTapBindings: [TapModifierKey: TapBinding] = [:]
+    var pressedTapModifiers: Set<TapModifierKey> = []
+    var pendingTapTriggerTasks: [TapModifierKey: Task<Void, Never>] = [:]
+    var pendingTapTriggerTokens: [TapModifierKey: Int] = [:]
+    var nextTapTriggerToken = 0
+    var hotkeysSuspended = false
+    var sequenceBindingsByPrefix: [Key: [SequenceBinding]] = [:]
+    var sequenceBindingsPrefixKeys: Set<Key> = []
+    /// Timestamp of the last Escape press, used for sequence detection via local monitor
+    var lastSequencePrefixTime: DispatchTime? = nil
+    /// Which prefix key was pressed last
+    var lastSequencePrefixKey: Key? = nil
+    var activeMode: String? = mainModeId
+
+    isolated deinit {
+        for task in pendingTapTriggerTasks.values { task.cancel() }
+        for key in hotkeys.values { key.isEnabled = false }
+    }
+}
+
+@MainActor private var hotkeyState: HotkeyState { runtime.hotkeys }
+@MainActor var sequenceBindingsPrefixKeys: Set<Key> {
+    get { hotkeyState.sequenceBindingsPrefixKeys }
+    set { hotkeyState.sequenceBindingsPrefixKeys = newValue }
+}
 private let tapBindingTriggerDelayNs: UInt64 = 75_000_000
 /// Max time (ns) between prefix key and subsequent key for a sequence binding
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
@@ -25,19 +41,20 @@ private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 @MainActor func resetHotKeys() {
     // Explicitly unregister all hotkeys. We cannot always rely on destruction of the HotKey object to trigger
     // unregistration because we might be running inside a hotkey handler that is keeping its HotKey object alive.
-    for (_, key) in hotkeys {
+    for (_, key) in hotkeyState.hotkeys {
         key.isEnabled = false
     }
-    hotkeys = [:]
-    activeTapBindings = [:]
-    pendingTapBindings = [:]
-    pressedTapModifiers = []
+    hotkeyState.hotkeys = [:]
+    hotkeyState.activeTapBindings = [:]
+    hotkeyState.sideFilteredBindings = [:]
+    hotkeyState.pendingTapBindings = [:]
+    hotkeyState.pressedTapModifiers = []
     cancelPendingTapTriggers()
-    sequenceBindingsByPrefix = [:]
+    hotkeyState.sequenceBindingsByPrefix = [:]
     sequenceBindingsPrefixKeys = []
-    lastSequencePrefixTime = nil
-    lastSequencePrefixKey = nil
-    hotkeysSuspended = false
+    hotkeyState.lastSequencePrefixTime = nil
+    hotkeyState.lastSequencePrefixKey = nil
+    hotkeyState.hotkeysSuspended = false
 }
 
 extension HotKey {
@@ -51,47 +68,60 @@ extension HotKey {
     }
 }
 
-@MainActor var activeMode: String? = mainModeId
+@MainActor var activeMode: String? {
+    get { hotkeyState.activeMode }
+    set { hotkeyState.activeMode = newValue }
+}
 @MainActor func setHotkeysSuspended(_ suspended: Bool) {
-    if hotkeysSuspended == suspended { return }
-    hotkeysSuspended = suspended
+    if hotkeyState.hotkeysSuspended == suspended { return }
+    hotkeyState.hotkeysSuspended = suspended
     if suspended {
-        pendingTapBindings = [:]
-        pressedTapModifiers = []
+        hotkeyState.pendingTapBindings = [:]
+        hotkeyState.pressedTapModifiers = []
         cancelPendingTapTriggers()
     }
     applyHotkeyEnabledState()
 }
 
 @MainActor func activateMode(_ targetMode: String?) async throws {
+    let owner = runtime
     let mode = targetMode.flatMap { config.modes[$0] }
     let targetBindings = mode?.bindings ?? [:]
-    activeTapBindings = mode?
+    hotkeyState.sideFilteredBindings = Dictionary(grouping: targetBindings.values.filter { config.modifierSides.restricts($0.modifiers) },
+        by: { Int64($0.keyCode.carbonKeyCode) })
+    hotkeyState.activeTapBindings = mode?
         .tapBindings
         .values
         .reduce(into: [:]) { $0[$1.trigger] = $1 } ?? [:]
-    pendingTapBindings = [:]
-    pressedTapModifiers = []
+    hotkeyState.pendingTapBindings = [:]
+    hotkeyState.pressedTapModifiers = []
     cancelPendingTapTriggers()
-    for binding in targetBindings.values where !hotkeys.keys.contains(binding.descriptionWithKeyCode) {
-        hotkeys[binding.descriptionWithKeyCode] = HotKey(key: binding.keyCode, modifiers: binding.modifiers, keyDownHandler: {
+    for binding in targetBindings.values where !config.modifierSides.restricts(binding.modifiers) && !hotkeyState.hotkeys.keys.contains(binding.descriptionWithKeyCode) {
+        hotkeyState.hotkeys[binding.descriptionWithKeyCode] = HotKey(key: binding.keyCode, modifiers: binding.modifiers, keyDownHandler: { [weak owner] in
             Task { @MainActor in
-                if hotkeysSuspended { return }
-                noteTapBindingKeyDown()
-                triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+                guard let owner else { return }
+                owner.withValue {
+                    if hotkeyState.hotkeysSuspended { return }
+                    noteTapBindingKeyDown()
+                    triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+                }
             }
         })
     }
     // Populate sequence binding lookup tables
-    sequenceBindingsByPrefix = [:]
+    hotkeyState.sequenceBindingsByPrefix = [:]
     sequenceBindingsPrefixKeys = []
-    lastSequencePrefixTime = nil
-    lastSequencePrefixKey = nil
+    hotkeyState.lastSequencePrefixTime = nil
+    hotkeyState.lastSequencePrefixKey = nil
     if let seqBindings = mode?.sequenceBindings.values {
         for seq in seqBindings {
-            sequenceBindingsByPrefix[seq.prefix, default: []].append(seq)
+            hotkeyState.sequenceBindingsByPrefix[seq.prefix, default: []].append(seq)
             sequenceBindingsPrefixKeys.insert(seq.prefix)
         }
+    }
+    if targetBindings.values.contains(where: { config.modifierSides.restricts($0.modifiers) }),
+       !SideFilteredHotkeys.shared.install() {
+        MessageModel.shared.message = Message(description: "Shortcut modifiers", body: "Could not install side-filtered shortcuts. Check WinMuxX Accessibility access, then reload the configuration.")
     }
     let oldMode = activeMode
     activeMode = targetMode
@@ -108,19 +138,22 @@ extension HotKey {
 }
 
 @MainActor private func triggerBinding(_ binding: String, _ commands: [any Command]) {
-    if hotkeysSuspended { return }
+    if hotkeyState.hotkeysSuspended { return }
+    let owner = runtime
     Task {
-        if let activeMode {
-            broadcastEvent(.bindingTriggered(
-                mode: activeMode,
-                binding: binding,
-            ))
-            try await runLightSession(
-                .hotkeyBinding,
-                .checkServerIsEnabledOrDie(),
-                shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
-            ) { () throws in
-                _ = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
+        try await owner.withValue {
+            if let activeMode {
+                broadcastEvent(.bindingTriggered(
+                    mode: activeMode,
+                    binding: binding,
+                ))
+                try await runLightSession(
+                    .hotkeyBinding,
+                    .checkServerIsEnabledOrDie(),
+                    shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
+                ) { () throws in
+                    _ = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
+                }
             }
         }
     }
@@ -130,8 +163,8 @@ extension HotKey {
 /// is pressed. Records the timestamp so a subsequent matching key can trigger a
 /// sequence binding. Does NOT consume the event.
 @MainActor func noteSequencePrefixKeyPressed(_ prefix: Key) {
-    lastSequencePrefixTime = DispatchTime.now()
-    lastSequencePrefixKey = prefix
+    hotkeyState.lastSequencePrefixTime = DispatchTime.now()
+    hotkeyState.lastSequencePrefixKey = prefix
 }
 
 /// Called from the local keyDown monitor for every keyDown event.
@@ -139,43 +172,43 @@ extension HotKey {
 /// checks if this key matches a sequence binding and executes it.
 /// Returns true if the event was consumed (should not reach the app).
 @MainActor func handleSequenceKeyDown(event: NSEvent) -> Bool {
-    guard let prefix = lastSequencePrefixKey,
-          let lastTime = lastSequencePrefixTime,
-          let bindings = sequenceBindingsByPrefix[prefix] else {
+    guard let prefix = hotkeyState.lastSequencePrefixKey,
+          let lastTime = hotkeyState.lastSequencePrefixTime,
+          let bindings = hotkeyState.sequenceBindingsByPrefix[prefix] else {
         return false
     }
     let elapsed = DispatchTime.now().uptimeNanoseconds - lastTime.uptimeNanoseconds
     guard elapsed < sequenceChordTimeoutNs else {
         // Timeout expired, clear state
-        lastSequencePrefixTime = nil
-        lastSequencePrefixKey = nil
+        hotkeyState.lastSequencePrefixTime = nil
+        hotkeyState.lastSequencePrefixKey = nil
         return false
     }
     // Check if this key matches any sequence binding for this prefix
     for seq in bindings {
         if seq.key.carbonKeyCode == event.keyCode {
             // Match! Execute the command and consume the event
-            lastSequencePrefixTime = nil
-            lastSequencePrefixKey = nil
+            hotkeyState.lastSequencePrefixTime = nil
+            hotkeyState.lastSequencePrefixKey = nil
             triggerBinding(seq.descriptionWithKeyNotation, seq.commands)
             return true
         }
     }
     // No match - clear state and let event pass through
-    lastSequencePrefixTime = nil
-    lastSequencePrefixKey = nil
+    hotkeyState.lastSequencePrefixTime = nil
+    hotkeyState.lastSequencePrefixKey = nil
     return false
 }
 
 @MainActor func noteTapBindingKeyDown() {
-    if hotkeysSuspended { return }
+    if hotkeyState.hotkeysSuspended { return }
     cancelPendingTapTriggers()
-    pendingTapBindings = [:]
+    hotkeyState.pendingTapBindings = [:]
 }
 
 @MainActor func noteTapBindingFlagsChanged(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
-    if hotkeysSuspended { return }
-    if activeTapBindings.isEmpty && pendingTapBindings.isEmpty && pendingTapTriggerTasks.isEmpty { return }
+    if hotkeyState.hotkeysSuspended { return }
+    if hotkeyState.activeTapBindings.isEmpty && hotkeyState.pendingTapBindings.isEmpty && hotkeyState.pendingTapTriggerTasks.isEmpty { return }
     guard let tapModifier = TapModifierKey(keyCode: keyCode) else { return }
     cancelPendingTapTriggers()
 
@@ -183,18 +216,18 @@ extension HotKey {
     // applying the single changed key. macOS can occasionally drop a modifier
     // release event; if that happens, a stale entry here makes later single-key
     // tap launchers look like multi-modifier chords and they stop firing.
-    pressedTapModifiers = tapModifiersPressed(in: modifierFlags)
+    hotkeyState.pressedTapModifiers = tapModifiersPressed(in: modifierFlags)
 
-    if pressedTapModifiers.contains(tapModifier) {
-        let hadOtherPressedModifiers = !pressedTapModifiers.subtracting([tapModifier]).isEmpty
-        pendingTapBindings = [:]
-        if !hadOtherPressedModifiers, let binding = activeTapBindings[tapModifier] {
-            pendingTapBindings[tapModifier] = binding
+    if hotkeyState.pressedTapModifiers.contains(tapModifier) {
+        let hadOtherPressedModifiers = !hotkeyState.pressedTapModifiers.subtracting([tapModifier]).isEmpty
+        hotkeyState.pendingTapBindings = [:]
+        if !hadOtherPressedModifiers, let binding = hotkeyState.activeTapBindings[tapModifier] {
+            hotkeyState.pendingTapBindings[tapModifier] = binding
         }
         return
     }
 
-    if let binding = pendingTapBindings.removeValue(forKey: tapModifier) {
+    if let binding = hotkeyState.pendingTapBindings.removeValue(forKey: tapModifier) {
         scheduleTapBindingTrigger(binding)
     }
 }
@@ -205,39 +238,55 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
 
 @MainActor private func scheduleTapBindingTrigger(_ binding: TapBinding) {
     let trigger = binding.trigger
-    nextTapTriggerToken += 1
-    let token = nextTapTriggerToken
-    pendingTapTriggerTokens[trigger] = token
-    let task = Task { @MainActor in
-        try? await Task.sleep(nanoseconds: tapBindingTriggerDelayNs)
-        guard pendingTapTriggerTokens[trigger] == token else { return }
-        pendingTapTriggerTasks[trigger] = nil
-        pendingTapTriggerTokens[trigger] = nil
-        guard pressedTapModifiers.isEmpty else { return }
-        triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+    hotkeyState.nextTapTriggerToken += 1
+    let token = hotkeyState.nextTapTriggerToken
+    hotkeyState.pendingTapTriggerTokens[trigger] = token
+    let owner = runtime
+    let task = Task { @MainActor [weak owner] in
+        do { try await Task.sleep(nanoseconds: tapBindingTriggerDelayNs) } catch { return }
+        guard let owner else { return }
+        owner.withValue {
+            guard hotkeyState.pendingTapTriggerTokens[trigger] == token else { return }
+            hotkeyState.pendingTapTriggerTasks[trigger] = nil
+            hotkeyState.pendingTapTriggerTokens[trigger] = nil
+            guard hotkeyState.pressedTapModifiers.isEmpty else { return }
+            triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+        }
     }
-    pendingTapTriggerTasks[trigger] = task
+    hotkeyState.pendingTapTriggerTasks[trigger] = task
 }
 
 @MainActor private func cancelPendingTapTriggers() {
-    for task in pendingTapTriggerTasks.values {
+    for task in hotkeyState.pendingTapTriggerTasks.values {
         task.cancel()
     }
-    pendingTapTriggerTasks = [:]
-    pendingTapTriggerTokens = [:]
+    hotkeyState.pendingTapTriggerTasks = [:]
+    hotkeyState.pendingTapTriggerTokens = [:]
 }
 
 @MainActor private func applyHotkeyEnabledState() {
     let targetBindings = activeMode.flatMap { config.modes[$0] }?.bindings ?? [:]
-    for (binding, key) in hotkeys {
-        key.isEnabled = !hotkeysSuspended && targetBindings.keys.contains(binding)
+    for (binding, key) in hotkeyState.hotkeys {
+        key.isEnabled = !hotkeyState.hotkeysSuspended && targetBindings[binding].map { !config.modifierSides.restricts($0.modifiers) } == true
     }
 }
 
 @MainActor func tapBindingPressedModifiersForTests() -> Set<TapModifierKey> {
-    pressedTapModifiers
+    hotkeyState.pressedTapModifiers
 }
 
 @MainActor func hasPendingTapBindingForTests() -> Bool {
-    !pendingTapBindings.isEmpty || !pendingTapTriggerTasks.isEmpty
+    !hotkeyState.pendingTapBindings.isEmpty || !hotkeyState.pendingTapTriggerTasks.isEmpty
+}
+
+@MainActor func sideFilteredBinding(keyCode: Int64, flags: NSEvent.ModifierFlags) -> HotkeyBinding? {
+    guard !hotkeyState.hotkeysSuspended, TrayMenuModel.shared.isEnabled, activeMode != nil else { return nil }
+    return hotkeyState.sideFilteredBindings[keyCode]?.first { config.modifierSides.matches($0.modifiers, flags: flags) }
+}
+
+@MainActor func handleSideFilteredKeyDown(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {
+    guard let binding = sideFilteredBinding(keyCode: keyCode, flags: flags) else { return false }
+    noteTapBindingKeyDown()
+    triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+    return true
 }

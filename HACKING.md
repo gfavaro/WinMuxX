@@ -8,7 +8,13 @@ investigations and reviews are listed in the [documentation index](docs/README.m
 ## Build and check
 
 Development requires macOS and Xcode. `Package.swift` defines Swift targets;
-`.swift-version` pins the toolchain used through `script/setup.sh` and CI. The app
+`.swift-version` pins Swift 6.4.0 for `script/setup.sh` and CI. Local Xcode’s
+Swift 6.4 is accepted as the same release version. A mismatched compiler fails
+before building; install the pin with Swiftly or select a matching Xcode. Release
+app builds pass the selected compiler to Xcode through `SWIFT_EXEC`, so the app
+and CLI use the same compiler. `Package.swift` still requires tools version 6.2.
+See [dependencies](docs/DEPENDENCIES.md) for retained packages and audit decisions.
+The app
 supports macOS 13+, with native Liquid Glass enabled on macOS 26+.
 
 ```sh
@@ -25,7 +31,7 @@ regenerates version/hash files in `Sources/Common`; review their diff before
 committing. `WinMux.xcodeproj` and build outputs are generated artifacts.
 
 For local releases, `script/fork-build.sh` reads the signing identity from
-`${XDG_CONFIG_HOME:-~/.config}/winmux-gf/signing-identity`, unless
+`${XDG_CONFIG_HOME:-~/.config}/winmuxx/signing-identity`, unless
 `CODESIGN_IDENTITY` is supplied. Retain the identity and bundle ID across installs
 to preserve macOS permissions. Without a configured identity the build is ad hoc.
 
@@ -47,6 +53,9 @@ CLI is `WinMuxX.app/Contents/MacOS/winmuxx-cli`; `--version` compares client and
 server versions. Installation and validation of interactive behavior are separate
 from compilation and automated tests.
 
+See [Testing](docs/TESTING.md) for fixture isolation, asynchronous tests, rendering
+coverage, regression requirements and CI reports.
+
 ## Architecture
 
 | Area | Responsibility |
@@ -61,6 +70,46 @@ Within AppBundle, `tree` owns windows, workspaces and containers; `layout` compu
 geometry; `command` implements actions; `focus` and `mouse` handle input policy;
 `config` parses TOML. `ui` groups native features such as settings, sidebar, borders,
 tabs and the menu bar. Keep pure geometry/policy separate from AppKit side effects.
+
+Settings saves are owned by a model-local `SettingsSaveQueue`. Scalar/document,
+shortcut and raw-editor saves share its ordering. Structured saves share progress,
+error and retry handling; the raw editor retains its own baseline and error UI.
+TOML transformations live separately from UI save orchestration. For persistence
+tests, create a fresh ShortcutSettingsModel with injected SettingsConfigAccess and
+SettingsDraftStore; production uses the shared instance with native access. The
+workspace/config state has an explicit runtime owner as described below.
+
+`runtime/WinMuxRuntime.swift` is the composition point for configuration, workspace /
+project / viewport registry, focus history and native focus holds, monitor caches,
+hotkeys and recovery snapshots/tasks. Production uses one process-lifetime owner.
+The `config`, `configUrl` and focus accessors are domain conveniences over that
+owner, not independent storage. Config reload publishes value and path together
+before observers run, and its gate, diagnostics, watcher and debounce belong to
+the configuration owner. Monitor snapshots are immutable and Sendable; cached
+main/list/sorted snapshots invalidate together on screen changes.
+
+For focused state tests, construct a WinMuxRuntime and use `withValue` for a scoped
+binding, including across suspension. Deferred work can use `runtime.task` to retain
+its originating binding. A Workspace is used within its runtime binding; IDs are
+unique within a registry, while object equality remains identity. Legacy serial
+fixtures replace the runtime as a unit. Native window registries, UI singletons,
+refresh scheduling and persistence adapters still have process lifetimes, so this
+does not make the complete suite parallel-safe. Do not replace production runtime
+state or alter AX/multitouch thread ownership to simplify a test.
+
+`WorkspaceMonitorAssignment.swift` owns ordinary selection and explicit display
+moves. `Workspace.assignedMonitor` is the ownership lookup; `workspaceMonitor` adds
+a fallback for unassigned slots. Selection preserves ownership. Explicit moves
+invalidate recovery state and replace secondary slots, returning displaced owners
+to main without activating them. Startup/restoration only seed ownership.
+
+The swipe preview uses `WorkspaceSwipePreviewPhase` to wait for both the animation
+and workspace layout before removing its overlay. Async completions must check their
+generation before affecting a newer interaction. Outgoing screen capture and incoming
+composition share the bounded actor worker. The preview reuses one native surface;
+ordinary cancellation must hide it and clear images/animations, while invalidation
+releases it. See [swipe performance](docs/SWIPE_PERFORMANCE.md) for timing boundaries
+and the distinction between synthetic surface tests and physical gesture latency.
 
 Settings navigation lives in `ui/settings/ShortcutSettingsView.swift`. Each config
 pane has a `Settings*View.swift` file; controls and TOML persistence are shared in

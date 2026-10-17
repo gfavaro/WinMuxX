@@ -1,13 +1,5 @@
 import AppKit
 
-/// First line of defence against lock screen
-///
-/// When you lock the screen, all accessibility API becomes unobservable (all attributes become empty, window id
-/// becomes nil, etc.) which tricks WinMux into thinking that all windows were closed.
-/// That's why every time a window dies WinMux caches the "entire world" (unless window is already presented in the cache)
-/// so that once the screen is unlocked, WinMux could restore windows to where they were
-@MainActor private var closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
-
 struct FrozenMonitor: Codable, Sendable {
     let displayUUID: String?
     let topLeftCorner: CGPoint
@@ -82,32 +74,33 @@ struct FrozenWorkspace: Codable, Sendable {
 
 @MainActor func cacheClosedWindowIfNeeded() {
     let frozenWorld = snapshotCurrentFrozenWorld()
-    if frozenWorld.windowIds.isSubset(of: closedWindowsCache.windowIds) {
+    if frozenWorld.windowIds.isSubset(of: runtime.recovery.closedWindows.windowIds) {
         return // already cached
     }
-    closedWindowsCache = frozenWorld
+    runtime.recovery.closedWindows = frozenWorld
 }
 
 @MainActor
 func replaceClosedWindowsCache(_ frozenWorld: FrozenWorld) {
-    closedWindowsCache = frozenWorld
+    runtime.recovery.closedWindows = frozenWorld
 }
 
 @MainActor
 func syncClosedWindowsCacheToCurrentWorld() {
-    closedWindowsCache = snapshotCurrentFrozenWorld()
+    invalidateLateRestartTreeRestoration()
+    runtime.recovery.closedWindows = snapshotCurrentFrozenWorld()
 }
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {
     // An empty cache is not a restoration: new-window rules must still run.
-    guard !closedWindowsCache.workspaces.isEmpty else { return false }
-    return try await restoreFrozenWorldIfNeeded(closedWindowsCache, newlyDetectedWindow: newlyDetectedWindow)
+    guard !runtime.recovery.closedWindows.workspaces.isEmpty else { return false }
+    return try await restoreFrozenWorldIfNeeded(runtime.recovery.closedWindows, newlyDetectedWindow: newlyDetectedWindow)
 }
 
 /// AX disappearing during screen lock is recoverable; a native close is not.
 /// Invalidate old ID-only snapshots so a reused ID never inherits the closed window's state.
 @MainActor func invalidateClosedWindowsCacheForNativeClosure(_ windowId: UInt32) {
-    if closedWindowsCache.windowIds.contains(windowId) { resetClosedWindowsCache() }
+    if runtime.recovery.closedWindows.windowIds.contains(windowId) { resetClosedWindowsCache() }
 }
 
 @MainActor
@@ -126,7 +119,9 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex
-        workspace.preferredMonitorPoint = frozenWorkspace.monitor.preferredPoint(in: monitors)
+        if restoreVisibleWorkspaces || workspace.preferredMonitorPoint == nil {
+            workspace.preferredMonitorPoint = frozenWorkspace.monitor.preferredPoint(in: monitors)
+        }
         let frozenWindowById = collectFrozenWindows(frozenWorkspace)
         for frozenWindow in frozenWorkspace.floatingWindows {
             if let window = windowsById[frozenWindow.id] {
@@ -309,5 +304,6 @@ private func collectFrozenWindowsRecursive(_ frozenContainer: FrozenContainer, r
 // That's why we have to refresh the cache every time layout or visible workspace assignment changes. Those changes can
 // be caused by running commands and with mouse manipulations.
 @MainActor func resetClosedWindowsCache() {
-    closedWindowsCache = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+    invalidateLateRestartTreeRestoration()
+    runtime.recovery.closedWindows = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
 }

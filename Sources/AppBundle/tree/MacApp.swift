@@ -14,14 +14,14 @@ final class MacApp: AbstractApp {
     private let axApp: ThreadGuardedValue<AXUIElement>
     /// Second app element with a much shorter messaging timeout, for the focused-window query
     /// that fronts every refresh session: when the app is too busy to answer quickly, the
-    /// session must fall back to the event-maintained cache instead of stalling on the full
-    /// timeout (and then acting as if no window were focused at all).
+    /// session must leave confirmed focus untouched instead of treating a timeout as no focus.
     private let axAppFastTimeout: ThreadGuardedValue<AXUIElement>
     private let appAxSubscriptions: ThreadGuardedValue<[AxSubscription]> // keep subscriptions in memory
     private let windows: ThreadGuardedValue<[UInt32: AxWindow]> = .init([:])
     // Retain the destroyed element only until AX stops enumerating it. This
     // prevents a late/stale AXWindows response from resurrecting a closed node.
     private let destroyedWindows: ThreadGuardedValue<[UInt32: AXUIElement]> = .init([:])
+    private let animatedSizes: ThreadGuardedValue<[UInt32: (session: UUID, size: CGSize)]> = .init([:])
     private var windowsCount = 0
     var lastNativeFocusedWindowId: UInt32? = nil
     private var thread: Thread?
@@ -35,6 +35,7 @@ final class MacApp: AbstractApp {
     // todo think if it's possible to integrate this global mutable state to https://github.com/nikitabobko/WinMux/issues/1215
     //      and make deinitialization automatic in deinit
     @MainActor static var allAppsMap: [pid_t: MacApp] = [:]
+    @MainActor static let registrationRetries = AppRegistrationRetries()
     @MainActor private static var wipPids: [pid_t: AwaitableOneTimeBroadcastLatch] = [:]
 
     private init(_ nsApp: NSRunningApplication, _ axApp: AXUIElement, _ axAppFastTimeout: AXUIElement, _ axSubscriptions: [AxSubscription], _ thread: Thread) {
@@ -60,50 +61,66 @@ final class MacApp: AbstractApp {
         // AX requests crash if you send them to yourself
         if pid == myPid { return nil }
 
-        var attempted = false
-        while true {
-            if let existing = allAppsMap[pid] { return existing }
-            try checkCancellation()
-            if let wip = wipPids[pid] {
-                try await wip.await()
-                continue
-            }
-            // Registration can fail (app still launching, AX subscription rejected). In that case
-            // allAppsMap[pid] stays absent, so without this guard the loop would respawn the
-            // registration thread forever, stalling every refresh that awaits this app.
-            if attempted { return nil }
-            attempted = true
-            let wip = AwaitableOneTimeBroadcastLatch()
-            wipPids[pid] = wip
+        if let existing = allAppsMap[pid] {
+            if !existing.nsApp.isTerminated, existing.nsApp.launchDate == nsApp.launchDate { return existing }
+            await existing.destroy()
+        }
+        try checkCancellation()
+        if let wip = wipPids[pid] {
+            try await wip.await()
+            return allAppsMap[pid]
+        }
+        let process = RegistrationProcess(pid: pid, launchDate: nsApp.launchDate, fallbackIdentity: ObjectIdentifier(nsApp))
+        guard registrationRetries.canAttempt(process) else { return nil }
+        // Share a single registration attempt with current waiters. If it fails,
+        // a later refresh can retry without spinning inside this call.
+        let wip = AwaitableOneTimeBroadcastLatch()
+        wipPids[pid] = wip
 
-            let thread = Thread {
-                $axTaskLocalAppThreadToken.withValue(AxAppThreadToken(pid: pid, idForDebug: nsApp.idForDebug)) {
-                    let axApp = AXUIElementCreateApplication(nsApp.processIdentifier)
-                    // Cap AX round-trips to this app at 1s instead of the 6s global default,
-                    // so a busy/unresponsive app can't stall window operations for seconds.
-                    AXUIElementSetMessagingTimeout(axApp, 1.0)
-                    let axAppFastTimeout = AXUIElementCreateApplication(nsApp.processIdentifier)
-                    AXUIElementSetMessagingTimeout(axAppFastTimeout, MacApp.focusedWindowQueryTimeout)
-                    let handlers: HandlerToNotifKeyMapping = [
-                        (refreshObs, [kAXWindowCreatedNotification, kAXFocusedWindowChangedNotification]),
-                    ]
-                    let job = RunLoopJob()
-                    let subscriptions = (try? AxSubscription.bulkSubscribe(nsApp, axApp, job, handlers)) ?? []
-                    let isGood = !subscriptions.isEmpty
-                    let app = isGood ? MacApp(nsApp, axApp, axAppFastTimeout, subscriptions, Thread.current) : nil
-                    Task { @MainActor in
+        let thread = Thread {
+            $axTaskLocalAppThreadToken.withValue(AxAppThreadToken(pid: pid, idForDebug: nsApp.idForDebug)) {
+                let axApp = AXUIElementCreateApplication(nsApp.processIdentifier)
+                // Cap AX round-trips to this app at 1s instead of the 6s global default,
+                // so a busy/unresponsive app can't stall window operations for seconds.
+                AXUIElementSetMessagingTimeout(axApp, 1.0)
+                let axAppFastTimeout = AXUIElementCreateApplication(nsApp.processIdentifier)
+                AXUIElementSetMessagingTimeout(axAppFastTimeout, MacApp.focusedWindowQueryTimeout)
+                let handlers: HandlerToNotifKeyMapping = [
+                    (refreshObs, [kAXWindowCreatedNotification, kAXFocusedWindowChangedNotification]),
+                ]
+                let job = RunLoopJob()
+                let subscriptions = (try? AxSubscription.bulkSubscribe(nsApp, axApp, job, handlers)) ?? []
+                let isGood = !subscriptions.isEmpty
+                let app = isGood ? MacApp(nsApp, axApp, axAppFastTimeout, subscriptions, Thread.current) : nil
+                Task { @MainActor in
+                    if nsApp.isTerminated {
+                        if let app { await app.destroy() }
+                        registrationRetries.cancel(pid: pid)
+                    } else {
                         allAppsMap[pid] = app
-                        await wip.signalToAll()
-                        wipPids[pid] = nil
+                        if app != nil { registrationRetries.cancel(pid: pid) }
+                        else {
+                            registrationRetries.failed(process) {
+                                guard !nsApp.isTerminated else { registrationRetries.cancel(pid: pid); return }
+                                if (try? await getOrRegister(nsApp)) != nil {
+                                    scheduleRefreshSession(.globalObserver("registrationRetry"))
+                                }
+                            }
+                        }
                     }
-                    if isGood {
-                        CFRunLoopRun()
-                    }
+                    wipPids[pid] = nil
+                    await wip.signalToAll()
+                }
+                if isGood {
+                    CFRunLoopRun()
                 }
             }
-            thread.name = "AxAppThread \(nsApp.idForDebug)"
-            thread.start()
         }
+        thread.name = "AxAppThread \(nsApp.idForDebug)"
+        thread.start()
+
+        try await wip.await()
+        return allAppsMap[pid]
     }
 
     func closeAndUnregisterAxWindow(_ windowId: UInt32) {
@@ -151,8 +168,10 @@ final class MacApp: AbstractApp {
 
     private func queryFocusedWindowId() async throws -> FocusedWindowQuery {
         try await thread?.runInLoop { [nsApp, axAppFastTimeout, windows] job -> FocusedWindowQuery in
+            if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { return .timedOut }
             var raw: AnyObject?
             let error = AXUIElementCopyAttributeValue(axAppFastTimeout.threadGuarded, kAXFocusedWindowAttribute as CFString, &raw)
+            AXReadBudget.current?.record(error, pid: nsApp.processIdentifier)
             switch error {
                 case .success:
                     guard let raw else { return .noFocusedWindow }
@@ -180,19 +199,8 @@ final class MacApp: AbstractApp {
             case .noFocusedWindow:
                 return nil
             case .timedOut:
-                // The app is too busy to answer AX right now. A stalled app cannot change its
-                // own focused window (that requires its main run loop), so the last known
-                // value — maintained by kAXFocusedWindowChanged events and every successful
-                // session — is still accurate. Using it beats both stalling the session for
-                // the full messaging timeout and the old behavior of treating the timeout as
-                // "no window is focused".
-                return lastNativeFocusedWindow()
+                throw NativeFocusUnknown()
         }
-    }
-
-    @MainActor
-    private func lastNativeFocusedWindow() -> Window? {
-        lastNativeFocusedWindowId.flatMap { Window.get(byId: $0) }
     }
 
     @MainActor func nativeFocus(_ windowId: UInt32, forceRaise: Bool = false) {
@@ -234,29 +242,34 @@ final class MacApp: AbstractApp {
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp] window, job in
+        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
+            animatedSizes.threadGuarded[windowId] = nil
             try setFrame(window, app: axApp.threadGuarded, topLeft, size, job)
         }
     }
 
     @MainActor
-    func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect) {
+    func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect, session: UUID) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp] window, job in
+        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             // Intermediate steps need no readback or minimum-size confirmation.
             // Finish both writes of a started step; cancellation drops queued steps.
             try disableAnimations(app: axApp.threadGuarded, job) {
-                window.set(Ax.sizeAttr, frame.size)
+                if animatedSizes.threadGuarded[windowId]?.session != session || animatedSizes.threadGuarded[windowId]?.size != frame.size {
+                    let accepted = window.set(Ax.sizeAttr, frame.size)
+                    animatedSizes.threadGuarded[windowId] = accepted ? (session, frame.size) : nil
+                }
                 window.set(Ax.topLeftCornerAttr, frame.origin)
             }
         }
     }
 
-    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) async throws {
+    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        try await withWindow(windowId) { [axApp] window, job in
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job)
+        try await withWindow(windowId) { [axApp, animatedSizes] window, job in
+            animatedSizes.threadGuarded[windowId] = nil
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId)
         }
     }
 
@@ -362,6 +375,14 @@ final class MacApp: AbstractApp {
         }
     }
 
+    func readNativeState(_ windowId: UInt32) async throws -> (fullscreen: Bool, minimized: Bool)? {
+        try await withWindow(windowId) { window, _ in
+            let fullscreen = try window.read(Ax.isFullscreenAttr).get() ?? false
+            let minimized = fullscreen ? false : try window.read(Ax.minimizedAttr).get() ?? false
+            return (fullscreen, minimized)
+        }
+    }
+
     func isMacosNativeFullscreen(_ windowId: UInt32) async throws -> Bool? {
         try await withWindow(windowId) { window, job in
             window.get(Ax.isFullscreenAttr)
@@ -458,7 +479,8 @@ final class MacApp: AbstractApp {
 
     func unregisterDestroyedWindow(_ windowId: UInt32) async throws {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        try await thread?.runInLoop { [windows, destroyedWindows] _ in
+        try await thread?.runInLoop { [windows, destroyedWindows, animatedSizes] _ in
+            animatedSizes.threadGuarded[windowId] = nil
             if let removed = windows.threadGuarded.removeValue(forKey: windowId) {
                 destroyedWindows.threadGuarded[windowId] = removed.ax
             }
@@ -524,7 +546,8 @@ final class MacApp: AbstractApp {
             job.cancel()
         }
         setFrameJobs = [:]
-        thread?.runInLoopAsync { [windows, destroyedWindows, appAxSubscriptions, axApp, axAppFastTimeout] job in
+        thread?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, appAxSubscriptions, axApp, axAppFastTimeout] job in
+            animatedSizes.destroy()
             appAxSubscriptions.destroy() // Destroy AX objects in reverse order of their creation
             windows.destroy()
             destroyedWindows.destroy()
@@ -537,9 +560,12 @@ final class MacApp: AbstractApp {
 
     private func withWindow<T>(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> T?) async throws -> T? {
         try await thread?.runInLoop { [windows, axApp, nsApp] job in
+            if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { throw AXReadFailure(code: .cannotComplete) }
             guard let window = try windows.threadGuarded.getOrRegisterAxWindow(
                 windowId: windowId, from: axApp.threadGuarded, nsApp, job) else { return nil }
-            return try body(window.ax, job)
+            let value = try body(window.ax, job)
+            if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { throw AXReadFailure(code: .cannotComplete) }
+            return value
         }
     }
 

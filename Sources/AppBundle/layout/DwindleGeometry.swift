@@ -12,6 +12,17 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
         if node is Window { return }
         guard let container = node as? TilingContainer else { return }
         switch container.layout {
+            case .stacked:
+                let count = container.children.count
+                for (index, child) in container.children.enumerated() {
+                    let horizontal = container.orientation == .h
+                    let extent = horizontal ? rect.width : rect.height
+                    let step = extent / CGFloat(max(count, 1))
+                    let frame = Rect(topLeftX: rect.topLeftX + (horizontal ? CGFloat(index) * step : 0),
+                        topLeftY: rect.topLeftY + (horizontal ? 0 : CGFloat(index) * step),
+                        width: horizontal ? step : rect.width, height: horizontal ? rect.height : step)
+                    visit(child, physical ? (child.lastAppliedLayoutPhysicalRect ?? frame) : frame)
+                }
             case .tabGroup:
                 if let active = container.mostRecentChild {
                     let showsWindowTabs = container.showsWindowTabs

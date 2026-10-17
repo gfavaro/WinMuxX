@@ -1,7 +1,15 @@
 import SwiftUI
 
+enum SettingsAutomationSection: String, CaseIterable {
+    case rules, events
+    static func restored(_ value: String) -> Self { Self(rawValue: value) ?? .rules }
+}
+
 struct ShortcutAutomationSettingsView: View {
+    @AppStorage("settings.automationSection") private var storedSection = SettingsAutomationSection.rules.rawValue
     @ObservedObject var model: ShortcutSettingsModel
+    @ObservedObject var rules: SettingsWindowRulesModel
+    var onRawEditor: () -> Void
     @SettingsDraft("after-startup-command", load: { config.afterStartupCommand.map { $0.args.description }.joined(separator: "\n") }) private var startupCommands: String
     @SettingsDraft("exec-on-workspace-change", load: { config.execOnWorkspaceChange.joined(separator: "\n") }) private var workspaceCommands: String
     @SettingsDraft("on-focus-changed", load: { config.onFocusChanged.map { $0.args.description }.joined(separator: "\n") }) private var focusCommands: String
@@ -9,6 +17,19 @@ struct ShortcutAutomationSettingsView: View {
     @SettingsDraft("on-mode-changed", load: { config.onModeChanged.map { $0.args.description }.joined(separator: "\n") }) private var modeCommands: String
 
     var body: some View {
+        VStack(spacing: 12) {
+            Picker("Automation section", selection: Binding(get: { SettingsAutomationSection.restored(storedSection) }, set: { storedSection = $0.rawValue })) {
+                Text("Rules").tag(SettingsAutomationSection.rules)
+                Text("Events").tag(SettingsAutomationSection.events)
+            }.pickerStyle(.segmented).padding(.horizontal, 20)
+            if SettingsAutomationSection.restored(storedSection) == .rules {
+                SettingsWindowRulesView(model: model, rules: rules, onRawEditor: onRawEditor)
+            } else { events }
+        }
+        .navigationTitle("Automation")
+    }
+
+    private var events: some View {
         SettingsScrollView {
             SettingsSection("Event actions") {
                 SettingsMultilineField("On workspace change", id: "exec-on-workspace-change", text: $workspaceCommands, help: "One command per line. Commands run after changing workspaces.", savedValue: config.execOnWorkspaceChange.joined(separator: "\n")) { onSaved in saveCommands("exec-on-workspace-change", workspaceCommands, onSaved: onSaved) }

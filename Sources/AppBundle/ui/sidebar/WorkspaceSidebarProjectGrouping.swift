@@ -22,13 +22,12 @@ func workspaceSidebarVisibleWorkspacesByProject(
     return result
 }
 
-func workspaceSidebarWorkspaceIsInUseOnOtherDisplay(
+func workspaceSidebarWorkspaceIsOnOtherDisplay(
     _ workspace: WorkspaceSidebarWorkspaceViewModel,
     selectedScopeId: String,
 ) -> Bool {
     guard selectedScopeId != workspaceSidebarDefaultScopeId,
-          selectedScopeId != workspaceSidebarFocusedScopeId,
-          workspace.isVisible
+          selectedScopeId != workspaceSidebarFocusedScopeId
     else {
         return false
     }

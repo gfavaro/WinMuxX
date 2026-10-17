@@ -79,7 +79,7 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
             creations += 1
             handle = OpaquePointer(bitPattern: 1)
             return true
-        }, updateNativeBorder: { _, _, _, _, _, _, _ in false }, destroyNativeBorder: { _ in
+        }, updateNativeBorder: { _, _, _, _, _, _, _, _ in false }, destroyNativeBorder: { _ in
             destructions += 1
         })
         var settings = WindowBordersConfig()

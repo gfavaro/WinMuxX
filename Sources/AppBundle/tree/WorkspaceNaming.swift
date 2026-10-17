@@ -20,7 +20,7 @@ func lowestUnusedPositiveIndex(_ usedIndices: Set<Int>) -> Int {
 
 @MainActor
 func nextInternalAutomaticWorkspaceName() -> String {
-    let usedIndices = Set(winMuxWorkspaceState.workspaceIdByName.keys.compactMap(internalAutomaticWorkspaceIndex))
+    let usedIndices = Set(runtime.workspaces.workspaceIdByName.keys.compactMap(internalAutomaticWorkspaceIndex))
     return "\(internalAutomaticWorkspacePrefix)\(lowestUnusedPositiveIndex(usedIndices))"
 }
 
@@ -39,7 +39,7 @@ func nextAutomaticWorkspaceName(projectId _: WorkspaceProjectId = workspaceProje
     var candidate = 1
     while true {
         let name = String(candidate)
-        if winMuxWorkspaceState.workspaceIdByName[name] == nil,
+        if runtime.workspaces.workspaceIdByName[name] == nil,
            isValidAssignment(workspaceName: name, screen: monitor.rect.topLeftCorner)
         {
             return name

@@ -1,6 +1,8 @@
 import AppKit
 import Common
 
+private let traceTreeBindings = ProcessInfo.processInfo.environment["WINMUXX_TRACE_TREE_BINDINGS"] == "1"
+
 open class TreeNode: Equatable, WinMuxAny {
     private(set) var bindingGeneration: UInt64 = 0
     private var _children: [TreeNode] = []
@@ -110,7 +112,7 @@ open class TreeNode: Equatable, WinMuxAny {
         _parent._children.remove(at: index)
         check(_parent._mruChildren.remove(self))
         self._parent = nil
-        unboundStacktrace = getStringStacktrace()
+        unboundStacktrace = traceTreeBindings ? getStringStacktrace() : nil
 
         return BindingData(parent: _parent, adaptiveWeight: adaptiveWeight, index: index)
     }

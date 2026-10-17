@@ -14,9 +14,9 @@ func singleWindowAspectRatioTarget(in workspace: Workspace) -> Window? {
     guard ratio.isFinite, ratio > 0, monitor.rect.height > 0,
           monitor.rect.width / monitor.rect.height >= 2.3 else { return nil }
     let windows = workspace.rootTilingContainer.allLeafWindowsRecursive
-    guard windows.count == 1, workspace.floatingWindows.isEmpty,
+    guard windows.count == 1,
           let window = windows.first, !window.isFullscreen,
-          !window.parents.contains(where: { ($0 as? TilingContainer)?.layout == .tabGroup }) else { return nil }
+          !window.parents.contains(where: { ($0 as? TilingContainer).map { $0.layout == .tabGroup || $0.layout == .stacked } == true }) else { return nil }
     return window
 }
 

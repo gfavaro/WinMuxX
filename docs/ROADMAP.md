@@ -1,22 +1,43 @@
 # WinMuxX roadmap
 
-## Current delivery
+## Current baseline — 2026-10-17
 
-- [x] Native menu-bar action catalog: categorized clickable commands, current-mode shortcuts, custom bindings, taps and sequences.
-- [x] Shared CLI and GUI diagnostics: loaded config path, validation, permissions, displays, AX latency and potentially conflicting window managers; refresh/copy without changing system settings.
+Workspace/configuration ownership cleanup is complete in signed build 76; see
+[RUNTIME_STATE_CLEANUP_PLAN.md](RUNTIME_STATE_CLEANUP_PLAN.md). Settings, display
+assignments/rules, the retained AeroSpork adaptations and dependency cleanup are
+implemented. Accessibility and screen capture were granted in the latest diagnostics.
+The latest local check passes **1,078 Swift + 13 Python tests**. Signed build 78
+is installed and verified. Capture runs off-main and the preview surface is reused;
+aggregate stage timings are available. Build 77's physical run measured 23 warm
+submissions at p95 47.6 ms, still above target. At least 30 completed warm submissions
+are needed with the expanded diagnostics; the latency goal remains open.
 
-Verified with the Swift test suite, a Debug app build, and runtime checks of the native menu and the GUI/CLI diagnostics. Automated menu-action tests cover routing on two monitors. Display topology handling and learned minimum-size persistence are now implemented and covered by targeted tests.
+## Remaining work, in priority order
 
-## Next priorities
+| Priority | Work | Completion criteria |
+| --- | --- | --- |
+| 1 | Swipe latency | Capture runs off-main and the surface is reused; collect 30+ warm physical gestures, compare stage timings and pursue <=16.7 ms submission p95. See [performance record](SWIPE_PERFORMANCE.md). Target is not yet established. |
+| 2 | Display topology | Real dock/undock/reconnection and three-display tests preserve explicit ownership and one secondary workspace per display; ordinary navigation never relocates workspaces. |
+| 3 | Recovery and sizing | Exercise crash recovery with real windows, delayed restoration, learned minima, nested dwindle/tab/accordion groups and overflow. Algorithms and automated regressions already exist. |
+| 4 | Native Settings and sidebar | Manual keyboard/accessibility, save/conflict, compact-layout, appearance and Bring Here checks. Offscreen geometry and persistence tests do not certify interaction or appearance. |
+| 5 | App/system compatibility | Windows App and Electron AX behavior, Cmd-Tab/Dock with multiple app windows, Mission Control, focus-follows-mouse and isolated permission transitions. |
+| 6 | Remaining process adapters | Isolate native window registries, UI singletons and refresh/persistence test adapters where needed. The completed runtime ownership scope does not make the whole suite parallel-safe. |
 
-Crash-recovery journal and manual menu action are implemented and covered by journal tests. Runtime validation with real windows remains pending. Original geometry is recorded atomically before frame changes; recovery pauses tiling, verifies app identity and readback, skips disconnected displays/native fullscreen/minimized windows, and retains failures. No native Space manipulation is included.
+Remote CI and physical runtime checks must be recorded separately from local suite
+results. No fixed grids or scrolling workspace layouts are planned. Accordion and
+tabbed layouts already exist. Do not revive rejected feature ideas as backlog items.
 
-Learned minimum sizes now have per-window evidence, two delayed readbacks, conservative rounding tolerance, cancellation on changed requests/closure/recovery, diagnostics, manual reset, persistence through the frozen-world state, distribution in tile containers, guarded distribution in dwindle, and pure tests for proportional fitting and overflow. Nested dwindle, tab chrome and per-monitor gaps now share contextual minimum aggregation; remaining work is interactive runtime validation.
+## Implemented reliability and UI work
 
-Validation update: the Debug build completed after rebuilding the stale SwiftPM cache, and the full Swift suite passes (716 tests). Targeted monitor navigation, recovery, dwindle, focus, movement, minimum redistribution and Mission Control suppression suites also pass. Live CLI diagnostics and recovery behavior remain separate from manual runtime validation. Screen-capture permission is currently reported missing for this build and may require reauthorization.
+- Native menu-bar action catalog and shared GUI/CLI diagnostics.
+- Crash-recovery journal with identity/readback checks and retained failures.
+- Learned minimum sizes with evidence, delayed readbacks, persistence and nested fitting.
+- Display Settings, window-rule editor, UUID/hardware selectors and Settings save queue.
+- Explicit workspace moves, ownership-preserving navigation and complete restart trees.
+- Runtime ownership, scoped bindings and fresh test fixtures.
 
-1. **Runtime validation.** Exercise crash recovery and display reconnection with real windows and dock/undock arrangements. [Recovery reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/Recovery.swift), [display reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/Display.swift).
-2. **Learned minimum sizes.** Validate and refine dwindle, nested containers, tab groups and overflow behavior. [Dinky reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/FrameApplier.swift).
+The sections below retain implementation details and outstanding manual checks;
+older test totals and permission observations have been superseded by the baseline above.
 
 ## Dwindle follow-up
 
@@ -30,12 +51,11 @@ Validation update: the Debug build completed after rebuilding the stale SwiftPM 
 - [x] Sequential corner resize with automatic-axis changes and matching live geometry.
 - [x] Flatten resets ratios/default orientation and preserves order, floating windows and logical focus.
 
-See [the detailed Dinky comparison](DWINDLE_DINKY_COMPARISON.md) for behavior and validation. Accordion is excluded: our tab interface remains the product choice. Fixed layouts remain deferred.
+See [the detailed Dinky comparison](DWINDLE_DINKY_COMPARISON.md) for behavior and validation. Tabbed and accordion layouts are both supported. Fixed grids and scrolling workspace layouts are excluded by the product scope.
 
 ## Ideas to revisit
 
 - [x] **Denser frost for the expanded sidebar:** the expanded sidebar now shares the Background toggle’s translucent glass surface with a lighter tint veil, retaining native blur, wallpaper-derived automatic tint, manual color choices, and the current compact rail. Reduce Transparency still overrides it with an opaque surface.
-- **Fixed workspace layouts (deferred):** reserve grid cells, preserve empty slots, define overflow expansion without rearranging existing placements. This remains outside the current delivery scope. [Reference](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#workspacenumber).
 - [x] **Optional short animations:** sidebar and tab-strip state transitions now disable animation when Reduce Motion is enabled. State-driven SwiftUI transitions retarget to the latest value; monitor reflow remains responsible for settling geometry after display changes. Runtime interruption checks remain useful follow-up validation. [Reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/Animator.swift).
 - [x] **Focus follows mouse:** off by default, configurable dwell, ignores dragging and button presses, and protects focus after pointer changes. Runtime validation remains pending. [Reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/FocusFollowsMouse.swift).
 - [x] **Mission Control / Exposé:** border overlays are suppressed when macOS exposes the display-sized WindowManager layer, while workspace visibility and activation remain untouched. Runtime validation remains pending. [Reference](https://github.com/mikker/Dinky/blob/main/Sources/dinky/MissionControl.swift).
@@ -59,4 +79,4 @@ Dinky 0.12's selected-window raise already existed here. Activation context now 
 
 References: [classification](https://github.com/mikker/Dinky/blob/main/Sources/dinky/WindowRules.swift), [activation](https://github.com/mikker/Dinky/blob/main/Sources/dinky/ActivationFollower.swift). Manual Cmd-Tab/Dock checks with multiple windows and one/two monitors, Finder copy progress, Calculator and hidden-titlebar terminals remain pending.
 
-Validation: the full Swift suite passed (803 tests), followed by all nine focus regression tests including two added checks for superseding activation during refresh and native selection across workspaces. The Debug `WinMuxApp` product build and `git diff --check` passed. The runtime checks listed above have not been performed.
+Historical validation: the then-current Swift suite passed (803 tests), followed by all nine focus regression tests including two added checks for superseding activation during refresh and native selection across workspaces. The Debug `WinMuxApp` product build and `git diff --check` passed. The runtime checks listed above have not been performed.

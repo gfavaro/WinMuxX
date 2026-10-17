@@ -61,13 +61,33 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         configuration.collapsedWidth = 44
         configuration.menuBarBackground = false
         container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
-        XCTAssertTrue(container.activeSurface === container.effect)
+        XCTAssertTrue(container.activeSurface === container.opaqueSurface)
         XCTAssertNil(container.appearance)
 
         reduceTransparency = false
         container.configure(configuration: configuration, visibleWidth: 44, wallpaperTone: .dark)
         XCTAssertTrue(container.activeSurface === container.clearSurface)
         XCTAssertEqual(container.appearance?.name, .darkAqua)
+    }
+
+    func testOpaqueBackgroundFollowsAppearanceAndKeepsHostedContent() {
+        let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200), reduceTransparency: { true })
+        let content = NSView()
+        container.install(content: content)
+        container.configure(configuration: .empty, visibleWidth: 44)
+        XCTAssertTrue(content.superview === container.opaqueSurface)
+        var colors: [CGColor] = []
+        for name in [NSAppearance.Name.darkAqua, .aqua] {
+            container.appearance = NSAppearance(named: name)
+            container.viewDidChangeEffectiveAppearance()
+            let color = container.opaqueSurface.layer?.backgroundColor
+            XCTAssertEqual(color?.alpha, 1)
+            if let color { colors.append(color) }
+        }
+        XCTAssertEqual(colors.count, 2)
+        XCTAssertNotEqual(colors.first, colors.last)
+        XCTAssertEqual(container.opaqueSurface.frame.width, 44)
+        XCTAssertTrue(container.effect.isHidden)
     }
 
     func testSolidForegroundContrastForPresetsAndCustomColors() {

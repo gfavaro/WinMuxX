@@ -66,6 +66,7 @@ final class WindowDropIntentOverlayPanelController {
         if panel.isVisible {
             panel.orderOut(nil)
         }
+        panel.setContentSize(CGSize(width: 1, height: 1))
         logWindowDragLive("dropOverlay hide wasVisible=\(wasVisible) isVisible=\(panel.isVisible)")
     }
 

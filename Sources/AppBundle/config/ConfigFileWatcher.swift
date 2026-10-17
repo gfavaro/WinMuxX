@@ -141,32 +141,45 @@ final class ConfigReloadScheduler {
     }
 }
 
-@MainActor private var currentWatcher: ConfigFileWatcher?
-@MainActor private let reloadScheduler = ConfigReloadScheduler { await reloadConfigAfterFileChange() }
+@MainActor private func configReloadScheduler() -> ConfigReloadScheduler {
+    let owner = runtime
+    if let scheduler = owner.configuration.reloadScheduler { return scheduler }
+    let scheduler = ConfigReloadScheduler { [weak owner] in
+        guard let owner else { return }
+        await owner.withValue { await reloadConfigAfterFileChange() }
+    }
+    owner.configuration.reloadScheduler = scheduler
+    return scheduler
+}
 
 @MainActor func syncConfigFileWatcher() {
     guard !isUnitTest else { return }
+    let owner = runtime
+    let state = owner.configuration
     guard config.autoReloadConfig else {
-        currentWatcher = nil
-        reloadScheduler.cancelPending()
+        state.watcher = nil
+        configReloadScheduler().cancelPending()
         return
     }
     let url = preferredEditableConfigUrl()
-    guard currentWatcher?.paths != ConfigWatchPaths(url: url) else { return }
-    currentWatcher = ConfigFileWatcher(url: url) {
-        guard config.autoReloadConfig else { return }
-        reloadScheduler.fileChanged(runtimeReady: isWinMuxRuntimeReady)
+    guard state.watcher?.paths != ConfigWatchPaths(url: url) else { return }
+    state.watcher = ConfigFileWatcher(url: url) { [weak owner] in
+        guard let owner else { return }
+        owner.withValue {
+            guard config.autoReloadConfig else { return }
+            configReloadScheduler().fileChanged(runtimeReady: isWinMuxRuntimeReady)
+        }
     }
-    if currentWatcher == nil { configWatcherLog.error("Could not observe the configuration directory") }
+    if state.watcher == nil { configWatcherLog.error("Could not observe the configuration directory") }
 }
 
 @MainActor func reloadConfigIfSavedDuringStartup() {
-    if config.autoReloadConfig { reloadScheduler.startupFinished() }
+    if config.autoReloadConfig { configReloadScheduler().startupFinished() }
 }
 
 @MainActor func reloadConfigAfterFileChange() async {
     guard config.autoReloadConfig else { return }
-    guard isWinMuxRuntimeReady else { reloadScheduler.fileChanged(runtimeReady: false); return }
+    guard isWinMuxRuntimeReady else { configReloadScheduler().fileChanged(runtimeReady: false); return }
     let url = preferredEditableConfigUrl()
     // Force this path: a delete/rename must not select the shipped defaults.
     do {

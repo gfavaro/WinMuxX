@@ -10,7 +10,7 @@ func tabStackDestination(targetWindow: Window, mouseLocation: CGPoint? = nil) ->
         kind: .tabStack(targetWindowId: targetWindow.windowId),
         previewRect: rects.previewRect,
         interactionRect: rects.interactionRect,
-        title: "Insert Into Tabs",
+        title: dragStackLayout(for: targetWindow) == .stacked ? "Insert Into Accordion" : "Insert Into Tabs",
         subtitle: "Drop near the top edge to add this window",
         previewStyle: .tabInsert,
         previewGeometry: .tabStrip,

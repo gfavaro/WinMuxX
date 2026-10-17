@@ -93,6 +93,9 @@ func scheduleRefreshSession(
     optimisticallyPreLayoutWorkspaces: Bool = false,
     recordsActivation: Bool = true,
 ) {
+    // Startup owns the first enumeration and tree restoration. AX notifications from
+    // newly subscribed apps must not start a second enumeration alongside it.
+    guard isUnitTest || isWinMuxRuntimeReady else { return }
     if recordsActivation, case .globalObserver(let notification) = event,
        notification == NSWorkspace.didActivateApplicationNotification.rawValue,
        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
@@ -152,7 +155,25 @@ func scheduleRefreshSession(
 }
 
 @MainActor
-func runRefreshSessionBlocking(
+func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
+                               optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
+    try await AXReadBudget.$current.withValue(AXReadBudget()) {
+        try await performRefreshSession(event, layoutWorkspaces: layoutWorkspaces,
+                                        optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
+    }
+}
+
+@MainActor
+func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
+                       shouldSchedulePostRefresh: Bool = true,
+                       body: @MainActor () async throws -> T) async throws -> T {
+    try await AXReadBudget.$current.withValue(AXReadBudget()) {
+        try await performLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
+    }
+}
+
+@MainActor
+private func performRefreshSession(
     _ event: RefreshSessionEvent,
     layoutWorkspaces shouldLayoutWorkspaces: Bool = true,
     optimisticallyPreLayoutWorkspaces: Bool = false,
@@ -167,11 +188,14 @@ func runRefreshSessionBlocking(
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
                 let frontmostActivationPolicy = NSWorkspace.shared.frontmostApplication?.activationPolicy
-                let nativeFocused = try await getNativeFocusedWindow()
+                let observation = try await observeNativeFocusForSession()
+                let nativeFocused = observation.window
                 try checkCancellation()
                 if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
-                await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
-                updateFocusCache(nativeFocused)
+                if observation.known {
+                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+                    updateFocusCache(nativeFocused)
+                }
                 try checkCancellation()
 
                 if shouldLayoutWorkspaces && optimisticallyPreLayoutWorkspaces { try await layoutWorkspaces() }
@@ -202,7 +226,7 @@ func runRefreshSessionBlocking(
                 if shouldLayoutWorkspaces {
                     try await layoutWorkspaces()
                     try checkCancellation()
-                    if shouldSyncFocusBackToMacOs(
+                    if observation.known && shouldSyncFocusBackToMacOs(
                         nativeFocused: nativeFocused,
                         frontmostActivationPolicy: frontmostActivationPolicy,
                     ) {
@@ -215,7 +239,7 @@ func runRefreshSessionBlocking(
                         } else {
                             // Cmd+Tab already reports the chosen AX window as focused, but
                             // switching virtual workspaces can leave another window above it.
-                            if pendingActivation == activation, let window = logicalFocused as? MacWindow,
+                            if pendingActivation == activation, let window = logicalFocused as? MacWindow, !window.isHiddenInCorner,
                                activation?.shouldRaise(
                                    currentWorkspace: focus.workspace.name,
                                    nativeWindowId: nativeFocused?.windowId, logicalWindowId: logicalFocused?.windowId,
@@ -244,12 +268,17 @@ func runRefreshSessionBlocking(
 }
 
 @MainActor
-func runLightSession<T>(
+private func performLightSession<T>(
     _ event: RefreshSessionEvent,
     _: RunSessionGuard,
     shouldSchedulePostRefresh: Bool = true,
     body: @MainActor () async throws -> T,
 ) async throws -> T {
+    if case .globalObserver("workspaceSwipe") = event {
+        // The swipe's own commit keeps its preview until the real layout is ready.
+    } else {
+        WorkspaceSwipeController.shared.cancelVisualInteraction()
+    }
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
     activeRefreshTask?.cancel() // Give priority to runSession
@@ -263,11 +292,14 @@ func runLightSession<T>(
     return try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
-                let nativeFocused = try await getNativeFocusedWindow()
+                let observation = try await observeNativeFocusForSession()
+                let nativeFocused = observation.window
                 try checkCancellation()
                 if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
-                await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
-                updateFocusCache(nativeFocused)
+                if observation.known {
+                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+                    updateFocusCache(nativeFocused)
+                }
                 try checkCancellation()
                 let focusBefore = focus.windowOrNil
 

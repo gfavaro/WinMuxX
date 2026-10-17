@@ -35,34 +35,6 @@ struct WinMuxWorkspaceState {
     private var nextProjectCounter = 1
     private var nextProjectOrderCounter = 1
 
-    mutating func resetProjects(defaultProjectName: String) {
-        projectsById = [
-            workspaceProjectDefaultId: WorkspaceProject(id: workspaceProjectDefaultId, name: defaultProjectName, order: 0),
-        ]
-        nextProjectCounter = 1
-        nextProjectOrderCounter = 1
-        for workspace in workspaceById.values {
-            workspace.projectId = workspaceProjectDefaultId
-        }
-        rebuildProjectWorkspaceIndexes()
-    }
-
-    mutating func resetDisplayAssignments() {
-        monitorViewportsById = [:]
-    }
-
-    mutating func resetWorkspaceRegistryForTests(defaultProjectName: String) {
-        workspaceById = [:]
-        workspaceIdByName = [:]
-        monitorViewportsById = [:]
-        projectsById = [
-            workspaceProjectDefaultId: WorkspaceProject(id: workspaceProjectDefaultId, name: defaultProjectName, order: 0),
-        ]
-        nextWorkspaceCounter = 1
-        nextProjectCounter = 1
-        nextProjectOrderCounter = 1
-    }
-
     mutating func nextWorkspaceId() -> WorkspaceId {
         while workspaceById[WorkspaceId("workspace-\(nextWorkspaceCounter)")] != nil {
             nextWorkspaceCounter += 1
@@ -163,8 +135,10 @@ struct WinMuxWorkspaceState {
 
         var viewport = monitorViewportsById[viewportId] ?? MonitorViewport(id: viewportId)
         if viewport.activeWorkspaceId != workspace.id {
+            viewport.activeWorkspaceId.flatMap { workspaceById[$0] }?.preferredMonitorPoint = viewportId.topLeftCorner
             viewport.previousWorkspaceId = viewport.activeWorkspaceId
         }
+        workspace.preferredMonitorPoint = viewportId.topLeftCorner
         viewport.activeWorkspaceId = workspace.id
         viewport.lastActiveWorkspaceByProject[workspace.projectId] = workspace.id
         monitorViewportsById[viewportId] = viewport
@@ -197,6 +171,8 @@ struct WinMuxWorkspaceState {
         updated[first] = a
         updated[second] = b
         monitorViewportsById = updated
+        aWorkspace.preferredMonitorPoint = second.topLeftCorner
+        bWorkspace.preferredMonitorPoint = first.topLeftCorner
         return true
     }
 
@@ -240,26 +216,6 @@ struct WinMuxWorkspaceState {
         }
     }
 
-    private mutating func rebuildProjectWorkspaceIndexes() {
-        for (projectId, project) in projectsById {
-            var project = project
-            project.workspaceOrder = []
-            projectsById[projectId] = project
-        }
-        for workspace in sortedWorkspaces() {
-            ensureProjectExists(workspace.projectId)
-            insertWorkspace(workspace.id, intoProject: workspace.projectId)
-        }
-        for (viewportId, viewport) in monitorViewportsById {
-            guard let workspaceId = viewport.activeWorkspaceId,
-                  let workspace = workspaceById[workspaceId]
-            else { continue }
-            var viewport = viewport
-            viewport.lastActiveWorkspaceByProject[workspace.projectId] = workspaceId
-            monitorViewportsById[viewportId] = viewport
-        }
-    }
-
     private mutating func insertWorkspace(_ workspaceId: WorkspaceId, intoProject projectId: WorkspaceProjectId) {
         var project = projectsById[projectId].orDie()
         if !project.workspaceOrder.contains(workspaceId) {
@@ -276,5 +232,3 @@ struct WinMuxWorkspaceState {
         }
     }
 }
-
-@MainActor var winMuxWorkspaceState = WinMuxWorkspaceState()

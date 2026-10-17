@@ -14,18 +14,29 @@ private let terminationCoordinator = WindowTerminationCoordinator()
 private var terminationSignals: [DispatchSourceSignal] = []
 
 @MainActor
-func interceptTermination(_ number: Int32) {
+func interceptTermination(_ number: Int32, deadline: DispatchTimeInterval = .seconds(10)) {
     signal(number, SIG_IGN)
-    let source = DispatchSource.makeSignalSource(signal: number, queue: .main)
-    source.setEventHandler {
+    let source = DispatchSource.makeSignalSource(signal: number, queue: DispatchQueue(label: "\(winMuxAppId).termination"))
+    source.setEventHandler(handler: terminationSignalHandler(number, deadline: deadline))
+    terminationSignals.append(source)
+    source.resume()
+}
+
+// Construct outside MainActor: Dispatch invokes this on the independent signal queue.
+private func terminationSignalHandler(_ number: Int32, deadline: DispatchTimeInterval) -> @Sendable () -> Void {
+    return {
+        let completed = DispatchSemaphore(value: 0)
         Task { @MainActor in
-            defer { exit(number) }
+            defer { completed.signal() }
             do { try await terminationHandler.performTerminationCleanup() }
             catch { NSLog("WinMux termination: %@", String(describing: error)) }
         }
+        if completed.wait(timeout: .now() + deadline) == .timedOut {
+            NSLog("WinMuxX: termination cleanup exceeded deadline; recovery will run at next launch")
+            _exit(number)
+        }
+        exit(number)
     }
-    terminationSignals.append(source)
-    source.resume()
 }
 
 @MainActor
@@ -38,6 +49,8 @@ func initTerminationHandler() {
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
         await terminationCoordinator.run {
+            MacApp.registrationRetries.cancelAll()
+            WindowDetectionOperations.shared.cancelAll()
             WindowRecoveryController.shared.beginTermination()
             persistFrozenWorldForRestartIfPossible()
             for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }

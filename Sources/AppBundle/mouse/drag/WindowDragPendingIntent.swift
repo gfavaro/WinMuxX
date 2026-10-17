@@ -208,7 +208,7 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             else { return false }
             syncClosedWindowsCacheToCurrentWorld()
             suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, targetWindow.windowId])
-            createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow)
+            createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow, newGroupLayout: config.dragStackLayout)
             return true
         case .detachTab(let windowId):
             guard sourceWindow.windowId == windowId else { return false }

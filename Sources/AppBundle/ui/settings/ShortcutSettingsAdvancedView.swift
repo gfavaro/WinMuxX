@@ -11,6 +11,7 @@ struct ShortcutAdvancedView: View {
     @State private var targetUrl: URL? = nil
     @State private var hasLoaded = false
     @State private var savedText = ""
+    @State private var diskTextAtLoad: String?
     @State private var isSaving = false
 
     var body: some View {
@@ -77,7 +78,7 @@ struct ShortcutAdvancedView: View {
         .onChange(of: model.settingsRevision) { _ in
             if configText == savedText { loadFromDisk(preservingDraft: true) }
         }
-        .onChange(of: configText) { model.configurationDraft = $0 == savedText ? nil : $0 }
+        .onChange(of: configText) { model.configurationDraft = $0 == savedText ? nil : RawConfigDraft(text: $0, baseline: diskTextAtLoad) }
         .task {
             guard !hasLoaded else { return }
             hasLoaded = true
@@ -90,9 +91,18 @@ struct ShortcutAdvancedView: View {
         targetUrl = resolvedUrl
         validationMessage = nil
         saveMessage = nil
-        configText = advancedConfigEditorCurrentText(for: resolvedUrl)
+        do {
+            diskTextAtLoad = try ConfigFileStore.read(resolvedUrl)
+            configText = diskTextAtLoad ?? starterConfigText()
+        } catch {
+            validationMessage = error.localizedDescription
+            return
+        }
         savedText = configText
-        if preservingDraft, let draft = model.configurationDraft { configText = draft }
+        if preservingDraft, let draft = model.configurationDraft {
+            configText = draft.text
+            diskTextAtLoad = draft.baseline
+        }
         else { model.configurationDraft = nil }
     }
 
@@ -120,22 +130,18 @@ struct ShortcutAdvancedView: View {
         targetUrl = resolvedUrl
 
         let submittedText = configText
+        let expectedDiskText = diskTextAtLoad
         isSaving = true
-        let previousSave = model.pendingSettingsSave
-        model.pendingSettingsSave = Task { @MainActor in
-            await previousSave?.value
+        model.saveQueue.enqueue {
             model.savingSettingIDs.insert("configuration")
             defer {
                 isSaving = false
                 model.savingSettingIDs.remove("configuration")
             }
             do {
-                let parentUrl = resolvedUrl.deletingLastPathComponent()
-                if parentUrl.path != resolvedUrl.path {
-                    try FileManager.default.createDirectory(at: parentUrl, withIntermediateDirectories: true)
-                }
-                try submittedText.write(to: resolvedUrl, atomically: true, encoding: .utf8)
-                let isOk = try await reloadConfig(forceConfigUrl: resolvedUrl)
+                try ConfigFileStore.replace(at: resolvedUrl, text: submittedText, expected: expectedDiskText)
+                diskTextAtLoad = submittedText
+                let isOk = try await model.configAccess.reload(resolvedUrl)
                 if isOk {
                     savedText = submittedText
                     if configText == submittedText { model.configurationDraft = nil }
@@ -157,23 +163,6 @@ private func advancedConfigEditorTargetUrl() -> URL {
     preferredEditableConfigUrl()
 }
 
-@MainActor
-private func advancedConfigEditorCurrentText(for targetUrl: URL) -> String {
-    if let text = try? String(contentsOf: targetUrl, encoding: .utf8) {
-        return text
-    }
-    return starterConfigText()
-}
-
-struct OpenShortcutSettingsButton: View {
-    @Environment(\.openWindow) private var openWindow: OpenWindowAction
-
-    var body: some View {
-        Button("Settings…") {
-            openShortcutSettingsWindow(openWindow)
-        }
-    }
-}
 
 @MainActor
 func shortcutSettingsWindow() -> NSWindow? {

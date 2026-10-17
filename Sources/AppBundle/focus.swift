@@ -72,9 +72,9 @@ var refreshSessionFocusSnapshot: RefreshSessionFocusSnapshot? { _refreshSessionF
 func captureRefreshSessionFocusSnapshot() -> RefreshSessionFocusSnapshot {
     let currentFocus = focus
     return RefreshSessionFocusSnapshot(
-        focus: _focus,
-        prevFocus: _prevFocus,
-        prevPrevFocus: _prevPrevFocus,
+        focus: runtime.focus.requested,
+        prevFocus: runtime.focus.previous,
+        prevPrevFocus: runtime.focus.previousPrevious,
         fallbackWhenFocusedWindowCloses: currentFocus.windowOrNil.map { currentFocus.workspace.toLiveFocus(excluding: $0).frozen },
     )
 }
@@ -95,17 +95,29 @@ func debugDescribe(_ snapshot: RefreshSessionFocusSnapshot?) -> String {
     return "focus[\(debugDescribe(snapshot.focus.liveOrNil))] prev[\(debugDescribe(snapshot.prevFocus?.liveOrNil))] prevPrev[\(debugDescribe(snapshot.prevPrevFocus?.liveOrNil))] closeFallback[\(debugDescribe(snapshot.fallbackWhenFocusedWindowCloses?.liveOrNil))]"
 }
 
-@MainActor private var _focus: FrozenFocus = {
-    let monitor = mainMonitor
-    return FrozenFocus(windowId: nil, workspaceName: monitor.activeWorkspace.name, monitorId_oneBased: monitor.monitorId_oneBased ?? 0)
-}()
+@MainActor
+final class WorkspaceFocusState {
+    lazy var requested: FrozenFocus = {
+        let monitor = mainMonitor
+        return FrozenFocus(windowId: nil, workspaceName: monitor.activeWorkspace.name,
+                           monitorId_oneBased: monitor.monitorId_oneBased ?? 0)
+    }()
+    lazy var lastKnown: FrozenFocus = requested
+    var previous: FrozenFocus?
+    var previousPrevious: FrozenFocus?
+    var previousWorkspaceName: String? {
+        didSet { previousWorkspaceDate = .now }
+    }
+    var previousWorkspaceDate: Date = .distantPast
+    var runningCallbacks = false
+}
 
 @MainActor
 func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
-    _focus = _focus.replacingWorkspaceName(oldName, with: newName)
-    _lastKnownFocus = _lastKnownFocus.replacingWorkspaceName(oldName, with: newName)
-    _prevFocus = _prevFocus?.replacingWorkspaceName(oldName, with: newName)
-    _prevPrevFocus = _prevPrevFocus?.replacingWorkspaceName(oldName, with: newName)
+    runtime.focus.requested = runtime.focus.requested.replacingWorkspaceName(oldName, with: newName)
+    runtime.focus.lastKnown = runtime.focus.lastKnown.replacingWorkspaceName(oldName, with: newName)
+    runtime.focus.previous = runtime.focus.previous?.replacingWorkspaceName(oldName, with: newName)
+    runtime.focus.previousPrevious = runtime.focus.previousPrevious?.replacingWorkspaceName(oldName, with: newName)
     if _prevFocusedWorkspaceName == oldName {
         _prevFocusedWorkspaceName = newName
     }
@@ -115,10 +127,13 @@ func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
 /// Commands must be cautious about accessing this property directly. There are legitimate cases.
 /// But, in general, commands must firstly check --window-id, --workspace, WINMUX_WINDOW_ID env and
 /// WINMUX_WORKSPACE env before accessing the global focus.
-@MainActor var focus: LiveFocus { _focus.live }
+@MainActor var focus: LiveFocus { runtime.focus.requested.live }
+
+/// Unlike derived live focus, this changes only when focus is explicitly assigned.
+@MainActor func captureRequestedFocus() -> FrozenFocus { runtime.focus.requested }
 
 @MainActor func setFocus(to newFocus: LiveFocus) -> Bool {
-    if _focus == newFocus.frozen {
+    if runtime.focus.requested == newFocus.frozen {
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
     let oldFocus = focus
@@ -130,7 +145,7 @@ func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
         oldFocus.windowOrNil?.markAsMostRecentChild()
     }
 
-    _focus = newFocus.frozen
+    runtime.focus.requested = newFocus.frozen
     newFocus.windowOrNil?.markAsMostRecentChild()
     return true
 }
@@ -168,30 +183,26 @@ extension Workspace {
     }
 }
 
-@MainActor private var _lastKnownFocus: FrozenFocus = _focus
-
-// Used by workspace-back-and-forth
-@MainActor var _prevFocusedWorkspaceName: String? = nil {
-    didSet {
-        prevFocusedWorkspaceDate = .now
-    }
+// Used by workspace-back-and-forth and focus-back-and-forth.
+@MainActor var _prevFocusedWorkspaceName: String? {
+    get { runtime.focus.previousWorkspaceName }
+    set { runtime.focus.previousWorkspaceName = newValue }
 }
-@MainActor var prevFocusedWorkspaceDate: Date = .distantPast
+@MainActor var prevFocusedWorkspaceDate: Date {
+    get { runtime.focus.previousWorkspaceDate }
+    set { runtime.focus.previousWorkspaceDate = newValue }
+}
 @MainActor var prevFocusedWorkspace: Workspace? { _prevFocusedWorkspaceName.flatMap(Workspace.existing(byName:)) }
 
-// Used by focus-back-and-forth
-@MainActor private var _prevFocus: FrozenFocus? = nil
 @MainActor var prevFocus: LiveFocus? {
-    guard let prevFocus = _prevFocus?.liveOrNil, prevFocus != focus else { return nil }
-    return prevFocus
+    guard let previous = runtime.focus.previous?.liveOrNil, previous != focus else { return nil }
+    return previous
 }
-@MainActor private var _prevPrevFocus: FrozenFocus? = nil
 @MainActor var prevPrevFocus: LiveFocus? {
-    guard let prevPrevFocus = _prevPrevFocus?.liveOrNil, prevPrevFocus != focus else { return nil }
-    return prevPrevFocus
+    guard let previous = runtime.focus.previousPrevious?.liveOrNil, previous != focus else { return nil }
+    return previous
 }
 
-@MainActor private var onFocusChangedRecursionGuard = false
 // Should be called in refreshSession
 @MainActor func checkOnFocusChangedCallbacks() {
     if refreshSessionEvent?.isStartup == true {
@@ -199,29 +210,29 @@ extension Workspace {
     }
     let focus = focus
     let frozenFocus = focus.frozen
-    let lastKnownFocusBefore = _lastKnownFocus
-    let prevFocusBefore = _prevFocus
-    let prevPrevFocusBefore = _prevPrevFocus
+    let lastKnownFocusBefore = runtime.focus.lastKnown
+    let prevFocusBefore = runtime.focus.previous
+    let prevPrevFocusBefore = runtime.focus.previousPrevious
     var hasFocusChanged = false
     var hasFocusedWorkspaceChanged = false
     var hasFocusedMonitorChanged = false
-    if frozenFocus != _lastKnownFocus {
-        _prevPrevFocus = _prevFocus
-        _prevFocus = _lastKnownFocus
+    if frozenFocus != runtime.focus.lastKnown {
+        runtime.focus.previousPrevious = runtime.focus.previous
+        runtime.focus.previous = runtime.focus.lastKnown
         hasFocusChanged = true
     }
-    if frozenFocus.workspaceName != _lastKnownFocus.workspaceName {
-        _prevFocusedWorkspaceName = _lastKnownFocus.workspaceName
+    if frozenFocus.workspaceName != runtime.focus.lastKnown.workspaceName {
+        _prevFocusedWorkspaceName = runtime.focus.lastKnown.workspaceName
         hasFocusedWorkspaceChanged = true
     }
-    if frozenFocus.monitorId_oneBased != _lastKnownFocus.monitorId_oneBased {
+    if frozenFocus.monitorId_oneBased != runtime.focus.lastKnown.monitorId_oneBased {
         hasFocusedMonitorChanged = true
     }
-    _lastKnownFocus = frozenFocus
+    runtime.focus.lastKnown = frozenFocus
 
-    if onFocusChangedRecursionGuard { return }
-    onFocusChangedRecursionGuard = true
-    defer { onFocusChangedRecursionGuard = false }
+    if runtime.focus.runningCallbacks { return }
+    runtime.focus.runningCallbacks = true
+    defer { runtime.focus.runningCallbacks = false }
     if hasFocusChanged {
         onFocusChanged(focus)
     }
@@ -233,7 +244,7 @@ extension Workspace {
     }
     if hasFocusChanged {
         debugFocusLog(
-            "checkOnFocusChangedCallbacks event=\(refreshSessionEvent.prettyDescription) lastKnown=\(debugDescribe(lastKnownFocusBefore.liveOrNil)) -> focus=\(debugDescribe(focus)) prev=\(debugDescribe(prevFocusBefore?.liveOrNil)) -> \(debugDescribe(_prevFocus?.liveOrNil)) prevPrev=\(debugDescribe(prevPrevFocusBefore?.liveOrNil)) -> \(debugDescribe(_prevPrevFocus?.liveOrNil))"
+            "checkOnFocusChangedCallbacks event=\(refreshSessionEvent.prettyDescription) lastKnown=\(debugDescribe(lastKnownFocusBefore.liveOrNil)) -> focus=\(debugDescribe(focus)) prev=\(debugDescribe(prevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previous?.liveOrNil)) prevPrev=\(debugDescribe(prevPrevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previousPrevious?.liveOrNil))"
         )
     }
 }
@@ -246,9 +257,12 @@ extension Workspace {
     if config.onFocusedMonitorChanged.isEmpty { return }
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession
+    let owner = runtime
     Task {
-        try await runLightSession(.onFocusedMonitorChanged, token) {
-            _ = try await config.onFocusedMonitorChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+        try await owner.withValue {
+            try await runLightSession(.onFocusedMonitorChanged, token) {
+                _ = try await config.onFocusedMonitorChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+            }
         }
     }
 }
@@ -260,9 +274,12 @@ extension Workspace {
     if config.onFocusChanged.isEmpty { return }
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession
+    let owner = runtime
     Task {
-        try await runLightSession(.onFocusChanged, token) {
-            _ = try await config.onFocusChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+        try await owner.withValue {
+            try await runLightSession(.onFocusChanged, token) {
+                _ = try await config.onFocusChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+            }
         }
     }
 }

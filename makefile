@@ -86,11 +86,12 @@ check:
 	/bin/bash -lc 'cd "$(CURDIR)" && \
 	set -euo pipefail && \
 	source ./script/setup.sh && \
-	swift test && \
+	mkdir -p .build && \
+	swift test --force-resolved-versions --no-parallel 2>&1 | tee .build/test-output.log && \
 	python3 -m unittest script/test_validate_appcast.py && \
 	python3 -m unittest script/test_fork_identity.py && \
-	swift package resolve && \
-	git diff --exit-code -- Package.resolved'
+	python3 -m unittest script/test_swift_version.py && \
+	swift package --force-resolved-versions resolve'
 
 release:
 	$(MAKE) fork-build VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)"

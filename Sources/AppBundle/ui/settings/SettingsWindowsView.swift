@@ -2,9 +2,14 @@ import SwiftUI
 import Common
 
 struct ShortcutBehaviorSettingsView: View {
+    @ObservedObject private var workspaceTouch = RawWorkspaceTouchSource.shared
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
+    @SettingsDraft("drag-stack-layout", load: { config.dragStackLayout }) private var dragStackLayout: Layout
+    @SettingsDraft("workspace-swipe.animation-duration-ms", load: { config.workspaceSwipe.animationDurationMs }) private var swipeAnimationDuration: Int
+    @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
+    @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
     @State private var doubleSidedWindows = ExperimentalUISettings().doubleSidedWindows
     @SettingsDraft("automatically-tile-new-windows", load: { config.automaticallyTileNewWindows }) private var automaticallyTileNewWindows: Bool
     @SettingsDraft("auto-add-new-windows-to-tab-group", load: { config.autoAddNewWindowsToTabGroup }) private var autoAddNewWindowsToTabGroup: Bool
@@ -28,10 +33,15 @@ struct ShortcutBehaviorSettingsView: View {
                 SettingsToggle("Unhide macOS-hidden apps", id: "automatically-unhide-macos-hidden-apps", isOn: $automaticallyUnhideMacosHiddenApps, help: "Restore apps macOS has hidden when they receive focus.") { persistRootBool("automatically-unhide-macos-hidden-apps", automaticallyUnhideMacosHiddenApps) }
             }
             SettingsSection("Default layout") {
+                SettingsPicker("Default drag stack", id: "drag-stack-layout", selection: $dragStackLayout, help: "Layout for a new group created by dropping a window onto another. Existing groups keep their layout; edge drops still split.") {
+                    Text("Accordion").tag(Layout.stacked)
+                    Text("Tabbed").tag(Layout.tabGroup)
+                } onChange: { persistRootString("drag-stack-layout", dragStackLayout.rawValue) }
                 SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
                     Text("Tiles").tag(Layout.tiles)
-                    Text("Tab group").tag(Layout.tabGroup)
+                    Text("Stacked: Tabbed").tag(Layout.tabGroup)
+                    Text("Stacked: Accordion").tag(Layout.stacked)
                 } onChange: { persistRootString("default-root-container-layout", defaultLayout.rawValue) }
                 Text("Defaults apply to new workspaces. Selecting Dwindle also updates existing tiled workspaces.")
                     .font(.callout).foregroundStyle(.secondary)
@@ -56,6 +66,24 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("1.5 equals 3:2. 0 disables the limit. Applies only to screens with width/height ≥ 2.3.")
                     .font(.callout).foregroundStyle(.secondary)
 
+            }
+            SettingsSection("Workspace swipes — experimental") {
+                SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
+                    persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
+                }
+                SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
+                    persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
+                }
+                .disabled(!workspaceSwipes)
+                SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
+                    help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
+                    persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
+                }
+                .disabled(!workspaceSwipes)
+                Text(workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
+                    .font(.callout).foregroundStyle(.secondary)
+                Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Pointer focus") {
                 SettingsToggle("Focus windows under the pointer", id: "focus-follows-mouse", isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {

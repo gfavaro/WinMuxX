@@ -12,8 +12,8 @@ struct WorkspaceBackAndForthCommand: Command {
 
 @MainActor
 func activatePreviousWorkspace(on monitor: Monitor) -> Bool {
-    guard let previousId = winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(monitor)]?.previousWorkspaceId,
-          let workspace = winMuxWorkspaceState.workspaceById[previousId], !workspace.isArchived,
+    guard let previousId = runtime.workspaces.monitorViewportsById[MonitorViewportId(monitor)]?.previousWorkspaceId,
+          let workspace = runtime.workspaces.workspaceById[previousId], !workspace.isArchived,
           workspace != monitor.activeWorkspace else { return false }
     return activateWorkspaceForUser(workspace, on: monitor)
 }

@@ -4,6 +4,17 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarGeometryTest: XCTestCase {
+    func testRenderedMenuBoundsUseEachDisplaysOwnHeightWithoutWorkspaceClearance() {
+        let notched = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        let external = CGRect(x: -908, y: -1440, width: 3440, height: 1440)
+        let bars = [CGRect(x: 0, y: 0, width: 1710, height: 38),
+                    CGRect(x: -908, y: -1440, width: 3440, height: 24)]
+        XCTAssertEqual(workspaceSidebarRenderedMenuBarHeight(screen: notched, safeAreaTop: 37.5, fallback: 39, menuBars: bars), 38)
+        XCTAssertEqual(workspaceSidebarRenderedMenuBarHeight(screen: external, safeAreaTop: 0, fallback: 25, menuBars: bars), 24)
+        XCTAssertEqual(workspaceSidebarRenderedMenuBarHeight(screen: notched, safeAreaTop: 37.5, fallback: 39, menuBars: [bars[1]]), 39)
+        XCTAssertEqual(workspaceSidebarRenderedMenuBarHeight(screen: notched, safeAreaTop: 37.5, fallback: 39, menuBars: []), 39)
+    }
+
     func testEveryModeAndSideProtectsMenuBarAndAnchorsToDisplayEdge() {
         let screens = [CGRect(x: 0, y: 0, width: 1440, height: 900), CGRect(x: -1920, y: -300, width: 1920, height: 1080)]
         for screen in screens {

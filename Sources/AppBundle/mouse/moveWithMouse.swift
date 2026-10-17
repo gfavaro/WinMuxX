@@ -189,7 +189,7 @@ extension CGPoint {
                 tree.children.first(where: {
                     (virtual ? $0.lastAppliedLayoutVirtualRect : $0.lastAppliedLayoutPhysicalRect)?.contains(point) == true
                 })
-            case .tabGroup:
+            case .tabGroup, .stacked:
                 tree.mostRecentChild
         }
         guard let target else { return nil }

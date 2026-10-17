@@ -4,28 +4,18 @@ import XCTest
 
 @MainActor
 final class MonitorWorkspaceNavigationTest: XCTestCase {
-    private var displays: [TestMonitor] = []
-    private var spaces: [Workspace] = []
+    private var fixture: WorkspaceNavigationFixture!
+    private var displays: [TestMonitor] { fixture.displays }
+    private var spaces: [Workspace] { fixture.spaces }
 
     override func setUp() async throws {
-        setUpWorkspacesForTests()
-        displays = (0..<3).map { index in
-            let rect = Rect(topLeftX: Double(index * 1920), topLeftY: 0, width: 1920, height: 1080)
-            return TestMonitor(monitorAppKitNsScreenScreensId: index + 1, name: "Display\(index + 1)", rect: rect, visibleRect: rect, isMain: index == 0)
-        }
-        setMonitorsForTests(displays)
-        spaces = (1...5).map { index in
-            let workspace = Workspace.get(byName: String(index))
-            TestWindow.new(id: UInt32(900 + index), parent: workspace.rootTilingContainer).markAsMostRecentChild()
-            return workspace
-        }
-        XCTAssertTrue(displays[0].setActiveWorkspace(spaces[0]))
-        XCTAssertTrue(displays[1].setActiveWorkspace(spaces[1]))
-        XCTAssertTrue(displays[2].setActiveWorkspace(spaces[4]))
-        XCTAssertTrue(spaces[0].focusWorkspace())
+        fixture = WorkspaceNavigationFixture()
     }
 
-    override func tearDown() async throws { setMonitorsForTests(nil) }
+    override func tearDown() async throws {
+        fixture.cleanUp()
+        fixture = nil
+    }
 
     private func run(_ command: String, stdin: String = "") async throws {
         let result = try await parseCommand(command).cmdOrDie.run(.defaultEnv, CmdStdin(stdin))
@@ -33,11 +23,160 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
     }
 
+    func testSwipePreviewTargetSelectionDoesNotChangeAnyViewport() {
+        spaces[2].seedMonitorIfNeeded(displays[1])
+        spaces[3].seedMonitorIfNeeded(displays[2])
+        let before = displays.map { $0.activeWorkspace.id }
+        XCTAssertEqual(workspaceSwipeTarget(on: displays[1], isNext: true), spaces[2])
+        XCTAssertNil(workspaceSwipeTarget(on: displays[0], isNext: true))
+        XCTAssertEqual(displays.map { $0.activeWorkspace.id }, before)
+        XCTAssertEqual(focus.workspace, spaces[0])
+    }
+
+    func testExplicitlyMovedWorkspaceBecomesSwipeReachableOnItsNewDisplay() {
+        spaces[2].seedMonitorIfNeeded(displays[0])
+        spaces[3].seedMonitorIfNeeded(displays[0])
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[4], targetMonitor: displays[0]))
+        let otherDisplays = displays.dropFirst().map { $0.activeWorkspace.id }
+        XCTAssertTrue(activateWorkspaceForUser(spaces[0], on: displays[0]))
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[2])
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[3])
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[4])
+        XCTAssertEqual(displays.dropFirst().map { $0.activeWorkspace.id }, otherDisplays)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+    }
+
+    func testExplicitWorkspaceMoveCannotBeUndoneByOldRecoverySnapshot() async throws {
+        resetClosedWindowsCache()
+        defer { resetClosedWindowsCache() }
+        let moved = spaces[4]
+        let window = try XCTUnwrap(moved.allLeafWindowsRecursive.first)
+        replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(moved, targetMonitor: displays[0]))
+        XCTAssertTrue(activateWorkspaceForUser(spaces[0], on: displays[0]))
+        let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
+        XCTAssertFalse(restored)
+        XCTAssertEqual(moved.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        spaces[2].seedMonitorIfNeeded(displays[1])
+        spaces[3].seedMonitorIfNeeded(displays[1])
+        XCTAssertEqual(workspaceSwipeTarget(on: displays[0], isNext: true), moved)
+    }
+
+    func testReplacingSecondaryWorkspaceReturnsPreviousOwnerToMainForSwipes() {
+        XCTAssertTrue(spaces[0].focusWorkspace())
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[2], targetMonitor: displays[1]))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[2])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        XCTAssertFalse(spaces[1].isVisible)
+        XCTAssertEqual(spaces[1].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertEqual(workspaceSwipeTarget(on: displays[0], isNext: true), spaces[1])
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[2])
+    }
+
+    func testReplacingThirdDisplayAlsoReturnsItsHiddenWorkspacesToMain() {
+        spaces[3].seedMonitorIfNeeded(displays[2])
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[2], targetMonitor: displays[2]))
+        for workspace in [spaces[3], spaces[4]] {
+            XCTAssertEqual(workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+            XCTAssertFalse(workspace.isVisible)
+        }
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[2])
+    }
+
+    func testSwipeStaysWithinActiveProject() {
+        let project = WorkspaceProjectId("swipe-other")
+        spaces[2].assignProject(project)
+        spaces[3].seedMonitorIfNeeded(displays[0])
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[3])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+    }
+
+    func testSwipeNavigatesOnlyExistingLocalWorkspacesAndStopsAtEnds() {
+        spaces[2].seedMonitorIfNeeded(displays[1])
+        spaces[3].seedMonitorIfNeeded(displays[2])
+        let ids = Set(Workspace.all.map(\.id))
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[1], isNext: true))
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[2])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        XCTAssertFalse(navigateWorkspaceBySwipe(on: displays[1], isNext: true))
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[1], isNext: false))
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertFalse(navigateWorkspaceBySwipe(on: displays[1], isNext: false))
+        XCTAssertFalse(navigateWorkspaceBySwipe(on: displays[0], isNext: true))
+        XCTAssertFalse(navigateWorkspaceBySwipe(on: displays[0], isNext: false))
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: displays[2], isNext: false))
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[3])
+        XCTAssertFalse(navigateWorkspaceBySwipe(on: displays[2], isNext: false))
+        XCTAssertEqual(Set(Workspace.all.map(\.id)), ids)
+        XCTAssertEqual(spaces[2].workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[2].rect.topLeftCorner)
+    }
+
+    func testLateTreeRestorationPreservesStartupDisplayChoice() async throws {
+        let workspace = spaces[2]
+        workspace.seedMonitorIfNeeded(displays[1])
+        let world = snapshotCurrentFrozenWorld()
+        config.startWorkspacesOnMainMonitor = true
+        applyStartupWorkspacePlacement()
+        let window = try XCTUnwrap(workspace.allLeafWindowsRecursive.first)
+        let restored = try await restoreFrozenWorldIfNeeded(world, newlyDetectedWindow: window,
+            matchedWindows: [window.windowId: window], restoreVisibleWorkspaces: false)
+        XCTAssertTrue(restored)
+        XCTAssertEqual(workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+    }
+
+    func testStartupPlacementIsOptionalAndExplicitMovesStillWork() async throws {
+        config.startWorkspacesOnMainMonitor = false
+        applyStartupWorkspacePlacement()
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+
+        config.startWorkspacesOnMainMonitor = true
+        config.workspaceToMonitorForceAssignment = ["5": [.sequenceNumber(3)]]
+        applyStartupWorkspacePlacement()
+        for workspace in spaces.prefix(4) {
+            XCTAssertEqual(workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        }
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        XCTAssertTrue(displays[1].activeWorkspace.isEffectivelyEmpty)
+        XCTAssertFalse(spaces.contains(displays[1].activeWorkspace))
+
+        try await run("move-workspace-to-monitor 2 --workspace 2")
+        try await run("workspace 1")
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+    }
+
+    func testAutomaticSelectionCannotTakeHiddenWorkspaceFromAnotherDisplay() {
+        let hidden = spaces[2]
+        hidden.seedMonitorIfNeeded(displays[0])
+        XCTAssertFalse(workspaceIsAvailableForMonitor(hidden, monitor: displays[1]))
+        XCTAssertTrue(workspaceIsAvailableForMonitor(hidden, monitor: displays[0]))
+        XCTAssertNotEqual(availablePreferredWorkspace(projectId: hidden.projectId, monitor: displays[1]), hidden)
+
+        // Fallback creation must leave even an empty owned workspace on its display.
+        let empty = Workspace.get(byName: "owned-empty")
+        empty.seedMonitorIfNeeded(displays[0])
+        let fallback = getOrCreateMonitorViewportFallbackWorkspace(for: displays[1])
+        XCTAssertNotEqual(fallback, empty)
+        XCTAssertEqual(empty.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+    }
+
     func testDirectSelectionOnlyFocusesDestinationAndPreservesHistory() async throws {
         for display in displays {
-            winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
+            runtime.workspaces.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
         }
-        let before = winMuxWorkspaceState.monitorViewportsById
+        let before = runtime.workspaces.monitorViewportsById
         try await run("workspace 2")
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
@@ -45,8 +184,8 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.windowOrNil?.windowId, 902)
         XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
         for (id, viewport) in before {
-            XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
-            XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.activeWorkspaceId, viewport.activeWorkspaceId)
+            XCTAssertEqual(runtime.workspaces.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
+            XCTAssertEqual(runtime.workspaces.monitorViewportsById[id]?.activeWorkspaceId, viewport.activeWorkspaceId)
         }
     }
 
@@ -85,16 +224,16 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
     func testForcedSourceAssignmentDoesNotBlockCrossMonitorFocus() async throws {
         config.workspaceToMonitorForceAssignment = ["1": [.main]]
         for display in displays {
-            winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
+            runtime.workspaces.monitorViewportsById[MonitorViewportId(display)]?.previousWorkspaceId = spaces[3].id
         }
-        let before = winMuxWorkspaceState.monitorViewportsById
+        let before = runtime.workspaces.monitorViewportsById
         let result = try await parseCommand("workspace --name 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
         XCTAssertEqual(focus.workspace, spaces[1])
         for (id, viewport) in before {
-            XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
+            XCTAssertEqual(runtime.workspaces.monitorViewportsById[id]?.previousWorkspaceId, viewport.previousWorkspaceId)
         }
     }
 
@@ -104,8 +243,8 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[3])
     }
 
-    func testSidebarRequiresOverrideForWorkspaceVisibleOnAnotherDisplay() {
-        XCTAssertFalse(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
+    func testSidebarFocusesWorkspaceOnItsExistingDisplay() {
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
         XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
@@ -120,13 +259,13 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[1])
     }
 
-    func testForcedHiddenWorkspaceStillCannotActivateOnWrongMonitor() async throws {
+    func testForcedHiddenWorkspaceActivatesOnItsAssignedMonitor() async throws {
         config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(2)]]
         let result = try await parseCommand("workspace --name 3").cmdOrDie.run(.defaultEnv, .emptyStdin)
-        XCTAssertEqual(result.exitCode, 1)
+        XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
-        XCTAssertEqual(focus.workspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[2])
+        XCTAssertEqual(focus.workspace, spaces[2])
     }
 
     func testAlreadyFocusedVisibleWorkspaceIsNoopEvenWhenAnotherMonitorIsRequested() async throws {
@@ -149,7 +288,7 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
     }
 
     func testMissingHistoryDoesNotCreateAWorkspaceOrChangeFocus() async throws {
-        winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(displays[0])]?.previousWorkspaceId = WorkspaceId("removed")
+        runtime.workspaces.monitorViewportsById[MonitorViewportId(displays[0])]?.previousWorkspaceId = WorkspaceId("removed")
         let workspaceIds = Set(Workspace.all.map(\.id))
         let result = try await parseCommand("workspace-back-and-forth").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 1)
@@ -165,17 +304,33 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         setMonitorsForTests(displays)
         rearrangeWorkspacesOnMonitors()
         checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
-        XCTAssertEqual(winMuxWorkspaceState.monitorViewportsById[MonitorViewportId(displays[0])]?.previousWorkspaceId, spaces[0].id)
+        XCTAssertEqual(runtime.workspaces.monitorViewportsById[MonitorViewportId(displays[0])]?.previousWorkspaceId, spaces[0].id)
         try await run("workspace-back-and-forth")
         XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
     }
-    func testSidebarOverrideSwapsOnlyTheSourceAndDestinationDisplays() {
-        XCTAssertTrue(overrideWorkspaceOnMonitorBySwappingActiveViewports(spaces[0], targetMonitor: displays[1]))
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
+    func testSidebarOverrideBringsWorkspaceToDestinationWithoutSwapping() {
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[0], targetMonitor: displays[1]))
+        XCTAssertNotEqual(displays[0].activeWorkspace, spaces[1])
+        XCTAssertTrue(displays[0].activeWorkspace.isEffectivelyEmpty)
+        XCTAssertEqual(spaces[1].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertFalse(spaces[1].isVisible)
         XCTAssertEqual(displays[1].activeWorkspace, spaces[0])
         XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
         XCTAssertTrue(focusWorkspaceFromSidebar(spaces[0], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
         XCTAssertEqual(focus.workspace, spaces[0])
+    }
+
+    func testOverrideUsesThirdDisplayAndRejectsInvalidAssignmentWithoutChanges() {
+        config.workspaceToMonitorForceAssignment = ["1": [.sequenceNumber(1)]]
+        XCTAssertFalse(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[0], targetMonitor: displays[2]))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
+        config.workspaceToMonitorForceAssignment = [:]
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[0], targetMonitor: displays[2]))
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertFalse(spaces[4].isVisible)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
     }
 
 }

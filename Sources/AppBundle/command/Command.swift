@@ -94,6 +94,7 @@ extension [Command] {
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
         var isSucc = true
         for command in self {
+            try WindowDetectionOperations.current?.check()
             let commandSucc = try await command.run(env, io)
             isSucc = commandSucc && isSucc
             refreshModel()

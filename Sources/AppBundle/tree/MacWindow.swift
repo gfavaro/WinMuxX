@@ -27,6 +27,9 @@ final class MacWindow: Window {
         learnedMinimum = LearnedWindowMinimum(size: size)
     }
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?
+    private var workspaceReveal = WorkspaceWindowRevealState()
+    private(set) var workspacePreviewFrame: Rect?
+    private(set) var workspacePreviewMonitorOrigin: CGPoint?
     /// The corner the window is parked in, together with the monitor rect it was parked
     /// against: when the monitor's geometry changes (or the workspace moves to another
     /// monitor), the old corner position is wrong and the window must be re-parked even
@@ -36,6 +39,9 @@ final class MacWindow: Window {
     @MainActor
     private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
         self.macApp = actor
+        if !isUnitTest, let size = PersistedAppMinimums.shared.size(for: actor.rawAppBundleId) {
+            learnedMinimum = LearnedWindowMinimum(size: size)
+        }
         super.init(id: id, actor, lastFloatingSize: lastFloatingSize, parent: parent, adaptiveWeight: adaptiveWeight, index: index)
     }
 
@@ -75,19 +81,26 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
         WindowRecoveryController.shared.recordBeforeMutation(window, originalRect: rect)
 
-        window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
-        if window.restartIdentity == nil, let bundleId = macApp.rawAppBundleId {
-            window.restartIdentity = RestartWindowIdentity(bundleId: bundleId, pid: macApp.pid,
-                launchDate: macApp.nsApp.launchDate, title: "")
+        try await WindowDetectionOperations.shared.run(window) {
+            window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
+            if window.restartIdentity == nil, let bundleId = macApp.rawAppBundleId {
+                window.restartIdentity = RestartWindowIdentity(bundleId: bundleId, pid: macApp.pid,
+                    launchDate: macApp.nsApp.launchDate, title: "")
+            }
+            try await debugWindowsIfRecording(window)
+            let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
+            let didRestoreClosedWindowsCache = didRestorePersistedFrozenWorld ? false : try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
+            if !didRestorePersistedFrozenWorld && !didRestoreClosedWindowsCache {
+                try await tryOnWindowDetected(window)
+            }
+            if !didRestorePersistedFrozenWorld {
+                trackPendingRestartWindow(window)
+                if window.parent is TilingContainer || window.parent is Workspace {
+                    invalidateLateRestartTreeRestoration()
+                }
+            }
         }
-        try await debugWindowsIfRecording(window)
-        let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
-        let didRestoreClosedWindowsCache = didRestorePersistedFrozenWorld ? false : try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
-        if !didRestorePersistedFrozenWorld && !didRestoreClosedWindowsCache {
-            if !isStartup { WindowMotion.shared.noteNewWindow(windowId) }
-            try await tryOnWindowDetected(window)
-        }
-        if !didRestorePersistedFrozenWorld { trackPendingRestartWindow(window) }
+        if window.parent is MacosPopupWindowsContainer { WindowDetectionOperations.shared.schedulePopupChecks(window) }
         return window
     }
 
@@ -115,6 +128,12 @@ final class MacWindow: Window {
         try await macApp.dumpWindowAxInfo(windowId: windowId)
     }
 
+    @MainActor
+    override func readNativeState() async throws -> (fullscreen: Bool, minimized: Bool)? {
+        do { return try await macApp.readNativeState(windowId) }
+        catch let failure as AXReadFailure where failure.code == .cannotComplete { return nil }
+    }
+
     func setNativeFullscreen(_ value: Bool) {
         macApp.setNativeFullscreen(windowId, value)
     }
@@ -127,6 +146,7 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
+        WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
         if macApp.nsApp.isTerminated, MacWindow.allWindowsMap[windowId] != nil {
             rememberRestartWindowBeforeAppTermination(self)
@@ -185,6 +205,8 @@ final class MacWindow: Window {
 
     @MainActor
     override func nativeFocus() {
+        guard !isHiddenInCorner else { return }
+        WorkspaceTransitionDiagnostics.record("focus", window: self, generation: workspaceReveal.generation)
         macApp.nativeFocus(windowId)
     }
 
@@ -211,11 +233,6 @@ final class MacWindow: Window {
     @MainActor
     func hideInCorner(_ corner: OptimalHideCorner, force: Bool = false) async throws {
         guard let nodeMonitor else { return }
-        if !force, isHiddenInCorner, hiddenInCorner?.corner == corner,
-           hiddenInCorner?.monitorVisibleRect == nodeMonitor.visibleRect
-        {
-            return
-        }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent `hideInCorner` calls
         if !isHiddenInCorner {
             guard let windowRect = try await getAxRect() else { return }
@@ -223,15 +240,27 @@ final class MacWindow: Window {
             if !isHiddenInCorner {
                 let topLeftCorner = windowRect.topLeftCorner
                 let monitorRect = windowRect.center.monitorApproximation.rect // Similar to layoutFloatingWindow. Non idempotent
+                workspacePreviewFrame = windowRect
+                workspacePreviewMonitorOrigin = monitorRect.topLeftCorner
                 let absolutePoint = topLeftCorner - monitorRect.topLeftCorner
                 prevUnhiddenProportionalPositionInsideWorkspaceRect =
                     CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
             }
         }
+        // A parking flag is only a hint: apps may reposition without AX events.
+        // Query WindowServer before skipping the write, without paying an AX round-trip.
+        var parkedFrame: CGRect?
+        if !force, isHiddenInCorner, hiddenInCorner?.corner == corner,
+           hiddenInCorner?.monitorVisibleRect == nodeMonitor.visibleRect {
+            var actual = CGRect.zero
+            if winmux_window_frame(windowId, &actual) { parkedFrame = actual }
+        }
         let p: CGPoint
         switch corner {
             case .bottomLeftCorner:
-                guard let s = try await getAxSize() else { fallthrough }
+                let size: CGSize?
+                if let parkedFrame { size = parkedFrame.size } else { size = try await getAxSize() }
+                guard let s = size else { fallthrough }
                 // Zoom will jump off if you do one pixel offset https://github.com/nikitabobko/WinMux/issues/527
                 // todo this ad hoc won't be necessary once I implement optimization suggested by Zalim
                 let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: -1)
@@ -242,11 +271,20 @@ final class MacWindow: Window {
                 let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: 1)
                 p = nodeMonitor.visibleRect.bottomRightCorner - onePixelOffset
         }
+        if let parkedFrame, workspaceParkingPositionMatches(parkedFrame.origin, p) { return }
         // Complete parking before another workspace is revealed. AX frame writes
         // are otherwise queued, allowing outgoing windows to overlap the destination.
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        workspaceReveal.park()
+        if !isUnitTest { WindowBorderController.shared.remove(windowId: windowId) }
+        let parkingGeneration = workspaceReveal.generation
+        WorkspaceTransitionDiagnostics.record("park-begin", window: self, generation: parkingGeneration,
+            requested: CGRect(origin: p, size: CGSize(width: lastKnownActualRect?.width ?? 0, height: lastKnownActualRect?.height ?? 0)))
         try await setAxFrameBlocking(p, nil)
+        try checkCancellation()
+        guard workspaceReveal.generation == parkingGeneration else { return }
         hiddenInCorner = (corner, nodeMonitor.visibleRect)
+        WorkspaceTransitionDiagnostics.record("park-end", window: self, generation: parkingGeneration)
     }
 
     @MainActor
@@ -263,7 +301,8 @@ final class MacWindow: Window {
             let windowHeight = lastKnownActualRect?.height ?? lastFloatingSize?.height ?? 0
             newX = newX.coerce(in: workspaceRect.minX ... max(workspaceRect.minX, workspaceRect.maxX - windowWidth))
             newY = newY.coerce(in: workspaceRect.minY ... max(workspaceRect.minY, workspaceRect.maxY - windowHeight))
-            try await setAxFrameBlocking(CGPoint(x: newX, y: newY), nil)
+            let size = CGSize(width: windowWidth, height: windowHeight)
+            _ = try await restoreFromCorner(to: CGRect(x: newX, y: newY, width: size.width, height: size.height), resize: false)
         }
 
         switch getChildParentRelation(child: self, parent: parent) {
@@ -277,8 +316,41 @@ final class MacWindow: Window {
                  .macosPopupWindow, .rootTilingContainer, .shimContainerRelation: break
         }
 
-        self.prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
-        self.hiddenInCorner = nil
+    }
+
+    @MainActor
+    @discardableResult
+    func restoreFromCorner(to target: CGRect, resize: Bool = true) async throws -> Bool {
+        guard isHiddenInCorner, let workspace = nodeWorkspace else { return false }
+        let token = workspaceReveal.begin()
+        if !isUnitTest { WindowBorderController.shared.remove(windowId: windowId) }
+        // Once a reveal starts, the old parking coordinates no longer describe
+        // the native window. A later outgoing transition must park it again.
+        hiddenInCorner = nil
+        WorkspaceTransitionDiagnostics.record("restore-begin", window: self, generation: token, requested: target)
+        do {
+            try await setAxFrameBlocking(target.origin, resize ? target.size : nil, positionFirst: true)
+            try checkCancellation()
+            // AX success alone does not mean the app accepted the requested position.
+            let actual = try await macApp.getAxRect(windowId)
+            try checkCancellation()
+            let matches = actual.map { abs($0.topLeftX - target.minX) <= 2 && abs($0.topLeftY - target.minY) <= 2 } ?? false
+            let current = nodeWorkspace === workspace && (workspace.isVisible || !TrayMenuModel.shared.isEnabled)
+            guard workspaceReveal.finish(token, succeeded: matches && current) else {
+                lastAppliedLayoutPhysicalRect = nil
+                WorkspaceTransitionDiagnostics.record("restore-pending", window: self, generation: token, requested: target)
+                return false
+            }
+            prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
+            hiddenInCorner = nil
+            WorkspaceTransitionDiagnostics.record("restore-end", window: self, generation: token, requested: target)
+            return true
+        } catch {
+            _ = workspaceReveal.finish(token, succeeded: false)
+            lastAppliedLayoutPhysicalRect = nil
+            WorkspaceTransitionDiagnostics.record("restore-cancelled-or-failed", window: self, generation: token, requested: target)
+            throw error
+        }
     }
 
     override var isHiddenInCorner: Bool {
@@ -328,6 +400,10 @@ final class MacWindow: Window {
                       shouldLearnWindowMinimum(nativeFullscreen: confirmedFullscreen, nativeMinimized: confirmedMinimized,
                                                animating: WindowMotion.shared.isAnimating(self.windowId)) else { return }
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
+                if !isUnitTest { PersistedAppMinimums.shared.remember(self.learnedMinimum.size, for: self.macApp.rawAppBundleId) }
+                WindowMotion.shared.noteLanded(self.windowId,
+                    asked: CGRect(origin: topLeft, size: size),
+                    got: CGRect(origin: confirmed.topLeftCorner, size: confirmed.size))
             } catch {
                 // Cancellation, closed windows and failed AX reads are not minimum-size evidence.
             }
@@ -352,13 +428,13 @@ final class MacWindow: Window {
     }
 
     @MainActor
-    func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?) async throws {
+    func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
         WindowMotion.shared.cancel(windowId)
         frameRequestGeneration &+= 1
         minimumObservation?.cancel()
         minimumRequest = nil
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
-        try await macApp.setAxFrameBlocking(windowId, topLeft, size)
+        try await macApp.setAxFrameBlocking(windowId, topLeft, size, positionFirst: positionFirst)
     }
 
     @MainActor

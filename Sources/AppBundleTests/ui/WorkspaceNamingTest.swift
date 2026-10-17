@@ -130,9 +130,9 @@ final class WorkspaceNamingTest: XCTestCase {
         second.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 212, parent: second.rootTilingContainer)
 
-        var project = winMuxWorkspaceState.projectsById[first.projectId].orDie()
+        var project = runtime.workspaces.projectsById[first.projectId].orDie()
         project.workspaceOrder = [first.id]
-        winMuxWorkspaceState.projectsById[first.projectId] = project
+        runtime.workspaces.projectsById[first.projectId] = project
 
         Workspace.reconcileWorkspaceState()
 
@@ -502,7 +502,7 @@ final class WorkspaceNamingTest: XCTestCase {
         XCTAssertNil(config.workspaceSidebar.projectLabels[project.id.rawValue])
         XCTAssertNil(config.workspaceSidebar.projectColors[project.id.rawValue])
         XCTAssertFalse(workspaceProjects().contains { $0.id == project.id })
-        XCTAssertNil(winMuxWorkspaceState.projectsById[WorkspaceProjectId("Work")])
+        XCTAssertNil(runtime.workspaces.projectsById[WorkspaceProjectId("Work")])
     }
 
     func testPersistedProjectLabelMaterializesProject() {

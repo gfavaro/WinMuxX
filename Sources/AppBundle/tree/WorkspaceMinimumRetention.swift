@@ -11,7 +11,11 @@ func minimumWorkspaceRetentionIds() -> Set<WorkspaceId> {
     }
     let needed = max(0, config.effectiveMinimumWorkspaceCount - existingSurvivors.count)
     let survivorIds = Set(existingSurvivors.map(\.id))
-    return Set(ordered.lazy.filter { !survivorIds.contains($0.id) }.prefix(needed).map(\.id))
+    let candidates = ordered.filter { !survivorIds.contains($0.id) }
+    // Reuse a displayed empty slot before another spare, preserving focus whenever
+    // the configured minimum still has room for an empty workspace.
+    let prioritized = candidates.filter(\.isVisible) + candidates.filter { !$0.isVisible }
+    return Set(prioritized.prefix(needed).map(\.id))
 }
 
 @MainActor

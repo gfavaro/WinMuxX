@@ -41,7 +41,7 @@ extension CGPoint {
         switch container.layout {
             case .tiles, .dwindle:
                 return findWindowDragTargetInTiles(container, excluding: excludedNode)
-            case .tabGroup:
+            case .tabGroup, .stacked:
                 return findWindowDragTargetInTabGroup(container, excluding: excludedNode)
         }
     }

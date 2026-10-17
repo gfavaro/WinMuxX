@@ -123,7 +123,7 @@ private func windowResizePreviewContainerItems(
                 context: context,
                 activeWindowId: activeWindowId,
             )
-        case .tabGroup:
+        case .tabGroup, .stacked:
             return windowResizePreviewTabGroupItems(
                 container: container,
                 point: point,

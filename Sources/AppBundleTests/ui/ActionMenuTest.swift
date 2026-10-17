@@ -65,11 +65,35 @@ final class ActionMenuTest: XCTestCase {
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Toggle Floating" }).keyEquivalent, "t")
-        for title in ["Horizontal Tiles", "Vertical Tiles", "Tab Group", "Toggle Orientation"] {
+        for title in ["Tiles", "Tabbed", "Accordion", "Horizontal", "Vertical"] {
             let item = try XCTUnwrap(layout.items.first { $0.title == title })
             XCTAssertEqual(item.title, title)
             XCTAssertEqual(item.keyEquivalent, "", title)
         }
+    }
+
+    func testEssentialMenuOmitsRareCommandsRatherThanNestingThem() throws {
+        let previousMode = activeMode
+        defer { activeMode = previousMode }
+        activeMode = mainModeId
+        let menu = NSMenu()
+        NativeActionMenu().menuNeedsUpdate(menu)
+        let titles = menu.items.map(\.title)
+        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Reload Config", "Enabled", "Settings…", "Quit WinMuxX"] {
+            XCTAssertTrue(titles.contains(title), title)
+        }
+        XCTAssertFalse(titles.contains("Mode: main"))
+        func descendants(_ menu: NSMenu) -> [NSMenuItem] {
+            menu.items.flatMap { [$0] + ($0.submenu.map(descendants) ?? []) }
+        }
+        let allTitles = descendants(menu).map(\.title)
+        for title in ["Advanced", "Projects", "Utilities", "Other Key Bindings", "Bring Here", "Copy Version", "Open Config", "Diagnostics…", "Close Other Windows…", "New Opposite Container", "Next Tab"] {
+            XCTAssertFalse(allTitles.contains(title), title)
+        }
+        let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
+        XCTAssertNotNil(workspaces.items.first { $0.title == "Move and Follow" }?.submenu)
+        XCTAssertNotNil(workspaces.items.first { $0.title == "Move Window to" }?.submenu)
+        if sortedMonitors.count == 1 { XCTAssertFalse(titles.contains("Display")) }
     }
 
     func testMultipleBindingsAreAllClaimed() throws {
@@ -185,13 +209,13 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == "Settings…" }).isEnabled)
     }
 
-    func testDisabledMenuKeepsRecoveryControlsAndDiagnosticsAvailable() throws {
+    func testDisabledMenuKeepsEssentialControlsAvailable() throws {
         let previousEnabled = TrayMenuModel.shared.isEnabled
         defer { TrayMenuModel.shared.isEnabled = previousEnabled }
         TrayMenuModel.shared.isEnabled = false
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        for title in ["Enable", "Reload Config", "Settings…", "Diagnostics…", "Quit WinMuxX"] {
+        for title in ["Enabled", "Reload Config", "Settings…", "Quit WinMuxX"] {
             XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == title }).isEnabled, title)
         }
         let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)

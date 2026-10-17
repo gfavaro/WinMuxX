@@ -20,8 +20,6 @@ let package = Package(
         .library(name: "SparkleSupport", targets: ["SparkleSupport"]),
     ],
     dependencies: [
-        .package(path: "./ShellParserGenerated"),
-        .package(url: "https://github.com/InerziaSoft/ISSoundAdditions.git", exact: "2.0.1"),
         .package(url: "https://github.com/LebJe/TOMLKit.git", exact: "0.5.5"),
         .package(url: "https://github.com/rxhanson/MASShortcut", revision: "2f9fbb3f959b7a683c6faaf9638d22afad37a235"),
         .package(url: "https://github.com/apple/swift-collections.git", exact: "1.3.0"),
@@ -36,6 +34,7 @@ let package = Package(
             name: "PrivateApi",
             path: "Sources/PrivateApi",
             publicHeadersPath: "include",
+            linkerSettings: [.linkedFramework("IOKit")],
         ),
         .target(
             name: "Common",
@@ -48,9 +47,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "HotKey", package: "HotKey"),
-                .product(name: "ISSoundAdditions", package: "ISSoundAdditions"),
                 .product(name: "MASShortcut", package: "MASShortcut"),
-                .product(name: "ShellParserGenerated", package: "ShellParserGenerated"),
                 .product(name: "TOMLKit", package: "TOMLKit"),
                 .target(name: "Common"),
                 .target(name: "PrivateApi"),

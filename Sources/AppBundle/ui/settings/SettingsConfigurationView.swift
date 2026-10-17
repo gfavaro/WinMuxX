@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsConfigurationView: View {
     @ObservedObject var model: ShortcutSettingsModel
+    var onNavigate: (SettingsSidebarItem) -> Void = { _ in }
     @State private var showsReference = false
     var body: some View {
         VStack(spacing: 12) {
@@ -10,7 +11,7 @@ struct SettingsConfigurationView: View {
                 Text("Reference").tag(true)
             }
             .pickerStyle(.segmented).padding(.horizontal, 20)
-            if showsReference { ShortcutConfigurationReferenceView() }
+            if showsReference { ShortcutConfigurationReferenceView(onNavigate: onNavigate) }
             else { ShortcutAdvancedView(model: model) }
         }
     }

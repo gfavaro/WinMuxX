@@ -44,7 +44,7 @@ private func newConnection(_ connection: NWConnection) async { // todo add exit 
     }
     while true {
         let rawRequest: Data
-        switch await connection.readNonAtomic() {
+        switch await connection.readNonAtomic(timeout: .seconds(30)) {
             case .success(let _rawRequest): rawRequest = _rawRequest
             case .failure(let error):
                 await answerToClient(exitCode: 1, stderr: "Error: \(error)")

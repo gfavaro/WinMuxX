@@ -2,9 +2,8 @@ import AppKit
 import Common
 import XCTest
 
-/// Hidden (corner-parked) windows are re-asserted only when macOS could have moved windows
-/// behind our back with no AX events delivered. Every other event must leave parked windows
-/// alone — re-asserting them costs one AX round-trip per hidden window per event.
+/// Only wake and startup force AX parking writes even when native geometry agrees.
+/// Other events still verify native geometry before trusting a remembered parking flag.
 final class RefreshSessionEventReassertionTest: XCTestCase {
     func testOnlyWakeAndStartupRequireHiddenWindowsReassertion() {
         XCTAssertTrue(RefreshSessionEvent.startup.requiresHiddenWindowsReassertion)

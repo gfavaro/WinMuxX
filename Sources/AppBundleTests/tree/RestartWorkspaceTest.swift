@@ -7,10 +7,188 @@ import XCTest
 final class RestartWorkspaceTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testRestartPreservesNestedDwindleOrderAndRatiosWithReverseDiscovery() async throws {
+        try await assertNestedDwindleRestart(delayed: false)
+    }
+
+    func testDelayedWindowRestoresNestedDwindleBranchAndRatios() async throws {
+        try await assertNestedDwindleRestart(delayed: true)
+    }
+
+    private func assertNestedDwindleRestart(delayed: Bool) async throws {
+        let workspace = Workspace.get(byName: "4")
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        root.dwindleChildRatios = []
+        let first = TestWindow.new(id: 1, parent: root)
+        let branch = TilingContainer(parent: root, adaptiveWeight: 1, .v, .dwindle, index: INDEX_BIND_LAST)
+        branch.dwindleOrientation = .v
+        branch.dwindleChildRatios = []
+        let second = TestWindow.new(id: 2, parent: branch)
+        let third = TestWindow.new(id: 3, parent: branch)
+        root.dwindleChildRatios = [0.65, 0.35]
+        branch.dwindleChildRatios = [0.3, 0.7]
+        for window in [first, second, third] { window.restartIdentity = identity("Window \(window.windowId)") }
+        let envelope = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self, from: JSONEncoder().encode(makeRestartEnvelope()))
+        for window in [first, second, third] { window.unbindFromParent() }
+        preparePersistedFrozenWorldForStartup(envelope)
+        try await $_isStartup.withValue(true) {
+            for id: UInt32 in (delayed ? [3, 2] : [3, 2, 1]) {
+                let window = TestWindow.new(id: id, parent: workspace.rootTilingContainer)
+                window.restartIdentity = identity("Window \(id)")
+                let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
+                XCTAssertTrue(restored)
+            }
+            try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: delayed ? [2, 3] : [1, 2, 3])
+            workspace.normalizeContainers()
+        }
+        if delayed {
+            try await $_isStartup.withValue(false) {
+                let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+                window.restartIdentity = identity("Window 1")
+                let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
+                XCTAssertTrue(restored)
+                workspace.normalizeContainers()
+            }
+        }
+        let restored = workspace.rootTilingContainer
+        XCTAssertEqual(restored.allLeafWindowsRecursive.map(\.windowId), [1, 2, 3])
+        XCTAssertEqual(restored.children.count, 2)
+        XCTAssertEqual(restored.dwindleChildRatios, [0.65, 0.35])
+        let restoredBranch = try XCTUnwrap(restored.children.last as? TilingContainer)
+        XCTAssertEqual(restoredBranch.dwindleOrientation, .v)
+        XCTAssertEqual(restoredBranch.dwindleChildRatios, [0.3, 0.7])
+    }
+
+    func testDelayedSameProcessWindowReturnsToItsSavedDwindleSlot() async throws {
+        try await assertDelayedDwindleRestoration(preserveEdit: false)
+    }
+
+    func testDelayedWindowDoesNotReplayTreeAfterUserLayoutEdit() async throws {
+        try await assertDelayedDwindleRestoration(preserveEdit: true)
+    }
+
+    private func assertDelayedDwindleRestoration(preserveEdit: Bool) async throws {
+        let previousReady = isWinMuxRuntimeReady
+        defer { isWinMuxRuntimeReady = previousReady }
+        isWinMuxRuntimeReady = false
+        let workspace = Workspace.get(byName: "4")
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        root.dwindleChildRatios = []
+        let first = TestWindow.new(id: 1, parent: root)
+        let second = TestWindow.new(id: 2, parent: root)
+        first.restartIdentity = identity("First")
+        second.restartIdentity = identity("Second")
+        root.dwindleChildRatios = [0.7, 0.3]
+        let envelope = makeRestartEnvelope()
+        first.unbindFromParent()
+        second.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(envelope)
+        try await $_isStartup.withValue(true) {
+            let current = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+            current.restartIdentity = identity("Second")
+            let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
+            XCTAssertTrue(restored)
+            try await $_isStartup.withValue(false) {
+                syncClosedWindowsCacheToCurrentWorld()
+            }
+            try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: [2])
+            workspace.normalizeContainers()
+        }
+        isWinMuxRuntimeReady = true
+        try await $_isStartup.withValue(false) {
+            if preserveEdit {
+                workspace.rootTilingContainer.dwindleOrientation = .v
+                syncClosedWindowsCacheToCurrentWorld()
+            }
+            let delayed = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+            delayed.restartIdentity = identity("First")
+            let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: delayed)
+            XCTAssertTrue(restored)
+            workspace.normalizeContainers()
+        }
+        let restored = workspace.rootTilingContainer
+        XCTAssertEqual(restored.allLeafWindowsRecursive.map(\.windowId), preserveEdit ? [2, 1] : [1, 2])
+        XCTAssertEqual(restored.dwindleOrientation, preserveEdit ? .v : .h)
+        if !preserveEdit { XCTAssertEqual(restored.dwindleChildRatios, [0.7, 0.3]) }
+    }
+
+    func testRestoredDisplayNumbersOrderSidebarAndWorkspaceNavigation() async throws {
+        let workspaces = ["1", "2", "3", "6", "4"].map { Workspace.get(byName: $0) }
+        for (offset, workspace) in workspaces.enumerated() {
+            workspace.markAsAutomaticallyNamed()
+            workspace.restoredDisplayIndex = [1, 2, 3, 5, 4][offset]
+            _ = TestWindow.new(id: UInt32(offset + 1), parent: workspace.rootTilingContainer)
+        }
+        XCTAssertTrue(workspaces[0].focusWorkspace())
+        let expected = ["1", "2", "3", "4", "6"]
+        XCTAssertEqual(orderedUserFacingWorkspaces(in: workspaceProjectDefaultId).map(\.name), expected)
+        let rows = await buildWorkspaceSidebarWorkspaceViewModels(currentFocus: focus, workspaceLabels: [:], availableMonitors: sortedMonitors)
+        XCTAssertEqual(rows.filter { expected.contains($0.name) }.map(\.name), expected)
+        XCTAssertEqual(rows.filter { expected.contains($0.name) }.map(\.displayName), (1...5).map { "Workspace \($0)" })
+    }
+
     private func identity(_ title: String, pid: Int32 = 10, launch: TimeInterval = 10,
                           app: String = "test.editor", document: String? = nil, identifier: String? = nil) -> RestartWindowIdentity {
         RestartWindowIdentity(bundleId: app, pid: pid, launchDate: Date(timeIntervalSince1970: launch), title: title,
             documentURL: document, accessibilityIdentifier: identifier)
+    }
+
+    func testLatestPlacementRestoresBothTerminalsDespiteOlderSnapshotsAndChangedTitles() async throws {
+        let oldWorkspace = Workspace.get(byName: "2")
+        let first = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
+        let second = TestWindow.new(id: 2, parent: oldWorkspace.rootTilingContainer)
+        first.restartIdentity = identity("Old spinner", app: "com.mitchellh.ghostty")
+        second.restartIdentity = identity("Other terminal", app: "com.mitchellh.ghostty")
+        let oldWorld = snapshotCurrentFrozenWorld()
+        let correct = Workspace.get(byName: "4")
+        first.bind(to: correct.rootTilingContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
+        second.bind(to: correct.rootTilingContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
+        first.restartIdentity = identity("New spinner", app: "com.mitchellh.ghostty")
+        let latestWorld = snapshotCurrentFrozenWorld()
+        first.unbindFromParent()
+        second.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: latestWorld,
+            pending: [PendingRestartSnapshot(world: oldWorld, remainingWindowIds: [1, 2])]))
+        XCTAssertFalse(workspaceHasPendingRestartWindows("2"))
+        for id: UInt32 in [1, 2] {
+            let current = TestWindow.new(id: id, parent: focus.workspace.rootTilingContainer)
+            current.restartIdentity = identity("Another title", app: "com.mitchellh.ghostty")
+            let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
+            XCTAssertTrue(restored)
+            XCTAssertEqual(current.nodeWorkspace?.name, "4")
+        }
+        XCTAssertEqual(pendingRestartWindowCount, 0)
+    }
+
+    func testSupersessionDoesNotMergeRecycledIdsFromDifferentProcessLaunches() {
+        let workspace = Workspace.get(byName: "2")
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        first.restartIdentity = identity("First", launch: 10)
+        let oldWorld = snapshotCurrentFrozenWorld()
+        first.restartIdentity = identity("Second", launch: 20)
+        let latestWorld = snapshotCurrentFrozenWorld()
+        let snapshots = discardSupersededRestartAssignments([
+            PendingRestartSnapshot(world: oldWorld, remainingWindowIds: [1]),
+            PendingRestartSnapshot(world: latestWorld, remainingWindowIds: [1]),
+        ])
+        XCTAssertEqual(snapshots.map(\.remainingWindowIds), [[1], [1]])
+    }
+
+    func testSavingCurrentPlacementDropsOlderPendingCopy() {
+        let oldWorkspace = Workspace.get(byName: "2")
+        let window = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
+        window.restartIdentity = identity("Old title")
+        let oldWorld = snapshotCurrentFrozenWorld()
+        preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: oldWorld, pending: nil))
+        window.bind(to: Workspace.get(byName: "4").rootTilingContainer, adaptiveWeight: 1, index: INDEX_BIND_LAST)
+        window.restartIdentity = identity("Changed title")
+        let saved = makeRestartEnvelope()
+        XCTAssertTrue((saved.pending ?? []).allSatisfy { !$0.remainingWindowIds.contains(1) })
+        XCTAssertTrue(saved.world.workspaces.contains { $0.name == "4" && collectFrozenWindows($0)[1] != nil })
     }
 
     func testReopenedWindowReturnsToSameNumberedWorkspaceAndProject() async throws {
@@ -232,7 +410,9 @@ final class RestartWorkspaceTest: XCTestCase {
         first.unbindFromParent()
         let secondWorkspace = Workspace.get(byName: "5")
         let second = TestWindow.new(id: 1, parent: secondWorkspace.rootTilingContainer)
-        second.restartIdentity = identity("Report", document: "file:///second.txt")
+        // The colliding ID belongs to a different app launch. Within one verified
+        // launch, a newer snapshot of that same ID supersedes the old placement.
+        second.restartIdentity = identity("Report", pid: 11, launch: 11, document: "file:///second.txt")
         let secondWorld = snapshotCurrentFrozenWorld()
         second.unbindFromParent()
         preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: secondWorld,

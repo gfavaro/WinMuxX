@@ -1,12 +1,33 @@
+import Common
+
 @MainActor
 func tryOnWindowDetected(_ window: Window) async throws {
     guard let parent = window.parent else { return }
     switch parent.cases {
-        case .tilingContainer, .workspace, .macosMinimizedWindowsContainer,
-             .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer:
+        case .tilingContainer, .workspace:
+            // Consume before any suspension so another detected window cannot take it.
+            let layout = layoutForNextDetectedWindow
+            layoutForNextDetectedWindow = nil
+            if let layout { try await applyDetectedWindowLayout(layout, to: window) }
+            try await onWindowDetected(window)
+            // Rules may move the window to another workspace or change its layout.
+            if let layout { try await applyDetectedWindowLayout(layout, to: window) }
+        case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer:
             try await onWindowDetected(window)
         case .macosPopupWindowsContainer:
             break
+    }
+}
+
+@MainActor
+private func applyDetectedWindowLayout(_ layout: LayoutCmdArgs.LayoutDescription, to window: Window) async throws {
+    guard let parent = window.parent else { return }
+    switch parent.cases {
+        case .tilingContainer, .workspace:
+            _ = try await LayoutCommand(args: LayoutCmdArgs(rawArgs: [], toggleBetween: [layout]))
+                .run(.defaultEnv.copy(\.windowId, window.windowId), .emptyStdin)
+        case .macosPopupWindowsContainer, .macosMinimizedWindowsContainer,
+             .macosFullscreenWindowsContainer, .macosHiddenAppsWindowsContainer: break
     }
 }
 

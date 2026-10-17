@@ -17,6 +17,8 @@ config-version = 2
 # do not require additional TOML options. Learned minima do not constrain layout yet.
 
 start-at-login = false
+# Reset workspace placement at launch; explicit assignments still apply.
+start-workspaces-on-main-monitor = false
 after-startup-command = []
 # after-login-command is deprecated; use start-at-login and after-startup-command.
 auto-reload-config = true
@@ -42,6 +44,8 @@ borders.order = 'below'
 borders.exclude-apps = []
 
 # Dwindle splits space recursively when windows are tiled; no layout shortcut is needed.
+# New groups created by dragging: 'tab-group' or 'accordion'.
+drag-stack-layout = 'tab-group'
 default-root-container-layout = 'dwindle'
 default-root-container-orientation = 'auto'
 
@@ -221,3 +225,11 @@ on-mode-changed = []
     alt-cmd-shift-7 = 'move-node-to-project 7'
     alt-cmd-shift-8 = 'move-node-to-project 8'
     alt-cmd-shift-9 = 'move-node-to-project 9'
+
+# Experimental raw-touch backend: exactly three fingers, horizontal only.
+# Assign native macOS full-screen app swipes to four fingers or off.
+[workspace-swipe]
+enabled = false
+reverse-direction = false
+# Finger-tracked preview; release past halfway to commit. Zero disables visuals.
+animation-duration-ms = 220

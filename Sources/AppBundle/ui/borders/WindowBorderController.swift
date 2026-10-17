@@ -157,11 +157,12 @@ final class WindowBorder {
     let target: UInt32
     private var nativeID: OpaquePointer?
     private var frame: CGRect?
+    private var geometry: WindowBorderGeometry?
     private var appearance: Appearance?
     private var scale: CGFloat = 0
     private var fallbackPanels: [WindowBorderFallbackPanel] = []
     private let createNativeBorder: (Float, inout OpaquePointer?) -> Bool
-    private let updateNativeBorder: (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool) -> Bool
+    private let updateNativeBorder: (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool, CGPath?) -> Bool
     private let destroyNativeBorder: (OpaquePointer?) -> Void
 
     var windowIds: [UInt32] {
@@ -174,7 +175,7 @@ final class WindowBorder {
     init(
         target: UInt32,
         createNativeBorder: @escaping (Float, inout OpaquePointer?) -> Bool = { scale, id in winmux_border_create(scale, &id) },
-        updateNativeBorder: @escaping (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool) -> Bool = winmux_border_update,
+        updateNativeBorder: @escaping (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool, CGPath?) -> Bool = winmux_border_update,
         destroyNativeBorder: @escaping (OpaquePointer?) -> Void = winmux_border_destroy
     ) {
         self.target = target
@@ -213,8 +214,11 @@ final class WindowBorder {
         let nextAppearance = Appearance(settings: settings, active: active)
         if appearance == nextAppearance, self.frame == frame { return }
         if appearance != nextAppearance || self.frame?.size != frame.size {
-            guard updateNativeBorder(nativeID, target, frame, Float(systemWindowCornerRadius()),
-                                       nextAppearance.rgba, Float(settings.width), settings.order == .above) else {
+            let radius = systemWindowCornerRadius()
+            let outerSize = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width)).size
+            let path = borderGeometry(size: outerSize, radius: radius, width: CGFloat(settings.width), scale: nextScale).path
+            guard updateNativeBorder(nativeID, target, frame, Float(radius),
+                                       nextAppearance.rgba, Float(settings.width), settings.order == .above, path) else {
                 if let nativeID { destroyNativeBorder(nativeID) }
                 nativeID = nil
                 updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
@@ -232,13 +236,22 @@ final class WindowBorder {
         self.frame = frame
     }
 
+    private func borderGeometry(size: CGSize, radius: CGFloat, width: CGFloat, scale: CGFloat) -> WindowBorderGeometry {
+        let key = WindowBorderGeometry.Key(size: size, radius: radius, width: width, scale: scale)
+        if let geometry, geometry.key == key { return geometry }
+        let updated = WindowBorderGeometry(size: size, radius: radius, width: width, scale: scale)
+        geometry = updated
+        return updated
+    }
+
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat) {
         if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
         let outer = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = systemWindowCornerRadius()
+        let path = borderGeometry(size: outer.size, radius: radius, width: CGFloat(settings.width), scale: scale).path
         for (index, panel) in fallbackPanels.enumerated() {
             let piece = winmux_border_piece(outer.size, Float(radius), Float(settings.width), Float(scale), Int32(index))
-            panel.update(outer: outer, piece: piece, radius: radius, windowId: target, active: active, settings: settings)
+            panel.update(outer: outer, piece: piece, radius: radius, path: path, windowId: target, active: active, settings: settings)
         }
     }
 
@@ -290,17 +303,18 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    func update(outer: CGRect, piece: CGRect, radius: CGFloat, windowId: UInt32, active: Bool, settings: WindowBordersConfig) {
+    func update(outer: CGRect, piece: CGRect, radius: CGFloat, path: CGPath, windowId: UInt32, active: Bool, settings: WindowBordersConfig) {
         guard !piece.isEmpty else { orderOut(nil); return }
         let frame = piece.offsetBy(dx: outer.minX, dy: outer.minY)
         if self.frame != frame { setFrame(frame, display: false) }
-        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius
+        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path !== path
         if geometryChanged || borderView.settings != settings || borderView.active != active {
             borderView.settings = settings
             borderView.active = active
             borderView.outerSize = outer.size
             borderView.piece = piece
             borderView.radius = radius
+            borderView.path = path
             borderView.needsDisplay = true
         }
         order(settings.order == .above ? .above : .below, relativeTo: Int(windowId))
@@ -314,6 +328,7 @@ private final class WindowBorderFallbackView: NSView {
     var outerSize = CGSize.zero
     var piece = CGRect.zero
     var radius: CGFloat = 0
+    var path: CGPath?
 
     override func draw(_ dirtyRect: NSRect) {
         let hex = active ? settings.activeColor : settings.inactiveColor
@@ -323,6 +338,6 @@ private final class WindowBorderFallbackView: NSView {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         let rgbValue = UInt32(rgb)
         let rgba = (rgbValue << 8) | UInt32(round(alpha * 255))
-        winmux_border_draw(context, outerSize, piece, Float(radius), rgba, Float(settings.width))
+        if let path { winmux_border_draw_path(context, piece, path, rgba) }
     }
 }

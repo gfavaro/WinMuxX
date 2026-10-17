@@ -29,8 +29,15 @@ var defaultConfigUrl: URL {
     }
     return parsedConfig.config
 }()
-@MainActor var config: Config = defaultConfig // todo move to Ctx?
-@MainActor var configUrl: URL = defaultConfigUrl
+// Domain accessors; storage and lifetime belong to the runtime.
+@MainActor var config: Config {
+    get { runtime.configuration.value }
+    set { runtime.configuration.value = newValue }
+}
+@MainActor var configUrl: URL {
+    get { runtime.configuration.url }
+    set { runtime.configuration.url = newValue }
+}
 
 struct Config: ConvenienceCopyable {
     var configVersion: Int = 1
@@ -41,6 +48,7 @@ struct Config: ConvenienceCopyable {
     var _nonEmptyWorkspacesRootContainersLayoutOnStartup: Void = ()
     var defaultRootContainerLayout: Layout = .dwindle
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto
+    var startWorkspacesOnMainMonitor: Bool = false
     var startAtLogin: Bool = false
     var autoReloadConfig: Bool = false
     var automaticallyUnhideMacosHiddenApps: Bool = false
@@ -49,12 +57,15 @@ struct Config: ConvenienceCopyable {
     var focusFollowsMouse: Bool = false
     var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none
+    var workspaceSwipe = WorkspaceSwipeConfig()
+    var dragStackLayout: Layout = .tabGroup
     var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var minimumWorkspaceCount: Int? = nil
     var effectiveMinimumWorkspaceCount: Int { minimumWorkspaceCount ?? max(1, persistentWorkspaces.count) }
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
+    var modifierSides = ModifierSides()
     var keyMapping = KeyMapping()
     var execConfig: ExecConfig = ExecConfig()
 

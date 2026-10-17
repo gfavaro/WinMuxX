@@ -1,6 +1,7 @@
 @MainActor
 func normalizeLayoutReason() async throws {
     for workspace in Workspace.all {
+        try checkCancellation()
         let windows: [Window] = workspace.allLeafWindowsRecursive
         try await _normalizeLayoutReason(workspace: workspace, windows: windows)
     }
@@ -13,50 +14,67 @@ private func validateStillPopups() async throws {
     for node in macosPopupWindowsContainer.children {
         guard let popup = node as? MacWindow else { continue }
         let windowLevel = getWindowLevel(for: popup.windowId)
-        if try await popup.isWindowHeuristic(windowLevel) {
-            try await popup.relayoutWindow(on: focus.workspace)
-            try await tryOnWindowDetected(popup)
+        if try await popup.isWindowHeuristic(windowLevel), popup.parent is MacosPopupWindowsContainer {
+            try await WindowDetectionOperations.shared.run(popup) {
+                guard popup.parent is MacosPopupWindowsContainer else { return }
+                try await popup.relayoutWindow(on: focus.workspace)
+                WindowDetectionOperations.shared.resolvedPopup(popup)
+                try await tryOnWindowDetected(popup)
+            }
         }
     }
 }
 
 @MainActor
 private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) async throws {
-    // Phase 1: gather native state. Windows with an intact event-invalidated cache are answered
-    // synchronously; only windows whose state may have changed (a moved/resized/miniaturized/
-    // deminiaturized event arrived since the last observation) go over AX, with one concurrent
-    // task per window so round-trips to different apps overlap instead of serializing.
-    // Phase 2: apply tree mutations sequentially to keep binding order deterministic.
-    var axState = [(isMacosFullscreen: Bool, isMacosMinimized: Bool)?](repeating: nil, count: windows.count)
-    try await withThrowingTaskGroup(of: (Int, Bool, Bool).self) { group in
+    typealias Observation = (token: UInt64, full: Bool, mini: Bool)
+    var states = [Observation?](repeating: nil, count: windows.count)
+    try await withThrowingTaskGroup(of: (Int, Observation?).self) { group in
         for (index, window) in windows.enumerated() {
-            if let cachedFullscreen = window.lastKnownNativeFullscreen,
-               let cachedMinimized = window.lastKnownNativeMinimized
-            {
-                axState[index] = (cachedFullscreen, cachedMinimized)
-                continue
-            }
-            group.addTask { @Sendable @MainActor in
-                let observationToken = window.nativeStateObservationToken()
-                let isMacosFullscreen = try await window.isMacosFullscreen
-                let isMacosMinimized = try await (!isMacosFullscreen).andAsync { @MainActor @Sendable in try await window.isMacosMinimized }
-                // Token-guarded: a transition that completed while these round-trips were in
-                // flight already consumed its invalidation events; writing the pre-transition
-                // values back would look valid forever.
-                window.recordObservedNativeState(fullscreen: isMacosFullscreen, minimized: isMacosMinimized, token: observationToken)
-                return (index, isMacosFullscreen, isMacosMinimized)
+            if let full = window.lastKnownNativeFullscreen, let mini = window.lastKnownNativeMinimized {
+                states[index] = (window.nativeStateObservationToken(), full, mini)
+            } else {
+                group.addTask { @Sendable @MainActor in
+                    let token = window.nativeStateObservationToken()
+                    guard let state = try await window.readNativeState(), token == window.nativeStateObservationToken() else { return (index, nil) }
+                    window.recordObservedNativeState(fullscreen: state.fullscreen, minimized: state.minimized, token: token)
+                    return (index, (token, state.fullscreen, state.minimized))
+                }
             }
         }
-        for try await (index, isFullscreen, isMinimized) in group {
-            axState[index] = (isFullscreen, isMinimized)
-        }
+        for try await (index, observation) in group { states[index] = observation }
     }
     for (index, window) in windows.enumerated() {
-        guard let (isMacosFullscreen, isMacosMinimized) = axState[index] else { continue }
-        // Safe cast rather than macAppUnsafe: identical in production (all windows are
-        // MacWindow), and non-Mac windows (tests) are simply never "windows of a hidden app".
-        let isMacosWindowOfHiddenApp = !isMacosFullscreen && !isMacosMinimized &&
-            !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+        try checkCancellation()
+        guard window.parent != nil,
+              window.nodeWorkspace === workspace || window.parent is MacosMinimizedWindowsContainer else { continue }
+        var observation = states[index]
+        var hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+        let willMutate = observation.map { value in
+            let unconventional = value.full || value.mini || hidden
+            if case .standard = window.layoutReason { return unconventional }
+            return !unconventional
+        } ?? false
+        if willMutate || observation?.token != window.nativeStateObservationToken() {
+            let token = window.nativeStateObservationToken()
+            let parent = window.parent
+            guard let fresh = try await window.readNativeState(), token == window.nativeStateObservationToken(),
+                  window.parent === parent else { continue }
+            try checkCancellation()
+            hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+            observation = (token, fresh.fullscreen, fresh.minimized)
+            window.recordObservedNativeState(fullscreen: fresh.fullscreen, minimized: fresh.minimized, token: token)
+        }
+        guard let observation else { continue }
+        let isMacosFullscreen = observation.full, isMacosMinimized = observation.mini
+        let isMacosWindowOfHiddenApp = !isMacosFullscreen && !isMacosMinimized && hidden
+        let mru = window.nodeWorkspace?.mostRecentWindowRecursive
+        let requestedFocus = captureRequestedFocus()
+        defer {
+            if captureRequestedFocus() == requestedFocus, let mru, mru !== window, mru.parent != nil {
+                mru.markAsMostRecentChild()
+            }
+        }
         switch window.layoutReason {
             case .standard:
                 guard window.parent != nil else { continue }

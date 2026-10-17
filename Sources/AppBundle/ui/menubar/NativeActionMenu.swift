@@ -74,104 +74,99 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.autoenablesItems = false
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
-        menu.addItem(NSMenuItem(title: "WinMuxX v\(winMuxAppVersion) · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "WinMuxX · Workspace \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
+        if activeMode != mainModeId {
+            menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
+        }
         let conflicts = runningOtherWindowManagers()
         if !conflicts.isEmpty {
             menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))
             menu.addItem(callbackItem("Window management may conflict — view diagnostics…", #selector(openDiagnostics)))
         }
         menu.addItem(.separator())
-        for section in buildShortcutSections() where !section.actions.isEmpty {
-            addSubmenu(section.title, to: menu) { submenu in
-                for action in section.actions { addCommand(action.title, script: action.commandScript, to: submenu) }
-            }
-        }
-        addSubmenu("Workspaces", to: menu) { submenu in
-            addCommand("Previous", script: "workspace prev", to: submenu)
-            addCommand("Next", script: "workspace next", to: submenu)
-            addCommand("Back and Forth", script: "workspace-back-and-forth", to: submenu)
+        addSubmenu("Workspaces", to: menu) { workspacesMenu in
+            addCommand("Previous", script: "workspace prev", to: workspacesMenu)
+            addCommand("Next", script: "workspace next", to: workspacesMenu)
+            addCommand("Back and Forth", script: "workspace-back-and-forth", to: workspacesMenu)
             for (workspace, target) in menuWorkspaceTargets() {
-                let item = addCommand(workspaceDisplayName(workspace.name), args: ["workspace", target], to: submenu)
+                let item = addCommand(workspaceDisplayName(workspace.name), args: ["workspace", target], to: workspacesMenu)
                 item?.state = workspace == focus.workspace ? .on : .off
             }
-        }
-        addSubmenu("Move Window and Follow", to: menu) { submenu in
-            addCommand("Previous", script: "move-node-to-workspace --focus-follows-window prev", to: submenu)
-            addCommand("Next", script: "move-node-to-workspace --focus-follows-window next", to: submenu)
-            for (workspace, target) in menuWorkspaceTargets() {
-                addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", "--focus-follows-window", target], to: submenu)
+            workspacesMenu.addItem(.separator())
+            addSubmenu("Move and Follow", to: workspacesMenu) { submenu in
+                addCommand("Previous", script: "move-node-to-workspace --focus-follows-window prev", to: submenu)
+                addCommand("Next", script: "move-node-to-workspace --focus-follows-window next", to: submenu)
+                for (workspace, target) in menuWorkspaceTargets() {
+                    addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", "--focus-follows-window", target], to: submenu)
+                }
             }
-        }
-        addSubmenu("Move Window to Workspace", to: menu) { submenu in
-            addCommand("Previous", script: "move-node-to-workspace prev", to: submenu)
-            addCommand("Next", script: "move-node-to-workspace next", to: submenu)
-            for (workspace, target) in menuWorkspaceTargets() {
-                addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", target], to: submenu)
-            }
-        }
-        addSubmenu("Bring Workspace Here", to: menu) { submenu in
-            for (workspace, _) in menuWorkspaceTargets() {
-                addCommand(workspaceDisplayName(workspace.name), args: ["summon-workspace", workspace.name], to: submenu)
-            }
-        }
-        addSubmenu("Projects", to: menu) { submenu in
-            addCommand("Previous", script: "project prev", to: submenu)
-            addCommand("Next", script: "project next", to: submenu)
-            for (index, project) in workspaceProjects().enumerated() {
-                addCommand(project.name, script: "project \(index + 1)", to: submenu)
-                addCommand("Move Window to \(project.name)", script: "move-node-to-project \(index + 1)", to: submenu)
-            }
-        }
-        addSubmenu("Monitors", to: menu) { submenu in
-            addCommand("Focus Previous", script: "focus-monitor prev", to: submenu)
-            addCommand("Focus Next", script: "focus-monitor next", to: submenu)
-            addCommand("Focus Main", script: "focus-monitor main", to: submenu)
-            addCommand("Focus Secondary", script: "focus-monitor secondary", to: submenu)
-            addCommand("Move Workspace to Main", script: "move-workspace-to-monitor main", to: submenu)
-            addCommand("Move Workspace to Secondary", script: "move-workspace-to-monitor secondary", to: submenu)
-            for (index, monitor) in sortedMonitors.enumerated() {
-                let target = String(index + 1)
-                addCommand("Focus \(monitor.name)", args: ["focus-monitor", target], to: submenu)
-                addCommand("Move Window to \(monitor.name)", args: ["move-node-to-monitor", target], to: submenu)
-                addCommand("Move Workspace to \(monitor.name)", args: ["move-workspace-to-monitor", target], to: submenu)
-            }
-        }
-        addSubmenu("Modes", to: menu) { submenu in
-            for mode in config.modes.keys.sorted() {
-                let item = addCommand(mode, args: ["mode", mode], to: submenu)
-                item?.state = mode == activeMode ? .on : .off
-            }
-        }
-        addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
-        addCommand(TrayMenuModel.shared.isEnabled ? "Disable" : "Enable", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
-        let others = bindings.unshown
-        if !others.isEmpty {
-            addSubmenu("Other Key Bindings", to: menu) { submenu in
-                for binding in others {
-                    let item = commandItem(binding.commands.prettyDescription, commands: binding.commands)
-                    applyBindings([binding], to: item)
-                    submenu.addItem(item)
+            addSubmenu("Move Window to", to: workspacesMenu) { submenu in
+                addCommand("Previous", script: "move-node-to-workspace prev", to: submenu)
+                addCommand("Next", script: "move-node-to-workspace next", to: submenu)
+                for (workspace, target) in menuWorkspaceTargets() {
+                    addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", target], to: submenu)
                 }
             }
         }
         menu.addItem(.separator())
-        menu.addItem(callbackItem("Settings…", #selector(openSettings)))
-        menu.addItem(callbackItem("Copy Version", #selector(copyVersion)))
-        menu.addItem(callbackItem("Open Config", #selector(openConfig)))
-        menu.addItem(callbackItem("Diagnostics…", #selector(openDiagnostics)))
-        if MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
-            menu.addItem(callbackItem("Reset Learned Minimum Sizes…", #selector(resetMinimumSizes)))
+        for (title, command) in [("Focus", "focus"), ("Move Window", "move"), ("Join With", "join-with")] {
+            addSubmenu(title, to: menu) { submenu in
+                for direction in ["left", "down", "up", "right"] {
+                    addCommand(direction.capitalized, script: "\(command) \(direction)", to: submenu)
+                }
+            }
         }
+        addSubmenu("Resize", to: menu) { submenu in
+            for (title, script) in [("Wider", "resize width +50"), ("Narrower", "resize width -50"),
+                                    ("Taller", "resize height +50"), ("Shorter", "resize height -50")] {
+                addCommand(title, script: script, to: submenu)
+            }
+        }
+        addSubmenu("Layout", to: menu) { submenu in
+            for (title, script) in [("Dwindle", "layout dwindle"), ("Tiles", "layout tiles"),
+                                    ("Tabbed", "layout tab-group"), ("Accordion", "layout accordion")] {
+                addCommand(title, script: script, to: submenu)
+            }
+            submenu.addItem(.separator())
+            addCommand("Horizontal", script: "layout horizontal", to: submenu)
+            addCommand("Vertical", script: "layout vertical", to: submenu)
+            submenu.addItem(.separator())
+            addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
+        }
+        addCommand("Fullscreen", script: "fullscreen", to: menu)
+        addCommand("Balance Sizes", script: "balance-sizes", to: menu)
+        if sortedMonitors.count > 1 {
+            addSubmenu("Display", to: menu) { submenu in
+                addCommand("Focus Previous", script: "focus-monitor prev", to: submenu)
+                addCommand("Focus Next", script: "focus-monitor next", to: submenu)
+                submenu.addItem(.separator())
+                for (index, monitor) in sortedMonitors.enumerated() {
+                    addCommand("Move Window to \(monitor.name)", args: ["move-node-to-monitor", String(index + 1)], to: submenu)
+                }
+            }
+        }
+        if config.modes.count > 1 {
+            addSubmenu("Mode", to: menu) { submenu in
+                for mode in config.modes.keys.sorted() {
+                    let item = addCommand(mode, args: ["mode", mode], to: submenu)
+                    item?.state = mode == activeMode ? .on : .off
+                }
+            }
+        }
+        menu.addItem(.separator())
+        addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
+        if !PersistedAppMinimums.shared.isEmpty || MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
+            menu.addItem(callbackItem("Clear Saved Minimum Sizes…", #selector(resetMinimumSizes)))
+        }
+        menu.addItem(callbackItem("Settings…", #selector(openSettings)))
+        let enabled = addCommand("Enabled", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
+        enabled?.state = TrayMenuModel.shared.isEnabled ? .on : .off
         let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
         if recoverableCount > 0 {
             let item = callbackItem("Recover \(recoverableCount) Windows from Previous Session…", #selector(recoverWindows))
             item.isEnabled = !WindowRecoveryController.shared.isRecovering
             menu.addItem(item)
         }
-        if checkForUpdates != nil { menu.addItem(callbackItem("Check for Updates…", #selector(checkUpdates))) }
-        menu.addItem(callbackItem("GitHub Repository", #selector(openRepository)))
-        menu.addItem(callbackItem("File an Issue…", #selector(openIssue)))
         menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
     }
 
@@ -266,10 +261,11 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     @objc private func resetMinimumSizes() {
         let alert = NSAlert()
         alert.messageText = "Reset learned minimum window sizes?"
-        alert.informativeText = "This clears session-local observations only. Window positions and your configuration are unchanged."
+        alert.informativeText = "This clears saved per-app minimum sizes and current observations. Window positions and your configuration are unchanged."
         alert.addButton(withTitle: "Cancel")
         alert.addButton(withTitle: "Reset")
         guard alert.runModal() == .alertSecondButtonReturn else { return }
+        PersistedAppMinimums.shared.reset()
         for window in MacWindow.allWindows { window.resetLearnedMinimum() }
     }
     @objc private func recoverWindows() {

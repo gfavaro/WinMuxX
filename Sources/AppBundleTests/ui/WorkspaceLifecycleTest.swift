@@ -184,13 +184,13 @@ final class WorkspaceLifecycleTest: XCTestCase {
         workspace.markAsAutomaticallyNamed()
         XCTAssertTrue(mainMonitor.setActiveWorkspace(workspace))
         let viewportId = MonitorViewportId(mainMonitor)
-        var viewport = winMuxWorkspaceState.monitorViewportsById[viewportId].orDie()
+        var viewport = runtime.workspaces.monitorViewportsById[viewportId].orDie()
         viewport.activeWorkspaceId = nil
-        winMuxWorkspaceState.monitorViewportsById[viewportId] = viewport
+        runtime.workspaces.monitorViewportsById[viewportId] = viewport
 
         Workspace.reconcileWorkspaceState()
 
-        XCTAssertNotNil(winMuxWorkspaceState.monitorViewportsById[viewportId]?.activeWorkspaceId)
+        XCTAssertNotNil(runtime.workspaces.monitorViewportsById[viewportId]?.activeWorkspaceId)
         XCTAssertEqual(mainMonitor.activeWorkspace.projectId, workspaceProjectDefaultId)
     }
 

@@ -5,6 +5,26 @@ import XCTest
 
 @MainActor
 final class ConfigTest: XCTestCase {
+    func testSwipeAnimationDurationValidation() {
+        XCTAssertEqual(Config().workspaceSwipe.animationDurationMs, 220)
+        for value in [0, 180, 1000] {
+            let parsed = parseConfig("config-version = 2\n[workspace-swipe]\nanimation-duration-ms = \(value)")
+            XCTAssertTrue(parsed.errors.isEmpty)
+            XCTAssertEqual(parsed.config.workspaceSwipe.animationDurationMs, value)
+        }
+        XCTAssertFalse(parseConfig("[workspace-swipe]\nanimation-duration-ms = -1").errors.isEmpty)
+        XCTAssertFalse(parseConfig("[workspace-swipe]\nanimation-duration-ms = 1001").errors.isEmpty)
+    }
+
+    func testDragStackLayoutAcceptsOnlyStackLayouts() {
+        for value in ["accordion", "tab-group", "tabbed"] {
+            let parsed = parseConfig("config-version = 2\ndrag-stack-layout = '\(value)'")
+            XCTAssertTrue(parsed.errors.isEmpty)
+            XCTAssertEqual(parsed.config.dragStackLayout, value == "accordion" ? .stacked : .tabGroup)
+        }
+        XCTAssertFalse(parseConfig("config-version = 2\ndrag-stack-layout = 'tiles'").errors.isEmpty)
+    }
+
     func testParseI3Config() {
         let toml =
             """

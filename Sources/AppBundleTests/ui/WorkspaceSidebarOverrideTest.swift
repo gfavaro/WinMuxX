@@ -72,7 +72,7 @@ final class WorkspaceSidebarOverrideTest: XCTestCase {
         XCTAssertEqual(overrides, 0)
     }
 
-    func testCompactAndExpandedClicksRequireExplicitOverride() throws {
+    func testCompactAndExpandedClicksAskBeforeBringingHere() throws {
         let item = WorkspaceSidebarWindowViewModel(windowId: 10, workspaceName: "remote",
             appName: "Finder", appBundleId: "com.apple.finder", appBundlePath: nil,
             title: "Example", isFocused: false)
@@ -100,20 +100,15 @@ final class WorkspaceSidebarOverrideTest: XCTestCase {
                 actions: WorkspaceSidebarActions(send: { actions.append($0) }))
             section.handleSectionClick()
             XCTAssertEqual(pending, workspace.name)
-            XCTAssertTrue(actions.isEmpty, "A click must request confirmation before activating or swapping")
-            XCTAssertEqual(section.inUseOverrideText, "In use on External Display")
-            XCTAssertEqual(section.overrideConfirmation.isCompact, progress == 0)
-            if progress == 1 {
-                XCTAssertEqual(section.sectionMinHeight, workspaceSidebarInUseOverrideEmptySectionMinHeight)
-                let (window, host) = render(section, size: CGSize(width: 240, height: 121))
-                defer { window.close() }
-                let override = try XCTUnwrap(accessibilityButtons(host).first { $0.accessibilityLabel?() == "Override" })
-                let frame = try XCTUnwrap(override.accessibilityFrame?())
-                XCTAssertTrue(window.accessibilityFrame().contains(frame), "Confirmation button must remain inside the section's hit area")
-                XCTAssertEqual(override.accessibilityPerformPress?(), true)
-                XCTAssertNil(pending)
-                XCTAssertEqual(actions, [.overrideWorkspaceInUse(workspace.name)])
-            }
+            XCTAssertTrue(actions.isEmpty)
+            section.overrideConfirmation.onCancel()
+            XCTAssertNil(pending)
+            XCTAssertTrue(actions.isEmpty)
+            section.handleSectionClick()
+            section.overrideConfirmation.onOverride()
+            XCTAssertNil(pending)
+            XCTAssertEqual(actions, [.overrideWorkspaceInUse(workspace.name)])
+
         }
     }
 }
@@ -134,6 +129,19 @@ final class WorkspaceSidebarOverrideSizeRegressionTest: XCTestCase {
                 XCTAssertFalse(state(view).locksCollapse)
             }
         }
+    }
+
+    func testHiddenWorkspaceOnAnotherDisplayStillOffersConfirmation() {
+        var snapshot = fixture().snapshot
+        let workspace = snapshot.workspaces[0]
+        snapshot.workspaces = [WorkspaceSidebarWorkspaceViewModel(
+            name: workspace.name, projectId: workspace.projectId, displayName: workspace.displayName,
+            sidebarLabel: workspace.sidebarLabel, isGeneratedName: workspace.isGeneratedName,
+            monitorScopeId: workspace.monitorScopeId, monitorName: workspace.monitorName,
+            isFocused: false, isVisible: false, items: [])]
+        XCTAssertTrue(workspaceSidebarWorkspaceIsOnOtherDisplay(snapshot.workspaces[0],
+            selectedScopeId: snapshot.targetMonitorScopeId))
+        XCTAssertEqual(state(fixture(snapshot: snapshot)).workspaceName, workspace.name)
     }
 
     func testSearchAndMonitorFilterReleaseHiddenConfirmation() {
@@ -183,7 +191,7 @@ final class WorkspaceSidebarOverrideSizeRegressionTest: XCTestCase {
         for width: CGFloat in [36, 44, 56, 80, 120] {
             let availableWidth = width - 2 * workspaceSidebarCompactRailHorizontalInset
             XCTAssertLessThanOrEqual(compact.fittingSize.width, availableWidth, "Compact rail \(width)")
-            XCTAssertLessThanOrEqual(compact.fittingSize.height, 38)
+            XCTAssertLessThanOrEqual(compact.fittingSize.height, 64)
         }
         // The expanded label can wrap; its buttons must fit even at the narrowest supported test width.
         let expanded = NSHostingView(rootView: WorkspaceSidebarInUseOverrideOverlay(

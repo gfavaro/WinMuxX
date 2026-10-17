@@ -3,7 +3,7 @@ import Foundation
 import TOMLKit
 
 let legacyConfigDotfileName = ".winmux.toml"
-let generatedConfigDirectoryName = "winmux-gf"
+let generatedConfigDirectoryName = "winmuxx"
 let generatedConfigFileName = "winmux.toml"
 let aerospaceLegacyConfigDotfileName = ".aerospace.toml"
 let aerospaceConfigDirectoryName = "aerospace"
@@ -22,6 +22,7 @@ func generatedConfigUrl() -> URL {
 
 func legacyConfigCandidateUrls() -> [URL] {
     [
+        xdgConfigHomeUrl().appending(path: "winmux-gf").appending(path: "winmux.toml"),
         xdgConfigHomeUrl().appending(path: "winmux").appending(path: "winmux.toml"),
         FileManager.default.homeDirectoryForCurrentUser.appending(path: legacyConfigDotfileName),
     ]
@@ -179,6 +180,7 @@ func ensureBootstrapConfigExistsIfNeeded() throws -> URL? {
     }
 }
 
+@MainActor
 func materializeBootstrapConfigIfNeeded(
     targetUrl: URL,
     existingLegacyUrls: [URL],
@@ -190,14 +192,14 @@ func materializeBootstrapConfigIfNeeded(
         try FileManager.default.createDirectory(at: parentUrl, withIntermediateDirectories: true)
     }
     if let legacyUrl = existingLegacyUrls.first {
-        try FileManager.default.copyItem(at: legacyUrl, to: targetUrl)
+        try ConfigFileStore.installBootstrap(String(contentsOf: legacyUrl, encoding: .utf8), at: targetUrl, legacy: true)
     } else if let aerospaceImportUrl {
         let migratedConfig = try migrateAerospaceConfigForWinMux(
             try String(contentsOf: aerospaceImportUrl, encoding: .utf8),
         )
-        try migratedConfig.write(to: targetUrl, atomically: true, encoding: .utf8)
+        try ConfigFileStore.installBootstrap(migratedConfig, at: targetUrl)
     } else {
-        try starterConfigText().write(to: targetUrl, atomically: true, encoding: .utf8)
+        try ConfigFileStore.installBootstrap(starterConfigText(), at: targetUrl)
     }
     return true
 }

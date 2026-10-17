@@ -891,7 +891,7 @@ extension WorkspaceSidebarView {
         let isFromOtherDisplay = false
         let isInUseOnOtherDisplay = allowsWorkspaceActivation &&
             !isPinnedActiveWorkspace &&
-            workspaceSidebarWorkspaceIsInUseOnOtherDisplay(
+            workspaceSidebarWorkspaceIsOnOtherDisplay(
                 workspace,
                 selectedScopeId: snapshot.targetMonitorScopeId
             )

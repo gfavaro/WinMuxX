@@ -39,6 +39,13 @@ func parseWorkspaceCmdArgs(_ args: StrArrSlice) -> ParsedCmd<WorkspaceCmdArgs> {
         .filter("--stdin and --no-stdin require using \(NextPrev.unionLiteral) argument") { ($0.explicitStdinFlag != nil).implies($0.target.isInitialized && $0.target.val.isRelative) }
         .filter("ERROR: Argument '\(workspaceTargetPlaceholder)' is mandatory") { $0.target.isInitialized || $0.internalName != nil }
         .filter("--name cannot be used with next or prev") { $0.internalName == nil || !($0.target.isInitialized && $0.target.val.isRelative) }
+        .map { parsed in
+            var parsed = parsed
+            if !parsed.target.isInitialized, let name = parsed.internalName {
+                parsed.target = .initialized(.direct(name))
+            }
+            return parsed
+        }
 }
 
 extension WorkspaceCmdArgs {

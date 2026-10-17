@@ -667,13 +667,13 @@ final class WorkspaceSidebarDragTest: XCTestCase {
             items: [],
         )
         XCTAssertTrue(
-            workspaceSidebarWorkspaceIsInUseOnOtherDisplay(
+            workspaceSidebarWorkspaceIsOnOtherDisplay(
                 workspace,
                 selectedScopeId: "monitor:0.0,0.0",
             ),
         )
         XCTAssertFalse(
-            workspaceSidebarWorkspaceIsInUseOnOtherDisplay(
+            workspaceSidebarWorkspaceIsOnOtherDisplay(
                 workspace,
                 selectedScopeId: "monitor:1440.0,0.0",
             ),

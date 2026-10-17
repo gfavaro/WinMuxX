@@ -26,7 +26,7 @@ extension Workspace {
             try await hideAllWindowsExcept(fullscreenWindow)
             fullscreenWindow.lastAppliedLayoutVirtualRect = rect
             fullscreenWindow.lastAppliedLayoutPhysicalRect = nil
-            fullscreenWindow.layoutFullscreen(context)
+            try await fullscreenWindow.layoutFullscreen(context)
             return
         }
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
@@ -57,13 +57,13 @@ extension TreeNode {
                     let isFullscreenTab = window.nearestWindowTabGroup?.hasFullscreenTab == true
                     if window.isFullscreen && !isFullscreenTab && window == context.workspace.rootTilingContainer.mostRecentWindowRecursive {
                         lastAppliedLayoutPhysicalRect = nil
-                        window.layoutFullscreen(context)
+                        try await window.layoutFullscreen(context)
                     } else {
                         lastAppliedLayoutPhysicalRect = physicalRect
                         if !isFullscreenTab {
                             window.isFullscreen = false
                         }
-                        if !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
+                        if window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
                             try await WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
                         }
                     }
@@ -79,7 +79,7 @@ extension TreeNode {
                         try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context)
                     case .dwindle:
                         try await container.layoutDwindle(point, width: width, height: height, virtual: virtual, context)
-                    case .tabGroup:
+                    case .tabGroup, .stacked:
                         try await container.layoutTabGroup(point, width: width, height: height, virtual: virtual, context)
                 }
             case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
@@ -112,12 +112,15 @@ private struct LayoutContext {
 extension Window {
     @MainActor
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
+        // A failed corner restoration must retry from its saved position, rather
+        // than treating the still-parked native frame as a cross-display move.
+        guard !isHiddenInCorner else { return }
         // With a single monitor the cross-monitor proportional move below is always a no-op,
         // so skip the AX round-trip it would need. This runs for every floating window on
         // every layout pass.
         if monitors.count == 1 {
             if isFullscreen {
-                layoutFullscreen(context)
+                try await layoutFullscreen(context)
                 isFullscreen = false
             }
             return
@@ -142,17 +145,22 @@ extension Window {
             setAxFrame(CGPoint(x: newX, y: newY), nil)
         }
         if isFullscreen {
-            layoutFullscreen(context)
+            try await layoutFullscreen(context)
             isFullscreen = false
         }
     }
 
     @MainActor
-    fileprivate func layoutFullscreen(_ context: LayoutContext) {
+    fileprivate func layoutFullscreen(_ context: LayoutContext) async throws {
         let monitorRect = noOuterGapsInFullscreen
             ? context.workspace.workspaceMonitor.visibleRect
             : context.workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
-        setAxFrame(monitorRect.topLeftCorner, CGSize(width: monitorRect.width, height: monitorRect.height))
+        let target = CGRect(origin: monitorRect.topLeftCorner, size: CGSize(width: monitorRect.width, height: monitorRect.height))
+        if let window = self as? MacWindow, window.isHiddenInCorner {
+            _ = try await window.restoreFromCorner(to: target)
+        } else {
+            setAxFrame(target.origin, target.size)
+        }
     }
 }
 
@@ -220,7 +228,8 @@ extension TilingContainer {
 
         guard let mruIndex: Int = mostRecentChild?.ownIndex else { return }
         for (index, child) in children.enumerated() {
-            let padding = CGFloat(config.tabGroupPadding)
+            let extent = orientation == .h ? width : height
+            let padding = min(CGFloat(max(config.tabGroupPadding, 0)), max(extent - 1, 0) / 2)
             let (lPadding, rPadding): (CGFloat, CGFloat) = switch index {
                 case 0 where children.count == 1: (0, 0)
                 case 0:                           (0, padding)
@@ -289,7 +298,10 @@ extension TreeNode {
                 }
                 let minimums = container.children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
                 guard !minimums.isEmpty else { return 0 }
-                if container.layout == .tabGroup {
+                if container.layout == .tabGroup || container.layout == .stacked {
+                    if container.layout == .stacked {
+                        return (minimums.max() ?? 0) + (container.orientation == axis && minimums.count > 1 ? CGFloat(max(config.tabGroupPadding, 0)) * 2 : 0)
+                    }
                     let chrome = container.showsWindowTabs
                         ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()
                             : resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0

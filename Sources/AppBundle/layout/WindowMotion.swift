@@ -21,6 +21,7 @@ struct WindowMotionFrame {
 final class WindowMotion: NSObject {
     static let shared = WindowMotion()
     private struct Playback {
+        let session = UUID()
         weak var window: MacWindow?
         let motion: WindowMotionFrame
         let duration: Double
@@ -29,13 +30,11 @@ final class WindowMotion: NSObject {
     private var jobs: [UInt32: Playback] = [:]
     private var frames: [UInt32: CGRect] = [:]
     private var targets: [UInt32: CGRect] = [:]
+    private var landed = WindowMotionRestingFrames()
     private var displayPolicy = WindowMotionDisplayPolicy()
-    private var newWindows = Set<UInt32>()
     private var displayLink: WindowMotionClock?
     private var lastTick: Double?
     private var stallTimeout: Task<Void, Never>?
-
-    func noteNewWindow(_ id: UInt32) { newWindows.insert(id) }
 
     func snapOnNextLayout(_ id: UInt32) {
         cancel(id)
@@ -45,6 +44,7 @@ final class WindowMotion: NSObject {
     func isAnimating(_ id: UInt32) -> Bool { jobs[id] != nil }
 
     func screensChanged() {
+        landed.removeAll()
         displayPolicy.screensChanged(windowIds: Set(MacWindow.allWindowsMap.keys))
         for id in Array(jobs.keys) { cancel(id) }
         for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }
@@ -58,11 +58,15 @@ final class WindowMotion: NSObject {
 
     func forget(_ id: UInt32) {
         cancel(id)
+        landed.forget(id)
         displayPolicy.forget(id)
     }
 
+    func noteLanded(_ id: UInt32, asked: CGRect, got: CGRect) {
+        landed.record(id, asked: windowMotionNativeTarget(asked), got: got)
+    }
+
     func cancel(_ id: UInt32) {
-        newWindows.remove(id)
         jobs.removeValue(forKey: id)
         frames.removeValue(forKey: id)
         targets.removeValue(forKey: id)
@@ -89,12 +93,16 @@ final class WindowMotion: NSObject {
             return
         }
         let id = window.windowId
+        if window.isHiddenInCorner {
+            cancel(id)
+            _ = try await window.restoreFromCorner(to: target)
+            return
+        }
         if snap {
             cancel(id)
             try await window.setAxFrameBlocking(target.origin, target.size)
             return
         }
-        let isNewWindow = newWindows.remove(id) != nil
         // AX move/resize events reassert the same tile while we are travelling.
         // They must not restart the clock indefinitely.
         if !snap, targets[id] == target, config.animations.enabled, config.animations.durationMs > 0,
@@ -106,13 +114,14 @@ final class WindowMotion: NSObject {
         // bounds once at departure, rather than skipping motion when that cache is cold.
         var nativeStart = CGRect.zero
         let hasNativeStart = !isUnitTest && winmux_window_frame(id, &nativeStart)
-        let departure = frames[id] ?? (hasNativeStart ? nativeStart : cachedStart)
-        let monitorRect = window.nodeMonitor?.visibleRectPaddedByOuterGaps
-        let destination = monitorRect.map {
-            CGRect(x: $0.topLeftX, y: $0.topLeftY, width: $0.width, height: $0.height)
-        }
-        let start = departure.map {
-            windowMotionOrigin(nativeFrame: $0, destination: destination, isNewWindow: isNewWindow)
+        // Travel directly from the actual window position to the tile. An ongoing
+        // glide keeps its latest frame when retargeted, without a synthetic waypoint.
+        let start = windowMotionDeparture(inFlight: frames[id],
+                                          nativeFrame: hasNativeStart ? nativeStart : nil,
+                                          cachedFrame: cachedStart)
+        if !snap, let start, landed.matches(id, asked: target, actual: start) {
+            cancel(id)
+            return
         }
         cancel(id)
         guard !snap, config.animations.enabled, config.animations.durationMs > 0,
@@ -174,7 +183,7 @@ final class WindowMotion: NSObject {
             if frames[id] == frame { continue }
             frames[id] = frame
             // Intermediate frames bypass minimum-size learning; only the final tile is observed.
-            window.macApp.setAnimatedAxFrame(id, frame)
+            window.macApp.setAnimatedAxFrame(id, frame, session: playback.session)
         }
     }
 }
@@ -226,18 +235,10 @@ func windowMotionFrameDelta(previous: Double?, current: Double, fallback: Double
     min(1.0 / 30, max(0, previous.map { current - $0 } ?? fallback))
 }
 
-/// Only a freshly created window is repositioned before gliding. Existing windows
-/// (including an interrupted glide) always depart from their current geometry.
-func windowMotionOrigin(nativeFrame: CGRect, destination: CGRect?, isNewWindow: Bool) -> CGRect {
-    guard isNewWindow, let destination, destination.width > 0, destination.height > 0,
-          !destination.contains(nativeFrame) else { return nativeFrame }
-    let size = CGSize(width: min(nativeFrame.width, destination.width), height: min(nativeFrame.height, destination.height))
-    let centerIsInside = destination.contains(CGPoint(x: nativeFrame.midX, y: nativeFrame.midY))
-    let x = centerIsInside ? nativeFrame.minX : destination.midX - size.width / 2
-    let y = centerIsInside ? nativeFrame.minY : destination.midY - size.height / 2
-    return CGRect(x: min(max(x, destination.minX), destination.maxX - size.width),
-                  y: min(max(y, destination.minY), destination.maxY - size.height),
-                  width: size.width, height: size.height)
+/// Preserve the current animation frame, otherwise prefer authoritative native
+/// geometry. A window on another display still departs from that display.
+func windowMotionDeparture(inFlight: CGRect?, nativeFrame: CGRect?, cachedFrame: CGRect?) -> CGRect? {
+    inFlight ?? nativeFrame ?? cachedFrame
 }
 
 /// Hidden windows retain their pending snap until their first settled layout.
@@ -259,5 +260,18 @@ struct WindowMotionDisplayPolicy {
     mutating func shouldSnap(_ id: UInt32) -> Bool {
         if changing { return true }
         return pending.remove(id) != nil
+    }
+}
+
+/// Quantized or refused sizes can settle away from the requested frame.
+struct WindowMotionRestingFrames {
+    private var values: [UInt32: (asked: CGRect, got: CGRect)] = [:]
+    mutating func record(_ id: UInt32, asked: CGRect, got: CGRect) { values[id] = (asked, got) }
+    mutating func forget(_ id: UInt32) { values[id] = nil }
+    mutating func removeAll() { values.removeAll() }
+    func matches(_ id: UInt32, asked: CGRect, actual: CGRect) -> Bool {
+        guard let value = values[id], value.asked == asked else { return false }
+        return abs(value.got.minX - actual.minX) <= 1 && abs(value.got.minY - actual.minY) <= 1 &&
+            abs(value.got.width - actual.width) <= 1 && abs(value.got.height - actual.height) <= 1
     }
 }

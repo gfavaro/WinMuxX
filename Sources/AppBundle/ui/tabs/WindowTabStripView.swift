@@ -79,40 +79,6 @@ extension WindowTabStripView {
             }
     }
 
-    func tabChromeGroupDragGesture(
-        for windowId: UInt32?,
-        context: WindowTabStripLayoutContext,
-    ) -> some Gesture {
-        DragGesture(minimumDistance: windowTabStripGroupDragMinimumDistance, coordinateSpace: .local)
-            .onChanged { value in
-                guard isWindowTabStripChromeGroupDragStart(
-                    localX: value.startLocation.x,
-                    contentMinX: tabScrollContentMinX,
-                    contentMaxX: tabScrollContentMaxX,
-                    tabWidth: context.tabWidth,
-                    tabCount: strip.tabs.count,
-                ) else { return }
-                noteCurrentMousePointerSample()
-                guard let windowId,
-                      shouldAllowTabStripChromeGroupDrag(windowId: windowId)
-                else { return }
-                updateMoveFromTabStrip(windowId)
-            }
-            .onEnded { value in
-                guard isWindowTabStripChromeGroupDragStart(
-                    localX: value.startLocation.x,
-                    contentMinX: tabScrollContentMinX,
-                    contentMaxX: tabScrollContentMaxX,
-                    tabWidth: context.tabWidth,
-                    tabCount: strip.tabs.count,
-                ) else { return }
-                noteCurrentMousePointerSample()
-                guard let windowId,
-                      shouldContinueCurrentGroupDrag(windowId: windowId)
-                else { return }
-                finishMoveFromTabStrip()
-            }
-    }
 }
 
 func isWindowTabStripScrollBackgroundDragStart(

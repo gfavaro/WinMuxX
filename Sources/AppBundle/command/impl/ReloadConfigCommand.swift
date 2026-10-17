@@ -4,12 +4,18 @@ import os
 
 /// Becomes true once the initial workspace model exists. Config parsing happens earlier during
 /// launch, when scheduling a live layout pass would race app initialization.
-@MainActor var isWinMuxRuntimeReady = false
-@MainActor var lastConfigReloadError: String? = nil
+@MainActor var isWinMuxRuntimeReady: Bool {
+    get { runtime.configuration.isReady }
+    set { runtime.configuration.isReady = newValue }
+}
+@MainActor var lastConfigReloadError: String? {
+    get { runtime.configuration.lastReloadError }
+    set { runtime.configuration.lastReloadError = newValue }
+}
 
 /// Manual and automatic reloads share this gate because applying config contains awaits.
 @MainActor
-private final class ConfigReloadGate {
+final class ConfigReloadGate {
     private var busy = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
     func acquire() async {
@@ -29,8 +35,6 @@ private enum ConfigReloadContext {
     @TaskLocal static var scope: ConfigReloadScope?
 }
 
-@MainActor private let configReloadGate = ConfigReloadGate()
-@MainActor private var lastAutomaticConfigNotification: String?
 
 struct ReloadConfigCommand: Command {
     let args: ReloadConfigCmdArgs
@@ -61,9 +65,20 @@ struct ReloadConfigCommand: Command {
         stdout.append("A configuration reload cannot run recursively from its own callbacks")
         return false
     }
-    await configReloadGate.acquire()
+    let owner = runtime
+    return try await owner.withValue {
+        try await reloadConfigInCurrentRuntime(args: args, forceConfigUrl: forceConfigUrl,
+                                             automatic: automatic, stdout: &stdout)
+    }
+}
+
+@MainActor private func reloadConfigInCurrentRuntime(
+    args: ReloadConfigCmdArgs, forceConfigUrl: URL?, automatic: Bool, stdout: inout String
+) async throws -> Bool {
+    let state = runtime.configuration
+    await state.reloadGate.acquire()
     defer {
-        configReloadGate.release()
+        state.reloadGate.release()
         if !args.dryRun { syncConfigFileWatcher() }
     }
     try Task.checkCancellation()
@@ -86,12 +101,12 @@ struct ReloadConfigCommand: Command {
         case .success(let (parsedConfig, url)):
             if !args.dryRun {
                 lastConfigReloadError = nil
-                lastAutomaticConfigNotification = nil
+                runtime.configuration.lastAutomaticNotification = nil
                 let previousRootLayout = config.defaultRootContainerLayout
                 let previousRootOrientation = config.defaultRootContainerOrientation
                 resetHotKeys()
-                config = parsedConfig
-                configUrl = url
+                runtime.configuration.publish(parsedConfig, from: url)
+                WorkspaceSwipeController.shared.syncConfiguration()
                 materializePersistedWorkspaces()
                 applyUpdatedDefaultWindowLayout(previousLayout: previousRootLayout)
                 applyUpdatedDwindleOrientation(previousOrientation: previousRootOrientation)
@@ -105,8 +120,8 @@ struct ReloadConfigCommand: Command {
             if !args.dryRun { lastConfigReloadError = msg }
             stdout.append(msg)
             if !args.dryRun { Logger(subsystem: winMuxAppId, category: "config").error("\(msg, privacy: .public)") }
-            if !args.noGui && (!automatic || lastAutomaticConfigNotification != msg) {
-                if automatic { lastAutomaticConfigNotification = msg }
+            if !args.noGui && (!automatic || runtime.configuration.lastAutomaticNotification != msg) {
+                if automatic { runtime.configuration.lastAutomaticNotification = msg }
                 MessageModel.shared.message = Message(description: "WinMux Config Error", body: msg)
             }
             result = false

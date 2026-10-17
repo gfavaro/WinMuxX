@@ -181,7 +181,10 @@ final class ConfigBootstrapTest: XCTestCase {
         XCTAssertTrue(migratedText.contains("layout h_tab_group v_tab_group"))
         XCTAssertTrue(migratedText.contains("$WINMUX_WINDOW_ID"))
         XCTAssertFalse(migratedText.contains("exec-on-workspace-change"))
-        XCTAssertFalse(migratedText.contains("accordion"))
+        let activeLines = migratedText.split(separator: "\n")
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("#") }
+            .joined(separator: "\n")
+        XCTAssertFalse(activeLines.contains("accordion"))
         XCTAssertFalse(migratedText.contains("AEROSPACE_"))
 
         let (parsedConfig, errors) = parseConfig(migratedText)

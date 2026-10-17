@@ -43,9 +43,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
     var isCompact: Bool { expansionProgress < workspaceSidebarRowsRevealProgress }
     var showsWindowRows: Bool { expansionProgress >= workspaceSidebarRowsRevealProgress }
     var sectionMinHeight: CGFloat? {
-        if !isCompact, allowsWorkspaceActivation, isInUseOnOtherDisplay,
-           workspace.items.isEmpty || isShowingInUseOverlay {
-            return workspaceSidebarInUseOverrideEmptySectionMinHeight
+        if allowsWorkspaceActivation, isShowingInUseOverlay {
+            return isCompact ? 64 : workspaceSidebarInUseOverrideEmptySectionMinHeight
         }
         return nil
     }
@@ -56,9 +55,9 @@ struct WorkspaceSidebarWorkspaceSection: View {
     var isRenamingWorkspace: Bool { renamingWorkspaceName == workspace.name }
     var inUseOverrideText: String {
         if let monitorName = workspace.monitorName, !monitorName.isEmpty {
-            return "In use on \(monitorName)"
+            return "On \(monitorName). Bring here?"
         }
-        return "In use on another display"
+        return "On another display. Bring here?"
     }
     var sectionShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: workspaceSidebarSectionCornerRadius, style: .continuous)
@@ -75,6 +74,13 @@ struct WorkspaceSidebarWorkspaceSection: View {
             .opacity(compactFocusOpacity)
             .contentShape(Rectangle())
             .contextMenu {
+                if allowsWorkspaceActivation && (isFromOtherDisplay || isInUseOnOtherDisplay) {
+                    Button("Bring Here") {
+                        actions.send(.overrideWorkspaceInUse(workspace.name))
+                    }
+                    .help("Bring this workspace to this display")
+                    Divider()
+                }
                 Button {
                     debugWorkspaceSidebarRenameLog("workspaceContextRename workspace=\(workspace.name) displayName=\(workspace.displayName) compact=\(isCompact)")
                     onBeginRenameWorkspace()
@@ -146,9 +152,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
 extension WorkspaceSidebarWorkspaceSection {
     func handleSectionClick() {
         guard allowsWorkspaceActivation else { return }
-        if isInUseOnOtherDisplay {
-            // A workspace already visible elsewhere must require an explicit second action
-            // before replacing the destination monitor's active workspace.
+        if isInUseOnOtherDisplay || isFromOtherDisplay {
             activeInUseOverrideWorkspaceName = workspace.name
             return
         }
@@ -262,11 +266,6 @@ extension WorkspaceSidebarWorkspaceSection {
         }
         if isSearchFiltering {
             return isHovered ? sidebarColors.foreground.opacity(0.045) : sidebarColors.foreground.opacity(0.015)
-        }
-        if allowsWorkspaceActivation && isInUseOnOtherDisplay {
-            let redOpacity: Double = workspace.isFocused ? 0.16 : 0.065
-            let hoveredRedOpacity: Double = workspace.isFocused ? 0.24 : 0.13
-            return Color(nsColor: .systemRed).opacity(isHovered ? hoveredRedOpacity : redOpacity)
         }
         if isPinnedActiveWorkspace {
             return sidebarColors.foreground.opacity(isHovered ? 0.15 : 0.10)

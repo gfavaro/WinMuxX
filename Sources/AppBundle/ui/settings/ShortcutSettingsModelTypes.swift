@@ -59,17 +59,4 @@ extension ShortcutSettingsModel {
         var id: String { workspaceName }
     }
 
-    enum Tab: String, CaseIterable, Identifiable {
-        case shortcuts
-        case advanced
-
-        var id: String { rawValue }
-
-        var title: String {
-            switch self {
-                case .shortcuts: "Shortcuts"
-                case .advanced: "Advanced"
-            }
-        }
-    }
 }

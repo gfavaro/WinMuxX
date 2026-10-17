@@ -36,38 +36,23 @@ final class WindowMotionTest: XCTestCase {
         XCTAssertEqual(windowMotionFrameDelta(previous: 10, current: 12, fallback: 0), 1.0 / 30)
         XCTAssertEqual(windowMotionFrameDelta(previous: 10, current: 9, fallback: 0), 0)
     }
-    func testNewWindowOnOtherMonitorDepartsInsideDestinationMonitor() {
-        let destination = CGRect(x: -1920, y: -1080, width: 1800, height: 1000)
+    func testCrossDisplayMotionDepartsFromNativeFrameAndGoesDirectlyToTile() throws {
         let native = CGRect(x: 300, y: 100, width: 800, height: 600)
-        let start = windowMotionOrigin(nativeFrame: native, destination: destination, isNewWindow: true)
-        XCTAssertEqual(start.size, native.size)
-        XCTAssertEqual(start.midX, destination.midX)
-        XCTAssertEqual(start.midY, destination.midY)
         let target = CGRect(x: -1900, y: -1050, width: 900, height: 900)
-        for progress in stride(from: 0.0, through: 1.0, by: 0.1) {
-            XCTAssertTrue(destination.contains(WindowMotionFrame(start: start, target: target).frame(progress: progress)))
-        }
+        let start = try XCTUnwrap(windowMotionDeparture(inFlight: nil, nativeFrame: native, cachedFrame: .zero))
+        let motion = WindowMotionFrame(start: start, target: target)
+        XCTAssertEqual(motion.frame(progress: 0), native)
+        XCTAssertEqual(motion.frame(progress: 1), target)
+        XCTAssertEqual(motion.frame(progress: 0.5).minX, (native.minX + target.minX) / 2)
+        XCTAssertEqual(motion.frame(progress: 0.5).minY, (native.minY + target.minY) / 2)
     }
 
-    func testExistingWindowAndRetargetKeepActualOriginAcrossMonitors() {
+    func testRetargetUsesInFlightPositionAndMissingNativeFrameUsesCache() {
+        let inFlight = CGRect(x: -100, y: 80, width: 700, height: 500)
         let native = CGRect(x: 300, y: 100, width: 800, height: 600)
-        let destination = CGRect(x: -1920, y: 0, width: 1920, height: 1080)
-        XCTAssertEqual(windowMotionOrigin(nativeFrame: native, destination: destination, isNewWindow: false), native)
-    }
-
-    func testNewWindowAlreadyInsideDestinationKeepsItsPosition() {
-        let destination = CGRect(x: 40, y: 30, width: 1400, height: 850)
-        let native = CGRect(x: 100, y: 80, width: 600, height: 500)
-        XCTAssertEqual(windowMotionOrigin(nativeFrame: native, destination: destination, isNewWindow: true), native)
-        XCTAssertEqual(windowMotionOrigin(nativeFrame: native, destination: nil, isNewWindow: true), native)
-    }
-
-    func testOversizedNewWindowIsContainedAndNearEdgePositionIsClamped() {
-        let destination = CGRect(x: 40, y: 30, width: 1000, height: 800)
-        let oversized = windowMotionOrigin(nativeFrame: CGRect(x: -500, y: -500, width: 2000, height: 1600), destination: destination, isNewWindow: true)
-        XCTAssertEqual(oversized, destination)
-        let nearEdge = windowMotionOrigin(nativeFrame: CGRect(x: -10, y: 50, width: 500, height: 500), destination: destination, isNewWindow: true)
-        XCTAssertEqual(nearEdge, CGRect(x: 40, y: 50, width: 500, height: 500))
+        XCTAssertEqual(windowMotionDeparture(inFlight: inFlight, nativeFrame: native, cachedFrame: .zero), inFlight)
+        XCTAssertEqual(windowMotionDeparture(inFlight: nil, nativeFrame: nil, cachedFrame: native), native)
+        XCTAssertNil(windowMotionDeparture(inFlight: nil, nativeFrame: nil, cachedFrame: nil))
     }
 
     func testDisplayChangesSnapVisibleAndHiddenWindowsOnce() {

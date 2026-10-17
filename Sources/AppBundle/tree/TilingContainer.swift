@@ -182,10 +182,11 @@ enum Layout: String, Codable {
     case tiles
     case tabGroup = "tab-group"
     case dwindle
+    case stacked = "accordion"
 }
 
 extension String {
     func parseLayout() -> Layout? {
-        Layout(rawValue: self)
+        Layout(rawValue: self == "tabbed" ? "tab-group" : self == "stacked" ? "accordion" : self)
     }
 }

@@ -46,15 +46,18 @@ public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
     }
 }
 
-enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
+enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
     case general
     case shortcuts
     case workspaces
+    case displays
     case sidebar
     case appearance
     case windows
     case automation
     case configuration
+
+    static func restored(_ value: String) -> Self { Self(rawValue: value) ?? .general }
 
     var id: Self { self }
 
@@ -63,6 +66,7 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
             case .general: "General"
             case .shortcuts: "Shortcuts"
             case .workspaces: "Workspaces"
+            case .displays: "Displays"
             case .windows: "Windows"
             case .sidebar: "Sidebar"
             case .appearance: "Appearance"
@@ -76,6 +80,7 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
             case .general: "gearshape"
             case .shortcuts: "keyboard"
             case .workspaces: "rectangle.3.group"
+            case .displays: "display.2"
             case .windows: "macwindow.on.rectangle"
             case .sidebar: "sidebar.left"
             case .appearance: "paintpalette"
@@ -87,13 +92,24 @@ enum SettingsSidebarItem: Hashable, Identifiable, CaseIterable {
 
 struct ShortcutSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @State private var selectedItem: SettingsSidebarItem? = .general
+    @StateObject private var displays = SettingsDisplaysModel()
+    @StateObject private var rules = SettingsWindowRulesModel()
+    @AppStorage("settings.selectedPage") private var storedPage = SettingsSidebarItem.general.rawValue
+    @State private var shortcutSearch = ""
 
-    private let sidebarItems: [SettingsSidebarItem] = [.general, .workspaces, .windows, .sidebar, .appearance, .shortcuts, .automation, .configuration]
+    private var selectedItem: SettingsSidebarItem? {
+        get { SettingsSidebarItem.restored(storedPage) }
+        nonmutating set { if let newValue { storedPage = newValue.rawValue } }
+    }
+    private var selection: Binding<SettingsSidebarItem?> {
+        Binding(get: { selectedItem }, set: { selectedItem = $0 })
+    }
+
+    private let sidebarItems: [SettingsSidebarItem] = [.general, .workspaces, .displays, .windows, .sidebar, .appearance, .shortcuts, .automation, .configuration]
 
     var body: some View {
         NavigationSplitView {
-            List(selection: $selectedItem) {
+            List(selection: selection) {
                 ForEach(sidebarItems) { item in
                     NavigationLink(value: item) {
                         Label(item.label, systemImage: item.icon)
@@ -104,15 +120,17 @@ struct ShortcutSettingsView: View {
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
         } detail: {
             VStack(alignment: .leading, spacing: 0) {
-                SettingsSaveSummary(model: model).padding(.horizontal, 20)
+                SettingsSaveSummary(model: model, additionalUnsaved: rules.isDirty || displays.assignment.isDirty).padding(.horizontal, 20)
                 Group {
                 switch selectedItem {
                     case .general:
                         ShortcutGeneralSettingsView(model: model)
                     case .shortcuts:
-                        ShortcutSettingsShortcutsView(model: model)
+                        ShortcutSettingsShortcutsView(model: model, query: $shortcutSearch)
                     case .workspaces:
                         ShortcutSettingsWorkspacePane(model: model)
+                    case .displays:
+                        SettingsDisplaysView(model: model, displays: displays, onGeneral: { selectedItem = .general })
                     case .windows:
                         ShortcutBehaviorSettingsView(model: model)
                     case .sidebar:
@@ -121,9 +139,9 @@ struct ShortcutSettingsView: View {
                         ShortcutAppearanceSettingsView(model: model)
 
                     case .automation:
-                        ShortcutAutomationSettingsView(model: model)
+                        ShortcutAutomationSettingsView(model: model, rules: rules, onRawEditor: { selectedItem = .configuration })
                     case .configuration:
-                        SettingsConfigurationView(model: model)
+                        SettingsConfigurationView(model: model, onNavigate: { selectedItem = $0 })
                     case nil:
                         Text("Select an item")
                 }
@@ -137,9 +155,10 @@ struct ShortcutSettingsView: View {
 
 struct ShortcutSettingsShortcutsView: View {
     @ObservedObject var model: ShortcutSettingsModel
+    @Binding var query: String
 
     var body: some View {
-        ShortcutCategoryView(model: model, category: .managed)
+        ShortcutCategoryView(model: model, category: .managed, query: $query)
     }
 }
 
@@ -154,12 +173,31 @@ struct ShortcutSettingsWorkspacePane: View {
 struct ShortcutCategoryView: View {
     @ObservedObject var model: ShortcutSettingsModel
     let category: ShortcutSettingsModel.Category
+    @Binding var query: String
+
+    init(model: ShortcutSettingsModel, category: ShortcutSettingsModel.Category, query: Binding<String> = .constant("")) {
+        self.model = model; self.category = category; self._query = query
+    }
     @SettingsDraft("shortcuts-preset", load: { config.shortcutsPreset.rawValue }) private var shortcutsPreset: String
+    @SettingsDraft("modifiers.alt", load: { config.modifierSides.alt.rawValue }) private var altSide: String
+    @SettingsDraft("modifiers.cmd", load: { config.modifierSides.cmd.rawValue }) private var cmdSide: String
+    @SettingsDraft("modifiers.ctrl", load: { config.modifierSides.ctrl.rawValue }) private var ctrlSide: String
+    @SettingsDraft("modifiers.shift", load: { config.modifierSides.shift.rawValue }) private var shiftSide: String
     @SettingsDraft("workspace-sidebar.project-deletion-action", load: { config.workspaceSidebar.projectDeletionAction }) private var projectDeletionAction: WorkspaceProjectDeletionAction
     @SettingsDraft("minimum-workspace-count", load: { config.effectiveMinimumWorkspaceCount }) private var minimumWorkspaceCount: Int
 
     var body: some View {
+        let searching = !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         Form {
+            if category == .managed {
+                Section {
+                    HStack {
+                        TextField("Search shortcuts", text: $query, prompt: Text("Action, command or shortcut"))
+                            .accessibilityIdentifier("settings.shortcuts.search")
+                        if !query.isEmpty { Button("Clear") { query = "" }.accessibilityLabel("Clear shortcut search") }
+                    }
+                }
+            }
 
             if category == .common {
                 Section("Workspace availability") {
@@ -186,7 +224,14 @@ struct ShortcutCategoryView: View {
                 }
             }
 
-            if category == .managed {
+            if category == .managed && !searching {
+                Section("Modifier keys") {
+                    modifierSidePicker("Option", key: "alt", selection: $altSide)
+                    modifierSidePicker("Command", key: "cmd", selection: $cmdSide)
+                    modifierSidePicker("Control", key: "ctrl", selection: $ctrlSide)
+                    modifierSidePicker("Shift", key: "shift", selection: $shiftSide)
+                    SettingsDescription("Choose which side triggers shortcuts. The other side passes through for typing. Modifier-only taps keep their explicit left/right bindings.")
+                }
                 Section("Shortcut preset") {
                     SettingsPicker("Preset", id: "shortcuts-preset", selection: $shortcutsPreset,
                         help: "Custom preserves your own shortcuts. Rectangle uses the familiar Rectangle bindings.") {
@@ -199,14 +244,40 @@ struct ShortcutCategoryView: View {
                 }
             }
 
-            let sections = model.sections.filter { $0.category == category && $0.id != "managed-move" }
+            let candidates = model.sections.filter { $0.category == category && (searching || $0.id != "managed-move") }
+            let sections = filteredShortcutSections(candidates, assignments: model.assignments, query: query)
             ForEach(sections) { section in
-                ShortcutSectionView(model: model, section: section)
+                if searching {
+                    Section(section.title) {
+                        ForEach(section.actions) { action in ShortcutRow(model: model, action: action) }
+                    }
+                } else {
+                    ShortcutSectionView(model: model, section: section)
+                }
+            }
+            if searching && sections.isEmpty {
+                Section {
+                    Text("No matching shortcuts").font(.headline)
+                    SettingsDescription("Try an action name, command or shortcut notation such as alt-h.")
+                    Button("Clear search") { query = "" }
+                }
             }
         }
         .formStyle(.grouped)
 
     }
+    private func modifierSidePicker(_ title: String, key: String, selection: Binding<String>) -> some View {
+        SettingsPicker(title, id: "modifiers.\(key)", selection: selection,
+            help: "Applies to shortcut combinations using this modifier. Both preserves the default behavior.") {
+            Text("Both").tag("both")
+            Text("Left").tag("left")
+            Text("Right").tag("right")
+        } onChange: {
+            persistSettingsConfig(section: "modifiers", key: key,
+                renderedValue: "'\(selection.wrappedValue)'", model: model)
+        }
+    }
+
     private func saveMinimumWorkspaceCount() {
         model.activeSettingTitle = "Workspaces to keep"
         persistSettingsConfigEdits([

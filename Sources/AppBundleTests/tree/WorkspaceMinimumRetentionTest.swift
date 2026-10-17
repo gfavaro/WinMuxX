@@ -95,4 +95,33 @@ final class WorkspaceMinimumRetentionTest: XCTestCase {
         XCTAssertNil(Workspace.existing(byName: "legacy"))
         XCTAssertEqual(config.effectiveMinimumWorkspaceCount, 1)
     }
+
+    func testPendingRestartAssignmentsDoNotKeepExtraEmptyWorkspaces() {
+        let occupied = focus.workspace
+        _ = TestWindow.new(id: 8201, parent: occupied.rootTilingContainer)
+        let stale = Workspace.get(byName: "stale")
+        let old = TestWindow.new(id: 8202, parent: stale.rootTilingContainer)
+        old.restartIdentity = RestartWindowIdentity(bundleId: "test.app", pid: 123,
+            launchDate: Date(timeIntervalSince1970: 1), title: "Old")
+        let world = snapshotCurrentFrozenWorld()
+        old.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: world, pending: nil))
+        config.minimumWorkspaceCount = 1
+        XCTAssertTrue(workspaceHasPendingRestartWindows(stale.name))
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(Workspace.all, [occupied])
+        XCTAssertFalse(workspaceHasPendingRestartWindows(stale.name))
+    }
+
+    func testExtraFocusedEmptyWorkspaceFallsBackToOccupiedWorkspace() {
+        let occupied = focus.workspace
+        _ = TestWindow.new(id: 8203, parent: occupied.rootTilingContainer)
+        config.minimumWorkspaceCount = 1
+        let empty = Workspace.get(byName: "extra")
+        _ = empty.focusWorkspace()
+        Workspace.reconcileWorkspaceState()
+        XCTAssertNil(Workspace.existing(byName: empty.name))
+        XCTAssertTrue(focus.workspace === occupied)
+        XCTAssertTrue(mainMonitor.activeWorkspace === occupied)
+    }
 }

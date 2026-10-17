@@ -67,7 +67,8 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "layout dwindle"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
-                shortcutAction(id: "layout-tabs", title: "Tab Group", command: "layout tab-group"),
+                shortcutAction(id: "layout-tabs", title: "Stacked: Tabbed", command: "layout tab-group"),
+                shortcutAction(id: "layout-stacked", title: "Stacked: Accordion", command: "layout accordion"),
                 shortcutAction(id: "layout-orientation", title: "Toggle Orientation", command: "layout horizontal vertical"),
                 shortcutAction(id: "balance", title: "Balance Sizes", command: "balance-sizes"),
                 shortcutAction(id: "flatten", title: "Flatten Workspace Tree", command: "flatten-workspace-tree"),
@@ -101,7 +102,7 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
         .init(id: "utilities", category: .common, title: "Utilities", summary: nil,
               actions: [
                   shortcutAction(id: "sidebar", title: "Open Sidebar", command: "open-sidebar"),
-                  shortcutAction(id: "palette", title: "Window Switcher", command: "palette"),
+                  shortcutAction(id: "palette", title: "Window Overview", command: "palette"),
                   shortcutAction(id: "volume-up", title: "Increase Volume", command: "volume up"),
                   shortcutAction(id: "volume-down", title: "Decrease Volume", command: "volume down"),
                   shortcutAction(id: "volume-mute", title: "Toggle Mute", command: "volume mute-toggle"),

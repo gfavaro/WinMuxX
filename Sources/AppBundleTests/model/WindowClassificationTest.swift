@@ -42,6 +42,19 @@ final class WindowClassificationTest: XCTestCase {
         }
     }
 
+    func testWindowsAppSessionsTileDespiteAccessoryDeclarationButDialogsFloat() {
+        for policy: NSApplication.ActivationPolicy in [.regular, .accessory] {
+            let session = Element.window(fullscreen: true)
+            XCTAssertEqual(session.getWindowType(axApp: Element(), .windowsApp, policy, .normalWindow, accessory: true), .window)
+            for fullscreen: Bool? in [nil, false] {
+                let utility = Element.window(fullscreen: fullscreen)
+                XCTAssertEqual(utility.getWindowType(axApp: Element(), .windowsApp, policy, .normalWindow, accessory: true), .dialog)
+            }
+            session.attributes[kAXSubroleAttribute] = kAXDialogSubrole
+            XCTAssertEqual(session.getWindowType(axApp: Element(), .windowsApp, policy, .normalWindow, accessory: true), .dialog)
+        }
+    }
+
     func testAccessoryClassificationDoesNotPromotePopupsToFloatingWindows() {
         let window = Element.window(fullscreen: true, close: nil)
         XCTAssertEqual(window.getWindowType(axApp: Element(), nil, .accessory, .normalWindow, accessory: true), .popup)

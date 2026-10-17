@@ -42,9 +42,13 @@ final class TestWindow: Window, CustomStringConvertible {
         unbindFromParent()
     }
 
-    override var title: String {
+    @MainActor private(set) var titleFetchCount = 0
+    @MainActor var testTitle: String?
+
+    @MainActor override var title: String {
         get async { // redundant async. todo create bug report to Swift
-            description
+            titleFetchCount += 1
+            return testTitle ?? description
         }
     }
 
@@ -53,6 +57,12 @@ final class TestWindow: Window, CustomStringConvertible {
     @MainActor override func getAxRect() async throws -> Rect? { // todo change to not Optional
         recordAuthoritativeActualRect(_rect)
         return _rect
+    }
+
+    @MainActor var nativeStateReader: (@MainActor () async throws -> (fullscreen: Bool, minimized: Bool)?)?
+    @MainActor override func readNativeState() async throws -> (fullscreen: Bool, minimized: Bool)? {
+        if let nativeStateReader { return try await nativeStateReader() }
+        return try await super.readNativeState()
     }
 
     @MainActor private(set) var nativeStateFetchCount = 0

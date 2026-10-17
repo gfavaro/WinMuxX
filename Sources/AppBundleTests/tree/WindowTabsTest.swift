@@ -37,6 +37,29 @@ func cgWindowBounds(windowNumber: Int) -> CGRect? {
 
 final class WindowTabsTest: XCTestCase {
     @MainActor
+    func testDragStackDefaultAndExistingGroupLayout() throws {
+        for preferred: Layout in [.stacked, .tabGroup] {
+            setUpWorkspacesForTests()
+            config.dragStackLayout = preferred
+            let root = Workspace.get(byName: "drag-stack").rootTilingContainer
+            let target = TestWindow.new(id: 1, parent: root)
+            let source = TestWindow.new(id: 2, parent: root)
+            XCTAssertEqual(dragStackLayout(for: target), preferred)
+            createOrAppendWindowTabStack(sourceWindow: source, onto: target, newGroupLayout: config.dragStackLayout)
+            let group = try XCTUnwrap(target.parent as? TilingContainer)
+            XCTAssertEqual(group.layout, preferred)
+            XCTAssertTrue(source.parent === group)
+            config.dragStackLayout = preferred == .stacked ? .tabGroup : .stacked
+            let third = TestWindow.new(id: 3, parent: root)
+            XCTAssertEqual(dragStackLayout(for: target), preferred)
+            createOrAppendWindowTabStack(sourceWindow: third, onto: target, newGroupLayout: config.dragStackLayout)
+            XCTAssertTrue(third.parent === group)
+            XCTAssertEqual(group.layout, preferred)
+            XCTAssertEqual(group.children.filterIsInstance(of: Window.self).map(\.windowId), [1, 3, 2])
+        }
+    }
+
+    @MainActor
     func testCreateTabStackFromTwoSiblingWindows() {
         setUpWorkspacesForTests()
         let workspace = Workspace.get(byName: "tabs")

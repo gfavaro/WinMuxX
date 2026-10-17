@@ -43,13 +43,34 @@ import Foundation
         _ = Workspace.all.first?.focusWorkspace()
         try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
         try await runLightSession(.startup, .forceRun) {
+            applyStartupWorkspacePlacement()
             applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
             _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
         }
         isWinMuxRuntimeReady = true
+        scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
         reloadConfigIfSavedDuringStartup()
         schedulePersistedFrozenWorldSave()
     }
+}
+
+/// Startup placement is separate from display ownership during normal switching.
+@MainActor
+func applyStartupWorkspacePlacement() {
+    guard config.startWorkspacesOnMainMonitor else { return }
+    let main = mainMonitor
+    let focused = focus.workspace
+    // Snapshot first: the empty secondary viewports created below stay on their displays.
+    for workspace in Workspace.all where workspace.forceAssignedMonitor == nil {
+        if let source = workspace.visibleMonitor,
+           source.rect.topLeftCorner != main.rect.topLeftCorner {
+            let blank = createBlankWorkspace(projectId: workspace.projectId, monitor: source)
+            check(source.setActiveWorkspace(blank))
+        }
+        workspace.preferredMonitorPoint = main.rect.topLeftCorner
+    }
+    _ = focused.focusWorkspace()
+    syncClosedWindowsCacheToCurrentWorld()
 }
 
 @MainActor
@@ -83,8 +104,8 @@ private let serverHelp = """
     OPTIONS:
       -h, --help              Print help
       -v, --version           Print WinMuxX.app version
-      --config-path <path>    Config path. Takes priority over ${XDG_CONFIG_HOME}/winmux-gf/winmux.toml
-                              (defaults to ~/.config/winmux-gf/winmux.toml).
+      --config-path <path>    Config path. Takes priority over ${XDG_CONFIG_HOME}/winmuxx/winmux.toml
+                              (defaults to ~/.config/winmuxx/winmux.toml).
       --read-only             Run without mutating macOS windows.
                               Useful if you want to use only debug-windows or other query commands.
     """

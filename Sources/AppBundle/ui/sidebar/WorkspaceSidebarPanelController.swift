@@ -208,6 +208,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     let effect = NSVisualEffectView()
     let customSurface = NSView()
     let clearSurface = NSView()
+    let opaqueSurface = NSView()
     let glassSurface: NSView?
     let glassContent = NSView()
     private var hostedContent: NSView?
@@ -244,9 +245,11 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         effect.wantsLayer = true
         customSurface.wantsLayer = true
         clearSurface.wantsLayer = true
+        opaqueSurface.wantsLayer = true
         addSubview(effect)
         addSubview(customSurface)
         addSubview(clearSurface)
+        addSubview(opaqueSurface)
         if let glassSurface { addSubview(glassSurface) }
         configure(configuration: configuration, visibleWidth: 0)
     }
@@ -278,7 +281,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
             switch background {
             case .clear: surface = clearSurface
             case .glass, .frosted: surface = glassSurface ?? effect
-            case .opaque: surface = effect
+            case .opaque: surface = opaqueSurface
             }
         }
         let contentParent = surface === glassSurface ? glassContent : surface
@@ -288,6 +291,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         effect.isHidden = surface !== effect || visibleWidth <= 0
         customSurface.isHidden = surface !== customSurface || visibleWidth <= 0
         clearSurface.isHidden = surface !== clearSurface || visibleWidth <= 0
+        opaqueSurface.isHidden = surface !== opaqueSurface || visibleWidth <= 0
         glassSurface?.isHidden = surface !== glassSurface || visibleWidth <= 0
         if system, expanded, let scheme = configuration.frostedTint.preferredColorScheme {
             // Only an explicit tint choice sets an appearance. Automatic tint
@@ -299,6 +303,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         } else {
             appearance = nil
         }
+        updateOpaqueBackground()
         updateGeometry()
     }
 
@@ -312,13 +317,26 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         ) {
         case .clear: return clearSurface
         case .glass, .frosted: return glassSurface ?? effect
-        case .opaque: return effect
+        case .opaque: return opaqueSurface
         }
     }
 
     override func layout() {
         super.layout()
         updateGeometry()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateOpaqueBackground()
+    }
+
+    private func updateOpaqueBackground() {
+        // AppKit exposes no menu-bar material. Match the measured opaque palette
+        // without screen capture, polling, or wallpaper-dependent contrast.
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let white: CGFloat = dark ? 32.0 / 255 : 218.0 / 255
+        opaqueSurface.layer?.backgroundColor = NSColor(srgbRed: white, green: white, blue: white, alpha: 1).cgColor
     }
 
     private func updateGeometry() {

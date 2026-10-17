@@ -63,6 +63,13 @@ open class Window: TreeNode, Hashable {
         lastKnownActualRect = rect
     }
 
+    @MainActor
+    func readNativeState() async throws -> (fullscreen: Bool, minimized: Bool)? {
+        let fullscreen = try await isMacosFullscreen
+        let minimized = try await (!fullscreen).andAsync { @MainActor @Sendable in try await self.isMacosMinimized }
+        return (fullscreen, minimized)
+    }
+
     @MainActor var minimumLayoutSize: CGSize { .zero }
 
     @MainActor

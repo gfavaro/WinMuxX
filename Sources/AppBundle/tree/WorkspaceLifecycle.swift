@@ -4,14 +4,14 @@ import Common
 @MainActor
 func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor) -> Workspace? {
     materializePersistedWorkspaceProjects()
-    guard winMuxWorkspaceState.projectsById[projectId] != nil else {
+    guard runtime.workspaces.projectsById[projectId] != nil else {
         debugWorkspaceSidebarProjectLog("switchProjectAbort unknownProject=\(projectId.rawValue)")
         return nil
     }
     let viewportId = MonitorViewportId(monitor)
-    let rememberedWorkspace = winMuxWorkspaceState.monitorViewportsById[viewportId]?
+    let rememberedWorkspace = runtime.workspaces.monitorViewportsById[viewportId]?
         .lastActiveWorkspaceByProject[projectId]
-        .flatMap { winMuxWorkspaceState.workspaceById[$0] }
+        .flatMap { runtime.workspaces.workspaceById[$0] }
         .flatMap { workspaceIsAvailableForMonitor($0, monitor: monitor) ? $0 : nil }
     let workspace = rememberedWorkspace
         ?? availablePreferredWorkspace(projectId: projectId, monitor: monitor)
@@ -44,7 +44,7 @@ func createBlankWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Wo
 func getOrCreateAdjacentBlankWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace {
     let scope = WorkspaceScope(projectId: projectId)
     if let workspaceId = retainedEmptyWorkspaceId(in: scope),
-       let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+       let workspace = runtime.workspaces.workspaceById[workspaceId],
        workspaceIsAvailableForMonitor(workspace, monitor: monitor)
     {
         return workspace
@@ -150,7 +150,7 @@ func moveWorkspaceContents(from source: Workspace, to target: Workspace) {
 func removeWorkspaceFromRegistry(_ workspace: Workspace) {
     discardPendingRestartWindows(forWorkspace: workspace.name)
     clearWorkspaceSidebarLabelIfNeeded(workspace.name)
-    _ = winMuxWorkspaceState.removeWorkspace(workspace)
+    _ = runtime.workspaces.removeWorkspace(workspace)
     // Restored numbers preserve the session while its workspaces are rebuilt.
     // Once a slot disappears, presentation must follow the live project order.
     for survivor in projectWorkspaces(projectId: workspace.projectId)
@@ -206,6 +206,18 @@ func workspaceShouldSurviveReconciliation(
     retainedEmptyWorkspaceIds: [WorkspaceScope: WorkspaceId],
 ) -> Bool {
     guard !workspace.isArchived else { return false }
+    if config.minimumWorkspaceCount != nil {
+        // Saved assignments and spare empty slots are not live windows. Only
+        // minimum retention may keep them, apart from required project/display slots.
+        return workspaceHasLifecycleWindows(workspace) ||
+            (!isUnitTest && !isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
+            projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived }.count == 1 ||
+            (workspace.isVisible && !Workspace.all.contains {
+                $0 !== workspace && workspaceHasLifecycleWindows($0) &&
+                    $0.projectId == workspace.projectId &&
+                    workspaceIsAvailableForMonitor($0, monitor: workspace.workspaceMonitor)
+            })
+    }
     return workspace.isVisible ||
         workspaceHasLifecycleWindows(workspace) ||
         workspace.isConfiguredPersistent ||
@@ -220,14 +232,15 @@ func replacementWorkspaceForPrunedWorkspace(
     retainedEmptyWorkspaceIds: [WorkspaceScope: WorkspaceId],
 ) -> Workspace? {
     let scope = WorkspaceScope(projectId: workspace.projectId)
+    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     if let retainedWorkspaceId = retainedEmptyWorkspaceIds[scope],
        retainedWorkspaceId != workspace.id,
-       let retainedWorkspace = winMuxWorkspaceState.workspaceById[retainedWorkspaceId],
+       config.minimumWorkspaceCount == nil || minimumWorkspaceIds.contains(retainedWorkspaceId),
+       let retainedWorkspace = runtime.workspaces.workspaceById[retainedWorkspaceId],
        workspaceIsAvailableForMonitor(retainedWorkspace, monitor: workspace.workspaceMonitor)
     {
         return retainedWorkspace
     }
-    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     if let candidate = orderedWorkspaces(in: scope).first(where: {
         $0.id != workspace.id &&
             (workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) || minimumWorkspaceIds.contains($0.id)) &&
@@ -244,7 +257,7 @@ func replacementWorkspaceForPrunedWorkspace(
 
 @MainActor
 func ensureVisibleActiveProjectWorkspaces() {
-    for monitor in monitors where winMuxWorkspaceState.visibleWorkspace(for: monitor) == nil {
+    for monitor in monitors where runtime.workspaces.visibleWorkspace(for: monitor) == nil {
         let viewportId = MonitorViewportId(monitor)
         let projectId = fallbackProjectIdForMissingActiveWorkspace(on: viewportId)
         let workspace = availablePreferredWorkspace(projectId: projectId, monitor: monitor)
@@ -255,15 +268,15 @@ func ensureVisibleActiveProjectWorkspaces() {
 
 @MainActor
 private func fallbackProjectIdForMissingActiveWorkspace(on viewportId: MonitorViewportId) -> WorkspaceProjectId {
-    guard let viewport = winMuxWorkspaceState.monitorViewportsById[viewportId] else {
+    guard let viewport = runtime.workspaces.monitorViewportsById[viewportId] else {
         return workspaceProjectDefaultId
     }
-    if let previousProjectId = viewport.previousWorkspaceId.flatMap({ winMuxWorkspaceState.workspaceById[$0]?.projectId }) {
+    if let previousProjectId = viewport.previousWorkspaceId.flatMap({ runtime.workspaces.workspaceById[$0]?.projectId }) {
         return previousProjectId
     }
     if let rememberedProjectId = viewport.lastActiveWorkspaceByProject
         .sorted(by: { $0.key < $1.key })
-        .first(where: { entry in winMuxWorkspaceState.workspaceById[entry.value] != nil })?
+        .first(where: { entry in runtime.workspaces.workspaceById[entry.value] != nil })?
         .key
     {
         return rememberedProjectId
@@ -273,44 +286,16 @@ private func fallbackProjectIdForMissingActiveWorkspace(on viewportId: MonitorVi
 
 @MainActor
 func availablePreferredWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace? {
-    orderedWorkspacesForPresentation()
-        .filter { $0.projectId == projectId }
-        .filter { !$0.isArchived }
-        .filter { isValidAssignment(workspace: $0, screen: monitor.rect.topLeftCorner) }
-        .first { workspaceIsAvailableForMonitor($0, monitor: monitor) }
-}
-
-@MainActor
-func workspaceIsAvailableForMonitor(_ workspace: Workspace, monitor: Monitor) -> Bool {
-    isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) &&
-        (!workspace.isVisible || workspace.workspaceMonitor.rect.topLeftCorner == monitor.rect.topLeftCorner)
-}
-
-@MainActor
-@discardableResult
-func activateWorkspaceForUser(
-    _ workspace: Workspace,
-    on targetMonitor: Monitor,
-) -> Bool {
-    // Selection follows an already-visible workspace; it does not relocate either
-    // monitor's viewport or history. Forced assignments only matter for hidden targets.
-    if workspace.isVisible {
-        guard workspace.visibleMonitor != nil else { return false }
-        return workspace.focusWorkspace()
+    orderedWorkspacesForPresentation().first {
+        $0.projectId == projectId && !$0.isArchived && workspaceIsAvailableForMonitor($0, monitor: monitor)
     }
-    guard isValidAssignment(workspace: workspace, screen: targetMonitor.rect.topLeftCorner) else {
-        return false
-    }
-
-    guard targetMonitor.setActiveWorkspace(workspace) else { return false }
-    return workspace.focusWorkspace()
 }
 
 @MainActor
 func repairInvalidVisibleWorkspaceAssignments() {
-    let invalidVisibleWorkspaces = winMuxWorkspaceState.monitorViewportsById.compactMap { viewportId, viewport -> Workspace? in
+    let invalidVisibleWorkspaces = runtime.workspaces.monitorViewportsById.compactMap { viewportId, viewport -> Workspace? in
         guard let workspaceId = viewport.activeWorkspaceId,
-              let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+              let workspace = runtime.workspaces.workspaceById[workspaceId],
               !isValidAssignment(workspace: workspace, screen: viewportId.topLeftCorner)
         else {
             return nil
@@ -324,9 +309,9 @@ func repairInvalidVisibleWorkspaceAssignments() {
         }
     }
 
-    for (viewportId, viewport) in winMuxWorkspaceState.monitorViewportsById {
+    for (viewportId, viewport) in runtime.workspaces.monitorViewportsById {
         guard let workspaceId = viewport.activeWorkspaceId,
-              let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+              let workspace = runtime.workspaces.workspaceById[workspaceId],
               !isValidAssignment(workspace: workspace, screen: viewportId.topLeftCorner)
         else {
             continue
@@ -336,6 +321,6 @@ func repairInvalidVisibleWorkspaceAssignments() {
         if viewport.previousWorkspaceId == workspaceId {
             viewport.previousWorkspaceId = nil
         }
-        winMuxWorkspaceState.monitorViewportsById[viewportId] = viewport
+        runtime.workspaces.monitorViewportsById[viewportId] = viewport
     }
 }

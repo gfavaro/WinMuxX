@@ -13,10 +13,11 @@ final class ForkIdentityTest: XCTestCase {
     }
 
     func testForkConfigurationHasAnIndependentOwnedDirectory() {
-        XCTAssertEqual(generatedConfigDirectoryName, "winmux-gf")
+        XCTAssertEqual(generatedConfigDirectoryName, "winmuxx")
         XCTAssertEqual(generatedConfigFileName, "winmux.toml")
-        XCTAssertEqual(generatedConfigUrl().deletingLastPathComponent().lastPathComponent, "winmux-gf")
+        XCTAssertEqual(generatedConfigUrl().deletingLastPathComponent().lastPathComponent, "winmuxx")
         XCTAssertTrue(legacyConfigCandidateUrls().contains { $0.path.hasSuffix("/winmux/winmux.toml") })
+        XCTAssertTrue(legacyConfigCandidateUrls().first?.path.hasSuffix("/winmux-gf/winmux.toml") == true)
     }
 
     func testAppRenameRetainsTheExistingPersonalForkStateDirectory() {

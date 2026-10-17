@@ -43,6 +43,35 @@ func buildDiagnosticsReport() async -> String {
     io.out("  These settings are informational; WinMux does not change them.")
     io.out("")
 
+    let touch = RawWorkspaceTouchSource.shared
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) backend=raw-touch status=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
+    let preview = WorkspaceSwipePreview.shared
+    if let timing = preview.timings.last {
+        let submission = timing.submissionMs.map { String(format: "%.1fms", $0) } ?? "not submitted"
+        let capture = timing.captureMs.map { String(format: "%.1fms", $0) } ?? "pending/cancelled"
+        let captureReady = timing.captureReadyMs.map { String(format: "%.1fms", $0) } ?? "not captured"
+        let panel = timing.panelMs.map { String(format: "%.1fms", $0) } ?? "not submitted"
+        let worker = timing.workerMs.map { String(format: "%.1fms", $0) } ?? "pending/cancelled"
+        io.out(String(format: "Last swipe preview: cache=%@ mainSetup=%.1fms request=%.1fms capture=%@ captureReady=%@ panel=%@ submission=%@ incomingWorker=%@ surfaces=%d",
+                      timing.cacheHit ? "hit" : "miss", timing.mainMs, timing.requestMs, capture,
+                      captureReady, panel, submission, worker, preview.surfaceCreations))
+        let warm = preview.timings.filter { $0.cacheHit && $0.submissionMs != nil }
+        io.out("Preview sample window: total=\(preview.timings.count) notSubmitted=\(preview.timings.filter { $0.submissionMs == nil }.count) capacity=\(WorkspaceSwipePreview.timingSampleLimit)")
+        let stages: [(String, [Double])] = [
+            ("Warm preview submissions", warm.compactMap(\.submissionMs)),
+            ("Warm main setup", warm.map(\.mainMs)),
+            ("Warm outgoing capture", warm.compactMap(\.captureMs)),
+            ("Warm capture readiness (includes queue wait)", warm.compactMap(\.captureReadyMs)),
+            ("Warm panel preparation", warm.compactMap(\.panelMs)),
+            ("Warm incoming composition", warm.compactMap(\.workerMs)),
+            ("Cold preview submissions", preview.timings.filter { !$0.cacheHit }.compactMap(\.submissionMs)),
+        ]
+        for (label, samples) in stages where !samples.isEmpty {
+            let sorted = samples.sorted()
+            io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms", label,
+                          sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
+        }
+    }
     io.out("Permissions:")
     io.out("  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")")
     io.out("  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")")

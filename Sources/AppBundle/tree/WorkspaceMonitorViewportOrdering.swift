@@ -45,7 +45,7 @@ func getOrCreateFallbackWorkspace(
 ) -> Workspace {
     let scope = WorkspaceScope(projectId: projectId)
     if let workspaceId = retainedEmptyWorkspaceId(in: scope),
-       let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+       let workspace = runtime.workspaces.workspaceById[workspaceId],
        workspace != excludedWorkspace,
        workspaceIsAvailableForMonitor(workspace, monitor: monitor)
     {
@@ -70,9 +70,9 @@ func getOrCreateFallbackWorkspace(
 
 @MainActor
 func projectWorkspaces(projectId: WorkspaceProjectId) -> [Workspace] {
-    guard let project = winMuxWorkspaceState.projectsById[projectId] else { return [] }
+    guard let project = runtime.workspaces.projectsById[projectId] else { return [] }
     let indexedWorkspaces = project.workspaceOrder
-        .compactMap { winMuxWorkspaceState.workspaceById[$0] }
+        .compactMap { runtime.workspaces.workspaceById[$0] }
         .filter { $0.projectId == projectId }
     if !indexedWorkspaces.isEmpty {
         return indexedWorkspaces
@@ -84,14 +84,14 @@ func projectWorkspaces(projectId: WorkspaceProjectId) -> [Workspace] {
 
 @MainActor
 func orderedWorkspaces(in scope: WorkspaceScope) -> [Workspace] {
-    projectWorkspaces(projectId: scope.projectId)
-        .filter { !$0.isArchived }
+    orderWorkspacesByDisplayIndex(projectWorkspaces(projectId: scope.projectId)
+        .filter { !$0.isArchived })
 }
 
 @MainActor
 func orderedWorkspaces(in projectId: WorkspaceProjectId) -> [Workspace] {
-    projectWorkspaces(projectId: projectId)
-        .filter { !$0.isArchived }
+    orderWorkspacesByDisplayIndex(projectWorkspaces(projectId: projectId)
+        .filter { !$0.isArchived })
 }
 
 @MainActor
@@ -100,7 +100,7 @@ func orderedWorkspacesForPresentation() -> [Workspace] {
     var result: [Workspace] = []
     for project in workspaceProjects() {
         for workspaceId in project.workspaceOrder {
-            guard let workspace = winMuxWorkspaceState.workspaceById[workspaceId],
+            guard let workspace = runtime.workspaces.workspaceById[workspaceId],
                   !workspace.isArchived,
                   seen.insert(workspaceId).inserted
             else { continue }
@@ -108,5 +108,29 @@ func orderedWorkspacesForPresentation() -> [Workspace] {
         }
     }
     result.append(contentsOf: Workspace.all.filter { !$0.isArchived && seen.insert($0.id).inserted })
+    for projectId in Set(result.map(\.projectId)) {
+        let slots = result.indices.filter { result[$0].projectId == projectId }
+        let ordered = orderWorkspacesByDisplayIndex(slots.map { result[$0] })
+        for (slot, workspace) in zip(slots, ordered) { result[slot] = workspace }
+    }
+    return result
+}
+
+// Restoration preserves displayed numbers independently of registry insertion order.
+// Sort numbered slots within each project while leaving custom-named slots in place.
+@MainActor
+private func orderWorkspacesByDisplayIndex(_ workspaces: [Workspace]) -> [Workspace] {
+    let numbered = workspaces.enumerated().compactMap { offset, workspace -> (offset: Int, workspace: Workspace, index: Int)? in
+        guard workspace.usesAutomaticDisplayName,
+              let index = workspace.isConfiguredPersistent
+                ? parsePositiveWorkspaceDisplayIndex(workspace.name)
+                : workspace.restoredDisplayIndex else { return nil }
+        return (offset, workspace, index)
+    }
+    let sorted = numbered.sorted {
+        $0.index == $1.index ? $0.offset < $1.offset : $0.index < $1.index
+    }
+    var result = workspaces
+    for (slot, value) in zip(numbered, sorted) { result[slot.offset] = value.workspace }
     return result
 }

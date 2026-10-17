@@ -32,12 +32,12 @@ Release app: `WinMuxX.app`, bundle ID `com.gfavaro.winmuxx`.
 Debug app: `WinMuxX-Debug`, bundle ID `com.gfavaro.winmuxx.debug`.
 The CLI packaged in the release is `Contents/MacOS/winmuxx-cli`; it connects to the
 fork socket, not the original app. Debug CLI builds connect to the debug fork.
-The app's displayed name and bundle identity are WinMuxX. Existing owned configuration
-and Application Support directories retain their historical `winmux-gf`/`WinMux-GF`
-names so the rename preserves user settings and recovery state. Login registration,
+The app's displayed name and bundle identity are WinMuxX. Configuration lives in the dedicated `winmuxx` folder. The previous
+`winmux-gf/winmux.toml` is copied on first launch when the new file is absent.
+Application Support retains `WinMux-GF` to preserve layout and recovery state. Login registration,
 diagnostics, and sockets remain separate. No original launch agents are deleted.
 
-The owned config is `${XDG_CONFIG_HOME:-~/.config}/winmux-gf/winmux.toml`.
+The owned config is `${XDG_CONFIG_HOME:-~/.config}/winmuxx/winmux.toml`.
 On first launch, an existing original WinMux config is copied, not modified.
 If none exists, the original AeroSpace import behavior is retained; otherwise a
 starter config is generated. `--config-path` overrides this selection. Explicitly
@@ -109,7 +109,7 @@ make fork-build BUILD_NUMBER=1
 Outputs: `.release/WinMuxX.app` and a version/build-number ZIP. The build is not
 notarized. By default it uses an ad hoc signature. To keep macOS privacy permissions
 across local builds, the script reads a signing identity name from
-`${XDG_CONFIG_HOME:-~/.config}/winmux-gf/signing-identity` (or `CODESIGN_IDENTITY`);
+`${XDG_CONFIG_HOME:-~/.config}/winmuxx/signing-identity` (or `CODESIGN_IDENTITY`);
 the same certificate and bundle ID must be retained. CI without that local identity
 continues to use ad hoc signing.
 Quit the original window manager, then copy the app to `/Applications/WinMuxX.app`

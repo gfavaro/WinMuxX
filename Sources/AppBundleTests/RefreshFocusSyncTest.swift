@@ -23,22 +23,30 @@ final class RefreshFocusSyncTest: XCTestCase {
                 setUpWorkspacesForTests()
                 TrayMenuModel.shared.isEnabled = true
                 var events: [RefreshSessionEvent] = []
-                var release = false
+                let started = expectation(description: "initial refresh started")
+                let finished = expectation(description: "coalesced refresh finished")
+                var release: CheckedContinuation<Void, Never>?
                 setScheduledRefreshOverrideForTests { event, _ in
                     events.append(event)
                     if events.count == 1 {
-                        while !release { await Task.yield() }
+                        await withCheckedContinuation { release = $0; started.fulfill() }
+                    } else {
+                        finished.fulfill()
                     }
                 }
-                defer { setScheduledRefreshOverrideForTests(nil) }
+                defer {
+                    release?.resume()
+                    setScheduledRefreshOverrideForTests(nil)
+                }
                 scheduleRefreshSession(.hotkeyBinding)
-                while events.isEmpty { await Task.yield() }
+                await fulfillment(of: [started], timeout: 2)
                 let activation = RefreshSessionEvent.globalObserver(NSWorkspace.didActivateApplicationNotification.rawValue)
                 scheduleRefreshSession(activationFirst ? activation : heavy)
                 scheduleRefreshSession(activationFirst ? heavy : activation)
                 recordRefreshActivation(workspaceName: "origin", pid: 7)
-                release = true
-                try await waitForScheduledRefreshForTests()
+                release?.resume()
+                release = nil
+                await fulfillment(of: [finished], timeout: 2)
                 XCTAssertEqual(events.count, 2)
                 XCTAssertEqual(events.last?.description, heavy.description)
                 XCTAssertEqual(pendingRefreshActivationForTests()?.workspaceName, "origin")
@@ -53,13 +61,18 @@ final class RefreshFocusSyncTest: XCTestCase {
         setUpWorkspacesForTests()
         TrayMenuModel.shared.isEnabled = true
         var events: [String] = []
+        let started = expectation(description: "refresh to interrupt started")
         setScheduledRefreshOverrideForTests { event, _ in
             events.append(event.description)
-            if events.count == 1 { try await Task.sleep(nanoseconds: 10_000_000_000) }
+            if events.count == 1 {
+                started.fulfill()
+                // Model an in-flight refresh: the light session must cancel it.
+                try await Task.sleep(nanoseconds: 10_000_000_000)
+            }
         }
         defer { setScheduledRefreshOverrideForTests(nil) }
         scheduleRefreshSession(.hotkeyBinding)
-        while events.isEmpty { await Task.yield() }
+        await fulfillment(of: [started], timeout: 2)
         let wake = RefreshSessionEvent.globalObserver(NSWorkspace.didWakeNotification.rawValue)
         scheduleRefreshSession(wake)
         recordRefreshActivation(workspaceName: "origin", pid: 7)

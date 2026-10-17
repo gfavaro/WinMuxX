@@ -100,4 +100,40 @@ final class ListWindowsTest: XCTestCase {
 
         assertEquals(result.stdout, ["1"])
     }
+    func testIdOnlyFormatsSkipTitleQueriesAndUseStableOrder() async throws {
+        let parent = focus.workspace.rootTilingContainer
+        let second = TestWindow.new(id: 2, parent: parent)
+        let first = TestWindow.new(id: 1, parent: parent)
+        first.testTitle = "Z"
+        second.testTitle = "A"
+        for format in ["--format '%{window-id}'", "--format '%{window-id}' --json", "--count"] {
+            let command = try XCTUnwrap(parseCommand("list-windows --all \(format)").cmdOrNil as? ListWindowsCommand)
+            let result = try await command.run(.defaultEnv, .emptyStdin)
+            XCTAssertTrue(result.stderr.isEmpty)
+            if format == "--format '%{window-id}'" { XCTAssertEqual(result.stdout, ["1", "2"]) }
+        }
+        XCTAssertEqual(first.titleFetchCount, 0)
+        XCTAssertEqual(second.titleFetchCount, 0)
+    }
+
+    func testTitleFormatsFetchTitlesAndKeepTitleSorting() async throws {
+        let parent = focus.workspace.rootTilingContainer
+        let first = TestWindow.new(id: 1, parent: parent)
+        let second = TestWindow.new(id: 2, parent: parent)
+        first.testTitle = "Z"
+        second.testTitle = "A"
+        let command = try XCTUnwrap(parseCommand("list-windows --all --format '%{window-title}'").cmdOrNil as? ListWindowsCommand)
+        let result = try await command.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.stdout, ["A", "Z"])
+        XCTAssertEqual(first.titleFetchCount, 1)
+        XCTAssertEqual(second.titleFetchCount, 1)
+
+        let defaultCommand = try XCTUnwrap(parseCommand("list-windows --all").cmdOrNil as? ListWindowsCommand)
+        let defaultResult = try await defaultCommand.run(.defaultEnv, .emptyStdin)
+        XCTAssertTrue(defaultResult.stdout[0].hasSuffix("A"))
+        XCTAssertTrue(defaultResult.stdout[1].hasSuffix("Z"))
+        XCTAssertEqual(first.titleFetchCount, 2)
+        XCTAssertEqual(second.titleFetchCount, 2)
+    }
+
 }

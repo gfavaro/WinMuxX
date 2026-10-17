@@ -43,6 +43,19 @@ final class WorkspaceCommandTest: XCTestCase {
         XCTAssertNil(parseCommand("workspace --monitor main --auto-back-and-forth 2").errorOrNil)
     }
 
+    func testNamedWorkspaceAlwaysHasACompleteParsedTargetForTheCli() throws {
+        for arguments in [["workspace", "--name", "3"], ["workspace", "--monitor", "main", "--name", "3"]] {
+            let parsed = try XCTUnwrap(parseCmdArgs(arguments.slice).cmdOrNil as? WorkspaceCmdArgs)
+            guard case .initialized(let target) = parsed.target else {
+                XCTFail("The CLI must not receive an uninitialized workspace target: \(arguments)")
+                continue
+            }
+            XCTAssertEqual(target, .direct(try XCTUnwrap(WorkspaceName.parse("3").getOrNil())))
+            XCTAssertFalse(target.isRelative)
+            XCTAssertEqual(parsed.internalName?.raw, "3")
+        }
+    }
+
     func testDirectWorkspaceFocusDoesNotCreateMissingWorkspace() async throws {
         let result = try await WorkspaceCommand(
             args: WorkspaceCmdArgs(target: .direct(.parse("2").getOrDie())),
@@ -67,7 +80,7 @@ final class WorkspaceCommandTest: XCTestCase {
         XCTAssertEqual(workspaceDisplayName("2"), "Workspace 2")
     }
 
-    func testHiddenWorkspaceSwitchUsesFocusedMonitorInsteadOfItsPreferredMonitor() async throws {
+    func testHiddenWorkspaceSwitchKeepsItsOwningMonitor() async throws {
         let main = TestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -89,6 +102,9 @@ final class WorkspaceCommandTest: XCTestCase {
         let workspace2 = Workspace.get(byName: "2")
         let workspace5 = Workspace.get(byName: "5")
         [workspace1, workspace2, workspace5].forEach { $0.markAsAutomaticallyNamed() }
+        for (index, workspace) in [workspace1, workspace2, workspace5].enumerated() {
+            _ = TestWindow.new(id: UInt32(610 + index), parent: workspace.rootTilingContainer)
+        }
         config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["2"]
         workspace2.seedMonitorIfNeeded(secondary)
@@ -96,12 +112,60 @@ final class WorkspaceCommandTest: XCTestCase {
         XCTAssertTrue(secondary.setActiveWorkspace(workspace1))
         XCTAssertTrue(workspace5.focusWorkspace())
 
+        XCTAssertNil(getNextPrevWorkspace(current: workspace5, isNext: false, wrapAround: false, stdin: "2\n5", on: main))
         let result = try await parseCommand("workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
 
         assertEquals(result.exitCode, 0)
-        XCTAssertTrue(main.activeWorkspace === workspace2)
-        XCTAssertTrue(secondary.activeWorkspace === workspace1)
+        XCTAssertTrue(main.activeWorkspace === workspace5)
+        XCTAssertTrue(secondary.activeWorkspace === workspace2)
         XCTAssertTrue(focus.workspace === workspace2)
+        XCTAssertTrue(workspace1.workspaceMonitor.rect.topLeftCorner == secondary.rect.topLeftCorner)
+
+        // Hiding it and switching from Main again must not pull it back.
+        XCTAssertTrue(secondary.setActiveWorkspace(workspace1))
+        XCTAssertTrue(workspace5.focusWorkspace())
+        let again = try await parseCommand("workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(again.exitCode, 0)
+        XCTAssertTrue(main.activeWorkspace === workspace5)
+        XCTAssertTrue(secondary.activeWorkspace === workspace2)
+
+        // Moving it is a separate explicit operation, and that new owner is remembered.
+        let moved = try await parseCommand("move-workspace-to-monitor main --workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(moved.exitCode, 0)
+        XCTAssertTrue(main.activeWorkspace === workspace2)
+        XCTAssertTrue(main.setActiveWorkspace(workspace5))
+        let selected = try await parseCommand("workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(selected.exitCode, 0)
+        XCTAssertTrue(main.activeWorkspace === workspace2)
+    }
+
+    func testExplicitMovesAcrossThreeDisplaysUpdateSelectionOwner() {
+        let displays = (0..<3).map { index in
+            TestMonitor(monitorAppKitNsScreenScreensId: index + 1, name: "Display \(index + 1)",
+                rect: Rect(topLeftX: Double(index * 1920), topLeftY: 0, width: 1920, height: 1080),
+                visibleRect: Rect(topLeftX: Double(index * 1920), topLeftY: 0, width: 1920, height: 1080),
+                isMain: index == 0)
+        }
+        setMonitorsForTests(displays)
+        defer { setMonitorsForTests(nil) }
+        let anchors = displays.enumerated().map { index, monitor in
+            let workspace = Workspace.get(byName: "anchor-\(index)")
+            _ = TestWindow.new(id: UInt32(700 + index), parent: workspace.rootTilingContainer)
+            XCTAssertTrue(monitor.setActiveWorkspace(workspace))
+            return workspace
+        }
+        let moved = Workspace.get(byName: "movable")
+        _ = TestWindow.new(id: 710, parent: moved.rootTilingContainer)
+        moved.seedMonitorIfNeeded(displays[0])
+        for index in [1, 2] {
+            XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(moved, targetMonitor: displays[index]))
+            XCTAssertTrue(displays[index].setActiveWorkspace(anchors[index]))
+            XCTAssertTrue(anchors[0].focusWorkspace())
+            let otherViewports = displays.enumerated().filter { $0.offset != index }.map { $0.element.activeWorkspace }
+            XCTAssertTrue(activateWorkspaceForUser(moved, on: displays[0]))
+            XCTAssertTrue(displays[index].activeWorkspace === moved)
+            XCTAssertEqual(displays.enumerated().filter { $0.offset != index }.map { $0.element.activeWorkspace }, otherViewports)
+        }
     }
 
     func testExplicitMonitorFocusesWorkspaceVisibleOnAnotherMonitorWithoutMovingIt() async throws {

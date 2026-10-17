@@ -1,0 +1,31 @@
+# Revisão do fork prateek/winmux — 2026-10-06
+
+Referência: branch `fork`, HEAD `a82b32b1`. Base comum com WinMuxX: `470eedbf`. Foram identificados 69 commits exclusivos no histórico e examinados os diffs das mudanças relevantes abaixo. Muitos commits são decisões, rascunhos ou infraestrutura de desenvolvimento. Esta é uma análise estática: o fork não foi compilado nem executado. Nenhuma mudança de produto foi importada.
+
+## Prioridade para adaptação
+
+1. **Recarga confiável da configuração — [c9c3f556](https://github.com/prateek/winmux/commit/c9c3f556).** Observa diretórios com FSEvents, reconhece substituição por rename/criação, mantém a configuração em uso quando o arquivo desaparece temporariamente, agrupa eventos e termina uma recarga antes de iniciar a próxima. Nosso ConfigFileWatcher observa o descritor do arquivo; após recarga bem-sucedida ele é reaberto, mas o caso de arquivo ausente durante rename/delete pode deixar o watcher sem arquivo. Adaptar os mecanismos de observação e coordenação ao TOML, preservando `auto-reload-config`. Imports Nickel e supervisor não são necessários aqui. A atualização das superfícies de UI já existe no WinMuxX.
+
+2. **Histórico global de foco confirmado — [d1e1387e](https://github.com/prateek/winmux/commit/d1e1387e).** Registra sequência crescente somente após o macOS confirmar o foco; conserva a ordem durante desaparecimento/recriação dos objetos no bloqueio de tela. Nosso seletor prioriza o workspace atual e depois a ordem da árvore, sem esse histórico global. Útil para uma ordenação por uso recente e retorno à janela anterior. Manter a política atual como opção; proteger a identidade contra reutilização de IDs e não interpretar a suposição do fork de IDs nunca reutilizados como garantia nossa. O histórico deles fica só em memória, sem preservar a ordem após reiniciar.
+
+3. **Estado visual da sidebar separado da configuração — implementação em [cb46cc55](https://github.com/prateek/winmux/commit/cb46cc55), decisão em [824fc43c](https://github.com/prateek/winmux/commit/824fc43c).** Labels e cores definidos pela UI ficam em JSON próprio e sobrescrevem o que o usuário configurou. Hoje persistimos essas alterações reescrevendo TOML. Pode reduzir conflitos e recargas para uma alteração visual, mas requer migrar valores existentes e definir como remover um override. Não alterar a identidade/numeração dos workspaces.
+
+4. **Janelas de apps acessórios — [7c569013](https://github.com/prateek/winmux/commit/7c569013).** Usa LSUIElement do bundle além da activationPolicy momentânea; um utilitário sem Dock pode temporariamente virar regular e ainda precisar flutuar. Adaptar como regra padrão explícita, mantendo classificação de popups e regras configuradas pelo usuário. Os testes do fork cobrem representações bool/número/string e mudança da política.
+
+5. **Captura e troca de abas — [5229f967](https://github.com/prateek/winmux/commit/5229f967) e [1adae330](https://github.com/prateek/winmux/commit/1adae330).** Timeout de captura de 500 ms, revalidação do par/workspace após await, captura compartilhada e ajuste da janela oculta antes de capturar evitam bloqueio e distorção. Nosso flip ainda é síncrono com Core Graphics: estas proteções assíncronas fazem sentido numa migração para ScreenCaptureKit, sem copiar o requisito macOS 26. O timeout deles solta o chamador, mas não cancela as tarefas da operação; numa adaptação devemos tratar também resultados atrasados e duração do trabalho pendente. Os 80 ms de redraw são uma heurística que precisa de validação com apps reais.
+
+## Ideias para uma evolução maior
+
+- **Overview com miniaturas/grid:** [ac8739de](https://github.com/prateek/winmux/commit/ac8739de), [8866cb55](https://github.com/prateek/winmux/commit/8866cb55), [192f4c1a](https://github.com/prateek/winmux/commit/192f4c1a). Poderíamos ampliar nosso seletor com agrupamento por projeto/workspace/monitor. O cache limita capturas simultâneas a duas e retém imagens, mas depende de Screen Recording. O próprio fork ainda registra validação pendente de nitidez em ultrawide.
+- **Colunas fixas:** [6e59dc31](https://github.com/prateek/winmux/commit/6e59dc31) e [ee92badf](https://github.com/prateek/winmux/commit/ee92badf). Mantêm posições e larguras mesmo com slots vazios. É um modo novo de layout, com alterações profundas na árvore, normalização e regras de chegada; avaliar como recurso opcional, separado de dwindle.
+- **Ciclo de vida e medição do seletor:** [b3a6b8b3](https://github.com/prateek/winmux/commit/b3a6b8b3) e [671e3d0e](https://github.com/prateek/winmux/commit/671e3d0e). Estados explícitos, descarte de resultados antigos, tarefas com dono, relógio controlado nos testes e signposts são ideias aproveitáveis sem adotar o sistema Lens inteiro. Pré-aquecer SwiftUI aumenta o custo de launch; medir antes de aplicar.
+
+## Validação e mudanças que não recomendo importar
+
+O [8e9ce664](https://github.com/prateek/winmux/commit/8e9ce664) corrige um crash no strip em build otimizado ao declarar @MainActor no tipo de uma closure. Nós não temos esse StripGesture; não é um patch direto. A lição relevante é testar também o binário Release com a mesma toolchain, pois os testes debug deles não detectaram o problema.
+
+O [d6dcd634](https://github.com/prateek/winmux/commit/d6dcd634) registra upgrades Brew/Sparkle mantendo grants com uma identidade de assinatura estável, em VM com SIP desligado. Reforça a direção que já adotamos, mas não substitui validação em máquina real. Rascunhos recentes sobre timeout por teste, toolchain única, restauração dos frames ao sair e primeira execução ainda não são implementações disponíveis.
+
+Não recomendo migrar para Nickel/Rust, elevar a versão mínima a macOS 26, trocar nossos atalhos ou importar o fork inteiro. Ele ainda não contém nossa persistência robusta entre reinícios: UUID dos monitores, displayIndex, matching de identidade, retries e tamanhos restaurados. O rascunho “windows back where they were on quit” é outro problema: devolver o desktop anterior ao encerrar, não restaurar nosso layout no próximo launch.
+
+**Ordem recomendada:** recarga confiável, foco global, classificação de acessórios; depois sidebar e captura. Overview e colunas merecem decisões de produto próprias.

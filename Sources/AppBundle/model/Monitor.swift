@@ -2,7 +2,8 @@ import AppKit
 import Common
 import CoreGraphics
 
-private struct MonitorImpl {
+private struct MonitorImpl: Sendable {
+    var hardwareIdentity: MonitorHardwareIdentity? = nil
     var displayUUID: String? = nil
     let monitorAppKitNsScreenScreensId: Int
     let name: String
@@ -17,7 +18,8 @@ extension MonitorImpl: Monitor {
 }
 
 /// Use it instead of NSScreen because it can be mocked in tests
-protocol Monitor: WinMuxAny {
+protocol Monitor: WinMuxAny, Sendable {
+    var hardwareIdentity: MonitorHardwareIdentity? { get }
     var displayUUID: String? { get }
     /// The index in NSScreen.screens array. 1-based index
     var monitorAppKitNsScreenScreensId: Int { get }
@@ -30,36 +32,8 @@ protocol Monitor: WinMuxAny {
 }
 
 extension Monitor {
+    var hardwareIdentity: MonitorHardwareIdentity? { nil }
     var displayUUID: String? { nil }
-}
-
-final class LazyMonitor: Monitor {
-    var displayUUID: String? { screen.displayUUID }
-    private let screen: NSScreen
-    let monitorAppKitNsScreenScreensId: Int
-    let name: String
-    let width: CGFloat
-    let height: CGFloat
-    let isMain: Bool
-    private var _rect: Rect?
-    private var _visibleRect: Rect?
-
-    init(monitorAppKitNsScreenScreensId: Int, isMain: Bool, _ screen: NSScreen) {
-        self.monitorAppKitNsScreenScreensId = monitorAppKitNsScreenScreensId
-        self.name = screen.localizedName
-        self.width = screen.frame.width // Don't call rect because it would cause recursion during mainMonitor init
-        self.height = screen.frame.height // Don't call rect because it would cause recursion during mainMonitor init
-        self.screen = screen
-        self.isMain = isMain
-    }
-
-    var rect: Rect {
-        _rect ?? screen.rect.also { _rect = $0 }
-    }
-
-    var visibleRect: Rect {
-        _visibleRect ?? screen.visibleRect.also { _visibleRect = $0 }
-    }
 }
 
 // Note to myself: Don't use NSScreen.main, it's garbage
@@ -67,6 +41,10 @@ final class LazyMonitor: Monitor {
 // 2. It's inaccurate because NSScreen.main doesn't work correctly from NSWorkspace.didActivateApplicationNotification &
 //    kAXFocusedWindowChangedNotification callbacks.
 extension NSScreen {
+    var hardwareIdentity: MonitorHardwareIdentity? {
+        guard let id = displayId else { return nil }
+        return MonitorHardwareIdentity(vendor: CGDisplayVendorNumber(id), model: CGDisplayModelNumber(id), serial: CGDisplaySerialNumber(id))
+    }
     var displayUUID: String? {
         guard let id = displayId, let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return nil }
         return CFUUIDCreateString(nil, uuid) as String
@@ -75,31 +53,22 @@ extension NSScreen {
         (deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber).map { CGDirectDisplayID(truncating: $0) }
     }
 
-    fileprivate func toMonitor(monitorAppKitNsScreenScreensId: Int) -> Monitor {
-        MonitorImpl(
+    fileprivate func toMonitor(monitorAppKitNsScreenScreensId: Int, mainHeight: CGFloat? = nil, isMain: Bool? = nil) -> Monitor {
+        let height = mainHeight ?? mainMonitor.height
+        return MonitorImpl(
+            hardwareIdentity: hardwareIdentity,
             displayUUID: displayUUID,
             monitorAppKitNsScreenScreensId: monitorAppKitNsScreenScreensId,
             name: localizedName,
-            rect: rect,
-            visibleRect: visibleRect,
-            isMain: isMainScreen,
+            rect: frame.monitorFrameNormalized(mainHeight: height),
+            visibleRect: visibleFrame.monitorFrameNormalized(mainHeight: height),
+            isMain: isMain ?? isMainScreen,
         )
     }
 
     fileprivate var isMainScreen: Bool {
         displayId == CGMainDisplayID()
     }
-
-    /// The property is a replacement for Apple's crazy ``frame``
-    ///
-    /// - For ``MacWindow.topLeftCorner``, (0, 0) is main screen top left corner, and positive y-axis goes down.
-    /// - For ``frame``, (0, 0) is main screen bottom left corner, and positive y-axis goes up (which is crazy).
-    ///
-    /// The property "normalizes" ``frame``
-    fileprivate var rect: Rect { frame.monitorFrameNormalized() }
-
-    /// Same as ``rect`` but for ``visibleFrame``
-    fileprivate var visibleRect: Rect { visibleFrame.monitorFrameNormalized() }
 }
 
 private let testMonitorRect = Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080)
@@ -110,33 +79,102 @@ private let testMonitor = MonitorImpl(
     visibleRect: testMonitorRect,
     isMain: true,
 )
-nonisolated(unsafe) private var monitorsOverrideForTests: [Monitor]? = nil
+/// Native lookup remains available off-main; only main-actor access uses runtime caches.
+@MainActor
+final class MonitorState {
+    private(set) var overrideForTests: [Monitor]?
+    private var cached: [Monitor]?
+    private var mainCache: Monitor?
+    private let readMonitors: () -> [Monitor]
+    private let readMain: () -> Monitor
+    private let notifications: NotificationCenter
+    private let observeChanges: Bool
+    private var sortedCache: [Monitor]?
+    private var observer: NSObjectProtocol?
+
+    init(readMonitors: @escaping () -> [Monitor] = { isUnitTest ? [testMonitor] : computeMonitors() },
+         readMain: @escaping () -> Monitor = { isUnitTest ? testMonitor : computeMainMonitor() },
+         notifications: NotificationCenter = .default, observeChanges: Bool = !isUnitTest) {
+        self.readMonitors = readMonitors
+        self.readMain = readMain
+        self.notifications = notifications
+        self.observeChanges = observeChanges
+    }
+
+    isolated deinit {
+        if let observer { notifications.removeObserver(observer) }
+    }
+
+    func invalidate() {
+        cached = nil
+        mainCache = nil
+        sortedCache = nil
+    }
+
+    private func observeScreenChanges() {
+        guard observeChanges, observer == nil else { return }
+        observer = notifications.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.invalidate() }
+        }
+    }
+
+    func main() -> Monitor {
+        if let overrides = overrideForTests {
+            return overrides.first(where: \.isMain) ?? overrides.first ?? testMonitor
+        }
+        observeScreenChanges()
+        if let mainCache { return mainCache }
+        let result = readMain()
+        mainCache = result
+        return result
+    }
+
+    func all() -> [Monitor] {
+        if let overrideForTests { return overrideForTests }
+        observeScreenChanges()
+        if let cached { return cached }
+        let result = readMonitors()
+        cached = result
+        return result
+    }
+
+    func sorted() -> [Monitor] {
+        if let sortedCache { return sortedCache }
+        let result = sortMonitors(all())
+        sortedCache = result
+        return result
+    }
+
+    func setOverride(_ monitors: [Monitor]?) {
+        precondition(isUnitTest)
+        overrideForTests = monitors
+        invalidate()
+    }
+}
 
 @MainActor
 func setMonitorsForTests(_ monitors: [Monitor]?) {
-    monitorsOverrideForTests = monitors
+    runtime.displays.setOverride(monitors)
 }
 
 var mainMonitor: Monitor {
-    if isUnitTest, let monitor = monitorsOverrideForTests?.first(where: \.isMain) ?? monitorsOverrideForTests?.first {
-        return monitor
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated { runtime.displays.main() }
     }
-    if isUnitTest { return testMonitor }
-    let screens = NSScreen.screens
-    // Fallback: If main screen can't be found (e.g., during display reconfiguration),
-    // return screens.first or testMonitor to avoid crash
-    let screen = screens.withIndex.singleOrNil(where: \.value.isMainScreen) ?? screens.first.map { (0, $0) }
-    guard let screen else { return testMonitor }
-    return LazyMonitor(monitorAppKitNsScreenScreensId: screen.index + 1, isMain: true, screen.value)
+    return isUnitTest ? testMonitor : computeMainMonitor()
 }
 
-// Rebuilding the monitor list from NSScreen on every access is wasteful: `monitors` and
-// `sortedMonitors` are hit on every focus change, layout pass, and pointer event. Cache the
-// result and invalidate when macOS reports a screen configuration change. Main-thread only:
-// NSScreen must be accessed from the main thread anyway, so off-main callers compute fresh.
-nonisolated(unsafe) private var monitorsCache: [Monitor]? = nil
-nonisolated(unsafe) private var sortedMonitorsCache: [Monitor]? = nil
-nonisolated(unsafe) private var monitorsCacheObserver: NSObjectProtocol? = nil
+private func computeMainMonitor() -> Monitor {
+    let screens = NSScreen.screens
+    // During display reconfiguration, fall back to the first available screen.
+    let screen = screens.withIndex.singleOrNil(where: \.value.isMainScreen) ?? screens.first.map { (0, $0) }
+    guard let screen else { return testMonitor }
+    return screen.value.toMonitor(monitorAppKitNsScreenScreensId: screen.index + 1,
+                                  mainHeight: screen.value.frame.height, isMain: true)
+}
 
 private func computeMonitors() -> [Monitor] {
     let screens = NSScreen.screens
@@ -147,38 +185,23 @@ private func computeMonitors() -> [Monitor] {
 }
 
 var monitors: [Monitor] {
-    if isUnitTest, let override = monitorsOverrideForTests {
-        return override
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated { runtime.displays.all() }
     }
-    if isUnitTest { return [mainMonitor] }
-    guard Thread.isMainThread else { return computeMonitors() }
-    if monitorsCacheObserver == nil {
-        monitorsCacheObserver = NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil,
-            queue: .main,
-        ) { _ in
-            monitorsCache = nil
-            sortedMonitorsCache = nil
-        }
+    return isUnitTest ? [testMonitor] : computeMonitors()
+}
+
+private func sortMonitors(_ monitors: [Monitor]) -> [Monitor] {
+    monitors.sorted {
+        if $0.rect.minX != $1.rect.minX { return $0.rect.minX < $1.rect.minX }
+        if $0.rect.minY != $1.rect.minY { return $0.rect.minY < $1.rect.minY }
+        return $0.monitorAppKitNsScreenScreensId < $1.monitorAppKitNsScreenScreensId
     }
-    if let cached = monitorsCache { return cached }
-    let computed = computeMonitors()
-    monitorsCache = computed
-    return computed
 }
 
 var sortedMonitors: [Monitor] {
-    if Thread.isMainThread, !isUnitTest, let cached = sortedMonitorsCache { return cached }
-    let sorted = monitors.sorted {
-        if $0.rect.minX != $1.rect.minX {
-            return $0.rect.minX < $1.rect.minX
-        }
-        if $0.rect.minY != $1.rect.minY {
-            return $0.rect.minY < $1.rect.minY
-        }
-        return $0.monitorAppKitNsScreenScreensId < $1.monitorAppKitNsScreenScreensId
+    if Thread.isMainThread {
+        return MainActor.assumeIsolated { runtime.displays.sorted() }
     }
-    if Thread.isMainThread, !isUnitTest { sortedMonitorsCache = sorted }
-    return sorted
+    return sortMonitors(monitors)
 }

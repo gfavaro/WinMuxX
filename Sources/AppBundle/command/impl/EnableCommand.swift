@@ -25,6 +25,9 @@ struct EnableCommand: Command {
         TrayMenuModel.shared.isEnabled = newState
         if newState { WindowRecoveryController.shared.resumeTiling() }
         if !newState {
+            MacApp.registrationRetries.cancelAll()
+            WindowDetectionOperations.shared.cancelAll()
+            WorkspaceSwipeController.shared.reset()
             GlobalObserver.cancelFocusFollowsMouse()
             TrayMenuModel.shared.isWorkspaceSidebarExpanded = false
             clearPendingWindowDragIntent()
