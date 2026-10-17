@@ -34,11 +34,7 @@ struct DebugWindowsCommand: Command {
         }
         switch debugWindowsState {
             case .recording:
-                debugWindowsState = .notRecording
-                io.out(debugWindowsLog.values.joined(separator: "\n\n"))
-                io.out("\n" + disclaimer + "\n")
-                io.out("Debug session finished" + "\n")
-                debugWindowsLog = [:]
+                io.out(finishWindowDebugRecording())
                 return true
             case .notRecording:
                 debugWindowsState = .recording
@@ -112,7 +108,10 @@ private func dumpWindowDebugInfo(_ window: Window) async throws -> String {
 }
 
 @MainActor
-func debugWindowsIfRecording(_ window: Window) async throws {
+func debugWindowsIfRecording(
+    _ window: Window,
+    dump: @MainActor (Window) async throws -> String = dumpWindowDebugInfo
+) async throws {
     switch debugWindowsState {
         case .recording: break
         case .notRecording, .recordingAborted: return
@@ -124,5 +123,19 @@ func debugWindowsIfRecording(_ window: Window) async throws {
     if debugWindowsLog.keys.contains(window.windowId) {
         return
     }
-    debugWindowsLog[window.windowId] = try await dumpWindowDebugInfo(window)
+    do { debugWindowsLog[window.windowId] = try await dump(window) }
+    catch is CancellationError { throw CancellationError() }
+    catch {
+        // Optional diagnostics must never block detection, focus or workspace commands.
+        // Retain one failure entry so every subsequent refresh does not retry the dump.
+        debugWindowsLog[window.windowId] = "Window \(window.windowId): diagnostic capture failed: \(error.localizedDescription)"
+    }
+}
+
+@MainActor
+func finishWindowDebugRecording() -> String {
+    let result = debugWindowsLog.values.joined(separator: "\n\n") + "\n" + disclaimer + "\nDebug session finished\n"
+    debugWindowsState = .notRecording
+    debugWindowsLog = [:]
+    return result
 }

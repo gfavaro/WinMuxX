@@ -87,3 +87,13 @@ no idle deadline.
 Tree detach operations no longer symbolize stacks routinely. Launch with
 `WINMUXX_TRACE_TREE_BINDINGS=1` when investigating double-unbind failures; normal
 operation leaves this tracing off in both Debug and Release builds.
+
+
+## Window diagnostics
+
+`debug-windows` recording is observational. A failed capture records its window ID
+and AX error without interrupting detection, focus or workspace commands. A failed
+window is recorded once per session. Cancelled captures remain retryable.
+Stale-element recovery considers only errors from the target window, not errors
+from nested buttons or the application element. The target identity is stored
+without retaining an AX object across threads.

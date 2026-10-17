@@ -46,4 +46,33 @@ final class AXWindowOperationTest: XCTestCase {
         XCTAssertNil(missing)
         XCTAssertEqual(calls, 0)
     }
+    func testStaleChildControlAndAppReadsDoNotInvalidateTheWindow() throws {
+        let window = NSObject(), button = NSObject(), app = NSObject()
+        var loads = 0
+        let result: Int? = try withRecoverableWindow(load: { _ in loads += 1; return window }, identify: ObjectIdentifier.init, body: { _ in
+            AXWindowOperation.current?.record(.invalidUIElement, from: ObjectIdentifier(button))
+            AXWindowOperation.current?.record(.invalidUIElement, from: ObjectIdentifier(app))
+            return 42
+        })
+        XCTAssertEqual(result, 42)
+        XCTAssertEqual(loads, 1)
+    }
+
+    func testOnlyTheTargetWindowErrorTriggersReplacement() throws {
+        let original = NSObject(), replacement = NSObject()
+        var loads: [Bool] = []
+        let result: Bool? = try withRecoverableWindow(load: { replacing in
+            loads.append(replacing)
+            return replacing ? replacement : original
+        }, identify: ObjectIdentifier.init, body: { window in
+            if window === original {
+                AXWindowOperation.current?.record(.invalidUIElement, from: ObjectIdentifier(window))
+                return nil
+            }
+            return window === replacement
+        })
+        XCTAssertEqual(result, true)
+        XCTAssertEqual(loads, [false, true])
+    }
+
 }

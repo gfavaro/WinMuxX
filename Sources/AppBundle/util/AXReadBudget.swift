@@ -2,8 +2,9 @@ import AppKit
 import Common
 import Foundation
 
-struct AXReadFailure: Error, Sendable {
+struct AXReadFailure: Error, LocalizedError, Sendable {
     let code: AXError
+    var errorDescription: String? { "Accessibility read failed (AXError \(code.rawValue))" }
 }
 
 /// Shared by one refresh and its app-thread jobs, never reused by the next refresh.

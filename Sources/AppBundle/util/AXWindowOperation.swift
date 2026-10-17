@@ -5,10 +5,15 @@ import os
 /// one window operation, so a dead element can be replaced without polling first.
 final class AXWindowOperation: Sendable {
     @TaskLocal static var current: AXWindowOperation?
+    private let target: ObjectIdentifier?
     private let invalid = OSAllocatedUnfairLock(initialState: false)
 
-    func record(_ error: AXError) {
-        if error == .invalidUIElement { invalid.withLock { $0 = true } }
+    init(target: ObjectIdentifier? = nil) { self.target = target }
+
+    func record(_ error: AXError, from element: ObjectIdentifier? = nil) {
+        if error == .invalidUIElement, target == nil || element == target {
+            invalid.withLock { $0 = true }
+        }
     }
 
     var needsReplacement: Bool { invalid.withLock { $0 } }
@@ -16,15 +21,17 @@ final class AXWindowOperation: Sendable {
 
 func withRecoverableWindow<Element, Value>(
     load: (_ replacing: Bool) throws -> Element?,
+    identify: (Element) -> ObjectIdentifier? = { _ in nil },
     body: (Element) throws -> Value?
 ) throws -> Value? {
     for attempt in 0...1 {
         guard let element = try load(attempt != 0) else { return nil }
-        let operation = AXWindowOperation()
+        let target = identify(element)
+        let operation = AXWindowOperation(target: target)
         let value: Value?
         do { value = try AXWindowOperation.$current.withValue(operation) { try body(element) } }
         catch let failure as AXReadFailure where failure.code == .invalidUIElement {
-            operation.record(failure.code)
+            operation.record(failure.code, from: target)
             value = nil
         }
         if operation.needsReplacement {

@@ -227,7 +227,7 @@ final class MacApp: AbstractApp {
                 // Raise firstly to make sure that by the time we activate the app, the window would be already on top
                 window.set(Ax.isMainAttr, true)
                 let raiseError = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
-                AXWindowOperation.current?.record(raiseError)
+                AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
                 nsApp.activate(options: .activateIgnoringOtherApps)
             }
         }
@@ -570,7 +570,7 @@ final class MacApp: AbstractApp {
                 }
                 return try windows.threadGuarded.getOrRegisterAxWindow(
                     windowId: windowId, from: axApp.threadGuarded, nsApp, job)
-            }, body: { window in try body(window.ax, job) })
+            }, identify: { (window: AxWindow) in ObjectIdentifier(window.ax) }, body: { window in try body(window.ax, job) })
             if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { throw AXReadFailure(code: .cannotComplete) }
             return value
         }
@@ -587,7 +587,7 @@ final class MacApp: AbstractApp {
                     }
                     return try windows.threadGuarded.getOrRegisterAxWindow(
                         windowId: windowId, from: axApp.threadGuarded, nsApp, job)
-                }, body: { window in try body(window.ax, job) })
+                }, identify: { (window: AxWindow) in ObjectIdentifier(window.ax) }, body: { window in try body(window.ax, job) })
             } catch {
                 // Closed windows, cancelled jobs and failed AX requests are retried by refresh.
             }

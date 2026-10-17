@@ -426,3 +426,36 @@ built-in display was connected during installation validation. The bundled CLI
 alias resolved in a clean shell environment and queried the running server.
 Native Settings, Slack reopen, Terminal rounding and physical docking/swipe
 validation remain manual checks; no such result is claimed by the automated suite.
+
+
+## Nonfatal window diagnostics and scoped AX recovery (build 81)
+
+The Helium sign-in capture exposed an AX read failure while recording. Recording
+ran inside focus/detection/refresh paths and propagated capture failures, so a
+subsequent workspace/CLI command could fail before its body ran. Clearing the
+recorder by restarting restored ordinary window queries. The event trace recorded
+workspace/focus changes but no valid sign-in window snapshot; its floating state
+therefore was not confirmed by this capture.
+
+Diagnostic captures now retain a per-window failure entry without blocking normal
+commands or repeatedly retrying on every refresh. Cancellation still propagates
+and leaves the entry available for a later capture. Stale AX recovery now matches
+the exact target element by non-retaining object identity: a dead child button or
+application element no longer invalidates an otherwise valid window. Real target
+failures still refetch once. AX errors report their native numeric code.
+
+Four new regressions cover unrelated element failures, target replacement,
+recording failure followed by successful workspace navigation, and cancellation
+followed by a successful capture. `make check` passed **1,106 Swift + 20 Python
+tests**. Signed build 81 was installed and strict/deep verification passed. Config
+bytes, window/workspace assignments, populated display/visibility state and focus
+matched before/after installation.
+
+A live check successfully started recording, captured Helium window 23773,
+switched to its workspace and back, restored original focus and stopped recording.
+All commands returned success. Helium's ordinary browser window classified as a
+regular window; no sign-in popup was open during this post-fix check. Doctor
+reported valid configuration, granted permissions and a listening raw-touch
+backend. Post-check window assignments/config were unchanged. A new sign-in
+capture is still required to verify that specific popup; no browser classification
+change or user configuration rule was added.

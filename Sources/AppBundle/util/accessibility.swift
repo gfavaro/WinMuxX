@@ -349,7 +349,7 @@ extension AXUIElement: AxUiElementMock {
                 case .success: return .success(raw.flatMap(attr.getter))
                 case .noValue, .attributeUnsupported: return .success(nil)
                 case let error:
-                    AXWindowOperation.current?.record(error)
+                    AXWindowOperation.current?.record(error, from: ObjectIdentifier(self))
                     return .failure(AXReadFailure(code: error))
             }
         }
@@ -365,7 +365,7 @@ extension AXUIElement: AxUiElementMock {
         defer { signposter.endInterval(#function, state) }
         guard let value = attr.setter(value) else { return false }
         let error = AXUIElementSetAttributeValue(self, attr.key as CFString, value)
-        AXWindowOperation.current?.record(error)
+        AXWindowOperation.current?.record(error, from: ObjectIdentifier(self))
         if let pid { AXReadBudget.current?.record(error, pid: pid) }
         return error == .success
     }
