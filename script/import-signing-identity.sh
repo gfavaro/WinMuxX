@@ -16,7 +16,9 @@ security unlock-keychain -p "$password" "$keychain"
 security import "$archive" -k "$keychain" -P "$SIGNING_PASSWORD" -T /usr/bin/codesign
 certificate="$RUNNER_TEMP/winmuxx-signing.cer"
 security find-certificate -p -c 'WinMuxX Local Code Signing' "$keychain" > "$certificate"
-security add-trusted-cert -r trustRoot -p codeSign -k "$keychain" "$certificate"
+# User-domain trust can prompt on hosted macOS and hang a headless runner.
+# Hosted runners allow passwordless sudo; -n makes an unavailable privilege fail fast.
+sudo -n security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" "$certificate"
 security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$keychain"
 security list-keychains -d user -s "$keychain" "$HOME/Library/Keychains/login.keychain-db"
 security find-identity -v -p codesigning "$keychain" | grep -F "$SIGNING_IDENTITY"

@@ -40,6 +40,7 @@ jobs:
       - name: Test
         run: make check
       - name: Import persistent signing identity
+        timeout-minutes: 2
         env:
           SIGNING_P12: ${{ secrets.WINMUXX_SIGNING_P12 }}
           SIGNING_PASSWORD: ${{ secrets.WINMUXX_SIGNING_PASSWORD }}
@@ -64,8 +65,4 @@ jobs:
             --notes 'Personal fork build. Signed with the persistent WinMuxX identity, not notarized. Automatic updates are disabled.'
       - name: Remove signing keychain
         if: always()
-        run: |
-          certificate="$RUNNER_TEMP/winmuxx-signing.cer"
-          if test -f "$certificate"; then security remove-trusted-cert "$certificate"; rm -f "$certificate"; fi
-          keychain="$RUNNER_TEMP/winmuxx-signing.keychain-db"
-          if test -f "$keychain"; then security delete-keychain "$keychain"; fi
+        run: bash script/cleanup-signing-identity.sh

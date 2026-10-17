@@ -110,8 +110,8 @@ Outputs: `.release/WinMuxX.app` and a version/build-number ZIP. The build is not
 notarized. By default it uses an ad hoc signature. To keep macOS privacy permissions
 across local builds, the script reads a signing identity name from
 `${XDG_CONFIG_HOME:-~/.config}/winmuxx/signing-identity` (or `CODESIGN_IDENTITY`);
-the same certificate and bundle ID must be retained. CI without that local identity
-continues to use ad hoc signing.
+the same certificate and bundle ID must be retained. PR builds use ad hoc signing;
+trusted main/release builds import the persistent identity from Actions secrets.
 Quit the original window manager, then copy the app to `/Applications/WinMuxX.app`
 and open it. The build command does not install, launch, or replace any app.
 The old upstream `make install` target is intentionally disabled.
@@ -119,6 +119,13 @@ The old upstream `make install` target is intentionally disabled.
 ## CI and releases
 
 CI tests PRs and `main`; trusted `main` builds also upload the app ZIP as an artifact.
+Signing import has a two-minute timeout. Hosted runners install certificate trust
+in the admin domain with passwordless, noninteractive `sudo -n`; user-domain trust
+can display a prompt and stall headless jobs. Both CI and release workflows call
+`script/cleanup-signing-identity.sh` even after failed/canceled imports. Cleanup
+tolerates absent trust entries, still attempts keychain deletion after trust errors,
+removes temporary certificate/archive files, and reports unexpected failures.
+Its regression tests use fake commands and synthetic files, never local keychains.
 Bot-created synchronization PRs do not rely on the normal PR event: synchronization
 explicitly dispatches CI on its branch. Check that run in Actions before merging.
 If dispatch fails, run CI manually on that branch. GitHub Actions must be allowed

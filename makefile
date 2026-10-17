@@ -91,6 +91,7 @@ check:
 	python3 -m unittest script/test_validate_appcast.py && \
 	python3 -m unittest script/test_fork_identity.py && \
 	python3 -m unittest script/test_swift_version.py && \
+	python3 -m unittest script/test_signing_cleanup.py && \
 	swift package --force-resolved-versions resolve'
 
 release:
