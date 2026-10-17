@@ -8,6 +8,7 @@
 - [Dependencies](DEPENDENCIES.md): package inventory, removal decisions and Swift toolchain.
 - [Reliability](RELIABILITY.md): AX failures, retries, UUID targeting, config backups and IPC limits.
 - [Runtime efficiency](RUNTIME_EFFICIENCY.md): persistence, native notifications, queries, subscribers and capture limits.
+- [Release validation](RELEASE_VALIDATION.md): completed checks, long observation and remaining native/energy gaps.
 - [Testing](TESTING.md): test design, isolation, asynchronous coordination and CI reports.
 - [Swipe performance](SWIPE_PERFORMANCE.md): stage timings, local surface benchmarks and physical validation requirements.
 - [Runtime state cleanup](RUNTIME_STATE_CLEANUP_PLAN.md): scope, ownership decisions and acceptance results.

@@ -503,3 +503,22 @@ unconfirmed. The query workload overlapped other desktop/test activity, so its
 modest footprint variation and writes cannot be attributed to queries alone.
 Another 500 queries succeeded. A final 30-second settled sample recorded zero
 logical/disk writes, unchanged 72.24 MiB footprint and 0.00047% CPU of one core.
+
+## Sustained observation and model lifecycle follow-up
+
+The latest `make check` passed **1,133 Swift tests and 26 Python checks**. A model
+stress test cycles 32 windows through 40 fullscreen/minimize/restore rounds,
+workspace focus changes and 160 close/replacements, asserting no lost or duplicate
+live windows. It does not open desktop windows or exercise native AX events.
+
+The stress case initially passed alone but failed in the full suite: three mock
+windows from earlier cases survived in process-lifetime minimized/popup roots.
+The shared workspace fixture now clears those roots as well as workspace children.
+A regression verifies that a reset empties the roots and releases their windows.
+No production native registry or AX thread ownership was changed for this fix.
+
+Six Python tests validate process-counter units, the SDK v4 ABI size, PID reuse,
+interruption/coverage reporting and counter resets in `script/profile_runtime.py`.
+Native smoke checks verified completed and terminated partial reports. A detached
+two-hour observation is running; see [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+for its report path and the checks that remain blocked or unmeasured.

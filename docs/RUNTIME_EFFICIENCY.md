@@ -63,7 +63,7 @@ temporarily allocate a full-resolution source image before reduction.
 
 ## Verification
 
-The local check passed 1,131 Swift tests and 20 Python tests. Two focused Thread
+The local check passed 1,133 Swift tests and 26 Python tests. Two focused Thread
 Sanitizer tests passed for concurrent cancellation and persistence-worker
 coalescing/final-save ordering, with no race reports. The strengthened six-window,
 ten-layout hotkey benchmark records six frame writes; the geometry-event scenario
@@ -165,3 +165,8 @@ computer-use access to the native apps was denied. Multi-monitor/hotplug tests a
 long-running managed-window churn are still pending. `powermetrics` was unavailable
 without superuser access; no watts, battery-life or full-system wakeup improvement
 is claimed from these process counters or unit tests.
+
+The follow-up [release validation checklist](RELEASE_VALIDATION.md) records the
+model lifecycle stress test, fixture isolation fix, two-hour passive observation
+and remaining native/energy access limits. The long observation is running; its
+completion must be checked in the generated report before citing a two-hour result.
