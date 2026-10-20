@@ -328,16 +328,15 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         clearSurface.isHidden = surface !== clearSurface || visibleWidth <= 0
         opaqueSurface.isHidden = surface !== opaqueSurface || visibleWidth <= 0
         glassSurface?.isHidden = surface !== glassSurface || visibleWidth <= 0
-        if system, expanded, let scheme = configuration.frostedTint.preferredColorScheme {
-            // Only an explicit tint choice sets an appearance. Automatic tint
-            // and custom chrome continue inheriting the system appearance.
+        if system, expanded {
+            let systemScheme: ColorScheme = contentColorScheme ??
+                (NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light)
+            let resolved = configuration.chromeAppearance(systemScheme: systemScheme,
+                wallpaperTone: wallpaperTone, reduceTransparency: reduceTransparency())
+            appearance = NSAppearance(named: resolved.scheme == .dark ? .darkAqua : .aqua)
+        } else if system, !reduceTransparency(), let scheme = contentColorScheme ?? wallpaperTone?.colorScheme {
             appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
-        } else if system, !reduceTransparency(),
-                  let scheme = contentColorScheme ?? wallpaperTone?.colorScheme {
-            appearance = NSAppearance(named: scheme == .light ? .aqua : .darkAqua)
-        } else {
-            appearance = nil
-        }
+        } else { appearance = nil }
         updateOpaqueBackground()
         updateGeometry()
     }

@@ -618,15 +618,17 @@ extension WorkspaceSidebarView {
         // The sidebar meets the display edge, so an outline around all four sides reads as a
         // second, lighter panel behind the content. Keep the material flat and use only the
         // trailing separator to define its boundary.
-        if snapshot.configuration.appearance == .system {
+        let chrome = snapshot.configuration.chromeAppearance(systemScheme: colorScheme,
+            reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+        if chrome.material != .solid {
             // The panel's NSVisualEffectView is the parent of this hosting
             // hierarchy. Keeping this layer clear lets AppKit apply vibrancy
             // to semantic SwiftUI foreground colors.
             Color.clear
                 .overlay {
-                    if snapshot.configuration.frostedTint != .automatic,
+                    if let tint = chrome.veil,
                        snapshot.configuration.alwaysExpanded || snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8 {
-                        WorkspaceSidebarFrostedVeil(tint: snapshot.configuration.frostedTint)
+                        WorkspaceSidebarFrostedVeil(tint: tint)
                     }
                 }
                 .clipShape(shape)
