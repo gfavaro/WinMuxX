@@ -3,22 +3,40 @@ import PrivateApi
 import Common
 
 @MainActor
-private var activeRefreshTask: Task<(), any Error>? = nil
+private var activeRefreshTask: Task<(), any Error>? {
+    get { runtime.refresh.activeRefreshTask }
+    set { runtime.refresh.activeRefreshTask = newValue }
+}
 
 @MainActor
-private var activeScheduledRefreshEvent: RefreshSessionEvent? = nil
+private var activeScheduledRefreshEvent: RefreshSessionEvent? {
+    get { runtime.refresh.activeScheduledRefreshEvent }
+    set { runtime.refresh.activeScheduledRefreshEvent = newValue }
+}
 
 @MainActor
-private var activeScheduledRefreshGeneration: UInt64 = 0
+private var activeScheduledRefreshGeneration: UInt64 {
+    get { runtime.refresh.activeScheduledRefreshGeneration }
+    set { runtime.refresh.activeScheduledRefreshGeneration = newValue }
+}
 
 @MainActor
-private var scheduledRefreshOverrideForTests: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)? = nil
+private var scheduledRefreshOverrideForTests: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)? {
+    get { runtime.refresh.scheduledRefreshOverrideForTests }
+    set { runtime.refresh.scheduledRefreshOverrideForTests = newValue }
+}
 
 @MainActor
-private var refreshOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
+private var refreshOverrideForTests: (@MainActor @Sendable () async throws -> Void)? {
+    get { runtime.refresh.refreshOverrideForTests }
+    set { runtime.refresh.refreshOverrideForTests = newValue }
+}
 
 @MainActor
-private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
+private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? {
+    get { runtime.refresh.normalizeLayoutReasonOverrideForTests }
+    set { runtime.refresh.normalizeLayoutReasonOverrideForTests = newValue }
+}
 
 /// Activation survives event coalescing and cancelled sessions until focus is reconciled.
 struct RefreshActivationContext: Equatable, Sendable {
@@ -33,8 +51,16 @@ struct RefreshActivationContext: Equatable, Sendable {
     }
 }
 
-@MainActor private var activationGeneration: UInt64 = 0
-@MainActor private var pendingActivation: RefreshActivationContext?
+@MainActor
+private var activationGeneration: UInt64 {
+    get { runtime.refresh.activationGeneration }
+    set { runtime.refresh.activationGeneration = newValue }
+}
+@MainActor
+private var pendingActivation: RefreshActivationContext? {
+    get { runtime.refresh.pendingActivation }
+    set { runtime.refresh.pendingActivation = newValue }
+}
 
 @MainActor
 func recordRefreshActivation(workspaceName: String, pid: Int32) {
@@ -83,7 +109,10 @@ func shouldSyncFocusBackToMacOs(
 }
 
 @MainActor
-private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? = nil
+private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? {
+    get { runtime.refresh.pendingRefreshRequest }
+    set { runtime.refresh.pendingRefreshRequest = newValue }
+}
 
 /// When two refresh requests coalesce, keep the event whose session does more work, so the
 /// follow-up session covers the requirements of every event that arrived while one was running.
@@ -138,7 +167,7 @@ func scheduleRefreshSession(
     let generation = activeScheduledRefreshGeneration
     activeScheduledRefreshEvent = request.event
     let override = scheduledRefreshOverrideForTests
-    activeRefreshTask = Task { @MainActor in
+    activeRefreshTask = runtime.throwingTask {
         defer {
             // Generation mismatch means someone took over (light session, test setup); they are
             // responsible for the next refresh, so don't drain the pending request from here.
