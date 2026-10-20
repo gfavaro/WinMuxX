@@ -593,3 +593,46 @@ master root; build 100 fixes it and passes the same native check. All 48 command
 help paths passed with the server stopped. Evidence is under
 `.local/validation/master-stack-build100/`. No new timers or AX queries were added
 to the runtime toggle path.
+
+## Runtime and UI reliability checks (2026-10-20)
+
+Run `make check` for the Swift suite, Python tooling checks and pinned dependency
+resolution. The reliability changes passed 1,271 Swift tests and 42 Python checks.
+Native palette fixtures are written to `.build/native-overlay-fixtures/`; CI
+uploads these with `.build/test-output.log`. Pixel assertions use the same AppKit
+color-profile pipeline for actual and reference images. Resolver tests cover
+wallpaper/system fallback, explicit tint, custom color and accessibility policy;
+native container tests cover surface ownership and appearance. These tests do
+not certify live blur, animation smoothness or multi-display appearance.
+
+The focused lifecycle scenario is:
+
+```sh
+swift test --filter RuntimePerformanceScenarioTest
+```
+
+It performs 20 warm-up and 100 measured cycles of palette/sidebar cleanup and
+workspace navigation, asserting balanced monitors and cleared deferred work.
+Overview tests separately exercise capture bounds, late callbacks and 1,000
+presentation sessions. No desktop applications are moved by these fixtures.
+
+For process measurements, record build, OS, display arrangement, config hash and
+scenario alongside the output. After a 30-second warm-up, sample the app for
+120 seconds using `script/profile_runtime.py --help`. Keep the workload and
+hardware comparable; run idle sampling without UI automation. Compare summaries:
+
+```sh
+python3 script/compare_runtime_profiles.py \
+  --baseline baseline/summary.json --candidate candidate/summary.json \
+  --output comparison.json
+```
+
+A candidate above the CPU baseline by max(0.5 percentage points, 25%), above
+wakeups by max(1/second, 25%), or growing by max(5 MiB, 5% of initial footprint)
+requests repeats. Pass three `--candidate` arguments to use their medians before
+calling it a confirmed regression. Incomplete or interrupted samples cannot pass.
+Counters describe this process, not battery life or WindowServer energy.
+
+Manual acceptance still includes light/dark glass, Reduce Transparency, increased
+contrast, both sidebar edges, multiple displays, IME, outside-click delivery and
+rapid close/reopen. Record unavailable hardware or unperformed cases explicitly.

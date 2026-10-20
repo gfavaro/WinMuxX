@@ -142,3 +142,25 @@ feedback loops.
 - Test both monitor edges, multiple displays and accessibility settings when changing sidebar geometry or materials.
 - Keep README/FORK current; label historical investigations rather than treating them as current configuration guides.
 - Make commits independently understandable. Reorganize unpublished history only; preserve published commits and upstream contribution branches.
+
+## Runtime and overlay ownership
+
+`WinMuxRuntime.refresh` owns refresh tasks, coalesced requests and activation
+state. Schedule refresh work through the originating runtime's `throwingTask`;
+this preserves its TaskLocal binding across suspension. Replacing a test runtime
+invalidates its coordinator before installing the next one.
+
+Palette item loading and outside-click callbacks belong to a presentation
+generation. Dismissal invalidates that generation before releasing monitors.
+A late completion must never populate or dismiss the next presentation. Sidebar
+search adoption follows the panel's reveal generation and retirement state.
+
+`ChromeAppearanceInputs` is the shared policy for expanded sidebar and overlay
+colors. Pass wallpaper tone, system scheme and accessibility state explicitly;
+do not create a full sidebar snapshot to resolve an overlay color. Native glass
+still requires desktop inspection because offscreen bitmaps cannot verify the
+WindowServer's backdrop composition.
+
+`WorkspaceSidebarView` retains its SwiftUI state. Paging, controls and surface
+composition live in separate extension files; moving presentation code must not
+introduce another owner for selection, search, rename or gesture state.

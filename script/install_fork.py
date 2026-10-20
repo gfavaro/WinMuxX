@@ -53,7 +53,7 @@ class NativeOperations:
             info = plistlib.load(stream)
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory) / 'certificate'
-            self.run('codesign', '-d', '--extract-certificates', prefix, app)
+            self.run('codesign', '-d', '--extract-certificates=' + str(prefix), app)
             leaf = Path(str(prefix) + '0')
             if not leaf.exists():
                 raise RuntimeError('A persistent signing certificate is required')

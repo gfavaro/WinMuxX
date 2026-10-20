@@ -384,3 +384,31 @@ queries returned the new workspace layout field. The installed client rejected
 the focused window, matched before and after restart. A config backup and a ZIP
 of build 108 were retained. These checks do not certify physical gesture behavior.
 Evidence: `.local/validation/dinky-021-*.log` and the before/after agent snapshots.
+
+## Verified local installer
+
+Use a fresh increasing build number and the existing persistent signing identity.
+The installer never changes the personal TOML or macOS preferences:
+
+```sh
+python3 script/install_fork.py --dry-run --app .release/WinMuxX.app
+python3 script/install_fork.py --install --app .release/WinMuxX.app \
+  --report .release/local-install.json
+python3 script/install_fork.py --resume .release/local-install.json
+```
+
+Preflight verifies both bundles, signing certificate equality, configuration and
+permissions. Installation archives the previous bundle outside Applications,
+rechecks desktop state, stops the old process, stages the complete new bundle,
+verifies its signature and launches it. Startup compares surviving window IDs
+and workspace assignments; opened and closed windows are recorded separately.
+A failed replacement/startup attempts rollback only while unlocked with unchanged
+display topology. The report records rollback failure instead of hiding it.
+
+A locked session remains pending; resume verifies the installed build and current
+state without replaying old focus commands. Changed config, topology or surviving
+window assignments require review. Reports contain local window IDs and config
+paths and are written with owner-only permissions; keep them out of commits.
+Explicit rollback is available with `--rollback .release/local-install.json` and
+checks the archived bundle against the recorded previous identity and build.
+`rolled_back` describes bundle restoration, not full desktop acceptance.
