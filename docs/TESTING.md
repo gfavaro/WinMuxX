@@ -597,7 +597,7 @@ to the runtime toggle path.
 ## Runtime and UI reliability checks (2026-10-20)
 
 Run `make check` for the Swift suite, Python tooling checks and pinned dependency
-resolution. The reliability changes passed 1,271 Swift tests and 42 Python checks.
+resolution. The reliability changes passed 1,271 Swift tests and 46 Python checks.
 Native palette fixtures are written to `.build/native-overlay-fixtures/`; CI
 uploads these with `.build/test-output.log`. Pixel assertions use the same AppKit
 color-profile pipeline for actual and reference images. Resolver tests cover

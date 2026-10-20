@@ -2,7 +2,7 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
-from script.install_fork import APP, Installer, differences
+from script.install_fork import APP, Installer, SessionLocked
 
 
 class Operations:
@@ -136,6 +136,39 @@ class InstallerTest(unittest.TestCase):
         self.ops.fail = 'snapshot'
         self.assertEqual(self.installer.verify()['status'], 'needs_review')
         self.assertNotIn('rollback', self.ops.calls)
+
+    def testRollbackFailureIsVisible(self):
+        self.ops.fail = 'launch'
+        def fail_rollback(*args): raise RuntimeError('rollback failed')
+        self.ops.rollback = fail_rollback
+        result = self.install()
+        self.assertEqual(result['status'], 'rollback_failed')
+        self.assertIn('rollback_error', result)
+
+    def testLockDuringRestorationRemainsPending(self):
+        def lock(*args): raise SessionLocked()
+        self.ops.restore = lock
+        self.assertEqual(self.install()['status'], 'installed_pending_validation')
+
+    def testDesktopChangeAfterBackupNeverStopsApp(self):
+        original = self.ops.archive
+        def archive(path):
+            original(path)
+            self.ops.state['focus'] = [{'workspace': 'other'}]
+        self.ops.archive = archive
+        self.assertEqual(self.install()['reason'], 'state_changed_before_shutdown')
+        self.assertNotIn('stop', self.ops.calls)
+
+    def testFocusChangesDuringStartupAreNotOverwritten(self):
+        original = self.ops.snapshot
+        def snapshot():
+            state = original()
+            if 'launch' in self.ops.calls:
+                state['focus'] = [{'workspace': str(self.ops.calls.count('snapshot'))}]
+            return state
+        self.ops.snapshot = snapshot
+        self.assertEqual(self.install()['reason'], 'focus_changed_during_validation')
+        self.assertNotIn('restore', self.ops.calls)
 
     def testReportsCannotLiveInApplications(self):
         with self.assertRaises(ValueError): Installer(self.ops, Path('/Applications/report.json'))
