@@ -412,3 +412,35 @@ paths and are written with owner-only permissions; keep them out of commits.
 Explicit rollback is available with `--rollback .release/local-install.json` and
 checks the archived bundle against the recorded previous identity and build.
 `rolled_back` describes bundle restoration, not full desktop acceptance.
+
+## Reliability changes — build 117 (2026-10-20)
+
+Installed once with `script/install_fork.py`, using the existing local signing
+certificate. Release app source identifies commit `4ece6c5a`; subsequent changes
+are installer/comparison tooling, tests and this record. The installed bundle
+passes strict deep signature verification. The recoverable build-116 archive and
+installation report are under `.release/`; the report is
+`install-build117.json`. Configuration hash and all seven surviving window IDs
+and workspace assignments matched after restart.
+
+Focus changed during startup. The installer skipped focus restoration, reported
+review required and then passed read-only resume validation. This exercised the
+non-disruptive resume path on the live desktop. Mock tests separately cover
+failure rollback; the live installation did not require rollback.
+
+Native screenshots were inspected for the dark palette on Built-in Retina Display
+and overview panels on that display and S34CG50. They opened and closed with no
+window assignment changes. Screenshots remain outside tracked files because they
+contain application content. This is a visual smoke test, not proof of animation
+frame pacing or native outside-click/IME delivery. Live light mode, accessibility
+setting changes, both sidebar edges and IME were not retested in this delivery;
+synthetic appearance/native-control tests cover their deterministic policy.
+
+After a 30-second warm-up, a 120-second idle process sample completed with 121
+samples and no sampling gaps: footprint 79.126 → 79.157 MiB, CPU below 0.01% of
+one core and 21 package-idle wakeups. This is one short observation. The earlier
+build-116 sample used only the built-in display, so the environment-aware
+comparison correctly reports **inconclusive**. It does not establish a memory,
+energy or battery-life improvement. Evidence is in the ignored directory
+`.build/reliability-review/`, including full suite logs, process samples,
+environment metadata, comparison output and native window inventories.
