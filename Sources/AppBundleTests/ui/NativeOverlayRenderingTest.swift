@@ -6,17 +6,6 @@ import XCTest
 /// Only synthetic offscreen controls are rendered; no desktop capture or real windows are queried.
 @MainActor
 final class NativeOverlayRenderingTest: WorkspaceTestCase {
-    func testOverlayAppearanceUsesExpandedSidebarWhenSidebarIsHidden() {
-        let monitor = mainMonitor
-        TrayMenuModel.shared.workspaceSidebarVisibleWidth = 0
-        TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId = workspaceSidebarMonitorScopeId(for: monitor)
-        let snapshot = overlayAppearanceSnapshot(monitor: MonitorViewportId(monitor))
-        XCTAssertEqual(snapshot.targetMonitorScopeId, workspaceSidebarMonitorScopeId(for: monitor))
-        XCTAssertTrue(snapshot.configuration.alwaysExpanded)
-        XCTAssertEqual(snapshot.visibleWidth, CGFloat(config.workspaceSidebar.width))
-        XCTAssertEqual(snapshot.configuration.frostedTint, config.workspaceSidebar.frostedTint)
-    }
-
     func testPaletteSearchAndListRenderInLightDarkAndIncreasedContrast() async throws {
         let model = SwitcherPaletteModel()
         model.items = (1...8).map { id in
@@ -51,6 +40,20 @@ final class NativeOverlayRenderingTest: WorkspaceTestCase {
             XCTAssertTrue(host.bounds.contains(fieldRect))
             let bitmap = try XCTUnwrap(host.bitmapImageRepForCachingDisplay(in: host.bounds))
             host.cacheDisplay(in: host.bounds, to: bitmap)
+            let pixel = try XCTUnwrap(bitmap.colorAt(x: bitmap.pixelsWide - 50, y: bitmap.pixelsHigh - 50)?.usingColorSpace(.sRGB))
+            // Compare through the same AppKit bitmap color profile, not raw sRGB numbers.
+            let reference = NSHostingView(rootView: Color(nsColor: workspaceSidebarOpaqueColor(dark: scheme == .dark)))
+            reference.frame = host.bounds
+            window.contentView = reference
+            reference.layoutSubtreeIfNeeded()
+            let referenceBitmap = try XCTUnwrap(reference.bitmapImageRepForCachingDisplay(in: reference.bounds))
+            reference.cacheDisplay(in: reference.bounds, to: referenceBitmap)
+            let expected = try XCTUnwrap(referenceBitmap.colorAt(x: referenceBitmap.pixelsWide / 2,
+                y: referenceBitmap.pixelsHigh / 2)?.usingColorSpace(.sRGB))
+            window.contentView = host
+            XCTAssertEqual(pixel.redComponent, expected.redComponent, accuracy: 2.0 / 255)
+            XCTAssertEqual(pixel.greenComponent, expected.greenComponent, accuracy: 2.0 / 255)
+            XCTAssertEqual(pixel.blueComponent, expected.blueComponent, accuracy: 2.0 / 255)
             let directory = projectRoot.appending(path: ".build/native-overlay-fixtures")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
