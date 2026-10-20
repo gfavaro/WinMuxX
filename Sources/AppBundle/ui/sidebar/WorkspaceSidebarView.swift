@@ -184,7 +184,10 @@ struct WorkspaceSidebarView: View {
             isSidebarCollapsing = false
             isSidebarExpanding = true
             let panel = notificationPanel(from: notification)
+            let generation = panel?.hoverRevealGeneration
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                guard let panel, !panel.isRetired, panel.viewModel.isWorkspaceSidebarExpanded,
+                      panel.hoverRevealGeneration == generation else { return }
                 beginSidebarSearchIfNeeded(panel: panel)
             }
         }

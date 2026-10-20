@@ -71,9 +71,24 @@ final class SwitcherPalettePanel: NSPanelHud {
     private let model: SwitcherPaletteModel
     private(set) var isPaletteActive = false
     private var outsideClickMonitors: [Any] = []
+    private var presentationGeneration: UInt64 = 0
+    private let loadItems: @MainActor () async -> [SwitcherPaletteItem]
+    private let nativePresentation: Bool
+    private let observeOutsideClicks: (@MainActor (@escaping @MainActor () -> Void) -> [Any])?
+    private let removeMonitor: @MainActor (Any) -> Void
 
-    init(model: SwitcherPaletteModel = SwitcherPaletteModel()) {
+    var ownedMonitorCount: Int { outsideClickMonitors.count }
+
+    init(model: SwitcherPaletteModel = SwitcherPaletteModel(),
+         loadItems: (@MainActor () async -> [SwitcherPaletteItem])? = nil,
+         nativePresentation: Bool = true,
+         observeOutsideClicks: (@MainActor (@escaping @MainActor () -> Void) -> [Any])? = nil,
+         removeMonitor: @escaping @MainActor (Any) -> Void = { NSEvent.removeMonitor($0) }) {
         self.model = model
+        self.loadItems = loadItems ?? { await buildSwitcherPaletteItems() }
+        self.nativePresentation = nativePresentation
+        self.observeOutsideClicks = observeOutsideClicks
+        self.removeMonitor = removeMonitor
         super.init()
         identifier = NSUserInterfaceItemIdentifier(switcherPalettePanelId)
         hasShadow = true
@@ -94,17 +109,23 @@ final class SwitcherPalettePanel: NSPanelHud {
 
     func show(groupByWorkspace: Bool = false) async {
         guard !isPaletteActive else { return }
-        WorkspaceOverviewController.shared.dismiss(restoreFocus: false)
+        if nativePresentation { WorkspaceOverviewController.shared.dismiss(restoreFocus: false) }
+        presentationGeneration &+= 1
+        let generation = presentationGeneration
         isPaletteActive = true
-        let items = await buildSwitcherPaletteItems()
+        let items = await loadItems()
         // Palette construction suspends while first-sight window titles are fetched. A second
         // toggle may have dismissed the palette in the meantime.
-        guard isPaletteActive else { return }
+        guard isPaletteActive, presentationGeneration == generation else { return }
         model.items = items
         model.groupByWorkspace = groupByWorkspace
         model.query = ""
         model.selection = 0
         model.onSelect = { [weak self] id in self?.select(id) }
+        guard nativePresentation else {
+            installOutsideClickMonitors()
+            return
+        }
         let monitorRect = focus.workspace.workspaceMonitor.visibleRect
         // Center horizontally on the focused monitor, top edge at ~1/4 of its height
         // (converting top-left-origin coordinates back to AppKit's bottom-left origin).
@@ -126,19 +147,32 @@ final class SwitcherPalettePanel: NSPanelHud {
     }
 
     private func installOutsideClickMonitors() {
+        for monitor in outsideClickMonitors { removeMonitor(monitor) }
+        outsideClickMonitors.removeAll()
+        let generation = presentationGeneration
+        let dismissCurrent: @MainActor () -> Void = { [weak self] in
+            guard let self, self.isPaletteActive, self.presentationGeneration == generation else { return }
+            self.dismiss()
+        }
+        if let observeOutsideClicks {
+            outsideClickMonitors = observeOutsideClicks(dismissCurrent)
+            return
+        }
+        guard nativePresentation else { return }
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
         let local = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
-            if let self, event.window !== self { self.dismiss() }
+            if let self, event.window !== self { dismissCurrent() }
             return event
         }
-        let global = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
-            Task { @MainActor in self?.dismiss() }
+        let global = NSEvent.addGlobalMonitorForEvents(matching: mask) { _ in
+            Task { @MainActor in dismissCurrent() }
         }
         outsideClickMonitors = [local, global].compactMap { $0 }
     }
 
     func dismiss() {
-        for monitor in outsideClickMonitors { NSEvent.removeMonitor(monitor) }
+        presentationGeneration &+= 1
+        for monitor in outsideClickMonitors { removeMonitor(monitor) }
         outsideClickMonitors.removeAll()
         if isPaletteActive {
             isPaletteActive = false
