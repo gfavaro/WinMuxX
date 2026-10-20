@@ -17,6 +17,18 @@ def metrics(report):
             'footprint': report['footprint_first_decile_median_mib']}
 
 
+def validate_environments(baseline, candidate):
+    for key in ('os', 'monitors', 'config_sha256'):
+        if key not in baseline or key not in candidate:
+            raise ValueError('Missing environment metadata: ' + key)
+        old, new = baseline[key], candidate[key]
+        if key == 'monitors':
+            old = json.loads(old) if isinstance(old, str) else old
+            new = json.loads(new) if isinstance(new, str) else new
+        if old != new:
+            raise ValueError('Environment differs: ' + key)
+
+
 def compare(baseline, candidates):
     old = metrics(baseline)
     values = [metrics(candidate) for candidate in candidates]
@@ -37,10 +49,17 @@ def main():
     parser.add_argument('--baseline', required=True, type=Path)
     parser.add_argument('--candidate', required=True, type=Path, action='append')
     parser.add_argument('--output', required=True, type=Path)
+    parser.add_argument('--baseline-environment', type=Path)
+    parser.add_argument('--candidate-environment', type=Path)
     args = parser.parse_args()
     try:
+        if args.baseline_environment or args.candidate_environment:
+            if not args.baseline_environment or not args.candidate_environment:
+                raise ValueError('Both environment files are required')
+            validate_environments(json.loads(args.baseline_environment.read_text()),
+                                  json.loads(args.candidate_environment.read_text()))
         result = compare(json.loads(args.baseline.read_text()), [json.loads(p.read_text()) for p in args.candidate])
-    except (ValueError, KeyError) as error:
+    except (ValueError, KeyError, OSError) as error:
         result = {'status': 'inconclusive', 'error': str(error)}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')

@@ -174,6 +174,8 @@ class Installer:
         self.report = {}
 
     def status(self, status, **details):
+        for key in ('reason', 'error', 'rollback_error'):
+            self.report.pop(key, None)
         self.report.update(status=status, **details)
         write_report(self.path, self.report)
         return self.report
@@ -190,7 +192,7 @@ class Installer:
                            before=self.ops.snapshot(), topology=self.ops.topology(), source=str(source))
         if dry_run:
             return self.status('dry_run_passed')
-        archive = self.path.parent / ('WinMuxX-rollback-' + uuid.uuid4().hex + '.zip')
+        archive = self.path.resolve().parent / ('WinMuxX-rollback-' + uuid.uuid4().hex + '.zip')
         self.ops.archive(archive)
         self.status('backed_up', archive=str(archive))
         if self.ops.locked():

@@ -65,6 +65,7 @@ class InstallerTest(unittest.TestCase):
         self.assertLess(calls.index('stop'), calls.index('replace'))
         self.assertLess(calls.index('replace'), calls.index('launch'))
         self.assertIn('restore', calls)
+        self.assertTrue(Path(self.installer.report['archive']).is_absolute())
 
     def testDryRunDoesNotMutate(self):
         self.assertEqual(self.install(dry_run=True)['status'], 'dry_run_passed')
@@ -101,7 +102,9 @@ class InstallerTest(unittest.TestCase):
         self.ops.lock_after_launch = True
         self.assertEqual(self.install()['status'], 'installed_pending_validation')
         self.ops.is_locked = False
-        self.assertEqual(self.installer.verify()['status'], 'validated')
+        result = self.installer.verify()
+        self.assertEqual(result['status'], 'validated')
+        self.assertNotIn('reason', result)
         self.assertNotIn('restore', self.ops.calls)
 
     def testMovedWindowRequiresReview(self):

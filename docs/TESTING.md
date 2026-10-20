@@ -597,7 +597,7 @@ to the runtime toggle path.
 ## Runtime and UI reliability checks (2026-10-20)
 
 Run `make check` for the Swift suite, Python tooling checks and pinned dependency
-resolution. The reliability changes passed 1,271 Swift tests and 46 Python checks.
+resolution. The reliability changes passed 1,271 Swift tests and 47 Python checks.
 Native palette fixtures are written to `.build/native-overlay-fixtures/`; CI
 uploads these with `.build/test-output.log`. Pixel assertions use the same AppKit
 color-profile pipeline for actual and reference images. Resolver tests cover
@@ -624,14 +624,19 @@ hardware comparable; run idle sampling without UI automation. Compare summaries:
 ```sh
 python3 script/compare_runtime_profiles.py \
   --baseline baseline/summary.json --candidate candidate/summary.json \
-  --output comparison.json
+  --output comparison.json \
+  --baseline-environment baseline/environment.json \
+  --candidate-environment candidate/environment.json
 ```
 
 A candidate above the CPU baseline by max(0.5 percentage points, 25%), above
 wakeups by max(1/second, 25%), or growing by max(5 MiB, 5% of initial footprint)
 requests repeats. Pass three `--candidate` arguments to use their medians before
 calling it a confirmed regression. Incomplete or interrupted samples cannot pass.
-Counters describe this process, not battery life or WindowServer energy.
+Environment files contain `os`, `monitors` and `config_sha256`; missing fields
+or a mismatch make the comparison inconclusive. Omit both environment arguments
+only for summaries whose environment was verified separately. Counters describe
+this process, not battery life or WindowServer energy.
 
 Manual acceptance still includes light/dark glass, Reduce Transparency, increased
 contrast, both sidebar edges, multiple displays, IME, outside-click delivery and

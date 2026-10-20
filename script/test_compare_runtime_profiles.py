@@ -1,5 +1,5 @@
 import unittest
-from script.compare_runtime_profiles import compare
+from script.compare_runtime_profiles import compare, validate_environments
 
 
 def sample(cpu=.1, wakeups=60, growth=0):
@@ -25,3 +25,11 @@ class ProfileComparisonTest(unittest.TestCase):
         invalid = sample()
         invalid['status'] = 'interrupted'
         with self.assertRaises(ValueError): compare(sample(), [invalid])
+
+    def testEnvironmentMismatchCannotPass(self):
+        environment = dict(os='macOS', monitors=[{'name': 'display'}], config_sha256='hash')
+        validate_environments(environment, dict(environment))
+        with self.assertRaisesRegex(ValueError, 'monitors'):
+            validate_environments(environment, dict(environment, monitors=[]))
+        with self.assertRaisesRegex(ValueError, 'Missing'):
+            validate_environments({}, environment)
