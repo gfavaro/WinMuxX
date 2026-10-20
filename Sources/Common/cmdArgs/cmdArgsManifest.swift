@@ -42,10 +42,12 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case subscribe
     case summonWorkspace = "summon-workspace"
     case swap
+    case swapWithMaster = "swap-with-master"
     case triggerBinding = "trigger-binding"
-    case volume
     case workspace
     case workspaceBackAndForth = "workspace-back-and-forth"
+    case workspaceLayout = "workspace-layout"
+    case workspaceOverview = "workspace-overview"
 }
 
 func initSubcommands() -> [String: any SubCommandParserProtocol] {
@@ -136,14 +138,18 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(parseSubscribeCmdArgs)
             case .summonWorkspace:
                 result[kind.rawValue] = SubCommandParser(SummonWorkspaceCmdArgs.init)
+            case .swapWithMaster:
+                result[kind.rawValue] = SubCommandParser(SwapWithMasterCmdArgs.init)
             case .swap:
                 result[kind.rawValue] = SubCommandParser(parseSwapCmdArgs)
             case .triggerBinding:
                 result[kind.rawValue] = SubCommandParser(parseTriggerBindingCmdArgs)
-            case .volume:
-                result[kind.rawValue] = SubCommandParser(VolumeCmdArgs.init)
             case .workspace:
                 result[kind.rawValue] = SubCommandParser(parseWorkspaceCmdArgs)
+            case .workspaceLayout:
+                result[kind.rawValue] = SubCommandParser(parseWorkspaceLayoutCmdArgs)
+            case .workspaceOverview:
+                result[kind.rawValue] = SubCommandParser(WorkspaceOverviewCmdArgs.init)
             case .workspaceBackAndForth:
                 result[kind.rawValue] = SubCommandParser(WorkspaceBackAndForthCmdArgs.init)
         }

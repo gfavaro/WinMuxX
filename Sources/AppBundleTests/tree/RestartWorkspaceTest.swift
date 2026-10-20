@@ -7,6 +7,44 @@ import XCTest
 final class RestartWorkspaceTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testAppLaunchedAfterWorkspaceSelectionKeepsNewPlacementAcrossFurtherNavigation() async throws {
+        let oldWorkspace = Workspace.get(byName: "1")
+        let old = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
+        old.restartIdentity = identity("Browser", launch: 10)
+        let saved = snapshotCurrentFrozenWorld()
+        old.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(.init(version: 2, world: saved, pending: nil))
+        let selected = Workspace.get(byName: "2")
+        XCTAssertTrue(activateWorkspaceForUser(selected, on: mainMonitor))
+        let current = TestWindow.new(id: 99, parent: selected.rootTilingContainer)
+        current.restartIdentity = identity("Browser", pid: 20, launch: Date.now.timeIntervalSince1970 + 1)
+        let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
+        XCTAssertFalse(restored)
+        XCTAssertTrue(current.nodeWorkspace === selected)
+        trackPendingRestartWindow(current)
+        XCTAssertNil(runtime.recovery.restartWindowAttempts[99])
+        recordUserWorkspaceSelectionForRestoration(at: Date.now.addingTimeInterval(2))
+        let retried = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
+        XCTAssertFalse(retried)
+        XCTAssertTrue(current.nodeWorkspace === selected)
+    }
+
+    func testWorkspaceSelectionStillRestoresExistingProcessWindowWithChangedTitle() async throws {
+        let workspace = Workspace.get(byName: "4")
+        let old = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        old.restartIdentity = identity("Old terminal title", launch: 10)
+        let saved = snapshotCurrentFrozenWorld()
+        old.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(.init(version: 2, world: saved, pending: nil))
+        let selected = Workspace.get(byName: "2")
+        XCTAssertTrue(activateWorkspaceForUser(selected, on: mainMonitor))
+        let current = TestWindow.new(id: 1, parent: selected.rootTilingContainer)
+        current.restartIdentity = identity("Changed terminal title", launch: 10)
+        let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
+        XCTAssertTrue(restored)
+        XCTAssertTrue(current.nodeWorkspace === workspace)
+    }
+
     func testRestartPreservesNestedDwindleOrderAndRatiosWithReverseDiscovery() async throws {
         try await assertNestedDwindleRestart(delayed: false)
     }

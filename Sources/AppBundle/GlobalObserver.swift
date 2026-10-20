@@ -94,7 +94,8 @@ enum GlobalObserver {
     }
 
     private static func onPointerActivity(_ event: NSEvent) {
-        let isLeftMouseDownEvent = event.type == .leftMouseDown
+        let eventType = event.type
+        let isLeftMouseDownEvent = eventType == .leftMouseDown
         let isClick = event.type == .leftMouseDown || event.type == .rightMouseDown || event.type == .otherMouseDown
         let timestamp = event.timestamp
         let screenPoint = NSEvent.mouseLocation
@@ -106,6 +107,7 @@ enum GlobalObserver {
             }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)
+            WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
             WorkspaceSidebarPanel.noteHoverPointerActivityForVisiblePanels(timestamp: timestamp)
             if isLeftMouseDownEvent {
@@ -126,7 +128,7 @@ enum GlobalObserver {
 
     @MainActor
     private static func scheduleFocusFollowsMouse(point: CGPoint, timestamp: TimeInterval) {
-        guard TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
+        guard !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
               !isMouseManipulationActive,
               let window = pointerFocusCandidate(at: point),
               window.participatesInWorkspaceFocus else {
@@ -141,13 +143,13 @@ enum GlobalObserver {
         let dwell = max(config.focusFollowsMouseDwell, 0)
         focusFollowsMouseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(dwell))
-            guard !Task.isCancelled, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+            guard !Task.isCancelled, !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive,
                   !isLeftMouseButtonDown,
                   let ready = FocusFollowsMouseController.shared.isReady(dwell: Double(dwell) / 1000, timestamp: ProcessInfo.processInfo.systemUptime),
                   ready == window.windowId else { return }
             let id = await PointerFocusNativeHitTester.shared.windowId(at: point)
-            guard !Task.isCancelled, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+            guard !Task.isCancelled, !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive, !isLeftMouseButtonDown,
                   let target = pointerFocusTarget(at: point, frontmostWindowId: id),
                   target != focus.windowOrNil else { return }
@@ -178,7 +180,7 @@ enum GlobalObserver {
             print("WinMuxX: WindowServer close notifications unavailable; using AX fallback")
         }
         DoubleSidedWindowGesture.shared.install()
-        WorkspaceSwipeController.shared.syncConfiguration()
+        WorkspaceGestureCoordinator.shared.syncConfiguration()
 
         let nc = NSWorkspace.shared.notificationCenter
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.didLaunchApplicationNotification, object: nil, queue: .main, using: onNotif))
@@ -225,7 +227,7 @@ enum GlobalObserver {
 
         let pointerActivityMask: NSEvent.EventTypeMask = [
             .mouseMoved,
-            .leftMouseDown, .rightMouseDown, .otherMouseDown,
+            .leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp,
             .leftMouseDragged, .rightMouseDragged, .otherMouseDragged,
             .scrollWheel,
         ]

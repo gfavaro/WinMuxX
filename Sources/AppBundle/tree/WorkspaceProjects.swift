@@ -86,13 +86,13 @@ func materializePersistedWorkspaceProjects() {
 
 @MainActor
 func materializePersistedWorkspaces() {
-    guard config.minimumWorkspaceCount == nil else { return }
     for rawName in config.persistentWorkspaces {
         let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { continue }
         let workspace = Workspace.get(byName: name)
         workspace.assignProject(workspace.projectId)
         workspace.lifecycle = .durable
+        workspace.seedMonitorIfNeeded(mainMonitor)
     }
 }
 

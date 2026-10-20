@@ -14,25 +14,7 @@ struct WorkspaceSwipePreviewGeometry {
     }
 
     static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration: Double) -> CASpringAnimation {
-        let animation: CASpringAnimation
-        if #available(macOS 14, *) {
-            animation = CASpringAnimation(perceptualDuration: duration, bounce: 0)
-            animation.keyPath = "transform.translation.x"
-        } else {
-            // Apple's published duration-to-spring conversion (WWDC23, Animate with springs).
-            animation = CASpringAnimation(keyPath: "transform.translation.x")
-            animation.mass = 1
-            animation.stiffness = pow(2 * .pi / duration, 2)
-            animation.damping = 2 * sqrt(animation.stiffness)
-        }
-        let distance = to - from
-        // Core Animation expects animation distances per second, positive towards the target.
-        let criticalSpeed = sqrt(animation.stiffness / animation.mass)
-        animation.initialVelocity = abs(distance) > 1 ? max(-criticalSpeed, min(criticalSpeed, speed / distance)) : 0
-        animation.fromValue = from
-        animation.toValue = to
-        animation.duration = animation.settlingDuration
-        return animation
+        WorkspaceGestureAnimation.settlingAnimation(keyPath: "transform.translation.x", from: from, to: to, speed: speed, duration: duration)
     }
 
     static func offsets(width: CGFloat, progress: Double, slidesLeft: Bool) -> (outgoing: CGFloat, incoming: CGFloat) {

@@ -5,6 +5,7 @@ extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
         applyConfiguredLayout()
+        normalizeMasterLayout()
         if isEffectivelyEmpty { return }
         let rect = workspaceTilingRect(self)
         let context = LayoutContext(self)
@@ -52,6 +53,7 @@ extension TreeNode {
                     try await window.layoutFloatingWindow(context)
                 }
             case .window(let window):
+                window.preserveRestoredWorkspacePreview = false
                 if window.windowId != currentlyManipulatedWithMouseWindowId || isPinnedDraggedWindow(window.windowId) {
                     let previousPhysicalRect = lastAppliedLayoutPhysicalRect
                     lastAppliedLayoutVirtualRect = virtual
@@ -76,7 +78,7 @@ extension TreeNode {
                     debugFocusLog("layoutRecursive tabContainer=\(ObjectIdentifier(container)) physicalRect=\(physicalRect) virtualRect=\(virtual)")
                 }
                 switch container.layout {
-                    case .tiles:
+                    case .tiles, .master:
                         try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context)
                     case .dwindle:
                         try await container.layoutDwindle(point, width: width, height: height, virtual: virtual, context)
@@ -117,6 +119,7 @@ extension Window {
         // A failed corner restoration must retry from its saved position, rather
         // than treating the still-parked native frame as a cross-display move.
         guard !isHiddenInCorner else { return }
+        preserveRestoredWorkspacePreview = false
         // With a single monitor the cross-monitor proportional move below is always a no-op,
         // so skip the AX round-trip it would need. This runs for every floating window on
         // every layout pass.
@@ -171,6 +174,9 @@ extension TilingContainer {
     fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = tileChildFrames(in: rect, gaps: context.resolvedGaps)
+        if layout == .master, frames.count == 2, width > 0, height > 0 {
+            masterRatio = frames[0].weight / rect.getDimension(orientation)
+        }
         for (child, frame) in zip(children, frames) {
             child.setWeight(orientation, frame.weight)
             let childVirtual = Rect(

@@ -3,12 +3,17 @@ import Darwin
 import Foundation
 import Network
 
+private let descriptionsByCommand = Dictionary(uniqueKeysWithValues:
+    subcommandDescriptions.map { ($0[0].trimmingCharacters(in: .whitespaces), $0[1]) })
+
 let usage =
     """
     USAGE: \(CommandLine.arguments.first ?? "winmuxx") [-h|--help] [-v|--version] <subcommand> [<args>...]
 
     SUBCOMMANDS:
-    \(subcommandDescriptions.sortedBy { $0[0] }.toPaddingTable(columnSeparator: "   ").joined(separator: "\n"))
+    \(cliSubcommandNames.map { ["  " + $0, descriptionsByCommand[$0] ?? ""] }.toPaddingTable(columnSeparator: "   ").joined(separator: "\n"))
+
+    Run 'winmuxx <subcommand> --help' for command details.
     """
 
 @main
@@ -16,10 +21,7 @@ struct Main {
     static func main() async {
         let args = CommandLine.arguments.slice(1...) ?? []
 
-        if args.isEmpty {
-            exit(1, err: usage)
-        }
-        if args.first == "--help" || args.first == "-h" {
+        if args.isEmpty || args.first == "--help" || args.first == "-h" {
             exit(0, out: usage)
         }
 

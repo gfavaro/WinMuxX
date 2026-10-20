@@ -13,6 +13,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     let hostingView: WorkspaceSidebarHostingView
     let materialContainer: WorkspaceSidebarMaterialContainer
     let monitorScopeId: String
+    private(set) var isRetired = false
     var pendingBackingResize: DispatchWorkItem?
     var pendingExpand: DispatchWorkItem?
     var pendingCollapse: DispatchWorkItem?
@@ -44,9 +45,11 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     var splitBrowseCollapseSuppressedUntil: Date = .distantPast
     var persistentExpansionWidth: CGFloat?
     var measuredContentHeight: CGFloat = 0
-    let hoverExitTolerance: CGFloat = 20
     let hoverPollInterval: TimeInterval = 1.0 / 30.0
-    let hoverOpenDelay: TimeInterval = 0.05
+    var hoverDwellSatisfied = false
+    var hoverRevealGeneration: UInt = 0
+    var leftMousePressStartedInsideSidebar = false
+    var appliedHoverOpenDelayMs = 400
     let hoverCueAnimationResponse: TimeInterval = 0.18
     let animationDuration: TimeInterval = 0.14
     let menuTrackingEndGrace: TimeInterval = 0.75
@@ -99,17 +102,48 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     }
 
     static func refreshAll() {
-        let activeMonitorScopeIds = Set(workspaceSidebarResolvedPanelMonitors().map { workspaceSidebarMonitorScopeId(for: $0) })
-        for monitor in workspaceSidebarResolvedPanelMonitors() {
+        refreshAll(on: workspaceSidebarResolvedPanelMonitors())
+    }
+
+    static func refreshAll(on monitors: [Monitor]) {
+        let activeMonitorScopeIds = Set(monitors.map { workspaceSidebarMonitorScopeId(for: $0) })
+        // Scope IDs include display positions. Do not keep a hosting tree for every
+        // arrangement the user has ever connected; returning scopes get fresh panels.
+        for scopeId in panelsByMonitorScopeId.keys.filter({ !activeMonitorScopeIds.contains($0) }) {
+            panelsByMonitorScopeId.removeValue(forKey: scopeId)?.retire()
+        }
+        for monitor in monitors {
             let scopeId = workspaceSidebarMonitorScopeId(for: monitor)
             let panel = panelsByMonitorScopeId[scopeId] ?? WorkspaceSidebarPanel(monitor: monitor)
             panelsByMonitorScopeId[scopeId] = panel
             panel.syncModelFromShared()
             panel.refresh(on: monitor)
         }
-        for (scopeId, panel) in panelsByMonitorScopeId where !activeMonitorScopeIds.contains(scopeId) {
-            panel.resetHiddenSidebarState()
-        }
+    }
+
+    func retire() {
+        guard !isRetired else { return }
+        isRetired = true
+        cancelExpansionWork()
+        endInlineTextEditing()
+        removeInlineTextEditingEventMonitors()
+        removeInlineTextEditingKeyEventTap()
+        removeCommandMouseUnlockMonitors()
+        inlineTextEditingCancel = nil
+        inlineTextEditingKeyDown = nil
+        commandExpansionLocksCollapse = false
+        shouldLockNextSidebarSearchExpansion = false
+        bufferedCommandSidebarSearchKeys = []
+        for observer in menuTrackingObservers { NotificationCenter.default.removeObserver(observer) }
+        menuTrackingObservers = []
+        // A search view may itself retain this panel. Drop the SwiftUI subtree
+        // explicitly so removing the registry entry also breaks that ownership path.
+        hostingView.rootView = nil
+        viewModel.isWorkspaceSidebarExpanded = false
+        viewModel.workspaceSidebarVisibleWidth = 0
+        ignoresMouseEvents = true
+        contentView = nil
+        close()
     }
 
     static func syncVisiblePanelModelsFromShared() {
@@ -125,6 +159,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     }
 
     func syncModelFromShared() {
+        guard !isRetired else { return }
         let sidebarConfiguration = workspaceSidebarConfiguration()
         materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: viewModel.workspaceSidebarVisibleWidth)
         viewModel.setIfChanged(\.workspaceSidebarConfiguration, sidebarConfiguration)
@@ -196,7 +231,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     }
 }
 
-final class WorkspaceSidebarHostingView: NSHostingView<WorkspaceSidebarContainerView> {
+final class WorkspaceSidebarHostingView: NSHostingView<WorkspaceSidebarContainerView?> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
     }
@@ -335,8 +370,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         // AppKit exposes no menu-bar material. Match the measured opaque palette
         // without screen capture, polling, or wallpaper-dependent contrast.
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        let white: CGFloat = dark ? 32.0 / 255 : 218.0 / 255
-        opaqueSurface.layer?.backgroundColor = NSColor(srgbRed: white, green: white, blue: white, alpha: 1).cgColor
+        opaqueSurface.layer?.backgroundColor = workspaceSidebarOpaqueColor(dark: dark).cgColor
     }
 
     private func updateGeometry() {
@@ -345,9 +379,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         surface.frame = rect
         if surface === glassSurface { glassContent.frame = CGRect(origin: .zero, size: rect.size) }
         hostedContent?.frame = CGRect(x: -rect.minX, y: 0, width: bounds.width, height: bounds.height)
-        let progress = configuration.transparentExpansionProgress(visibleWidth: rect.width)
-        let radius = progress < workspaceSidebarRowsRevealProgress ? 0 : workspaceSidebarPanelRightCornerRadius
-        let path = WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: configuration.position)
+        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: rect.width)
             .path(in: CGRect(origin: .zero, size: rect.size)).cgPath
         CATransaction.begin()
         CATransaction.setDisableActions(true)

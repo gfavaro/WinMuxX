@@ -4,7 +4,7 @@ import Common
 /// Existing lifecycle guarantees count first, independent of presentation filters.
 @MainActor
 func minimumWorkspaceRetentionIds() -> Set<WorkspaceId> {
-    let ordered = orderedWorkspacesForPresentation().filter { !$0.isArchived }
+    let ordered = workspacesInRestorationOrder()
     let retained = retainedEmptyWorkspaceIdsByScope()
     let existingSurvivors = ordered.filter {
         workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retained)

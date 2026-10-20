@@ -607,9 +607,7 @@ extension WorkspaceSidebarView {
 }
 extension WorkspaceSidebarView {
     var sidebarShape: some Shape {
-        let progress = snapshot.configuration.transparentExpansionProgress(visibleWidth: snapshot.visibleWidth)
-        let radius = progress < workspaceSidebarRowsRevealProgress ? 0 : workspaceSidebarPanelRightCornerRadius
-        return WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: snapshot.configuration.position)
+        workspaceSidebarPanelShape(configuration: snapshot.configuration, visibleWidth: snapshot.visibleWidth)
     }
 
     @ViewBuilder
@@ -664,11 +662,24 @@ extension WorkspaceSidebarView {
     }
 }
 
+@MainActor
+func workspaceSidebarPanelShape(configuration: WorkspaceSidebarConfiguration, visibleWidth: CGFloat) -> WorkspaceSidebarPanelShape {
+    let centered = configuration.heightMode == .centered
+    let progress = configuration.transparentExpansionProgress(visibleWidth: visibleWidth)
+    let radius = centered ? systemWindowCornerRadius()
+        : (progress < workspaceSidebarRowsRevealProgress ? 0 : workspaceSidebarPanelRightCornerRadius)
+    return WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: configuration.position, roundAllCorners: centered)
+}
+
 struct WorkspaceSidebarPanelShape: Shape {
     let rightCornerRadius: CGFloat
     var position: WorkspaceSidebarPosition = .left
+    var roundAllCorners = false
 
     func path(in rect: CGRect) -> Path {
+        if roundAllCorners {
+            return RoundedRectangle(cornerRadius: rightCornerRadius, style: .continuous).path(in: rect)
+        }
         let radius = min(rightCornerRadius, rect.width / 2, rect.height / 2)
 
         var path = Path()
@@ -744,11 +755,18 @@ extension WorkspaceSidebarView {
         showsCreateWorkspace: Bool = true,
         allowsActivation: Bool? = nil,
     ) -> some View {
-        ScrollView {
-            workspacePageContent(projectId: projectId, workspaces: workspaces, expansionProgress: expansionProgress,
+        ScrollViewReader { proxy in
+            ScrollView {
+                workspacePageContent(projectId: projectId, workspaces: workspaces, expansionProgress: expansionProgress,
                                  leadingInset: leadingInset, trailingInset: trailingInset, topPadding: topPadding,
                                  showsPinnedActiveWorkspace: showsPinnedActiveWorkspace, showsCreateWorkspace: showsCreateWorkspace,
                                  allowsActivation: allowsActivation)
+            }
+            .onChange(of: selectedSearchTarget) { target in
+                guard isInteractive, let target,
+                    workspaceSidebarSearchSelections(workspaces: workspaces, includeWorkspaceHeaders: true).contains(target) else { return }
+                proxy.scrollTo(target, anchor: .top)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -920,7 +938,7 @@ extension WorkspaceSidebarView {
             onCancelRenameWorkspace: {
                 finishWorkspaceRename(cancelled: true)
             },
-            selectedSearchTarget: searchText.isEmpty ? nil : selectedSearchTarget,
+            selectedSearchTarget: isSearchEditing ? selectedSearchTarget : nil,
             isSearchFiltering: !searchText.isEmpty,
             activeInUseOverrideWorkspaceName: $activeInUseOverrideWorkspaceName,
             actions: actions,

@@ -25,7 +25,7 @@ extension WorkspaceSidebarPanel {
 extension WorkspaceSidebarPanel {
     func updateMousePassthrough() {
         let inside = isMouseInsideVisibleRegion()
-        let shouldIgnoreMouseEvents = !inside
+        let shouldIgnoreMouseEvents = !inside || shouldSuppressHoverForPointerPress
         if ignoresMouseEvents != shouldIgnoreMouseEvents {
             debugWorkspaceSidebarHoverLog("mousePassthrough panel=\(monitorScopeId) ignores \(ignoresMouseEvents)->\(shouldIgnoreMouseEvents) insideVisible=\(inside) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
             ignoresMouseEvents = shouldIgnoreMouseEvents
@@ -34,10 +34,11 @@ extension WorkspaceSidebarPanel {
 
     func isMouseInsideHoverRegion() -> Bool {
         guard isVisible else { return false }
-        let hoverWidth = max(
-            viewModel.workspaceSidebarVisibleWidth,
-            workspaceSidebarHoverActivationWidth(config.workspaceSidebar),
-        ) + hoverExitTolerance
+        let hoverWidth = workspaceSidebarHoverRegionWidth(
+            config.workspaceSidebar,
+            visibleWidth: viewModel.workspaceSidebarVisibleWidth,
+            isExpanded: viewModel.isWorkspaceSidebarExpanded,
+        )
         let hoverRegion = workspaceSidebarVisibleFrame(panel: frame, width: hoverWidth, position: config.workspaceSidebar.position)
         let inside = hoverRegion.contains(NSEvent.mouseLocation)
         if viewModel.workspaceSidebarVisibleWidth > workspaceSidebarRestingWidth(config.workspaceSidebar) + 0.5 || pendingCollapse != nil {
@@ -58,6 +59,7 @@ extension WorkspaceSidebarPanel {
             mouseX: config.workspaceSidebar.position == .left ? NSEvent.mouseLocation.x : -NSEvent.mouseLocation.x,
             sidebarMinX: config.workspaceSidebar.position == .left ? frame.minX : -frame.maxX,
             collapsedWidth: workspaceSidebarHoverActivationWidth(config.workspaceSidebar),
+            autoHide: config.workspaceSidebar.autoHide,
         )
     }
 }

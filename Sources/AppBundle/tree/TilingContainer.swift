@@ -4,7 +4,19 @@ import Common
 final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider renaming to GenericContainer
     fileprivate var _orientation: Orientation
     var orientation: Orientation { _orientation }
-    var layout: Layout
+    var isMasterStack = false
+    var appliedMasterConfig: MasterConfig?
+    var masterRatio: CGFloat?
+    var masterStackLayout: Layout?
+    var layout: Layout {
+        didSet {
+            if oldValue != layout, oldValue == .master || layout == .master {
+                masterRatio = nil
+                masterStackLayout = nil
+                appliedMasterConfig = nil
+            }
+        }
+    }
     // Each entry controls a child versus the remaining subtree, not sibling weights.
     var dwindleSplitRatios: [CGFloat] = []
     // nil resolves each split from the available rectangle.
@@ -182,6 +194,7 @@ enum Layout: String, Codable {
     case tiles
     case tabGroup = "tab-group"
     case dwindle
+    case master
     case stacked = "accordion"
 }
 

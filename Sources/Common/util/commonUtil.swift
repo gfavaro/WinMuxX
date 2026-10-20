@@ -108,6 +108,8 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     /// Tab switch within a tab group: no new windows can appear, so skip the heavy window
     /// refresh barrier — only relayout (which hides the previously active tab) is needed.
     case onTabSwitched
+    /// Repair parked native windows without adopting focus or enumerating apps.
+    case onWindowParkingDrift
 
     public var isStartup: Bool {
         if case .startup = self { return true } else { return false }
@@ -121,7 +123,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
                 notif == NSWorkspace.didActivateApplicationNotification.rawValue || notif == "workspaceSwipe"
             case .hotkeyBinding, .menuBarButton, .socketServer, .onModeChanged:
                 true
-            case .onDisplayChanged, .onFocusedMonitorChanged, .onFocusChanged, .onTabSwitched:
+            case .onDisplayChanged, .onFocusedMonitorChanged, .onFocusChanged, .onTabSwitched, .onWindowParkingDrift:
                 true
             case .configAutoReload, .globalObserverLeftMouseUp, .startup, .workspaceRestoration,
                  .resetManipulatedWithMouse:
@@ -135,7 +137,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
                 notif != kAXFocusedWindowChangedNotification as String
             case .globalObserver(let notif):
                 notif != NSWorkspace.didActivateApplicationNotification.rawValue && notif != "workspaceSwipe"
-            case .onDisplayChanged, .onTabSwitched:
+            case .onDisplayChanged, .onTabSwitched, .onWindowParkingDrift:
                 false
             case .configAutoReload, .globalObserverLeftMouseUp, .menuBarButton, .hotkeyBinding,
                  .startup, .workspaceRestoration, .socketServer, .resetManipulatedWithMouse, .onFocusedMonitorChanged,
@@ -180,6 +182,7 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
             case .onFocusChanged: "onFocusChanged"
             case .onModeChanged: "onModeChanged"
             case .onTabSwitched: "onTabSwitched"
+            case .onWindowParkingDrift: "onWindowParkingDrift"
         }
     }
 }

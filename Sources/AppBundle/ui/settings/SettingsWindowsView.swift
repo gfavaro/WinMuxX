@@ -8,6 +8,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
     @SettingsDraft("drag-stack-layout", load: { config.dragStackLayout }) private var dragStackLayout: Layout
     @SettingsDraft("workspace-swipe.animation-duration-ms", load: { config.workspaceSwipe.animationDurationMs }) private var swipeAnimationDuration: Int
+    @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
     @State private var doubleSidedWindows = ExperimentalUISettings().doubleSidedWindows
@@ -39,6 +40,7 @@ struct ShortcutBehaviorSettingsView: View {
                 } onChange: { persistRootString("drag-stack-layout", dragStackLayout.rawValue) }
                 SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
+                    Text("Master").tag(Layout.master)
                     Text("Tiles").tag(Layout.tiles)
                     Text("Stacked: Tabbed").tag(Layout.tabGroup)
                     Text("Stacked: Accordion").tag(Layout.stacked)
@@ -83,6 +85,13 @@ struct ShortcutBehaviorSettingsView: View {
                 Text(workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
                     .font(.callout).foregroundStyle(.secondary)
                 Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            SettingsSection("Workspace overview") {
+                SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
+                    persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
+                }
+                Text("Use workspace-overview from a shortcut or the CLI. For the gesture, assign macOS Mission Control to four fingers or turn its gesture off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Pointer focus") {

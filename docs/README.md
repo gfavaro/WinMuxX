@@ -15,6 +15,9 @@
 - [Fork maintenance](FORK.md): identity, upstream workflow, configuration ownership and signing.
 - [Roadmap](ROADMAP.md): progress, deferred work and manual validation.
 
+- [Dinky 0.21 command migration](DINKY_021_ADOPTION.md): workspace/container commands and format output.
+- [Workspace overview](WORKSPACE_OVERVIEW.md): behavior, resource limits and validation.
+
 ## Reviews and investigations
 
 These documents preserve observations and experiments. Earlier sections may refer
@@ -23,6 +26,7 @@ guides above for today's settings and development workflow.
 
 - [Appearance settings review](APPEARANCE_SETTINGS_REVIEW.md)
 - [Menu-bar appearance investigation](MENU_BAR_APPEARANCE_INVESTIGATION.md)
+- [Dinky 0.20 adaptations](DINKY_020_ADOPTION.md)
 - [Dwindle comparison with Dinky](DWINDLE_DINKY_COMPARISON.md)
 - [Simplification review](SIMPLIFY_REVIEW.md)
 - [Window motion](WINDOW_MOTION.md)

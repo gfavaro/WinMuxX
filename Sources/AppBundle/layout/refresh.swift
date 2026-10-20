@@ -66,6 +66,13 @@ func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
     frontmostActivationPolicy: NSApplication.ActivationPolicy?,
 ) -> Bool {
+    if ignoresCrossWorkspaceActivation(nativeFocused) {
+        switch refreshSessionEvent {
+            case .socketServer, .hotkeyBinding, .menuBarButton: break
+            case .globalObserver(let name) where name == "workspaceSwipe" || name == "workspaceOverviewSelection": break
+            default: return false
+        }
+    }
     if nativeFocused?.participatesInWorkspaceFocus == false {
         return false
     }
@@ -81,6 +88,10 @@ private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPr
 /// When two refresh requests coalesce, keep the event whose session does more work, so the
 /// follow-up session covers the requirements of every event that arrived while one was running.
 private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessionEvent) -> RefreshSessionEvent {
+    // Parking repair is a placement-only pass. Never let it replace a pending
+    // focus/tab/activation reconciliation, including one with the same cost score.
+    if case .onWindowParkingDrift = new { return old }
+    if case .onWindowParkingDrift = old { return new }
     func score(_ e: RefreshSessionEvent) -> Int {
         (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
     }
@@ -194,6 +205,13 @@ private func performRefreshSession(
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
     if !TrayMenuModel.shared.isEnabled { return }
+    if case .onWindowParkingDrift = event {
+        guard !WindowBorderController.shared.isMissionControlActive else { return }
+        // A native window can move without an AX event. Repair placement promptly
+        // while preserving logical focus and avoiding unrelated AX enumeration.
+        try await $refreshSessionEvent.withValue(event) { try await layoutWorkspaces() }
+        return
+    }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
     let activation = pendingActivation
     debugFocusLog("runRefreshSessionBlocking begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
@@ -434,6 +452,7 @@ func refreshModel() {
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
+    if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 
 @MainActor
@@ -523,28 +542,9 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     }
 }
 
-enum OptimalHideCorner {
-    case bottomLeftCorner, bottomRightCorner
-}
-
 @MainActor
 private func layoutWorkspaces() async throws {
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
-    if !TrayMenuModel.shared.isEnabled {
-        for workspace in Workspace.all {
-            for window in workspace.allLeafWindowsRecursive {
-                try checkCancellation()
-                guard let macWindow = window as? MacWindow else { continue }
-                if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
-                    continue
-                }
-                try await macWindow.unhideFromCorner()
-            }
-            try await workspace.layoutWorkspace() // Unhide tiling windows from corner
-            try checkCancellation()
-        }
-        return
-    }
     let monitors = monitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]
     for monitor in monitors {
@@ -589,7 +589,10 @@ private func layoutWorkspaces() async throws {
             if geometryUnconfirmed {
                 _ = try? await macWindow.getAxRect()
             }
-            try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows || geometryUnconfirmed)
+            // Geometry invalidation also follows our own parking notifications. Let
+            // hideInCorner confirm native placement, including safe OS clamping,
+            // instead of forcing the same rejected position on every refresh.
+            try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows)
         }
     }
     // Reveal incoming windows only after outgoing workspaces are parked.

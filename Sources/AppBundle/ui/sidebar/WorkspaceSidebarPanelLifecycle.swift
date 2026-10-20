@@ -9,6 +9,16 @@ extension WorkspaceSidebarPanel {
     }
 
     func refresh(on monitor: Monitor) {
+        guard !isRetired else { return }
+        if appliedHoverOpenDelayMs != config.workspaceSidebar.hoverOpenDelayMs {
+            appliedHoverOpenDelayMs = config.workspaceSidebar.hoverOpenDelayMs
+            cancelHoverReveal()
+        }
+        guard !WorkspaceOverviewController.shared.isOpen else {
+            cancelExpansionWork()
+            resetHiddenSidebarState()
+            return
+        }
         guard let layout = currentSidebarPanelLayout(on: monitor) else {
             cancelExpansionWork()
             resetHiddenSidebarState()

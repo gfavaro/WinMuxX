@@ -73,6 +73,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         runtime.workspaces.pruneProjectWorkspaceIndexes()
         repairInvalidVisibleWorkspaceAssignments()
         rearrangeWorkspacesOnMonitors()
+        reconcileSecondaryWorkspaceAssignments()
         ensureMinimumWorkspaceForAllProjects()
         ensureConfiguredMinimumWorkspaces()
         pruneEmptyWorkspaces()
@@ -135,7 +136,7 @@ extension Workspace {
 
     @MainActor
     var isConfiguredPersistent: Bool {
-        config.minimumWorkspaceCount == nil && config.persistentWorkspaces.contains(name)
+        config.persistentWorkspaces.contains(name)
     }
 
     @MainActor

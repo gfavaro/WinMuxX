@@ -66,7 +66,8 @@ extension ObservableObject {
         ?? userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: workspace)
             .filter { $0.projectId == workspace.projectId }.firstIndex(of: workspace).map { $0 + 1 }
         ?? 1
-    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name], number: number))
+    let persistentLabel = workspace.isConfiguredPersistent && parsePositiveWorkspaceDisplayIndex(workspace.name) == nil ? workspace.name : nil
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name] ?? persistentLabel, number: number))
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, workspaceDisplayName(workspace.name))
     let workspaces = userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace).filter {
         $0.projectId == activeWorkspaceProjectId(for: $0.workspaceMonitor)

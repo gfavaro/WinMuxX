@@ -11,6 +11,9 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let layout: Layout
     let orientation: Orientation
     let weight: CGFloat
+    let isMasterStack: Bool?
+    let masterRatio: CGFloat?
+    let masterStackLayout: Layout?
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
@@ -28,6 +31,9 @@ struct FrozenContainer: Codable, Equatable, Sendable {
                     illegalChildParentRelation(child: $0, parent: container)
             }
         }
+        isMasterStack = container.isMasterStack ? true : nil
+        masterRatio = container.masterRatio
+        masterStackLayout = container.masterStackLayout
         layout = container.layout
         orientation = container.orientation
         weight = getWeightOrNil(container) ?? 1
@@ -40,6 +46,9 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     /// live-process tree. Keep only the target leaf and constant-size root policy.
     @MainActor init(assignment: FrozenWindow?, in container: TilingContainer) {
         children = assignment.map { [.window($0)] } ?? []
+        isMasterStack = container.isMasterStack ? true : nil
+        masterRatio = container.masterRatio
+        masterStackLayout = container.masterStackLayout
         layout = container.layout
         orientation = container.orientation
         weight = getWeightOrNil(container) ?? 1
@@ -60,6 +69,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
     let minimumEvidenceVersion: Int
     let lastFloatingSize: CGSize?
     let singleWindowManualWidth: CGFloat?
+    let workspacePreviewFrame: CGRect?
 
     @MainActor init(_ window: Window) {
         id = window.windowId
@@ -71,6 +81,15 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         lastFloatingSize = window.parent is Workspace && !window.isFullscreen
             ? window.lastKnownActualRect?.size ?? window.lastFloatingSize : window.lastFloatingSize
         singleWindowManualWidth = window.singleWindowManualWidth
+        if window.nodeWorkspace?.isVisible == true, !window.isHiddenInCorner,
+           let rect = window.lastKnownActualRect ?? window.lastAppliedLayoutPhysicalRect,
+           let monitor = window.nodeMonitor
+        {
+            workspacePreviewFrame = normalizedWorkspacePreviewFrame(CGRect(origin: rect.topLeftCorner, size: rect.size),
+                origin: monitor.rect.topLeftCorner, desktopSize: monitor.rect.size) ?? window.workspacePreviewFrame
+        } else {
+            workspacePreviewFrame = window.workspacePreviewFrame
+        }
         minimumEvidenceVersion = 2
         learnedMinimumSize = (window as? MacWindow)?.learnedMinimum.size == .zero ? nil : (window as? MacWindow)?.learnedMinimum.size
     }
@@ -86,6 +105,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         case minimumEvidenceVersion
         case lastFloatingSize
         case singleWindowManualWidth
+        case workspacePreviewFrame
     }
 
     init(from decoder: any Decoder) throws {
@@ -101,6 +121,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
             ? try container.decodeIfPresent(CGSize.self, forKey: .learnedMinimumSize) : nil
         lastFloatingSize = try container.decodeIfPresent(CGSize.self, forKey: .lastFloatingSize)
         singleWindowManualWidth = try container.decodeIfPresent(CGFloat.self, forKey: .singleWindowManualWidth)
+        workspacePreviewFrame = try container.decodeIfPresent(CGRect.self, forKey: .workspacePreviewFrame)
     }
 }
 

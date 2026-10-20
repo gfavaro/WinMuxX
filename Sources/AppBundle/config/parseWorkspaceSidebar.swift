@@ -14,6 +14,11 @@ private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebar
     "enable-focus": Parser(\.enableFocus, parseBool),
     "auto-hide": Parser(\.autoHide, parseBool),
     "always-expanded": Parser(\.alwaysExpanded, parseBool),
+    "hover-open-delay-ms": Parser(\.hoverOpenDelayMs) { raw, backtrace in
+        parseInt(raw, backtrace).filter(.semantic(backtrace, "Must be between 0 and 5000 milliseconds")) {
+            (0...5000).contains($0)
+        }
+    },
     "collapsed-width": Parser(\.collapsedWidth, parseWorkspaceSidebarWidth),
     "width": Parser(\.width, parseWorkspaceSidebarWidth),
     "monitor": Parser(\.monitor) { value, backtrace, errors in

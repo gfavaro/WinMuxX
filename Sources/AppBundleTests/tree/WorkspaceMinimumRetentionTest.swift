@@ -81,7 +81,7 @@ final class WorkspaceMinimumRetentionTest: XCTestCase {
         XCTAssertGreaterThanOrEqual(Workspace.all.count, 2)
     }
 
-    func testParsingAndExplicitMinimumOverrideLegacyNames() {
+    func testParsingAndExplicitMinimumCoexistWithPersistentNames() {
         for value in ["0", "1", "7"] {
             XCTAssertTrue(parseConfig("minimum-workspace-count = " + value).errors.isEmpty)
         }
@@ -92,7 +92,7 @@ final class WorkspaceMinimumRetentionTest: XCTestCase {
         XCTAssertEqual(legacy.config.effectiveMinimumWorkspaceCount, 3)
         config = parseConfig("config-version = 2\nminimum-workspace-count = 1\npersistent-workspaces = ['legacy']").config
         materializePersistedWorkspaces()
-        XCTAssertNil(Workspace.existing(byName: "legacy"))
+        XCTAssertTrue(Workspace.existing(byName: "legacy")?.isConfiguredPersistent == true)
         XCTAssertEqual(config.effectiveMinimumWorkspaceCount, 1)
     }
 

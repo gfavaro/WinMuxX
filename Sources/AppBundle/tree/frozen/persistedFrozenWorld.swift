@@ -16,6 +16,7 @@ final class WorkspaceRecoveryState {
     var restartWindowAttempts: [UInt32: RestartWindowAttempt] = [:]
     var restartRetryTask: Task<Void, Never>?
     var restartRestorationsInFlight = 0
+    var firstUserWorkspaceSelectionDate: Date?
     let restartWriter = RestartStateWriter()
 
     func reset() {
@@ -28,6 +29,7 @@ final class WorkspaceRecoveryState {
         restartMatchedWindows = []
         lastRestartIdentityRefresh = .distantPast
         restartWindowAttempts = [:]
+        firstUserWorkspaceSelectionDate = nil
         restartRetryTask?.cancel()
         restartRetryTask = nil
         closedWindows = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
@@ -43,6 +45,24 @@ final class WorkspaceRecoveryState {
 @MainActor private var recovery: WorkspaceRecoveryState { runtime.recovery }
 
 private let persistedFrozenWorldVersion = 2
+
+/// Once navigation begins, subsequently launched apps belong to the user's
+/// selected workspace. Keep the first boundary so later navigation cannot make
+/// an excluded process eligible again during delayed AX retries.
+@MainActor
+func recordUserWorkspaceSelectionForRestoration(at date: Date = .now) {
+    guard _isStartup != true, isWinMuxRuntimeReady || isUnitTest else { return }
+    if recovery.firstUserWorkspaceSelectionDate == nil {
+        recovery.firstUserWorkspaceSelectionDate = date
+    }
+}
+
+@MainActor
+private func allowsSavedPlacement(_ identity: RestartWindowIdentity) -> Bool {
+    guard let selection = recovery.firstUserWorkspaceSelectionDate else { return true }
+    guard let launch = identity.launchDate else { return false }
+    return launch <= selection
+}
 
 /// Only finish startup trees while no subsequent user layout change has occurred.
 @MainActor
@@ -226,6 +246,7 @@ func loadPersistedFrozenWorldForStartupIfPresent() -> Bool {
 
 @MainActor
 func preparePersistedFrozenWorldForStartup(_ envelope: PersistedFrozenWorldEnvelope) {
+    recovery.firstUserWorkspaceSelectionDate = nil
     recovery.lateRestartTreeExpiry?.cancel()
     recovery.lateRestartTreeDeadline = .now.addingTimeInterval(30)
     if !isUnitTest {
@@ -287,7 +308,9 @@ var pendingRestartWindowCount: Int {
 
 @MainActor
 func trackPendingRestartWindow(_ window: Window) {
-    guard let bundleId = window.restartIdentity?.bundleId,
+    guard let identity = window.restartIdentity, allowsSavedPlacement(identity) else { return }
+    let bundleId = identity.bundleId
+    guard
           recovery.pendingRestartSnapshots.contains(where: { snapshot in
               snapshot.world.workspaces.contains { workspace in
                   collectFrozenWindows(workspace).values.contains {
@@ -338,6 +361,10 @@ func retryPendingRestartWindows() async throws {
             forgetPendingRestartWindow(id)
             continue
         }
+        if let identity = window.restartIdentity, !allowsSavedPlacement(identity) {
+            forgetPendingRestartWindow(id)
+            continue
+        }
         if try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window) {
             forgetPendingRestartWindow(id)
         }
@@ -361,7 +388,7 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
         recovery.restartRestorationsInFlight -= 1
         compactPendingRestartSnapshots()
     }
-    guard let identity = window.restartIdentity else { return false }
+    guard let identity = window.restartIdentity, allowsSavedPlacement(identity) else { return false }
     let generation = window.bindingGeneration
     let candidates = recovery.pendingRestartSnapshots.indices.flatMap { index in
         recovery.pendingRestartSnapshots[index].world.workspaces.flatMap { workspace in
@@ -383,7 +410,7 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
     }
     guard let candidateIndex = matchRestartWindowIndex(id: window.windowId, identity: identity,
         saved: saved, live: live), Window.get(byId: window.windowId) === window,
-        window.bindingGeneration == generation else { return false }
+        window.bindingGeneration == generation, allowsSavedPlacement(identity) else { return false }
     let candidate = candidates[candidateIndex]
     let index = candidate.snapshotIndex
     let frozen = candidate.window

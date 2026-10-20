@@ -184,6 +184,7 @@ struct ShortcutCategoryView: View {
     @SettingsDraft("modifiers.ctrl", load: { config.modifierSides.ctrl.rawValue }) private var ctrlSide: String
     @SettingsDraft("modifiers.shift", load: { config.modifierSides.shift.rawValue }) private var shiftSide: String
     @SettingsDraft("workspace-sidebar.project-deletion-action", load: { config.workspaceSidebar.projectDeletionAction }) private var projectDeletionAction: WorkspaceProjectDeletionAction
+    @SettingsDraft("persistent-workspaces", load: { config.persistentWorkspaces.joined(separator: ", ") }) private var persistentWorkspaces: String
     @SettingsDraft("minimum-workspace-count", load: { config.effectiveMinimumWorkspaceCount }) private var minimumWorkspaceCount: Int
 
     var body: some View {
@@ -201,15 +202,18 @@ struct ShortcutCategoryView: View {
 
             if category == .common {
                 Section("Workspace availability") {
-                    SettingsStepper("Workspaces to keep", id: "minimum-workspace-count", value: $minimumWorkspaceCount,
+                    SettingsTextField("Persistent workspaces", id: "persistent-workspaces", text: $persistentWorkspaces,
+                        help: "Comma-separated names in sidebar order, for example 1, 3, 5, Code. These workspaces stay available when empty.") {
+                        persistSettingsConfig(section: nil, key: "persistent-workspaces",
+                            renderedValue: tomlCommaSeparatedStringArray(persistentWorkspaces), model: model)
+                    }
+                    SettingsStepper("Minimum workspace count", id: "minimum-workspace-count", value: $minimumWorkspaceCount,
                         range: 0...Int.max, help: "Keep at least this many workspaces across all projects. 0 disables the configured minimum.", unit: "") {
                         saveMinimumWorkspaceCount()
                     }
                     SettingsDescription("Each project and active display still keeps its required workspace. Occupied workspaces count toward this minimum.")
-                    if config.minimumWorkspaceCount == nil && !config.persistentWorkspaces.isEmpty {
-                        SettingsDescription("Saving this number replaces the old list of persistent names with a global minimum.")
-                        Button("Use this quantity") { saveMinimumWorkspaceCount() }
-                            .frame(minHeight: 28)
+                    if !config.persistentWorkspaces.isEmpty {
+                        SettingsDescription("Persistent workspaces stay available even when empty and count toward this minimum. Their configured names and order are preserved.")
                     }
                 }
                 Section("Projects") {
@@ -280,10 +284,7 @@ struct ShortcutCategoryView: View {
 
     private func saveMinimumWorkspaceCount() {
         model.activeSettingTitle = "Workspaces to keep"
-        persistSettingsConfigEdits([
-            SettingsConfigEdit(section: nil, key: "minimum-workspace-count", renderedValue: String(minimumWorkspaceCount)),
-            SettingsConfigEdit(section: nil, key: "persistent-workspaces", renderedValue: nil),
-        ], model: model)
+        persistSettingsConfigEdits(minimumWorkspaceCountConfigEdits(minimumWorkspaceCount), model: model)
     }
 
 }

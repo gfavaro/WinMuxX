@@ -119,7 +119,7 @@ final class WorkspaceCommandTest: XCTestCase {
         XCTAssertTrue(main.activeWorkspace === workspace5)
         XCTAssertTrue(secondary.activeWorkspace === workspace2)
         XCTAssertTrue(focus.workspace === workspace2)
-        XCTAssertTrue(workspace1.workspaceMonitor.rect.topLeftCorner == secondary.rect.topLeftCorner)
+        XCTAssertTrue(workspace1.workspaceMonitor.rect.topLeftCorner == main.rect.topLeftCorner)
 
         // Hiding it and switching from Main again must not pull it back.
         XCTAssertTrue(secondary.setActiveWorkspace(workspace1))

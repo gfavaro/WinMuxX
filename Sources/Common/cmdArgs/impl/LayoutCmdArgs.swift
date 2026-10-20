@@ -24,7 +24,6 @@ public struct LayoutCmdArgs: CmdArgs {
 
     public enum LayoutDescription: String, CaseIterable, Equatable, Sendable {
         case tabGroup = "tab-group"
-        case dwindle
         case stacked = "accordion"
         case tiles
         case horizontal, vertical, auto

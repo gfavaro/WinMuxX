@@ -188,6 +188,9 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
         index: index,
     )
 
+    container.isMasterStack = frozenContainer.isMasterStack ?? false
+    container.masterRatio = frozenContainer.masterRatio
+    container.masterStackLayout = frozenContainer.masterStackLayout
     container.dwindleOrientation = frozenContainer.dwindleOrientation
     for child in frozenContainer.children {
         switch child {
@@ -213,6 +216,12 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
     window.isFullscreen = frozenWindow.isFullscreen
     window.noOuterGapsInFullscreen = frozenWindow.noOuterGapsInFullscreen
     window.layoutReason = frozenWindow.layoutReason
+    if let frame = frozenWindow.workspacePreviewFrame,
+       let valid = normalizedWorkspacePreviewFrame(frame, origin: .zero, desktopSize: CGSize(width: 1, height: 1), minimumVisibleSize: 0)
+    {
+        window.workspacePreviewFrame = valid
+        window.preserveRestoredWorkspacePreview = true
+    }
     (window as? MacWindow)?.restoreLearnedMinimum(frozenWindow.learnedMinimumSize)
     if let size = frozenWindow.lastFloatingSize, validRestoredWindowSize(size) {
         window.lastFloatingSize = size

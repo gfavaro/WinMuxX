@@ -46,13 +46,31 @@ func clearOrphanedWorkspaceSidebarLabels() {
 }
 
 @MainActor
+func workspacePresentationDisplayIndex(_ workspace: Workspace, focusedWorkspace: Workspace? = nil) -> Int? {
+    if projectHasPersistentWorkspaces(workspace.projectId) {
+        return automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focusedWorkspace ?? focus.workspace)
+    }
+    return orderedUserFacingWorkspaces(in: workspace.projectId, focusedWorkspace: focusedWorkspace ?? focus.workspace)
+        .firstIndex(of: workspace).map { $0 + 1 }
+}
+
+@MainActor
 func workspaceDefaultDisplayName(_ workspaceName: String) -> String {
     if let workspace = Workspace.existing(byName: workspaceName) {
-        guard workspace.usesAutomaticDisplayName else { return workspaceName }
-        if let index = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focus.workspace)
-            ?? automaticWorkspaceDisplayIndexFallback(workspaceName)
+        if workspace.isConfiguredPersistent {
+            return parsePositiveWorkspaceDisplayIndex(workspaceName).map { "Workspace \($0)" } ?? workspaceName
+        }
+        if let index = workspacePresentationDisplayIndex(workspace)
         {
             return "Workspace \(index)"
+        }
+        // A slot not yet presented (for example, a newly created empty slot)
+        // can still use its provisional index until it enters the visible list.
+        let provisional = orderedWorkspaces(in: workspace.projectId).filter {
+            $0 === workspace || isUserFacingWorkspace($0, focusedWorkspace: focus.workspace)
+        }
+        if let index = provisional.firstIndex(of: workspace) {
+            return "Workspace \(index + 1)"
         }
         return workspaceName
     }

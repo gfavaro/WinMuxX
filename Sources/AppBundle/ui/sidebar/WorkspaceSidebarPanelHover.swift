@@ -48,31 +48,63 @@ extension WorkspaceSidebarPanel {
             updateMousePassthrough()
         }
 
-        guard isMouseDeepEnoughToExpand() else {
-            pendingExpand?.cancel()
-            pendingExpand = nil
-            return
-        }
-        scheduleHoverExpansion(expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
+        if isMouseDeepEnoughToExpand() { expandSidebar(to: expandedWidth) }
+    }
+
+    func cancelHoverReveal() {
+        hoverRevealGeneration &+= 1
+        pendingExpand?.cancel()
+        pendingExpand = nil
+        hoverDwellSatisfied = false
     }
 
     func scheduleHoverExpansion(expandedWidth: CGFloat, collapsedWidth: CGFloat) {
         guard pendingExpand == nil else { return }
+        let generation = hoverRevealGeneration
         let expand = DispatchWorkItem { [weak self] in
-            guard let self else { return }
+            guard let self, !self.isRetired, self.hoverRevealGeneration == generation else { return }
             self.pendingExpand = nil
-            guard self.isMouseInsideHoverRegion(),
-                  self.isMouseDeepEnoughToExpand()
-            else { return }
-            self.expandSidebar(to: expandedWidth)
+            guard self.isVisible, config.workspaceSidebar.enabled,
+                  self.isMouseInsideHoverRegion(), !self.shouldSuppressHoverForPointerPress
+            else { self.hoverDwellSatisfied = false; return }
+            self.hoverDwellSatisfied = true
+            let cueWidth = workspaceSidebarHoverCueWidth(collapsedWidth: collapsedWidth, expandedWidth: expandedWidth)
+            self.showHoverCue(cueWidth: cueWidth, expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
         }
         pendingExpand = expand
-        DispatchQueue.main.asyncAfter(deadline: .now() + hoverOpenDelay, execute: expand)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(config.workspaceSidebar.hoverOpenDelayMs) / 1000, execute: expand)
+    }
+
+    var shouldSuppressHoverForPointerPress: Bool {
+        shouldSuppressWorkspaceSidebarHoverForPointerPress(
+            isExpanded: viewModel.isWorkspaceSidebarExpanded,
+            isLeftMouseButtonDown: isLeftMouseButtonDown,
+            pressStartedInsideSidebar: leftMousePressStartedInsideSidebar,
+            isWindowDrag: isMouseWindowDragInProgress(),
+            isSidebarDrag: isWorkspaceSidebarItemDragActive() || getCurrentMouseDragStartedInSidebar(),
+        )
+    }
+
+    static func noteHoverPointerButtonEvent(type: NSEvent.EventType, screenPoint: CGPoint) {
+        guard type == .leftMouseDown || type == .leftMouseUp else { return }
+        for panel in visiblePanels {
+            panel.leftMousePressStartedInsideSidebar = type == .leftMouseDown &&
+                workspaceSidebarVisibleFrame(panel: panel.frame, width: panel.viewModel.workspaceSidebarVisibleWidth,
+                    position: config.workspaceSidebar.position).contains(screenPoint)
+            // Button transitions must cancel a pending dwell before a queued reveal
+            // or release mouse passthrough without waiting for another movement.
+            panel.updateHoverStateFromMousePosition()
+        }
     }
 }
 
 extension WorkspaceSidebarPanel {
     func handleHoverEnter(expandedWidth: CGFloat, collapsedWidth: CGFloat) {
+        if shouldSuppressHoverForPointerPress {
+            cancelHoverReveal()
+            updateMousePassthrough()
+            return
+        }
         let cueWidth = workspaceSidebarHoverCueWidth(collapsedWidth: collapsedWidth, expandedWidth: expandedWidth)
         let isExpansionLocked = shouldLockExpansionForSidebarDrag()
         let isExternalWindowDrag = isMouseWindowDragInProgress()
@@ -86,15 +118,14 @@ extension WorkspaceSidebarPanel {
         pendingCollapseFinalize?.cancel()
         pendingCollapseFinalize = nil
         if shouldSuppressDragExpansion {
-            pendingExpand?.cancel()
-            pendingExpand = nil
+            cancelHoverReveal()
             updateMousePassthrough()
             return
         }
 
         if isExternalWindowDrag && !isSidebarOriginatedDrag && isMousePushedAgainstDisplayEdge() {
             showCollapsedSidebarDuringExternalDrag(
-                collapsedWidth: workspaceSidebarHoverActivationWidth(config.workspaceSidebar)
+                collapsedWidth: CGFloat(config.workspaceSidebar.collapsedWidth)
             )
             return
         }
@@ -106,12 +137,15 @@ extension WorkspaceSidebarPanel {
             expandSidebar(to: expandedWidth)
             return
         }
-        showHoverCue(cueWidth: cueWidth, expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
+        if hoverDwellSatisfied {
+            showHoverCue(cueWidth: cueWidth, expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
+        } else {
+            scheduleHoverExpansion(expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
+        }
     }
 
     func showCollapsedSidebarDuringExternalDrag(collapsedWidth: CGFloat) {
-        pendingExpand?.cancel()
-        pendingExpand = nil
+        cancelHoverReveal()
         if !isVisible {
             refresh()
         }
@@ -126,8 +160,7 @@ extension WorkspaceSidebarPanel {
 extension WorkspaceSidebarPanel {
     func handleHoverExit(collapsedWidth: CGFloat) {
         debugWorkspaceSidebarHoverLog("handleHoverExit panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) expanded=\(viewModel.isWorkspaceSidebarExpanded) suppressActive=\(Date() < splitBrowseCollapseSuppressedUntil) mouse=\(NSEvent.mouseLocation)")
-        pendingExpand?.cancel()
-        pendingExpand = nil
+        cancelHoverReveal()
         guard !config.workspaceSidebar.alwaysExpanded else {
             cancelExpansionWork()
             expandSidebar(to: CGFloat(config.workspaceSidebar.width))

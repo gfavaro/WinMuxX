@@ -103,6 +103,12 @@ a fallback for unassigned slots. Selection preserves ownership. Explicit moves
 invalidate recovery state and replace secondary slots, returning displaced owners
 to main without activating them. Startup/restoration only seed ownership.
 
+`WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
+Recognizer policy, the bounded mailbox, native device ownership and the shared
+spring each have separate modules. The overview presentation owns panel-only
+motion; the horizontal controller owns horizontal navigation. Keep new gesture
+behavior out of startup/configuration/observer entry points beyond delegation.
+
 The swipe preview uses `WorkspaceSwipePreviewPhase` to wait for both the animation
 and workspace layout before removing its overlay. Async completions must check their
 generation before affecting a newer interaction. Outgoing screen capture and incoming

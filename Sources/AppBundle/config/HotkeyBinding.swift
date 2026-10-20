@@ -147,9 +147,10 @@ extension HotKey {
                     mode: activeMode,
                     binding: binding,
                 ))
-                try await runLightSession(
+                try await runCommandSession(
                     .hotkeyBinding,
                     .checkServerIsEnabledOrDie(),
+                    isQuery: commands.allSatisfy { $0.isQuery || $0.isPresentation },
                     shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
                 ) { () throws in
                     _ = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)

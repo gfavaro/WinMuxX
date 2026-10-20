@@ -21,6 +21,18 @@ batch before the first corresponding frame mutation. Recording a batch still
 completes synchronously before native writes. Removal of closed-window entries can
 coalesce for 50 ms; a subsequent record or clean quit flushes that pending update.
 
+Master layout adds a two-child root and one ordinary stack container. Geometry,
+minimum fitting, animation and resize previews reuse the existing tree paths; it
+has no polling, capture stream or additional display link. Closed stacks release
+their parent references, verified with weak references and 500 insert/close cycles.
+
+Explicit disable and quit share one active original-frame restoration task, with
+independent app queues and failure budgets. Completed tasks and closed-window
+bookkeeping are released. Successful restores are skipped until management resumes;
+failed retries retain their last known frame to protect off-state manual moves.
+Automatic layout/frame writes remain suppressed while disabled. Journal ownership
+uses a kernel birth-time fallback when LaunchServices omits a direct launch date.
+
 ## Native events and input
 
 Mission Control notifications share one pending 16 ms reconciliation. Border IDs
@@ -61,9 +73,29 @@ and cancelled/late images cannot present an animation. Each retained image is
 limited to 2 million pixels and a 2048-pixel longest edge. Native capture can still
 temporarily allocate a full-resolution source image before reduction.
 
+Palette dismissal releases indexed window titles, icon references and the selection
+callback, while keeping the reusable native panel. Repeated dismissal of an already
+hidden palette does not rebuild its hosting view or publish unchanged search state.
+
+Sidebar panels are retained only for the currently resolved monitor scopes. A scope
+that disappears is removed from the registry and retired: pending work, input taps,
+event monitors and menu observers are cancelled or removed, and its hosting subtree
+is cleared before closing. Deferred callbacks cannot reopen a retired panel. A
+returning monitor position creates a fresh panel; active scopes reuse their panels.
+
+The palette uses a native search field and a standard selectable SwiftUI list.
+Native text editing and marked-text composition precede palette commands. Result
+ranking/grouping is computed once per view update and row selection is keyed by
+window ID. The palette uses one system glass/material surface; overview retains a
+single full-screen native blur. Neither adds polling, capture streams or animation
+clocks. System semantic colors, opaque Reduce Transparency fallbacks and increased
+contrast outlines replace palette-specific white opacity layers. Existing opaque
+custom chrome remains supported. Overview exposes selected workspace/window traits
+and accessibility focus without changing the capture budget or gesture renderer.
+
 ## Verification
 
-The local check passed 1,133 Swift tests and 26 Python tests. Two focused Thread
+The current local check passed 1,243 Swift tests and 26 Python tests. Earlier, two focused Thread
 Sanitizer tests passed for concurrent cancellation and persistence-worker
 coalescing/final-save ordering, with no race reports. The strengthened six-window,
 ten-layout hotkey benchmark records six frame writes; the geometry-event scenario
@@ -160,13 +192,142 @@ Build 83 was compiled before these changes were committed locally and embeds bas
 hash `5579eaf1`. Its runtime implementation includes the fixes documented here;
 subsequent changes add tests, stress-fixture arguments and these measurements.
 
-Interactive Mission Control, gesture and occlusion checks remain unverified:
-computer-use access to the native apps was denied. Multi-monitor/hotplug tests and
+At the build 83 checkpoint, interactive Mission Control, gesture and occlusion
+checks were unverified because computer-use access was denied. Native app access
+subsequently worked for overview validation; see the current checklist. Multi-monitor/hotplug tests and
 long-running managed-window churn are still pending. `powermetrics` was unavailable
 without superuser access; no watts, battery-life or full-system wakeup improvement
 is claimed from these process counters or unit tests.
 
 The follow-up [release validation checklist](RELEASE_VALIDATION.md) records the
 model lifecycle stress test, fixture isolation fix, two-hour passive observation
-and remaining native/energy access limits. The long observation is running; its
-completion must be checked in the generated report before citing a two-hour result.
+and remaining native/energy access limits. The build 83 long observation was
+interrupted by an app update after 97.23 minutes; it was not a completed two-hour
+result. The checklist also records the overview capture leak attribution and the
+ScreenCaptureKit replacement on macOS 14+.
+
+
+## 2026-10-18: native corner-clamp retry
+
+A brief right-edge flash reported during idle/typing prompted an event-driven
+trace of build 87. macOS accepted parking AX requests at `(1709, 1111)` but
+kept several native windows at `(1709, 1080)`. Exact-position confirmation and
+forced writes after geometry invalidation retried that rejected coordinate.
+The 90-second diagnostic recorded 115 parking attempts and accepted AX position
+writes, including 85 after excluding the first ten seconds. This is evidence of
+redundant writes, not proof that those writes caused the reported flash.
+
+Build 88 accepts a native-confirmed correction of at most 64 points only when
+intersection with every connected display remains no more than the existing
+one-point parking strip in at least one dimension. Unknown/invalid bounds,
+meaningful onscreen drift, large corrections, and visibility on another display
+remain unconfirmed and trigger re-parking. Geometry invalidation now uses that
+native confirmation instead of forcing a write; startup and wake retain forced
+reassertion. No polling or permanent timer was added.
+
+Regression tests cover the observed clamp, actual onscreen drift, excessive
+correction, negative display origins, adjacent-display exposure and invalid bounds.
+The full suite passes 1,165 Swift tests and 26 Python checks. Installed build 88
+reported zero parking attempts and zero AX position writes during twenty no-op
+`enable on` refresh commands followed by twenty quiet seconds. This is a different
+workload from the original 90-second observation, not a percentage improvement or
+battery measurement. All window assignments and config contents were preserved;
+the final process runs without tracing. Private reports are in
+`.local/validation/parking-clamp-build88` and `.local/validation/flash-investigation`.
+
+The first diagnostic helper failed to reap its child before its relaunch step;
+the normal app was restored manually. The final validation restored its normal
+runtime successfully. The flash itself was not visually reproduced or conclusively
+attributed; continued user observation is still needed.
+
+## Overview gesture and drift recovery follow-up (build 91)
+
+Overview animation shares the horizontal swipe spring/duration and uses finite
+Core Animation animations. Capture and session observers stop when dismissal
+begins; one frozen image group remains until completion. Reopening first retires
+that group. The native raw-touch source is demanded while overview is open even
+when the upward shortcut is disabled, and stops when no enabled gesture needs it.
+Recognition, routing, delivery, lifecycle and presentation live in dedicated files.
+
+Parked-window geometry events are coalesced before native-bound checks. Only
+completed parking on an inactive workspace with known normal native state is
+eligible. Actual drift requests a placement-only refresh without native-focus
+adoption; already safe parking requests no repair. A 1,000-event regression test
+checks coalescing. This path adds no periodic polling or timer.
+
+The full suite passes 1,177 Swift tests and 26 Python checks. Build 90 completed
+20 animated plus 10 rapid native overview cycles with zero detected leaks before
+and after. Build 91 preserves configuration and all six current assignments,
+and native Close restores the sidebar after animation. These bounded checks do
+not prove battery improvement or resolution of the intermittent Safari flash.
+
+## Empty-cache recovery correction (build 93)
+
+A subsequent Safari flash prompted a finite build 92 event trace. It captured 18
+Safari geometry notifications with absent native-state flags; the prior fast
+repair silently excluded empty caches. Controlled workspace switching was part
+of this trace, so it does not reproduce or attribute the spontaneous flash.
+
+Native bounds now gate the expensive work: confirmed safe parking never queries
+AX. Drifted candidates receive one native fullscreen/minimized observation with
+generation and window-identity checks. Failed, stale or unsafe observations do
+not repair. Visibility and geometry are checked again after awaiting. Events
+during a read are retained in a set and drain in a follow-up batch, with one batch
+performing observations at a time. No periodic source was added. Three additional
+regression tests cover these paths; 1,180 Swift and 26 Python checks pass.
+The finite trace was disabled before the final normal runtime. Resolution of
+the intermittent visual flash remains unconfirmed.
+
+## Recurring flash correlated with external display hotplug
+
+A user-timed flash was captured in build 93. WindowServer repeatedly disconnected
+and reconnected external display 2 roughly every 70.91 seconds, with each outage
+lasting about 1.2 seconds. Native Safari and other inactive-window frames returned
+onscreen before WinMuxX's repair writes, while the focused Ghostty/workspace stayed
+unchanged. The user reported the external monitor was connected but switched off.
+This demonstrates actual geometry changes during native display reconfiguration,
+rather than confirming a border or gesture-preview artifact. The reason the
+connection cycles is not established. A cable-disconnection check is pending.
+The finite trace was disabled and assignments preserved; no battery improvement
+or additional software fix is claimed from this observation.
+
+The follow-up 120.45-second check with the powered-off monitor cable disconnected
+recorded zero display hotplug events and zero parked-window repairs; the user
+reported no flashes. This isolates the observed trigger without adding idle work
+or another hiding mechanism. The physical link-cycling cause remains unknown.
+
+## Interactive overview presentation (build 94)
+
+Vertical gesture progress now updates existing panel-layer opacity, scale and
+translation directly. It does not mutate SwiftUI models, lay out real windows or
+capture new snapshots per touch frame. A committed release carries bounded
+velocity into the common spring; reversal/reset cancel provisional opening or
+restore an existing closing session. Disabled motion retains release-only actions.
+No permanent timer or display-refresh callback was added.
+
+The full suite passes 1,187 Swift and 26 Python checks, including 1,000 progress
+updates sharing one controller model/image budget. Installed build 94 completed
+ten ordinary and ten rapid native CLI cycles, with zero detected leaks before
+and after. Configuration and assignments were preserved. Physical swipe feel
+remains separate from these fixtures and command-animation measurements.
+
+### Sidebar hover intent
+
+Hover reveal uses one cancelable, weakly captured dispatch item per panel, with
+`workspace-sidebar.hover-open-delay-ms` (400 ms by default, 0–5000 ms). The cue and
+expansion wait for dwell. Pointer exit, retirement, explicit opening, and delay
+reload cancel pending work; generation checks reject stale completions. Pointer
+button transitions reuse the existing observer event path. A press begun outside
+a collapsed sidebar suppresses hover, mouse interception and edge cursor trapping
+until release, except for recognized window/sidebar drags. Mouse-up permits a new
+dwell even with a stationary cursor. No repeating timer or new idle polling source
+was added. Tests cover delay parsing, deferred reveal/cancellation and pointer-press
+policy; those do not certify physical pointer feel in every application.
+
+Auto-hide uses a two-point opening strip independent of collapsed rail width.
+The exit tolerance applies only after content is revealed; a collapse reaching
+zero width returns to the two-point strip even if the expanded flag has not yet
+cleared. Compact rails retain their full visible hit area and depth threshold.
+Idle hidden panel backing also shrinks to the edge strip. External window-drag
+rail previews retain the configured rail width. Geometry tests cover both edges,
+offset/negative display origins and the distinction between opening and exit.

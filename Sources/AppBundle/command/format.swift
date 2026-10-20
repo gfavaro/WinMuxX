@@ -149,6 +149,7 @@ extension String {
                     case .workspaceVisible: .success(.bool(w.isVisible))
                     case .workspaceFocused: .success(.bool(focus.workspace == w))
                     case .workspaceRootContainerLayout: .success(.string(toLayoutString(tc: w.rootTilingContainer)))
+                    case .workspaceLayout: .success(.string(w.layoutName))
                 }
             case (.monitor(let m), .monitor(let f)):
                 return switch f {
@@ -186,7 +187,8 @@ private func toLayoutString(tc: TilingContainer) -> String {
     switch (tc.layout, tc.orientation) {
         case (.tiles, .h): return LayoutCmdArgs.LayoutDescription.h_tiles.rawValue
         case (.tiles, .v): return LayoutCmdArgs.LayoutDescription.v_tiles.rawValue
-        case (.dwindle, .h), (.dwindle, .v): return LayoutCmdArgs.LayoutDescription.dwindle.rawValue
+        case (.dwindle, .h), (.dwindle, .v): return "dwindle"
+        case (.master, _): return "master"
         case (.stacked, _): return LayoutCmdArgs.LayoutDescription.stacked.rawValue
         case (.tabGroup, .h): return LayoutCmdArgs.LayoutDescription.hTabGroup.rawValue
         case (.tabGroup, .v): return LayoutCmdArgs.LayoutDescription.vTabGroup.rawValue

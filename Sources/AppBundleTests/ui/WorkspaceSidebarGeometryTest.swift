@@ -4,6 +4,77 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarGeometryTest: XCTestCase {
+    func testCenteredSidebarUsesWindowRadiusAtBothWidthsAndOnBothEdges() {
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.heightMode = .centered
+        let rect = CGRect(x: 0, y: 0, width: 240, height: 400)
+        for side in WorkspaceSidebarPosition.allCases {
+            configuration.position = side
+            for width: CGFloat in [44, 240] {
+                let shape = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: width)
+                XCTAssertEqual(shape.rightCornerRadius, systemWindowCornerRadius())
+                XCTAssertTrue(shape.roundAllCorners)
+                let path = shape.path(in: rect)
+                for point in [CGPoint(x: 0.1, y: 0.1), CGPoint(x: 239.9, y: 0.1),
+                              CGPoint(x: 0.1, y: 399.9), CGPoint(x: 239.9, y: 399.9)] {
+                    XCTAssertFalse(path.contains(point))
+                }
+                XCTAssertTrue(path.contains(CGPoint(x: 120, y: 200)))
+            }
+        }
+        configuration.heightMode = .full
+        let full = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: 0)
+        XCTAssertFalse(full.roundAllCorners)
+        XCTAssertEqual(full.rightCornerRadius, 0)
+    }
+
+    func testHiddenOpeningStripAndExpandedExitToleranceUseSeparateRegionsOnBothEdges() {
+        var config = WorkspaceSidebarConfig()
+        config.autoHide = true
+        config.collapsedWidth = 44
+        config.width = 280
+        let screens = [CGRect(x: 0, y: 0, width: 1440, height: 900),
+                       CGRect(x: -1920, y: -300, width: 1920, height: 1080)]
+        for screen in screens {
+            for side in WorkspaceSidebarPosition.allCases {
+                config.position = side
+                let frame = workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 300)
+                let width = workspaceSidebarHoverRegionWidth(config, visibleWidth: 0, isExpanded: false)
+                XCTAssertEqual(width, 2)
+                let region = workspaceSidebarVisibleFrame(panel: frame, width: width, position: side)
+                func point(_ inset: CGFloat) -> CGPoint {
+                    CGPoint(x: side == .left ? screen.minX + inset : screen.maxX - inset, y: frame.midY)
+                }
+                XCTAssertTrue(region.contains(point(1)))
+                for inset: CGFloat in [-1, 3, 11, 44, 63] { XCTAssertFalse(region.contains(point(inset))) }
+                let openWidth = workspaceSidebarHoverRegionWidth(config, visibleWidth: 280, isExpanded: true)
+                XCTAssertEqual(openWidth, 300)
+                let open = workspaceSidebarVisibleFrame(panel: frame, width: openWidth, position: side)
+                XCTAssertTrue(open.contains(point(290)))
+                XCTAssertFalse(open.contains(point(301)))
+                // During collapse the flag can outlive the rendered width.
+                XCTAssertEqual(workspaceSidebarHoverRegionWidth(config, visibleWidth: 0, isExpanded: true), 2)
+            }
+        }
+        config.autoHide = false
+        XCTAssertEqual(workspaceSidebarHoverRegionWidth(config, visibleWidth: 44, isExpanded: false), 44)
+    }
+
+    func testAutoHideUsesWholeNarrowStripWhileCompactRailKeepsDepthThreshold() {
+        for origin: CGFloat in [-1920, 0, 1440] {
+            XCTAssertTrue(isWorkspaceSidebarHoverDeepEnoughToExpand(mouseX: origin + 1.9,
+                sidebarMinX: origin, collapsedWidth: 2, autoHide: true))
+            XCTAssertFalse(isWorkspaceSidebarHoverDeepEnoughToExpand(mouseX: origin - 1,
+                sidebarMinX: origin, collapsedWidth: 2, autoHide: true))
+            XCTAssertFalse(isWorkspaceSidebarHoverDeepEnoughToExpand(mouseX: origin + 3,
+                sidebarMinX: origin, collapsedWidth: 2, autoHide: true))
+            XCTAssertTrue(isWorkspaceSidebarHoverDeepEnoughToExpand(mouseX: origin + 11,
+                sidebarMinX: origin, collapsedWidth: 44))
+            XCTAssertFalse(isWorkspaceSidebarHoverDeepEnoughToExpand(mouseX: origin + 12,
+                sidebarMinX: origin, collapsedWidth: 44))
+        }
+    }
+
     func testRenderedMenuBoundsUseEachDisplaysOwnHeightWithoutWorkspaceClearance() {
         let notched = CGRect(x: 0, y: 0, width: 1710, height: 1112)
         let external = CGRect(x: -908, y: -1440, width: 3440, height: 1440)

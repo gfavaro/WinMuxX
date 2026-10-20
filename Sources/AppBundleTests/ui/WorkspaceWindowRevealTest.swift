@@ -5,11 +5,38 @@ import AppKit
 final class WorkspaceWindowRevealTest: XCTestCase {
     func testWindowThatReappearedOnScreenIsNotConfirmedParked() {
         let parking = CGPoint(x: 1709, y: 1111)
-        XCTAssertTrue(workspaceParkingPositionMatches(parking, parking))
-        XCTAssertTrue(workspaceParkingPositionMatches(CGPoint(x: 1708, y: 1110), parking))
-        XCTAssertFalse(workspaceParkingPositionMatches(CGPoint(x: 48, y: 43), parking),
+        let display = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        func acceptable(_ x: CGFloat, _ y: CGFloat) -> Bool {
+            workspaceParkingFrameIsAcceptable(CGRect(x: x, y: y, width: 1659, height: 1074),
+                requested: parking, displays: [display])
+        }
+        XCTAssertTrue(acceptable(1709, 1111))
+        XCTAssertTrue(acceptable(1709, 1080), "Native titlebar clamping must not start a parking retry loop")
+        XCTAssertFalse(acceptable(48, 43),
                        "Safari must be parked again even if its old hidden flag is still set")
-        XCTAssertFalse(workspaceParkingPositionMatches(CGPoint(x: 1709, y: 43), parking))
+        XCTAssertFalse(acceptable(1709, 43), "A window moving far up the edge must still be repaired")
+        XCTAssertFalse(acceptable(1678, 1080), "A visible 32-by-32 corner is not the one-point parking strip")
+    }
+
+    func testParkingClampMustRemainHiddenOnEveryDisplay() {
+        let observed = CGRect(x: 1709, y: 1080, width: 1659, height: 1074)
+        let main = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        let right = CGRect(x: 1710, y: 0, width: 1920, height: 1112)
+        XCTAssertFalse(workspaceParkingFrameIsAcceptable(observed, requested: CGPoint(x: 1709, y: 1111), displays: [main, right]))
+        let left = CGRect(x: -1920, y: -200, width: 1920, height: 1112)
+        XCTAssertTrue(workspaceParkingFrameIsAcceptable(CGRect(x: -2619, y: 880, width: 700, height: 500),
+            requested: CGPoint(x: -2619, y: 911), displays: [left, main]))
+    }
+
+    func testInvalidOrUnknownParkingGeometryIsNeverAccepted() {
+        let display = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        let parking = CGPoint(x: 1709, y: 1111)
+        for rect in [CGRect.zero, CGRect(x: CGFloat.nan, y: 1080, width: 800, height: 600),
+                     CGRect(x: 1709, y: 1080, width: CGFloat.infinity, height: 600)] {
+            XCTAssertFalse(workspaceParkingFrameIsAcceptable(rect, requested: parking, displays: [display]))
+        }
+        XCTAssertFalse(workspaceParkingFrameIsAcceptable(CGRect(x: 1709, y: 1080, width: 800, height: 600),
+            requested: parking, displays: []))
     }
 
     func testFailureKeepsWindowParkedForRetry() {

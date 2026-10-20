@@ -319,7 +319,10 @@ private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock {
         }
         die("Can't convert \(a) to AxUiElementMock")
     }
-    return a as! AXUIElement
+    let element = a as! AXUIElement
+    // Messaging timeouts belong to each element, including returned controls.
+    AXUIElementSetMessagingTimeout(element, 1.0)
+    return element
 }
 
 typealias WindowIdAndAxUiElementMock = (windowId: UInt32, ax: AxUiElementMock)

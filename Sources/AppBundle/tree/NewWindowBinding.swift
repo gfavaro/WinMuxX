@@ -37,6 +37,12 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> B
     if let tabGroupBinding = autoAddNewWindowToFocusedTabGroupBinding(workspace) {
         return tabGroupBinding
     }
+    if workspace.rootTilingContainer.layout == .master {
+        workspace.normalizeMasterLayout()
+        let root = workspace.rootTilingContainer
+        let parent = root.children.isEmpty ? root : workspace.masterStackForInsertion()
+        return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    }
     guard let mruWindow = workspace.mostRecentWindowRecursive,
           let tilingParent = mruWindow.parent as? TilingContainer
     else {

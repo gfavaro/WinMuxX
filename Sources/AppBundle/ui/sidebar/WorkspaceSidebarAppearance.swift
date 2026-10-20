@@ -175,6 +175,11 @@ struct WorkspaceSidebarPalette {
     }
 }
 
+func workspaceSidebarOpaqueColor(dark: Bool) -> NSColor {
+    let white: CGFloat = dark ? 32.0 / 255 : 218.0 / 255
+    return NSColor(srgbRed: white, green: white, blue: white, alpha: 1)
+}
+
 enum WorkspaceSidebarSystemBackground {
     case opaque, clear, glass, frosted
 
@@ -210,7 +215,7 @@ struct WorkspaceSidebarSystemSurface: View {
 }
 
 /// The expanded sidebar and the Background toggle share one translucent backing.
-private struct WorkspaceSidebarGlassSurface: View {
+struct WorkspaceSidebarGlassSurface: View {
     var body: some View {
         if #available(macOS 26, *) {
             WorkspaceSidebarNativeGlass()
@@ -222,6 +227,7 @@ private struct WorkspaceSidebarGlassSurface: View {
 
 @available(macOS 26, *)
 private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
+    @Environment(\.colorScheme) private var colorScheme
 
     func makeNSView(context: Context) -> NSGlassEffectView {
         let view = NSGlassEffectView()
@@ -235,10 +241,10 @@ private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
 
     private func configure(_ view: NSGlassEffectView) {
         view.style = .regular
-        // The outer sidebar shape owns rounding: compact stays square.
+        // The outer sidebar shape owns rounding, including all four centered corners.
         view.cornerRadius = 0
         view.tintColor = nil
-        view.appearance = nil
+        view.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
     }
 }
 

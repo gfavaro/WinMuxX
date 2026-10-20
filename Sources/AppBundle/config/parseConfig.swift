@@ -70,6 +70,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "automatically-tile-new-windows": Parser(\.automaticallyTileNewWindows, parseBool),
     "enable-shake-to-toggle-tiling": Parser(\.enableShakeToToggleTiling, parseBool),
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
+    "master": Parser(\.master, parseMaster),
+    "follow-app-activation": Parser(\.followAppActivation, parseFollowAppActivation),
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
     "drag-stack-layout": Parser(\.dragStackLayout) { raw, backtrace in
@@ -99,6 +101,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-swipe": Parser(\.workspaceSwipe, parseWorkspaceSwipe),
+    "workspace-overview": Parser(\.workspaceOverview, parseWorkspaceOverview),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),

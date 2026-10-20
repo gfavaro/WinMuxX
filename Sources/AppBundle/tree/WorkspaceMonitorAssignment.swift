@@ -40,7 +40,9 @@ func activateWorkspaceForUser(
     // Ordinary selection never relocates an owned workspace, visible or hidden.
     if workspace.isVisible {
         guard workspace.visibleMonitor != nil else { return false }
-        return workspace.focusWorkspace()
+        let focused = workspace.focusWorkspace()
+        if focused { recordUserWorkspaceSelectionForRestoration() }
+        return focused
     }
     let monitor = workspaceMonitorForUserActivation(workspace, on: targetMonitor)
     guard isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) else {
@@ -48,7 +50,9 @@ func activateWorkspaceForUser(
     }
 
     guard monitor.setActiveWorkspace(workspace) else { return false }
-    return workspace.focusWorkspace()
+    let focused = workspace.focusWorkspace()
+    if focused { recordUserWorkspaceSelectionForRestoration() }
+    return focused
 }
 
 @MainActor
@@ -72,17 +76,21 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
         )
     }
     guard targetMonitor.setActiveWorkspace(workspace) else { return false }
-    // An explicit move replaces the secondary display's slot. Keep the displaced
-    // workspaces hidden on main, where ordinary shortcuts and swipes can reach them.
-    if targetMonitor.rect.topLeftCorner != mainMonitor.rect.topLeftCorner {
-        for displaced in Workspace.all where displaced !== workspace && !displaced.isVisible &&
-            displaced.workspaceMonitor.rect.topLeftCorner == targetMonitor.rect.topLeftCorner &&
-            isValidAssignment(workspace: displaced, screen: mainMonitor.rect.topLeftCorner)
-        {
-            displaced.preferredMonitorPoint = mainMonitor.rect.topLeftCorner
-        }
-    }
+    reconcileSecondaryWorkspaceAssignments()
     return true
+}
+
+/// Secondary displays retain only their visible slot. Restoration, new slots and
+/// topology changes must follow the same rule as explicit monitor moves.
+@MainActor
+func reconcileSecondaryWorkspaceAssignments() {
+    let mainPoint = mainMonitor.rect.topLeftCorner
+    for workspace in Workspace.all where !workspace.isVisible {
+        guard let assigned = workspace.assignedMonitor,
+              assigned.rect.topLeftCorner != mainPoint,
+              isValidAssignment(workspace: workspace, screen: mainPoint) else { continue }
+        workspace.preferredMonitorPoint = mainPoint
+    }
 }
 
 @MainActor

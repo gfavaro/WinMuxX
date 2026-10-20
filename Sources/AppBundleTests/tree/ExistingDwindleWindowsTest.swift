@@ -120,4 +120,23 @@ final class ExistingDwindleWindowsTest: XCTestCase {
         XCTAssertTrue(floating.parent === workspace)
         XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.isEmpty)
     }
+    func testConfigReloadWhileDisabledDoesNotMigrateLayoutOrOrientation() {
+        let previouslyReady = isWinMuxRuntimeReady
+        let previouslyEnabled = TrayMenuModel.shared.isEnabled
+        defer { isWinMuxRuntimeReady = previouslyReady; TrayMenuModel.shared.isEnabled = previouslyEnabled }
+        isWinMuxRuntimeReady = true
+        TrayMenuModel.shared.isEnabled = false
+        let root = focus.workspace.rootTilingContainer
+        root.layout = .tiles
+        config.defaultRootContainerLayout = .dwindle
+        applyUpdatedDefaultWindowLayout(previousLayout: .tiles)
+        XCTAssertEqual(root.layout, .tiles)
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        config.defaultRootContainerOrientation = .vertical
+        applyUpdatedDwindleOrientation(previousOrientation: .horizontal)
+        XCTAssertEqual(root.dwindleOrientation, .h)
+        XCTAssertTrue(WindowRecoveryController.shared.suppressAutomaticFrameWrites)
+    }
+
 }

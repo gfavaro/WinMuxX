@@ -1,7 +1,7 @@
 import Foundation
 
 /// Window IDs and process IDs are reused. Never restore using an ID alone.
-struct RecoveryWindowIdentity: Codable, Equatable {
+struct RecoveryWindowIdentity: Codable, Hashable, Sendable {
     let windowId: UInt32
     let pid: Int32
     let bundleId: String?

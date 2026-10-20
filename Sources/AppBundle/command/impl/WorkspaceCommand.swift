@@ -44,6 +44,7 @@ struct WorkspaceCommand: Command {
     private func activateWorkspace(_ workspace: Workspace, on monitor: Monitor, io: CmdIo) -> Bool {
         if workspace == focus.workspace && workspace.visibleMonitor != nil {
             if args.failIfNoop { return false }
+            recordUserWorkspaceSelectionForRestoration()
             io.err("Workspace '\(workspaceDisplayName(workspace.name))' is already focused. Tip: use --fail-if-noop to exit with non-zero code")
             return true
         }

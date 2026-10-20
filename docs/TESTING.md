@@ -522,3 +522,74 @@ interruption/coverage reporting and counter resets in `script/profile_runtime.py
 Native smoke checks verified completed and terminated partial reports. A detached
 two-hour observation is running; see [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
 for its report path and the checks that remain blocked or unmeasured.
+
+## Workspace overview regression boundary
+
+`WorkspaceOverviewDependencies` injects model snapshots, display/project context,
+ordering/capture, panel creation and navigation. Controller tests exercise real
+queue/lifetime logic with synthetic images and cancellation-ignoring captures.
+`WorkspaceOverviewModelTest` uses `WorkspaceNavigationFixture` to check inactive
+workspace geometry and ownership without native AX traffic. Gesture integration
+tests inject action callbacks into the shared axis router and cover independent
+feature flags. Synthetic view rendering and native panel allocation/teardown are
+separate from real desktop and physical trackpad validation. See
+[overview documentation](WORKSPACE_OVERVIEW.md) for the resource budgets.
+
+## Dinky 0.20 adaptations (build 98)
+
+The full local suite passes **1,218 Swift tests and 26 Python checks**.
+The 24 additional Swift regressions cover:
+
+- `MasterLayoutTest`: four-side 60/40 geometry, perpendicular stack, promotion,
+  appending, root/nested tab-group preservation, directional move/swap/wrap,
+  layout toggle, resize/preview agreement, minimum fitting, persistence, policy
+  re-entry, empty defaults, released stack references, and 500 insert/close cycles.
+- `OriginalWindowRestoreTrackerTest`: one successful restore per enabled interval,
+  retry failures, protect off-state manual changes, unknown geometry, identity
+  reuse, close cleanup, and preservation of a known baseline when bounds disappear.
+- `WindowRestoreCoordinatorTest`: concurrent disable/quit shares its failure result;
+  a later disable can start a new retry without retaining a completed task.
+- `FollowAppActivationTest`: bool/table parsing, exclusions, same-workspace focus,
+  explicit navigation, and browser overlay levels.
+- `RecoveryProcessLaunchDateTest`: stable kernel birth time for direct app launches
+  and rejection of unavailable processes.
+- Disabled config reload leaves the existing layout/orientation alone.
+
+Native build 98 checks passed for master 60/40 placement, swap preserving focus,
+keyboard resize and leaving master mode. Disable confirmed original frames without
+reporting failures; repeating disable preserved a manual Safari Zoom size change.
+The recovery journal's owner matches the direct-launched process. Clean termination
+removed all current-session entries; restart preserved all five assignments,
+original focus and configuration SHA-256.
+
+A local silent video in a disposable Safari tab entered native PiP with WinMuxX
+enabled. Its native accessibility placeholder remained in PiP after selecting the
+original terminal workspace. The inventory remained at five managed windows and
+focus stayed on the requested terminal window. Closing the fixture tab closed PiP
+and restored the original 12 Safari tabs. This is Safari validation on the current
+macOS version, rather than coverage of every browser's PiP implementation.
+
+Private logs and scripts: `.local/validation/dinky-020-build98/`. Process-counter
+samples are finite observations, not battery-life or sustained leak certification.
+
+## Master stack layout toggle (build 100)
+
+The full suite passes **1,223 Swift tests and 26 Python checks**. Five additional
+regressions cover stack-only toggling from the master, stack, explicit window IDs
+and tab groups; four-side master geometry/focus preservation; floating-window
+rejection; empty-stack recreation and weak-reference release; JSON persistence
+and older snapshots; explicit config overrides; and direct moves into a solo
+master root retaining the configured share.
+
+Native Safari/Helium checks passed for toggling from both panes, explicit targets
+without changing focus, removal/recreation of an accordion stack while preserving
+the 60/40 split, and leaving master mode with `layout dwindle`. Configuration,
+window assignments, monitor assignments and focus were restored. The harness uses
+stable workspace IDs through agent operations for moves because numeric CLI
+arguments address display indices and can shift when a workspace empties.
+
+Build 99 exposed the pre-existing ratio reset on direct insertion into a solo
+master root; build 100 fixes it and passes the same native check. All 48 command
+help paths passed with the server stopped. Evidence is under
+`.local/validation/master-stack-build100/`. No new timers or AX queries were added
+to the runtime toggle path.

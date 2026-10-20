@@ -123,14 +123,18 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         addSubmenu("Layout", to: menu) { submenu in
-            for (title, script) in [("Dwindle", "layout dwindle"), ("Tiles", "layout tiles"),
+            for (title, script) in [("Tiles", "layout tiles"),
                                     ("Tabbed", "layout tab-group"), ("Accordion", "layout accordion")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
+            addCommand("Dwindle", script: "workspace-layout dwindle", to: submenu)
+            addCommand("Master", script: "workspace-layout master", to: submenu)
+            submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
+            addCommand("Swap with Master", script: "swap-with-master", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
@@ -295,7 +299,7 @@ final class MenuCommandPayload {
 func menuCommandRequiresWindow(_ command: any Command) -> Bool {
     switch command {
         case is FocusCommand, is MoveCommand, is JoinWithCommand, is StackWithCommand,
-             is SwapCommand, is ResizeCommand, is LayoutCommand, is FullscreenCommand,
+             is SwapCommand, is ResizeCommand, is LayoutCommand, is WorkspaceLayoutCommand, is FullscreenCommand,
              is MoveNodeToWorkspaceCommand, is MoveNodeToMonitorCommand, is MoveNodeToProjectCommand,
              is SplitCommand, is CloseCommand, is CloseAllWindowsButCurrentCommand,
              is MacosNativeMinimizeCommand, is MacosNativeFullscreenCommand: true

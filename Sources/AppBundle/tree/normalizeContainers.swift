@@ -1,9 +1,10 @@
 extension Workspace {
     @MainActor func normalizeContainers() {
+        normalizeMasterLayout()
         materializeDwindleTree()
         rootTilingContainer.unbindEmptyAndAutoFlatten() // Beware! rootTilingContainer may change after this line of code
         // Dwindle splits choose their axis from the available rectangle, not their parent's axis.
-        if config.enableNormalizationOppositeOrientationForNestedContainers && rootTilingContainer.layout != .dwindle {
+        if config.enableNormalizationOppositeOrientationForNestedContainers && rootTilingContainer.layout != .dwindle && rootTilingContainer.layout != .master {
             rootTilingContainer.normalizeOppositeOrientationForNestedContainers()
         }
     }
@@ -12,7 +13,7 @@ extension Workspace {
 extension TilingContainer {
     @MainActor fileprivate func unbindEmptyAndAutoFlatten() {
         // Keep the dwindle root: it carries the insertion policy even when its only child is a tiles split.
-        let preservesDwindleRoot = isRootContainer && layout == .dwindle
+        let preservesDwindleRoot = (isRootContainer && (layout == .dwindle || layout == .master)) || (parent as? TilingContainer)?.layout == .master
         if let child = children.singleOrNil(), config.enableNormalizationFlattenContainers && !preservesDwindleRoot && (child is TilingContainer || !isRootContainer) {
             let dwindleParent = parent as? TilingContainer
             let ratios = dwindleParent?.dwindleSplitRatios

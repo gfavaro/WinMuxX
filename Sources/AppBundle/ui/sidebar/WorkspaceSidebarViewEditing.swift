@@ -120,7 +120,7 @@ extension WorkspaceSidebarView {
                 selectFirstSearchTarget()
             case .deleteToBeginningOfLine:
                 searchText = ""
-                selectedSearchTarget = nil
+                selectFirstSearchTarget()
             case .deleteForward:
                 break
             case .commit:
@@ -148,23 +148,14 @@ extension WorkspaceSidebarView {
     }
 
     func selectFirstSearchTarget() {
-        selectedSearchTarget = searchText.isEmpty ? nil : currentSearchSelections().first
+        selectedSearchTarget = searchText.isEmpty
+            ? workspaceSidebarInitialNavigationSelection(workspaces: currentFilteredProjectWorkspaces())
+            : currentSearchSelections().first
     }
 
     func moveSearchSelection(delta: Int) {
-        let selections = currentSearchSelections()
-        guard !selections.isEmpty else {
-            selectedSearchTarget = nil
-            return
-        }
-        guard let selectedSearchTarget,
-              let index = selections.firstIndex(of: selectedSearchTarget)
-        else {
-            self.selectedSearchTarget = selections.first
-            return
-        }
-        let nextIndex = max(0, min(selections.count - 1, index + delta))
-        self.selectedSearchTarget = selections[nextIndex]
+        selectedSearchTarget = workspaceSidebarSelectionAfterMoving(selectedSearchTarget,
+            selections: currentSearchSelections(), delta: delta)
     }
 
     func activateSelectedSearchTarget() {
@@ -182,7 +173,7 @@ extension WorkspaceSidebarView {
 
     func currentSearchSelections() -> [WorkspaceSidebarSearchSelection] {
         let workspaces = currentFilteredProjectWorkspaces()
-        return workspaceSidebarSearchSelections(workspaces: workspaces)
+        return workspaceSidebarSearchSelections(workspaces: workspaces, includeWorkspaceHeaders: searchText.isEmpty)
     }
 
     func currentFilteredProjectWorkspaces() -> [WorkspaceSidebarWorkspaceViewModel] {

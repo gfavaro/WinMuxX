@@ -2,6 +2,7 @@ import AppKit
 import Common
 import ImageIO
 import QuartzCore
+import ScreenCaptureKit
 
 struct WorkspaceSwipeSnapshotKey: Hashable, Sendable {
     let workspace: WorkspaceId
@@ -34,6 +35,10 @@ struct WorkspaceSwipeSnapshotRequest: Sendable {
     let screenRect: CGRect?
     let wallpaper: URL?
     let windows: [Window]
+    var maximumPixelSize: CGSize = CGSize(width: 2048, height: 2048)
+    var windowsAreBackToFront = false
+    var allowCapture = true
+    var overviewSession: UUID?
 
     @MainActor
     init(workspace: Workspace, monitor: Monitor, rect: Rect) {
@@ -45,12 +50,17 @@ struct WorkspaceSwipeSnapshotRequest: Sendable {
         windows = workspace.allLeafWindowsRecursive.compactMap { node in
             guard let window = node as? MacWindow, case .standard = window.layoutReason else { return nil }
             if let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior, group.tabActiveWindow !== window { return nil }
-            guard let saved = window.workspacePreviewFrame ?? window.lastAppliedLayoutPhysicalRect else { return nil }
-            let origin = window.workspacePreviewMonitorOrigin ?? monitor.rect.topLeftCorner
+            let layout = window.lastAppliedLayoutPhysicalRect.flatMap {
+                normalizedWorkspacePreviewFrame(CGRect(origin: $0.topLeftCorner, size: $0.size),
+                    origin: monitor.rect.topLeftCorner, desktopSize: monitor.rect.size)
+            }
+            guard let saved = window.workspacePreviewFrame ?? layout else { return nil }
+            let width = saved.width * monitor.rect.width
+            let height = saved.height * monitor.rect.height
             return Window(id: window.windowId, frame: CGRect(
-                x: saved.minX - origin.x + monitor.rect.minX - rect.minX,
-                y: rect.height - (saved.minY - origin.y + monitor.rect.minY - rect.minY) - saved.height,
-                width: saved.width, height: saved.height))
+                x: saved.minX * monitor.rect.width + monitor.rect.minX - rect.minX,
+                y: rect.height - (saved.minY * monitor.rect.height + monitor.rect.minY - rect.minY) - height,
+                width: width, height: height))
         }
     }
 
@@ -153,10 +163,25 @@ final class WorkspaceSwipeSnapshots {
 }
 
 /// Offscreen rendering has its own executor and local graphics contexts.
-private actor WorkspaceSwipeSnapshotRenderer {
+actor WorkspaceSwipeSnapshotRenderer {
     static let shared = WorkspaceSwipeSnapshotRenderer()
+    let captureGate = WorkspaceCaptureGate()
+    var overviewCaptureSession: UUID?
+    var overviewCaptureWindows: [UInt32: SCWindow] = [:]
 
-    func render(_ request: WorkspaceSwipeSnapshotRequest) throws -> WorkspaceSwipeSnapshotResult {
+    func windowRanks() -> [UInt32: Int] {
+        guard !Task.isCancelled else { return [:] }
+        let info = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        return Dictionary(info.enumerated().compactMap { index, item in
+            (item[kCGWindowNumber as String] as? UInt32).map { ($0, index) }
+        }, uniquingKeysWith: { first, _ in first })
+    }
+
+    func render(_ request: WorkspaceSwipeSnapshotRequest) async throws -> WorkspaceSwipeSnapshotResult {
+        try await captureGate.run { try await self.renderLegacy(request) }
+    }
+
+    private func renderLegacy(_ request: WorkspaceSwipeSnapshotRequest) throws -> WorkspaceSwipeSnapshotResult {
         try Task.checkCancellation()
         let start = CACurrentMediaTime()
         if let rect = request.screenRect {
@@ -167,7 +192,7 @@ private actor WorkspaceSwipeSnapshotRenderer {
             return WorkspaceSwipeSnapshotResult(image: image, renderMs: (CACurrentMediaTime() - start) * 1000)
         }
         let width = request.key.width, height = request.key.height
-        let scale = min(1, 2048 / max(width, height))
+        let scale = min(1, request.maximumPixelSize.width / width, request.maximumPixelSize.height / height)
         guard width > 0, height > 0,
               let context = CGContext(data: nil, width: max(1, Int(width * scale)), height: max(1, Int(height * scale)),
                   bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
@@ -185,7 +210,7 @@ private actor WorkspaceSwipeSnapshotRenderer {
         }
         try Task.checkCancellation()
         var windows = request.windows
-        if windows.count > 1 {
+        if windows.count > 1 && !request.windowsAreBackToFront {
             let info = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
             var rank: [UInt32: Int] = [:]
             for (index, item) in info.enumerated() {
@@ -196,7 +221,10 @@ private actor WorkspaceSwipeSnapshotRenderer {
         for window in windows {
             try Task.checkCancellation()
             autoreleasepool {
-                if let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]) {
+                // A missing capture still has truthful geometry; no extra AX read or retry.
+                context.setFillColor(CGColor(gray: 0.23, alpha: 1))
+                context.fill(window.frame)
+                if request.allowCapture, let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]) {
                     context.draw(image, in: window.frame)
                 }
             }

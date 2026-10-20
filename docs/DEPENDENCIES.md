@@ -13,12 +13,8 @@ certification. Existing dependency versions were not upgraded.
 | swift-collections | 1.3.0 | Keep: ordered workspace configuration and ordered diagnostic records; replacing these needs equivalent ordering and uniqueness guarantees. |
 | Sparkle | 2.9.6 | Keep: isolated automatic-update integration. Personal fork releases continue to disable updates. |
 
-ISSoundAdditions 2.0.1 was removed. Volume commands now use a small CoreAudio
-boundary with the same virtual-main-volume property, 1/16 steps, clamping,
-0.005 automatic-mute threshold, best-effort failure behavior and existing panel.
-Mute writes use CoreAudio's UInt32 property size. Tests exercise command policy
-without changing the machine's audio. Real output-device compatibility remains
-a separate runtime check.
+Volume controls, their CoreAudio implementation and the volume HUD were removed.
+ISSoundAdditions is no longer a dependency.
 
 ANTLR 4.13.1 was removed from the app dependency graph in build 72. A fresh
 index and whole-repository call-site review then confirmed the unfinished shell

@@ -188,7 +188,7 @@ extension CGPoint {
             return nil
         }
         let target: TreeNode? = switch tree.layout {
-            case .tiles, .dwindle:
+            case .tiles, .master, .dwindle:
                 tree.children.first(where: {
                     (virtual ? $0.lastAppliedLayoutVirtualRect : $0.lastAppliedLayoutPhysicalRect)?.contains(point) == true
                 })

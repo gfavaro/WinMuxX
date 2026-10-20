@@ -77,6 +77,7 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 ///                      (from nativeFocused to runtime.nativeFocus.lastKnownWindowID)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
+    if ignoresCrossWorkspaceActivation(nativeFocused) { return }
     if nativeFocused?.parent is MacosPopupWindowsContainer {
         return
     }
@@ -101,4 +102,10 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
     debugFocusLog(
         "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(runtime.nativeFocus.lastKnownWindowID?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
     )
+}
+
+@MainActor
+func ignoresCrossWorkspaceActivation(_ window: Window?) -> Bool {
+    guard let window, let workspace = window.nodeWorkspace, workspace !== focus.workspace else { return false }
+    return !config.followAppActivation.follows(window.app.rawAppBundleId)
 }

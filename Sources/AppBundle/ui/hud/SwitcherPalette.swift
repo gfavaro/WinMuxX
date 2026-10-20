@@ -13,6 +13,8 @@ struct SwitcherPaletteItem: Identifiable {
     let icon: NSImage?
     let workspaceName: String
     let isFocused: Bool
+    var workspaceTitle: String? = nil
+    var projectName: String? = nil
 }
 
 // MARK: - Panel
@@ -23,10 +25,27 @@ final class SwitcherPaletteModel: ObservableObject {
         didSet { if query != oldValue { selection = 0 } }
     }
     @Published var selection = 0
+    @Published var groupByWorkspace = false {
+        didSet { if groupByWorkspace != oldValue { selection = 0 } }
+    }
     var items: [SwitcherPaletteItem] = []
     var onSelect: ((UInt32) -> Void)? = nil
 
-    var results: [SwitcherPaletteItem] { filterSwitcherPaletteItems(items, query: query) }
+    var results: [SwitcherPaletteItem] {
+        let matches = filterSwitcherPaletteItems(items, query: query)
+        return groupByWorkspace ? groupSwitcherPaletteItems(matches, workspaceOrder: items) : matches
+    }
+
+    var selectedResultId: UInt32? {
+        get {
+            let current = results
+            return current.indices.contains(selection) ? current[selection].id : nil
+        }
+        set {
+            guard let id = newValue, let index = results.firstIndex(where: { $0.id == id }) else { return }
+            if selection != index { selection = index }
+        }
+    }
 
     func moveSelection(_ delta: Int) {
         let count = results.count
@@ -49,10 +68,12 @@ final class SwitcherPaletteModel: ObservableObject {
 final class SwitcherPalettePanel: NSPanelHud {
     static let shared = SwitcherPalettePanel()
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
-    private let model = SwitcherPaletteModel()
+    private let model: SwitcherPaletteModel
     private(set) var isPaletteActive = false
+    private var outsideClickMonitors: [Any] = []
 
-    override private init() {
+    init(model: SwitcherPaletteModel = SwitcherPaletteModel()) {
+        self.model = model
         super.init()
         identifier = NSUserInterfaceItemIdentifier(switcherPalettePanelId)
         hasShadow = true
@@ -67,16 +88,20 @@ final class SwitcherPalettePanel: NSPanelHud {
         hostingView.autoresizingMask = [.width, .height]
     }
 
-    func toggle() async { if isPaletteActive { dismiss() } else { await show() } }
+    func toggle(groupByWorkspace: Bool = false) async {
+        if isPaletteActive { dismiss() } else { await show(groupByWorkspace: groupByWorkspace) }
+    }
 
-    func show() async {
+    func show(groupByWorkspace: Bool = false) async {
         guard !isPaletteActive else { return }
+        WorkspaceOverviewController.shared.dismiss(restoreFocus: false)
         isPaletteActive = true
         let items = await buildSwitcherPaletteItems()
         // Palette construction suspends while first-sight window titles are fetched. A second
         // toggle may have dismissed the palette in the meantime.
         guard isPaletteActive else { return }
         model.items = items
+        model.groupByWorkspace = groupByWorkspace
         model.query = ""
         model.selection = 0
         model.onSelect = { [weak self] id in self?.select(id) }
@@ -93,17 +118,37 @@ final class SwitcherPalettePanel: NSPanelHud {
             display: true,
             animate: false,
         )
-        hostingView.rootView = AnyView(SwitcherPaletteView(model: model))
+        hostingView.rootView = AnyView(SwitcherPaletteView(model: model, dismiss: { [weak self] in self?.dismiss() }))
         orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         makeKey()
+        installOutsideClickMonitors()
+    }
+
+    private func installOutsideClickMonitors() {
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        let local = NSEvent.addLocalMonitorForEvents(matching: mask) { [weak self] event in
+            if let self, event.window !== self { self.dismiss() }
+            return event
+        }
+        let global = NSEvent.addGlobalMonitorForEvents(matching: mask) { [weak self] _ in
+            Task { @MainActor in self?.dismiss() }
+        }
+        outsideClickMonitors = [local, global].compactMap { $0 }
     }
 
     func dismiss() {
-        guard isPaletteActive else { return }
-        isPaletteActive = false
-        orderOut(nil)
-        hostingView.rootView = AnyView(EmptyView())
+        for monitor in outsideClickMonitors { NSEvent.removeMonitor(monitor) }
+        outsideClickMonitors.removeAll()
+        if isPaletteActive {
+            isPaletteActive = false
+            orderOut(nil)
+            hostingView.rootView = AnyView(EmptyView())
+        }
+        model.items = []
+        model.onSelect = nil
+        if !model.query.isEmpty { model.query = "" }
+        if model.selection != 0 { model.selection = 0 }
     }
 
     private func select(_ windowId: UInt32) {
@@ -119,27 +164,28 @@ final class SwitcherPalettePanel: NSPanelHud {
         }
     }
 
-    // Intercept navigation keys before the field editor consumes them; everything else
-    // (typing) flows to the search field as usual.
+    // Only quick-select is panel-wide. Editing/navigation belongs to the search
+    // field delegate or the native list; input-method candidates always take priority.
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyDown, isPaletteActive {
-            // Quick-select: cmd+1...cmd+9 jumps straight to the Nth visible result.
-            if event.modifierFlags.contains(.command),
-               let digit = event.charactersIgnoringModifiers.flatMap({ Int($0) }),
-               (1 ... 9).contains(digit)
-            {
-                model.select(at: digit - 1)
-                return
-            }
-            switch event.keyCode {
-                case 53: dismiss(); return // esc
-                case 125: model.moveSelection(1); return // down arrow
-                case 126: model.moveSelection(-1); return // up arrow
-                case 36, 76: model.selectCurrent(); return // return / keypad enter
-                default: break
-            }
+        if event.type == .keyDown, isPaletteActive,
+           let index = paletteQuickSelectIndex(characters: event.charactersIgnoringModifiers,
+                modifiers: event.modifierFlags, hasMarkedText: overlayHasMarkedText(firstResponder)) {
+            model.select(at: index)
+            return
         }
         super.sendEvent(event)
+    }
+
+    override func keyDown(with event: NSEvent) {
+        guard isPaletteActive, !overlayHasMarkedText(firstResponder),
+              event.modifierFlags.intersection([.command, .option, .control, .shift]).isEmpty else {
+            super.keyDown(with: event); return
+        }
+        switch event.keyCode {
+        case 53: dismiss()
+        case 36, 76: model.selectCurrent()
+        default: super.keyDown(with: event)
+        }
     }
 
     override var canBecomeKey: Bool { true }
@@ -185,6 +231,8 @@ func makeSwitcherPaletteItem(
     focusedWindowId: UInt32?,
 ) async -> SwitcherPaletteItem {
     let appName = window.app.name ?? window.app.rawAppBundleId ?? "Unknown"
+    let workspaceTitle = workspaceDisplayName(workspaceName)
+    let projectName = Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) }
     // A cold cache previously indexed every Finder window as only "Finder" until some other
     // UI happened to fetch its title. Fetch first-sight titles before showing the palette so
     // folder names are searchable immediately; known stale titles still return instantly and
@@ -197,6 +245,8 @@ func makeSwitcherPaletteItem(
         icon: (window as? MacWindow)?.macApp.nsApp.icon,
         workspaceName: workspaceName,
         isFocused: window.windowId == focusedWindowId,
+        workspaceTitle: workspaceTitle,
+        projectName: projectName,
     )
 }
 
@@ -232,7 +282,7 @@ func filterSwitcherPaletteItems(_ items: [SwitcherPaletteItem], query: String) -
     guard !needle.isEmpty else { return items }
     return items
         .compactMap { item in
-            switcherPaletteFuzzyScore(needle, in: "\(item.appName) \(item.title) \(item.workspaceName)".lowercased())
+            switcherPaletteFuzzyScore(needle, in: "\(item.appName) \(item.title) \(item.workspaceName) \(item.workspaceTitle ?? "") \(item.projectName ?? "")".lowercased())
                 .map { (item, $0) }
         }
         .sorted { $0.1 > $1.1 }
@@ -243,107 +293,130 @@ func filterSwitcherPaletteItems(_ items: [SwitcherPaletteItem], query: String) -
 
 struct SwitcherPaletteView: View {
     @ObservedObject var model: SwitcherPaletteModel
-    @FocusState private var searchFocused: Bool
+    let dismiss: () -> Void
 
     var body: some View {
         let results = model.results
+        let selectedId = results.indices.contains(model.selection) ? results[model.selection].id : nil
+        let sections = model.groupByWorkspace ? paletteResultSections(results) : []
+        let indices = Dictionary(uniqueKeysWithValues: results.enumerated().map { ($0.element.id, $0.offset) })
         VStack(spacing: 0) {
             HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(GlassToken.textTertiary))
-                TextField("Search windows…", text: $model.query)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(GlassToken.textPrimary))
-                    .focused($searchFocused)
+                PaletteSearchField(text: $model.query) { command in
+                    switch command {
+                    case .previous: model.moveSelection(-1)
+                    case .next: model.moveSelection(1)
+                    case .activate: model.selectCurrent()
+                    case .dismiss: dismiss()
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                Toggle(isOn: $model.groupByWorkspace) {
+                    Label("Group by workspace", systemImage: "rectangle.3.group")
+                }
+                .labelStyle(.iconOnly)
+                .toggleStyle(.button)
+                .help("Group by workspace")
+                .accessibilityLabel("Group by workspace")
             }
             .padding(.horizontal, 14)
             .frame(height: 44)
 
-            Rectangle()
-                .fill(Color.white.opacity(GlassToken.separatorOpacity))
-                .frame(height: StrokeToken.hairline)
+            Divider()
 
             ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(spacing: 1) {
-                        ForEach(Array(results.enumerated()), id: \.element.id) { index, item in
-                            SwitcherPaletteRow(
-                                item: item,
-                                isSelected: index == model.selection,
-                                hotkeyLabel: index < 9 ? "⌘\(index + 1)" : nil,
-                            )
-                            .id(item.id)
-                            .onTapGesture { model.onSelect?(item.id) }
+                List(selection: Binding(get: { selectedId }, set: { model.selectedResultId = $0 })) {
+                    if model.groupByWorkspace {
+                        ForEach(sections, id: \.workspace) { section in
+                            Section {
+                                ForEach(section.items) { item in
+                                    resultRow(item, index: indices[item.id] ?? 0, selected: selectedId == item.id)
+                                }
+                            } header: {
+                                HStack {
+                                    Text(section.items.first?.workspaceTitle ?? section.workspace)
+                                    Spacer()
+                                    if let project = section.items.first?.projectName { Text(project) }
+                                }
+                            }
                         }
+                    } else {
+                        ForEach(results) { item in resultRow(item, index: indices[item.id] ?? 0, selected: selectedId == item.id) }
                     }
-                    .padding(6)
                 }
-                .onChange(of: model.selection) { newSelection in
-                    if results.indices.contains(newSelection) {
-                        proxy.scrollTo(results[newSelection].id, anchor: nil)
+                .listStyle(.inset)
+                .scrollContentBackground(.hidden)
+                .accessibilityLabel("Window results")
+                .overlay {
+                    if results.isEmpty {
+                        Text("No matching windows").foregroundStyle(.secondary).allowsHitTesting(false)
                     }
+                }
+                .onChange(of: selectedId) { id in
+                    if let id { proxy.scrollTo(id, anchor: nil) }
                 }
             }
-            .frame(maxHeight: switcherPaletteMaxHeight - 44)
+            .frame(height: switcherPaletteMaxHeight - 44)
         }
         .frame(width: switcherPaletteWidth)
-        .fixedSize(horizontal: false, vertical: true)
         .background {
-            GlassSurface(
-                shape: RoundedRectangle(cornerRadius: RadiusToken.panel, style: .continuous),
-                style: config.workspaceSidebar.chromeStyle,
-                solidColor: config.workspaceSidebar.resolvedSolidChromeColor,
-            )
+            OverlaySurface(cornerRadius: systemWindowCornerRadius())
         }
-        .clipShape(RoundedRectangle(cornerRadius: RadiusToken.panel, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: systemWindowCornerRadius(), style: .continuous))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onAppear { searchFocused = true }
+        .modifier(OverlayAppearance())
     }
+
+    private func resultRow(_ item: SwitcherPaletteItem, index: Int, selected: Bool) -> some View {
+        Button { model.select(at: index) } label: {
+            SwitcherPaletteRow(item: item, hotkeyLabel: index < 9 ? "⌘\(index + 1)" : nil)
+        }
+        .buttonStyle(.plain)
+        .tag(item.id)
+        .id(item.id)
+        .listRowSeparator(.hidden)
+        .accessibilityLabel("\(item.appName): \(item.title), workspace \(item.workspaceTitle ?? item.workspaceName)")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityHint("Open this window")
+    }
+}
+
+struct PaletteResultSection {
+    let workspace: String
+    var items: [SwitcherPaletteItem]
+}
+
+/// Results are already ranked/grouped. Preserve that order, including quick-select indices.
+func paletteResultSections(_ results: [SwitcherPaletteItem]) -> [PaletteResultSection] {
+    var sections: [PaletteResultSection] = []
+    for item in results {
+        if sections.last?.workspace == item.workspaceName {
+            sections[sections.count - 1].items.append(item)
+        } else {
+            sections.append(PaletteResultSection(workspace: item.workspaceName, items: [item]))
+        }
+    }
+    return sections
 }
 
 private struct SwitcherPaletteRow: View {
     let item: SwitcherPaletteItem
-    let isSelected: Bool
     let hotkeyLabel: String?
 
     var body: some View {
         HStack(spacing: 8) {
             if let icon = item.icon {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 18, height: 18)
+                Image(nsImage: icon).resizable().frame(width: 18, height: 18).accessibilityHidden(true)
             } else {
-                Image(systemName: "macwindow")
-                    .font(.system(size: 13))
-                    .frame(width: 18, height: 18)
-                    .foregroundStyle(Color.white.opacity(GlassToken.textTertiary))
+                Image(systemName: "macwindow").frame(width: 18, height: 18).accessibilityHidden(true)
             }
-            Text(item.title)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-                .foregroundStyle(Color.white.opacity(isSelected ? GlassToken.textPrimary : GlassToken.textSecondary))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            Text(item.title).font(.body).lineLimit(1).truncationMode(.tail)
             Spacer(minLength: 8)
             if let hotkeyLabel {
-                Text(hotkeyLabel)
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(GlassToken.textQuaternary))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Color.white.opacity(GlassToken.fillFaint))
-                    }
+                Text(hotkeyLabel).font(.caption.monospaced()).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background {
-            RoundedRectangle(cornerRadius: RadiusToken.row, style: .continuous)
-                .fill(Color.white.opacity(isSelected ? GlassToken.fillActive : 0))
-        }
+        .frame(minHeight: 26)
         .contentShape(Rectangle())
     }
 }

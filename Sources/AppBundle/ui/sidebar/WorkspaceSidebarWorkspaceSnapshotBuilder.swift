@@ -35,10 +35,10 @@ private func makeWorkspaceSidebarWorkspaceViewModel(
         displayName: sidebarWorkspaceDisplayName(
             workspace.name,
             labels: workspaceLabels,
-            displayIndex: automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: currentFocus.workspace)
+            displayIndex: workspacePresentationDisplayIndex(workspace, focusedWorkspace: currentFocus.workspace)
         ),
         sidebarLabel: workspaceLabels[workspace.name] ?? "",
-        isGeneratedName: isSidebarDraftWorkspaceName(workspace.name) || workspace.usesAutomaticDisplayName,
+        isGeneratedName: !workspace.isConfiguredPersistent || parsePositiveWorkspaceDisplayIndex(workspace.name) != nil,
         monitorScopeId: workspaceSidebarMonitorScopeId(for: workspaceMonitor),
         monitorName: availableMonitors.count > 1 ? workspaceMonitor.name : nil,
         isFocused: currentFocus.workspace == workspace,

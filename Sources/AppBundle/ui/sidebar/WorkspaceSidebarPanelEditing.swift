@@ -87,6 +87,7 @@ extension WorkspaceSidebarPanel {
         onCancel: (@MainActor () -> Void)? = nil,
         onKeyDown: (@MainActor (WorkspaceSidebarInlineTextKey) -> Void)? = nil
     ) {
+        guard !isRetired else { return }
         debugWorkspaceSidebarRenameLog("beginInlineTextEditing isKeyBefore=\(isKeyWindow) firstResponder=\(String(describing: firstResponder)) mouseInside=\(isMouseInsideVisibleRegion())")
         inlineTextEditingActive = true
         inlineTextEditingLocksExpansion = locksExpansion
@@ -125,8 +126,9 @@ extension WorkspaceSidebarPanel {
     }
 
     func prepareForInlineTextEditing(activatesWindow: Bool = true) {
+        guard !isRetired else { return }
         debugWorkspaceSidebarRenameLog("prepareForInlineTextEditing before visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder))")
-        cancelExpansionWork()
+        // Focusing the editor must not cancel an in-flight reveal or its backing resize.
         expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), viewModel.workspaceSidebarVisibleWidth))
         ignoresMouseEvents = false
         orderFrontRegardless()

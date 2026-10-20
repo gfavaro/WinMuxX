@@ -8,7 +8,11 @@ extension TilingContainer {
         let axis = orientation
         let extent = rect.getDimension(axis)
         let gap = CGFloat(gaps.inner.get(axis).toDouble())
-        let requested = children.map { weightAt?($0) ?? $0.getWeight(axis) }
+        var requested = children.map { weightAt?($0) ?? $0.getWeight(axis) }
+        if layout == .master {
+            let total = requested.reduce(0, +)
+            if total > 0 { requested = requested.map { $0 / total * extent } }
+        }
         let edgeGaps = children.indices.map { index in
             gap - (index == 0 ? gap / 2 : 0) - (index == children.count - 1 ? gap / 2 : 0)
         }
@@ -31,6 +35,14 @@ extension TilingContainer {
             let virtual = Rect(topLeftX: point.x, topLeftY: point.y,
                 width: axis == .h ? size : rect.width, height: axis == .v ? size : rect.height)
             point = point.addingOffset(axis, size)
+            if layout == .master, config.master.side.isReversed {
+                func mirrored(_ frame: Rect) -> Rect {
+                    Rect(topLeftX: axis == .h ? rect.minX + rect.maxX - frame.maxX : frame.minX,
+                         topLeftY: axis == .v ? rect.minY + rect.maxY - frame.maxY : frame.minY,
+                         width: frame.width, height: frame.height)
+                }
+                return (mirrored(physical), mirrored(virtual), size)
+            }
             return (physical, virtual, size)
         }
     }

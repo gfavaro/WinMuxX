@@ -5,6 +5,10 @@ enum KnownBundleId: String, Equatable {
     case alacritty = "org.alacritty"
     case braveBrowser = "com.brave.Browser"
     case chrome = "com.google.Chrome"
+    case safari = "com.apple.Safari"
+    case helium = "net.imput.helium"
+    case edge = "com.microsoft.edgemac"
+    case arc = "company.thebrowser.Browser"
     case cleanshotx = "pl.maketheweb.cleanshotx"
     case emacs = "org.gnu.Emacs"
     case finder = "com.apple.finder"
@@ -36,6 +40,11 @@ enum KnownBundleId: String, Equatable {
             || self == .mozillaFirefoxDeveloperEdition
             || self == .mozillaFirefoxNightly
             || self == .zenBrowser
+    }
+
+    var isBrowser: Bool {
+        isFirefox || self == .chrome || self == .braveBrowser || self == .safari || self == .helium ||
+            self == .edge || self == .arc || self == .qutebrowser
     }
 
     var isVscode: Bool {

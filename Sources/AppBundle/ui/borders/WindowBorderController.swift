@@ -8,6 +8,7 @@ final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
     private var borderWindowIds = Set<UInt32>()
+    private var watchedWindowIds = Set<UInt32>()
     private let nativeRefresh = NativeWindowRefreshScheduler()
     private var nativeBorderRefreshRequested = false
     private var movingBorders = WindowBorderMotionTracking()
@@ -37,6 +38,10 @@ final class WindowBorderController {
                 // Scanning every border transaction creates a geometry feedback storm.
                 guard TrayMenuModel.shared.isEnabled else { return }
                 if windowId != 0, controller.borderWindowIds.contains(windowId) { return }
+                if [UInt32(723), 806, 807, 808].contains(event) {
+                    WorkspaceTransitionDiagnostics.recordNativeEvent(event, windowId: windowId)
+                    HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
+                }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),
                    controller.borders[windowId] != nil {
@@ -77,22 +82,28 @@ final class WindowBorderController {
                   let id = entry[kCGWindowNumber as String] as? NSNumber else { return nil }
             return id.uint32Value
         })
-        if ids != missionControlWindowIds {
-            missionControlWindowIds = ids
-            let watched = Array(ids.union(MacWindow.allWindowsMap.keys))
-            watched.withUnsafeBufferPointer { winmux_watch_windows($0.baseAddress, Int32($0.count)) }
-        }
+        missionControlWindowIds = ids
+        synchronizeNativeWindowSubscriptions()
         let onscreen = all.filter { ($0[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true }
         let active = isMissionControlVisible(onscreen, screenSizes: NSScreen.screens.map { $0.frame.size },
             bundleIdentifierForPID: bundleIdentifier)
         let transition = missionControlState.update(active: active)
         if transition == true {
+            WorkspaceOverviewController.shared.dismiss(restoreFocus: false)
             WindowMotion.shared.finishAll()
             clear()
         } else if !active, transition != nil || refreshBorders {
             refresh(nativeSnapshot: onscreen)
         }
     }
+    private func synchronizeNativeWindowSubscriptions() {
+        let watched = missionControlWindowIds.union(MacWindow.allWindowsMap.keys)
+        guard watched != watchedWindowIds else { return }
+        watchedWindowIds = watched
+        let ids = Array(watched)
+        ids.withUnsafeBufferPointer { winmux_watch_windows($0.baseAddress, Int32($0.count)) }
+    }
+
     func windowGeometryChanged(_ windowId: UInt32) {
         guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
         refreshMovingBorder(windowId)
@@ -118,6 +129,7 @@ final class WindowBorderController {
     }
     func refresh(nativeSnapshot: [[String: Any]]? = nil) {
         guard !isUnitTest else { return }
+        synchronizeNativeWindowSubscriptions()
         guard !missionControlState.active else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }

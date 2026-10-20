@@ -55,9 +55,12 @@ struct Config: ConvenienceCopyable {
     var automaticallyTileNewWindows: Bool = true
     var enableShakeToToggleTiling: Bool = true
     var focusFollowsMouse: Bool = false
+    var master = MasterConfig()
+    var followAppActivation = FollowAppActivationConfig()
     var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none
     var workspaceSwipe = WorkspaceSwipeConfig()
+    var workspaceOverview = WorkspaceOverviewConfig()
     var dragStackLayout: Layout = .tabGroup
     var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
@@ -106,6 +109,7 @@ struct WorkspaceSidebarConfig: ConvenienceCopyable, Equatable, Sendable {
     var enableFocus: Bool = false
     var autoHide: Bool = false
     var alwaysExpanded: Bool = false
+    var hoverOpenDelayMs: Int = 400
     var collapsedWidth: Int = 44
     var width: Int = 240
     var monitor: [MonitorDescription] = []

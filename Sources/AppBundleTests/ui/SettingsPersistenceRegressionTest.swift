@@ -72,7 +72,7 @@ final class SettingsPersistenceRegressionTest: XCTestCase {
         parseConfig("[gaps]\nouter.left = [{ monitor.\"Disconnected [Panel]\" = 24 }, 0]").config.gaps.outer.left.rulesForTest
     }
 
-    func testMigrationRemovesWholeLegacyArrayAndPreservesComments() {
+    func testExplicitArrayRemovalPreservesComments() {
         let original = """
         config-version = 2
         persistent-workspaces = [

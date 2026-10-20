@@ -64,7 +64,8 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                     title: "Toggle Fullscreen",
                     command: "fullscreen"
                 ),
-                shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "layout dwindle"),
+                shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "workspace-layout dwindle"),
+                shortcutAction(id: "layout-master", title: "Master", command: "workspace-layout master"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
                 shortcutAction(id: "layout-tabs", title: "Stacked: Tabbed", command: "layout tab-group"),
@@ -103,9 +104,6 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
               actions: [
                   shortcutAction(id: "sidebar", title: "Open Sidebar", command: "open-sidebar"),
                   shortcutAction(id: "palette", title: "Window Overview", command: "palette"),
-                  shortcutAction(id: "volume-up", title: "Increase Volume", command: "volume up"),
-                  shortcutAction(id: "volume-down", title: "Decrease Volume", command: "volume down"),
-                  shortcutAction(id: "volume-mute", title: "Toggle Mute", command: "volume mute-toggle"),
               ]),
         .init(
             id: "workspaces",
@@ -206,7 +204,7 @@ func inferWorkspaceShortcutState(
 
 @MainActor
 func shortcutSettingsWorkspaceNumbers() -> [String] {
-    let configuredNumbers = Set(Array(config.minimumWorkspaceCount == nil ? config.persistentWorkspaces : []).filter { workspaceKey(for: $0) != nil })
+    let configuredNumbers = Set(Array(config.persistentWorkspaces).filter { workspaceKey(for: $0) != nil })
         .union(TrayMenuModel.shared.workspaces.map(\.name).filter { workspaceKey(for: $0) != nil })
     let defaults = (1 ... 9).map(String.init)
     let merged = configuredNumbers.union(defaults)
@@ -216,6 +214,10 @@ func shortcutSettingsWorkspaceNumbers() -> [String] {
         }
         return lhsInt < rhsInt
     }
+}
+
+func minimumWorkspaceCountConfigEdits(_ count: Int) -> [SettingsConfigEdit] {
+    [.init(section: nil, key: "minimum-workspace-count", renderedValue: String(count))]
 }
 
 func workspaceCommand(_ workspaceName: String, kind: ShortcutSettingsModel.WorkspaceShortcutKind) -> String {

@@ -43,6 +43,9 @@ The app has its own identity, CLI, configuration and recovery state. On first
 launch, it can copy your original WinMux configuration while leaving that file
 untouched. Releases use `gf-v` tags in this repository.
 
+Run `winmuxx` or `winmuxx --help` to list all CLI commands, including compatibility
+aliases. Use `winmuxx <command> --help` for details. Help works without the app running.
+
 ## Settings
 
 Open Settings from the WinMuxX menu. The window is resizable, and the controls
@@ -117,12 +120,24 @@ currently share the same safe geometry. Expanded and collapsed widths have
 Small, Medium and Large presets. Always expanded reserves window space on the
 chosen side.
 
+With auto-hide enabled, reach the outermost **2 points** of the chosen display
+edge to reveal the sidebar, like the Dock. The hidden trigger is independent of
+the collapsed rail size. The wider exit tolerance applies after revealing.
+The sidebar waits 400 ms before revealing on hover by default. Change
+`hover-open-delay-ms` in `[workspace-sidebar]`, or **Settings → Sidebar → Hover
+reveal delay**. Moving away cancels the pending reveal. A left-button press begun
+outside the sidebar keeps a collapsed sidebar from revealing or trapping the
+pointer during text selection; releasing starts a fresh hover delay. Sidebar
+clicks, recognized window/sidebar drags, and `winmuxx open-sidebar` retain their
+existing immediate interactions.
+
 Tiled windows glide into place by default (150 ms). Set `animations.enabled = false`
 or `animations.duration-ms = 0` for immediate placement. Reduce Motion disables
 the glide. See [window motion](docs/WINDOW_MOTION.md) for configuration and limits.
 
 ```toml
 [workspace-sidebar]
+    hover-open-delay-ms = 400 # 0–5000; Settings → Sidebar → Hover reveal delay
     chrome-style = 'liquid-glass' # or 'solid'
     menu-bar-background = false
     position = 'left'            # or 'right'
@@ -165,6 +180,18 @@ Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,
 and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).
 
+Dinky 0.20 adaptations add optional master layout / `swap-with-master`,
+app-activation exclusions, browser overlay filtering, and original-frame restoration
+on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md). In master
+mode, `layout tiles accordion` toggles only the stack from any tiled window;
+`workspace-layout dwindle` returns the workspace to its splitting tree.
+
+Dinky 0.21 command separation uses `workspace-layout dwindle master` to toggle
+workspace modes; `layout` only changes containers or floating/tiling. Existing
+`layout dwindle` and `layout master` bindings must be migrated. Three-option
+container cycles now visit every option, and `%{workspace-layout}` reports the
+workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
+
 Run `winmuxx doctor` to inspect the loaded config path, file validation, effective default layout,
 permissions, monitors, potentially conflicting window managers and per-app accessibility latency.
 The report uses the same diagnostics generator as the app.
@@ -205,6 +232,15 @@ safely match reopened windows; this build starts recording verified identities.
 
 ### Workspaces to keep
 
+Workspace names use a custom label from `[workspace-sidebar.workspace-labels]`
+when configured. Persistent numeric names display `Workspace N` using the configured
+number; persistent text names display literally. Other workspaces use a dynamic
+`Workspace N` fallback. With persistent slots, automatic numbers use the lowest
+available number, skipping configured numeric names. Without persistent slots,
+the fallback follows the current position in the project's presented list.
+Renaming in the sidebar saves the custom label to TOML. Internal workspace IDs
+remain unchanged.
+
 Settings → Workspaces → Workspaces to keep sets a minimum total across all
 projects. The default is **1**; **0** disables the configured minimum:
 
@@ -226,11 +262,25 @@ Restart restoration uses the latest saved placement of each window from a verifi
 app process. Older copies of the same window do not compete with its current
 placement when its title changes. Window IDs from different process launches
 remain separate.
+After you explicitly select a workspace, apps launched afterward open in your
+current workspace instead of returning to an old saved destination. Windows of
+apps already running remain eligible for restart restoration.
 
-Older configurations retain their named `persistent-workspaces` behavior until
-the quantity is saved in Settings. Saving replaces that list with
-`minimum-workspace-count`; an explicit count takes precedence over named and
-shortcut-inferred persistence.
+Use `persistent-workspaces` to keep specific slots in array order, followed by
+automatic slots. This works together with the minimum; saving the count in
+Settings preserves the array. For example:
+
+```toml
+persistent-workspaces = ["1", "3", "5", "7"]
+minimum-workspace-count = 5
+```
+
+The sidebar shows Workspace 1, Workspace 3, Workspace 5, Workspace 7, then an
+automatic Workspace 2. Numeric workspace commands match those displayed numbers.
+The four persistent slots remain even if the minimum is reduced to zero.
+Named entries such as `"Code"` keep their name and can be selected with
+`workspace Code`. Custom TOML labels override their display names without changing
+their internal names or shortcut targets.
 
 ### Projects
 
@@ -244,6 +294,11 @@ menu in the menu bar.
 
 Drag windows or tab groups through the sidebar to move them between workspaces.
 You can also drag a window back onto the current workspace.
+
+When the expanded sidebar is open, **Up/Down** moves the highlighted selection
+through workspace headers and window rows, **Return** activates it, and **Esc**
+closes the sidebar. Typing filters the list; arrow navigation also works before
+you enter a search query. The selected row scrolls into view.
 
 By default the sidebar rests as a compact rail and expands when hovered. To hide the rail
 completely until the pointer reaches the selected display edge, enable auto-hide.
@@ -413,6 +468,8 @@ For a workspace on another display, its sidebar context menu offers **Bring Here
 bring it to the display containing that sidebar. On a secondary display, the previous
 workspace returns to main, hidden and reachable by shortcuts or swipes. Main can own
 multiple workspaces; each secondary is replaced by the explicitly brought workspace.
+Reconciliation also returns hidden secondary assignments to main after restoration
+or display changes, keeping only the visible workspace on each secondary.
 Forced assignments still apply. The source gets a local fallback or empty workspace;
 other displays keep their current workspace.
 
@@ -471,13 +528,11 @@ bindings keep their explicitly configured sides. Accessibility access is require
 Confirmed application minimum sizes persist across restarts. Use **Clear Saved
 Minimum Sizes…** in the menu to clear saved and current observations.
 
-### Window overview
+### Window search palette
 
-WinMuxX includes a window overview that works like a lightweight Mission Control
-view. It lists windows from the available workspaces and monitors. Use the
-search field to filter the list, then select a window to focus it.
-
-You can open the overview with a normal shortcut or with a tap-only shortcut:
+The window search palette lists windows across workspaces and projects. Filter
+the list by typing, then select a window to focus it. Open it with a normal
+shortcut or a tap-only shortcut:
 
 ```toml
 [mode.main.binding]
@@ -487,9 +542,60 @@ You can open the overview with a normal shortcut or with a tap-only shortcut:
     right-cmd = 'palette'
 ```
 
-The right Command tap opens the overview when it is closed and closes it when
+The right Command tap opens the palette when it is closed and closes it when
 it is open. Press `Escape` to close it. A modifier tap does not run when you
 use that modifier as part of another shortcut.
+
+Use `winmuxx palette --group-by-workspace` (or bind
+`palette --group-by-workspace`) to group matches under workspace headings.
+The palette's **Group by workspace** button switches between grouped and flat
+results for the current opening. Groups keep the opening workspace order, with
+the focused workspace first; matches keep fuzzy ranking within each group.
+Headings show workspace display labels and project names. Up/Down, Return and
+⌘1–⌘9 count window rows only. Bare `palette` retains the flat list.
+Search uses a native macOS search field, including its clear button and standard
+text-editing commands. Input-method composition keeps priority over navigation
+and quick-select shortcuts. Results use standard selectable rows and adaptive
+system colors; glass follows system appearance, while opaque custom chrome
+keeps its configured color with a contrasting light or dark appearance.
+
+### Workspace overview
+
+`winmuxx workspace-overview` toggles a spatial overview of the current project.
+Each display shows its own workspace cards, preserving saved window positions,
+sizes and overlap. Click a card to switch workspaces or a window to focus it.
+Arrow keys select cards, Tab selects windows, Return activates, and Escape closes.
+Page Up/Down or Previous/Next navigate more than twelve cards on a display.
+The `show` and `hide` arguments are idempotent.
+
+```toml
+[mode.main.binding]
+    alt-shift-o = 'workspace-overview'
+
+[workspace-overview]
+    three-finger-up = false # opt in after adjusting macOS Mission Control
+```
+
+The optional three-finger upward gesture opens the overview. A three-finger
+downward gesture closes it whenever it is open, including when opened by command
+with the upward shortcut disabled. The overview follows your fingers while swiping
+up or down; reversing a short swipe returns it to its starting state. Release
+settles with your swipe velocity. Opening and closing share the workspace-swipe
+spring and `workspace-swipe.animation-duration-ms`. The overview uses the expanded
+sidebar's translucent frosted material; Reduce Transparency supplies an opaque
+background. Reduce Motion and disabled
+animations skip motion. Assign macOS Mission Control to four fingers or disable its trackpad
+gesture first; WinMuxX does not change macOS settings. Horizontal workspace swipes
+and the overview gesture can be enabled independently.
+
+Minimized windows, hidden apps, native full-screen windows and popups are excluded.
+Ordinary windows on inactive WinMuxX workspaces remain included. Previews are
+captured on demand and stay static. Missing permission or unavailable contents
+fall back to app icons and saved outlines. Windows without saved geometry appear
+in a menu beneath their card. There is no dragging or continuous live capture.
+See [overview implementation and validation](docs/WORKSPACE_OVERVIEW.md).
+
+### Example launch scripts
 
 ```applescript
 # ~/Documents/scripts/launchTerminalWindow.scpt

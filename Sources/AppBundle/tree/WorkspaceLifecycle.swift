@@ -206,6 +206,7 @@ func workspaceShouldSurviveReconciliation(
     retainedEmptyWorkspaceIds: [WorkspaceScope: WorkspaceId],
 ) -> Bool {
     guard !workspace.isArchived else { return false }
+    if workspace.isConfiguredPersistent { return true }
     if config.minimumWorkspaceCount != nil {
         // Saved assignments and spare empty slots are not live windows. Only
         // minimum retention may keep them, apart from required project/display slots.
@@ -213,7 +214,7 @@ func workspaceShouldSurviveReconciliation(
             (!isUnitTest && !isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
             projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived }.count == 1 ||
             (workspace.isVisible && !Workspace.all.contains {
-                $0 !== workspace && workspaceHasLifecycleWindows($0) &&
+                $0 !== workspace && (workspaceHasLifecycleWindows($0) || $0.isConfiguredPersistent) &&
                     $0.projectId == workspace.projectId &&
                     workspaceIsAvailableForMonitor($0, monitor: workspace.workspaceMonitor)
             })

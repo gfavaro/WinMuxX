@@ -44,7 +44,7 @@ private let workspaceParsers: [String: any ParserProtocol<WorkspaceLayoutConfig>
 
 private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<Layout?> {
     parseString(raw, trace).flatMap {
-        $0.parseLayout().map { Optional($0) }.orFailure(.semantic(trace, "Expected dwindle, tiles, accordion or tab-group"))
+        $0.parseLayout().map { Optional($0) }.orFailure(.semantic(trace, "Expected dwindle, master, tiles, accordion or tab-group"))
     }
 }
 
