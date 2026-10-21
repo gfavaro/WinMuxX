@@ -8,9 +8,10 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
     @SettingsDraft("drag-stack-layout", load: { config.dragStackLayout }) private var dragStackLayout: Layout
     @SettingsDraft("workspace-swipe.animation-duration-ms", load: { config.workspaceSwipe.animationDurationMs }) private var swipeAnimationDuration: Int
+    @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
-    @State private var doubleSidedWindows = ExperimentalUISettings().doubleSidedWindows
+    @SettingsDraft("window-tabs.double-sided-windows", load: { config.windowTabs.doubleSidedWindows }) private var doubleSidedWindows: Bool
     @SettingsDraft("automatically-tile-new-windows", load: { config.automaticallyTileNewWindows }) private var automaticallyTileNewWindows: Bool
     @SettingsDraft("auto-add-new-windows-to-tab-group", load: { config.autoAddNewWindowsToTabGroup }) private var autoAddNewWindowsToTabGroup: Bool
     @SettingsDraft("enable-shake-to-toggle-tiling", load: { config.enableShakeToToggleTiling }) private var enableShakeToToggleTiling: Bool
@@ -39,6 +40,7 @@ struct ShortcutBehaviorSettingsView: View {
                 } onChange: { persistRootString("drag-stack-layout", dragStackLayout.rawValue) }
                 SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
+                    Text("Master").tag(Layout.master)
                     Text("Tiles").tag(Layout.tiles)
                     Text("Stacked: Tabbed").tag(Layout.tabGroup)
                     Text("Stacked: Accordion").tag(Layout.stacked)
@@ -85,6 +87,13 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
                     .font(.callout).foregroundStyle(.secondary)
             }
+            SettingsSection("Workspace overview") {
+                SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
+                    persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
+                }
+                Text("Use workspace-overview from a shortcut or the CLI. For the gesture, assign macOS Mission Control to four fingers or turn its gesture off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
             SettingsSection("Pointer focus") {
                 SettingsToggle("Focus windows under the pointer", id: "focus-follows-mouse", isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
@@ -103,11 +112,11 @@ struct ShortcutBehaviorSettingsView: View {
                 .disabled(!tabEnabled)
 
 
-                SettingsToggle("Double-sided windows", id: "ui.double-sided-windows", isOn: $doubleSidedWindows, help: "Replace two-window tab strips with two sides. Option-click anywhere in the window or press Option-Tab to flip.") {
-                    var settings = ExperimentalUISettings()
-                    settings.doubleSidedWindows = doubleSidedWindows
-                    if doubleSidedWindows { requestScreenRecordingPermissionsIfNeeded() }
-                    scheduleRefreshSession(.menuBarButton)
+                SettingsToggle("Double-sided windows", id: "window-tabs.double-sided-windows", isOn: $doubleSidedWindows, help: "Replace two-window tab strips with two sides. Option-click anywhere in the window or press Option-Tab to flip.") {
+                    persistSettingsConfig(section: "window-tabs", key: "double-sided-windows",
+                        renderedValue: doubleSidedWindows ? "true" : "false", model: model) {
+                        if config.windowTabs.doubleSidedWindows { requestScreenRecordingPermissionsIfNeeded() }
+                    }
                 }
                 .disabled(!tabEnabled)
                 Text("Option-click anywhere in the window or press Option-Tab to flip between two windows. Three or more windows use tabs. Show tab strips must be enabled. When it is off, groups use overlapping windows with offsets. Rotation uses Screen Recording access and respects Reduce Motion.")

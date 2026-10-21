@@ -19,7 +19,6 @@ func openWorkspaceSidebarFromCommand() {
     panel.shouldLockNextSidebarSearchExpansion = true
     panel.bufferedCommandSidebarSearchKeys = []
     installWorkspaceSidebarCommandMouseUnlockMonitor(panel)
-    panel.expandSidebar(to: CGFloat(config.workspaceSidebar.width))
     panel.beginInlineTextEditing(
         locksExpansion: true,
         cancelsOnPointerExit: false,
@@ -50,8 +49,7 @@ func openWorkspaceSidebarFromCommand() {
 @MainActor
 func closeWorkspaceSidebarFromCommand(_ panel: WorkspaceSidebarPanel) {
     panel.endInlineTextEditing()
-    panel.pendingExpand?.cancel()
-    panel.pendingExpand = nil
+    panel.cancelHoverReveal()
     panel.pendingCollapse?.cancel()
     panel.pendingCollapse = nil
     panel.pendingCollapseFinalize?.cancel()
@@ -62,7 +60,7 @@ func closeWorkspaceSidebarFromCommand(_ panel: WorkspaceSidebarPanel) {
     panel.commandExpansionLocksCollapse = false
     panel.shouldLockNextSidebarSearchExpansion = false
     panel.bufferedCommandSidebarSearchKeys = []
-    removeWorkspaceSidebarCommandMouseUnlockMonitor(panel)
+    panel.removeCommandMouseUnlockMonitors()
     panel.animateVisibleSidebarWidth(workspaceSidebarRestingWidth(config.workspaceSidebar), animation: .easeInOut(duration: panel.animationDuration))
     panel.viewModel.isWorkspaceSidebarExpanded = config.workspaceSidebar.alwaysExpanded
     panel.updateMousePassthrough()
@@ -70,7 +68,7 @@ func closeWorkspaceSidebarFromCommand(_ panel: WorkspaceSidebarPanel) {
 
 @MainActor
 private func installWorkspaceSidebarCommandMouseUnlockMonitor(_ panel: WorkspaceSidebarPanel) {
-    removeWorkspaceSidebarCommandMouseUnlockMonitor(panel)
+    panel.removeCommandMouseUnlockMonitors()
     panel.commandMouseUnlockPoint = mouseLocation
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak panel] in
         guard let panel, panel.commandExpansionLocksCollapse else { return }
@@ -89,18 +87,15 @@ private func installWorkspaceSidebarCommandMouseUnlockMonitor(_ panel: Workspace
     }
 }
 
-@MainActor
-private func removeWorkspaceSidebarCommandMouseUnlockMonitor(_ panel: WorkspaceSidebarPanel) {
-    for monitor in panel.commandMouseUnlockMonitors {
-        NSEvent.removeMonitor(monitor)
-    }
-    panel.commandMouseUnlockMonitors = []
-    panel.commandMouseUnlockPoint = nil
-}
-
 private let workspaceSidebarCommandMouseUnlockDistance: CGFloat = 1
 
 extension WorkspaceSidebarPanel {
+    func removeCommandMouseUnlockMonitors() {
+        for monitor in commandMouseUnlockMonitors { NSEvent.removeMonitor(monitor) }
+        commandMouseUnlockMonitors = []
+        commandMouseUnlockPoint = nil
+    }
+
     @MainActor
     func unlockCommandSidebarExpansionIfMouseMoved() {
         guard commandExpansionLocksCollapse,
@@ -111,7 +106,7 @@ extension WorkspaceSidebarPanel {
         commandExpansionLocksCollapse = false
         shouldLockNextSidebarSearchExpansion = false
         inlineTextEditingLocksExpansion = false
-        removeWorkspaceSidebarCommandMouseUnlockMonitor(self)
+        removeCommandMouseUnlockMonitors()
         updateHoverStateFromMousePosition()
     }
 }

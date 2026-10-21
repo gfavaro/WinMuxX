@@ -319,7 +319,10 @@ private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock {
         }
         die("Can't convert \(a) to AxUiElementMock")
     }
-    return a as! AXUIElement
+    let element = a as! AXUIElement
+    // Messaging timeouts belong to each element, including returned controls.
+    AXUIElementSetMessagingTimeout(element, 1.0)
+    return element
 }
 
 typealias WindowIdAndAxUiElementMock = (windowId: UInt32, ax: AxUiElementMock)
@@ -342,6 +345,9 @@ extension AXUIElement: AxUiElementMock {
 
     func read<Attr: ReadableAttr>(_ attr: Attr) -> Result<Attr.T?, AXReadFailure> {
         func perform() -> Result<Attr.T?, AXReadFailure> {
+            guard RunLoopJob.current?.isCancelled != true else {
+                return .failure(AXReadFailure(code: .cannotComplete))
+            }
             let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
             defer { signposter.endInterval(#function, state) }
             var raw: AnyObject?
@@ -371,20 +377,21 @@ extension AXUIElement: AxUiElementMock {
     }
 
     func containingWindowId() -> CGWindowID? {
-        let state = signposter.beginInterval(#function, "axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
-        defer { signposter.endInterval(#function, state) }
-        var cgWindowId = CGWindowID()
-        return _AXUIElementGetWindow(self, &cgWindowId) == .success ? cgWindowId : nil
+        containingWindowIdWithError().windowId
     }
 
     /// Like containingWindowId, but surfaces the AXError so callers can distinguish "the window
     /// is gone" (.invalidUIElement) from "the app didn't answer" (.cannotComplete — busy app or
     /// timed-out round-trip). Window liveness decisions must not treat the latter as death.
-    func containingWindowIdWithError() -> (windowId: CGWindowID?, error: AXError) {
+    func containingWindowIdWithError(timeout: Float = 1.0) -> (windowId: CGWindowID?, error: AXError) {
         let state = signposter.beginInterval(#function, "axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
         defer { signposter.endInterval(#function, state) }
         let pid = axTaskLocalAppThreadToken?.pid
+        guard RunLoopJob.current?.isCancelled != true else { return (nil, .cannotComplete) }
         if let pid, AXReadBudget.current?.permits(pid) == false { return (nil, .cannotComplete) }
+        // Fresh results and observer callback elements may compare equal to a
+        // registered element without inheriting its messaging timeout.
+        AXUIElementSetMessagingTimeout(self, timeout)
         var cgWindowId = CGWindowID()
         let error = _AXUIElementGetWindow(self, &cgWindowId)
         if let pid { AXReadBudget.current?.record(error, pid: pid) }

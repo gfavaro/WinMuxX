@@ -22,8 +22,32 @@ enum DebugWindowsState {
 struct DebugWindowsCommand: Command {
     let args: DebugWindowsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    var isQuery: Bool { args.eventsStart || args.eventsStop || args.eventsExport || args.checkModel }
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        let eventFlags = [args.eventsStart, args.eventsStop, args.eventsExport, args.checkModel].filter { $0 }.count
+        if eventFlags > 1 || (eventFlags > 0 && args.windowId != nil) {
+            return io.err("Use only one event/model diagnostic flag, without --window-id")
+        }
+        if args.eventsStart { runtime.events.start(); io.out("Event history started"); return true }
+        if args.eventsStop { runtime.events.stop(); io.out("Event history stopped and cleared"); return true }
+        if args.checkModel {
+            guard runtime.refresh.activeRefreshTask == nil else {
+                return io.err("A model refresh is in progress; retry after it settles")
+            }
+            let violations = runtime.modelInvariantViolations()
+            io.out(violations.map { "\($0.kind.rawValue): \($0.identity)" }.joined(separator: "\n"))
+            return violations.isEmpty
+        }
+        if args.eventsExport {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("winmuxx-events-\(UUID().uuidString).json")
+            do {
+                try runtime.events.export(to: url, configURL: configUrl,
+                    topology: monitors.map { String(describing: $0.rect) })
+                io.out(url.path)
+                return true
+            } catch { return io.err("Event export failed: \(error.localizedDescription)") }
+        }
         if let windowId = args.windowId {
             guard let window = Window.get(byId: windowId) else {
                 return io.err("Can't find window with the specified window-id: \(windowId)")

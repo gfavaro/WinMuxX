@@ -20,7 +20,7 @@ let package = Package(
         .library(name: "SparkleSupport", targets: ["SparkleSupport"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/LebJe/TOMLKit.git", exact: "0.5.5"),
+        .package(path: "Vendor/TOMLKit"),
         .package(url: "https://github.com/rxhanson/MASShortcut", revision: "2f9fbb3f959b7a683c6faaf9638d22afad37a235"),
         .package(url: "https://github.com/apple/swift-collections.git", exact: "1.3.0"),
         .package(url: "https://github.com/soffes/HotKey.git", exact: "0.2.1"),
@@ -86,6 +86,7 @@ let package = Package(
             name: "AppBundleTests",
             dependencies: [
                 .target(name: "AppBundle"),
+                .product(name: "TOMLKit", package: "TOMLKit"),
             ],
             path: "Sources/AppBundleTests",
         ),

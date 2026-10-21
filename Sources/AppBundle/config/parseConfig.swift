@@ -46,6 +46,11 @@ private let persistentWorkspacesKey = "persistent-workspaces"
 // 1. Does it make sense to have different value
 // 2. Prefer commands and commands flags over toml options if possible
 private let configParser: [String: any ParserProtocol<Config>] = [
+    "appearance": Parser(\.appearance) { raw, backtrace in
+        parseString(raw, backtrace).flatMap {
+            AppAppearance(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: system, light, dark"))
+        }
+    },
     "config-version": Parser(\.configVersion, parseConfigVersion),
 
     "after-login-command": Parser(\.afterLoginCommand, parseAfterLoginCommand),
@@ -70,6 +75,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "automatically-tile-new-windows": Parser(\.automaticallyTileNewWindows, parseBool),
     "enable-shake-to-toggle-tiling": Parser(\.enableShakeToToggleTiling, parseBool),
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
+    "master": Parser(\.master, parseMaster),
+    "follow-app-activation": Parser(\.followAppActivation, parseFollowAppActivation),
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
     "drag-stack-layout": Parser(\.dragStackLayout) { raw, backtrace in
@@ -78,11 +85,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
         }
     },
     "tab-group-padding": Parser(\.tabGroupPadding, parseInt),
-    "minimum-workspace-count": Parser(\.minimumWorkspaceCount) { raw, backtrace in
-        parseInt(raw, backtrace)
-            .filter(.semantic(backtrace, "Must be a non-negative integer")) { $0 >= 0 }
-            .map { Optional($0) }
-    },
     persistentWorkspacesKey: Parser(\.persistentWorkspaces, parsePersistentWorkspaces),
     "exec-on-workspace-change": Parser(\.execOnWorkspaceChange, parseArrayOfStrings),
     "exec": Parser(\.execConfig, parseExecConfig),
@@ -99,7 +101,9 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-swipe": Parser(\.workspaceSwipe, parseWorkspaceSwipe),
+    "workspace-overview": Parser(\.workspaceOverview, parseWorkspaceOverview),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
+    "menu-bar": Parser(\.menuBar, parseMenuBar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
@@ -159,7 +163,7 @@ func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]
 @MainActor func parseConfig(_ rawToml: String) -> (config: Config, errors: [TomlParseError]) { // todo change return value to Result
     let rawTable: TOMLTable
     do {
-        rawTable = try TOMLTable(string: rawToml)
+        rawTable = try TOMLTable(string: migratingLegacyMinimumWorkspaceCount(in: rawToml))
     } catch let e as TOMLParseError {
         return (defaultConfig, [.syntax(e.debugDescription)])
     } catch let e {

@@ -40,6 +40,7 @@ var defaultConfigUrl: URL {
 }
 
 struct Config: ConvenienceCopyable {
+    var appearance: AppAppearance = .system
     var configVersion: Int = 1
     var afterLoginCommand: [any Command] = []
     var afterStartupCommand: [any Command] = []
@@ -55,14 +56,15 @@ struct Config: ConvenienceCopyable {
     var automaticallyTileNewWindows: Bool = true
     var enableShakeToToggleTiling: Bool = true
     var focusFollowsMouse: Bool = false
+    var master = MasterConfig()
+    var followAppActivation = FollowAppActivationConfig()
     var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none
     var workspaceSwipe = WorkspaceSwipeConfig()
+    var workspaceOverview = WorkspaceOverviewConfig()
     var dragStackLayout: Layout = .tabGroup
     var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
-    var minimumWorkspaceCount: Int? = nil
-    var effectiveMinimumWorkspaceCount: Int { minimumWorkspaceCount ?? max(1, persistentWorkspaces.count) }
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
     var modifierSides = ModifierSides()
@@ -79,6 +81,7 @@ struct Config: ConvenienceCopyable {
     var singleWindowAspectRatio: DynamicConfigValue<Double> = .constant(1.5)
     var gaps: Gaps = .zero
     var workspaceSidebar = WorkspaceSidebarConfig()
+    var menuBar = MenuBarConfig()
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
     var animations = AnimationsConfig()
@@ -87,6 +90,18 @@ struct Config: ConvenienceCopyable {
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: [any Command] = []
+}
+
+enum AppAppearance: String, CaseIterable, Identifiable, Sendable {
+    case system, light, dark
+    var id: String { rawValue }
+    var nativeAppearance: NSAppearance? {
+        switch self {
+            case .system: nil
+            case .light: NSAppearance(named: .aqua)
+            case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
 }
 
 enum DefaultContainerOrientation: String {
@@ -106,6 +121,7 @@ struct WorkspaceSidebarConfig: ConvenienceCopyable, Equatable, Sendable {
     var enableFocus: Bool = false
     var autoHide: Bool = false
     var alwaysExpanded: Bool = false
+    var hoverOpenDelayMs: Int = 400
     var collapsedWidth: Int = 44
     var width: Int = 240
     var monitor: [MonitorDescription] = []
@@ -285,6 +301,7 @@ enum WorkspaceProjectDeletionAction: String, CaseIterable, Identifiable, Sendabl
 }
 
 struct WindowTabsConfig: ConvenienceCopyable, Equatable, Sendable {
+    var doubleSidedWindows: Bool = false
     var enabled: Bool = true
     var height: Int = 36
 }

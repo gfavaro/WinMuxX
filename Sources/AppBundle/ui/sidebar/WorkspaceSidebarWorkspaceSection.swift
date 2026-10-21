@@ -65,6 +65,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
 
     var body: some View {
         interactiveSectionContent
+            .id(WorkspaceSidebarSearchSelection.workspace(workspace.name))
             .padding(.vertical, isCompact ? 3 : 4)
             .padding(.horizontal, isCompact ? compactMetrics.innerInset : workspaceSidebarSectionInnerHorizontalInset)
             .frame(width: sectionWidth, alignment: .leading)
@@ -573,6 +574,7 @@ extension WorkspaceSidebarWorkspaceSection {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .id(WorkspaceSidebarSearchSelection.window(window.windowId))
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .modifier(WorkspaceSidebarOptionalDragModifier(

@@ -42,7 +42,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.experimentalUISettings.iconAppearance, indicator: model.experimentalUISettings.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
         if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name { return }
         lastIconState = state
         if model.isEnabled && state.indicator == .workspace {
@@ -59,7 +59,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" : "WinMux disabled")
         let image: NSImage?
         if model.isEnabled {
-            let monochrome = model.experimentalUISettings.iconAppearance != .color
+            let monochrome = model.menuBarConfiguration.iconAppearance != .color
             image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
             image?.isTemplate = monochrome
         } else {
@@ -123,14 +123,18 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         addSubmenu("Layout", to: menu) { submenu in
-            for (title, script) in [("Dwindle", "layout dwindle"), ("Tiles", "layout tiles"),
+            for (title, script) in [("Tiles", "layout tiles"),
                                     ("Tabbed", "layout tab-group"), ("Accordion", "layout accordion")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
+            addCommand("Dwindle", script: "workspace-layout dwindle", to: submenu)
+            addCommand("Master", script: "workspace-layout master", to: submenu)
+            submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
+            addCommand("Swap with Master", script: "swap-with-master", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
@@ -295,7 +299,7 @@ final class MenuCommandPayload {
 func menuCommandRequiresWindow(_ command: any Command) -> Bool {
     switch command {
         case is FocusCommand, is MoveCommand, is JoinWithCommand, is StackWithCommand,
-             is SwapCommand, is ResizeCommand, is LayoutCommand, is FullscreenCommand,
+             is SwapCommand, is ResizeCommand, is LayoutCommand, is WorkspaceLayoutCommand, is FullscreenCommand,
              is MoveNodeToWorkspaceCommand, is MoveNodeToMonitorCommand, is MoveNodeToProjectCommand,
              is SplitCommand, is CloseCommand, is CloseAllWindowsButCurrentCommand,
              is MacosNativeMinimizeCommand, is MacosNativeFullscreenCommand: true

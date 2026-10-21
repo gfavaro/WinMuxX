@@ -201,6 +201,28 @@ func proposedResizeWeightMap(_ window: Window, rect: Rect) -> WindowResizePrevie
             }
         }
     }
+    if let root = window.nodeWorkspace?.rootTilingContainer, root.layout == .master,
+       root.children.count == 2, let pane = window.directChild(in: root),
+       let paneRect = pane.lastAppliedLayoutPhysicalRect, let index = pane.ownIndex {
+        let axis = root.orientation
+        let leading = (index == 0) != config.master.side.isReversed
+        let oldEdge = axis == .h ? (leading ? lastAppliedLayoutRect.maxX : lastAppliedLayoutRect.minX)
+            : (leading ? lastAppliedLayoutRect.maxY : lastAppliedLayoutRect.minY)
+        let paneEdge = axis == .h ? (leading ? paneRect.maxX : paneRect.minX)
+            : (leading ? paneRect.maxY : paneRect.minY)
+        let newEdge = axis == .h ? (leading ? rect.maxX : rect.minX) : (leading ? rect.maxY : rect.minY)
+        if abs(oldEdge - paneEdge) < 1, abs(newEdge - oldEdge) > 5 {
+            let sibling = root.children[1 - index]
+            let ownWeight = pane.getWeightBeforeResize(axis)
+            let otherWeight = sibling.getWeightBeforeResize(axis)
+            let diff = constrainedTiledResizeDiff((newEdge - oldEdge) * (leading ? 1 : -1), adjustments: [
+                TiledResizeAdjustment(weight: ownWeight, multiplier: 1),
+                TiledResizeAdjustment(weight: otherWeight, multiplier: -1),
+            ])
+            weightMap.set(ownWeight + diff, for: pane, orientation: axis)
+            weightMap.set(otherWeight - diff, for: sibling, orientation: axis)
+        }
+    }
     let (lParent, lOwnIndex) = window.closestParent(hasChildrenInDirection: .left, withLayout: .tiles) ?? (nil, nil)
     let (dParent, dOwnIndex) = window.closestParent(hasChildrenInDirection: .down, withLayout: .tiles) ?? (nil, nil)
     let (uParent, uOwnIndex) = window.closestParent(hasChildrenInDirection: .up, withLayout: .tiles) ?? (nil, nil)

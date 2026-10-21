@@ -28,8 +28,6 @@ final class MacWindow: Window {
     }
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?
     private var workspaceReveal = WorkspaceWindowRevealState()
-    private(set) var workspacePreviewFrame: Rect?
-    private(set) var workspacePreviewMonitorOrigin: CGPoint?
     /// The corner the window is parked in, together with the monitor rect it was parked
     /// against: when the monitor's geometry changes (or the workspace moves to another
     /// monitor), the old corner position is wrong and the window must be re-parked even
@@ -79,7 +77,7 @@ final class MacWindow: Window {
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
         window.recordAuthoritativeActualRect(rect)
         allWindowsMap[windowId] = window
-        WindowRecoveryController.shared.recordBeforeMutation(window, originalRect: rect)
+        WindowRecoveryController.shared.stageOriginalFrame(window, originalRect: rect)
 
         try await WindowDetectionOperations.shared.run(window) {
             window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
@@ -240,11 +238,18 @@ final class MacWindow: Window {
             if !isHiddenInCorner {
                 let topLeftCorner = windowRect.topLeftCorner
                 let monitorRect = windowRect.center.monitorApproximation.rect // Similar to layoutFloatingWindow. Non idempotent
-                workspacePreviewFrame = windowRect
-                workspacePreviewMonitorOrigin = monitorRect.topLeftCorner
+                if !preserveRestoredWorkspacePreview, let preview = normalizedWorkspacePreviewFrame(
+                    CGRect(origin: windowRect.topLeftCorner, size: windowRect.size),
+                    origin: monitorRect.topLeftCorner, desktopSize: monitorRect.size)
+                {
+                    workspacePreviewFrame = preview
+                }
                 let absolutePoint = topLeftCorner - monitorRect.topLeftCorner
-                prevUnhiddenProportionalPositionInsideWorkspaceRect =
-                    CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
+                // Startup cleanup may have moved native windows to a safe location.
+                // Floating reveal must use the same saved position as its preview.
+                prevUnhiddenProportionalPositionInsideWorkspaceRect = preserveRestoredWorkspacePreview
+                    ? workspacePreviewFrame?.origin
+                    : CGPoint(x: absolutePoint.x / monitorRect.width, y: absolutePoint.y / monitorRect.height)
             }
         }
         // A parking flag is only a hint: apps may reposition without AX events.
@@ -255,23 +260,17 @@ final class MacWindow: Window {
             var actual = CGRect.zero
             if winmux_window_frame(windowId, &actual) { parkedFrame = actual }
         }
-        let p: CGPoint
-        switch corner {
-            case .bottomLeftCorner:
-                let size: CGSize?
-                if let parkedFrame { size = parkedFrame.size } else { size = try await getAxSize() }
-                guard let s = size else { fallthrough }
-                // Zoom will jump off if you do one pixel offset https://github.com/nikitabobko/WinMux/issues/527
-                // todo this ad hoc won't be necessary once I implement optimization suggested by Zalim
-                let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: -1)
-                p = nodeMonitor.visibleRect.bottomLeftCorner + onePixelOffset + CGPoint(x: -s.width, y: 0)
-            case .bottomRightCorner:
-                // Zoom will jump off if you do one pixel offset https://github.com/nikitabobko/WinMux/issues/527
-                // todo this ad hoc won't be necessary once I implement optimization suggested by Zalim
-                let onePixelOffset = macApp.appId == .zoom ? .zero : CGPoint(x: 1, y: 1)
-                p = nodeMonitor.visibleRect.bottomRightCorner - onePixelOffset
+        var effectiveCorner = corner
+        var windowSize = parkedFrame?.size ?? .zero
+        if corner == .bottomLeftCorner, parkedFrame == nil {
+            if let size = try await getAxSize() { windowSize = size }
+            else { effectiveCorner = .bottomRightCorner }
         }
-        if let parkedFrame, workspaceParkingPositionMatches(parkedFrame.origin, p) { return }
+        let p = workspaceParkingPoint(corner: effectiveCorner,
+            visibleRect: CGRect(origin: nodeMonitor.visibleRect.topLeftCorner, size: nodeMonitor.visibleRect.size),
+            windowSize: windowSize, zeroOffset: macApp.appId == .zoom)
+        if let parkedFrame, workspaceParkingFrameIsAcceptable(parkedFrame, requested: p,
+            displays: monitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) }) { return }
         // Complete parking before another workspace is revealed. AX frame writes
         // are otherwise queued, allowing outgoing windows to overlap the destination.
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
@@ -285,6 +284,50 @@ final class MacWindow: Window {
         guard workspaceReveal.generation == parkingGeneration else { return }
         hiddenInCorner = (corner, nodeMonitor.visibleRect)
         WorkspaceTransitionDiagnostics.record("park-end", window: self, generation: parkingGeneration)
+    }
+
+    @MainActor var hasCompletedNativeParking: Bool { hiddenInCorner != nil }
+
+    @MainActor func nativeFrameForRecovery() -> CGRect? {
+        var frame = CGRect.zero
+        return winmux_window_frame(windowId, &frame) ? frame : nil
+    }
+
+    @MainActor func fallbackFrameForRecovery() -> CGRect? {
+        guard let monitor = nodeMonitor else { return nil }
+        if let unit = workspacePreviewFrame {
+            return CGRect(x: monitor.rect.minX + unit.minX * monitor.width,
+                y: monitor.rect.minY + unit.minY * monitor.height,
+                width: unit.width * monitor.width, height: unit.height * monitor.height)
+        }
+        return terminationFrame(visibleFrame: CGRect(origin: monitor.visibleRect.topLeftCorner, size: monitor.visibleRect.size),
+            floatingSize: lastFloatingSize)
+    }
+
+    @MainActor func resumeFromVisibleNativeGeometry() {
+        guard let frame = nativeFrameForRecovery(), monitors.contains(where: {
+            let intersection = frame.intersection(CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size))
+            return !intersection.isNull && intersection.width > 1 && intersection.height > 1
+        }) else { return }
+        prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
+        hiddenInCorner = nil
+        workspaceReveal = WorkspaceWindowRevealState()
+        recordAuthoritativeActualRect(Rect(topLeftX: frame.minX, topLeftY: frame.minY, width: frame.width, height: frame.height))
+        lastAppliedLayoutPhysicalRect = nil
+        lastAppliedLayoutVirtualRect = nil
+    }
+
+    @MainActor
+    func hasConfirmedNativeParkingPosition() -> Bool {
+        guard isHiddenInCorner, let hiddenInCorner, let nodeMonitor,
+              hiddenInCorner.monitorVisibleRect == nodeMonitor.visibleRect else { return false }
+        var actual = CGRect.zero
+        guard winmux_window_frame(windowId, &actual) else { return false }
+        let requested = workspaceParkingPoint(corner: hiddenInCorner.corner,
+            visibleRect: CGRect(origin: nodeMonitor.visibleRect.topLeftCorner, size: nodeMonitor.visibleRect.size),
+            windowSize: actual.size, zeroOffset: macApp.appId == .zoom)
+        return workspaceParkingFrameIsAcceptable(actual, requested: requested,
+            displays: monitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) })
     }
 
     @MainActor
@@ -341,6 +384,7 @@ final class MacWindow: Window {
                 WorkspaceTransitionDiagnostics.record("restore-pending", window: self, generation: token, requested: target)
                 return false
             }
+            preserveRestoredWorkspacePreview = false
             prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
             hiddenInCorner = nil
             WorkspaceTransitionDiagnostics.record("restore-end", window: self, generation: token, requested: target)

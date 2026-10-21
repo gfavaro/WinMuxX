@@ -57,6 +57,52 @@ final class RefreshFocusSyncTest: XCTestCase {
     }
 
     @MainActor
+    func testParkingRecoveryNeverReplacesPendingFocusOrTabReconciliation() async throws {
+        for other in [RefreshSessionEvent.onTabSwitched,
+                      .globalObserver(NSWorkspace.didActivateApplicationNotification.rawValue)] {
+            for parkingFirst in [true, false] {
+                setUpWorkspacesForTests()
+                TrayMenuModel.shared.isEnabled = true
+                var events: [RefreshSessionEvent] = []
+                let started = expectation(description: "initial refresh started")
+                let finished = expectation(description: "coalesced refresh finished")
+                var release: CheckedContinuation<Void, Never>?
+                setScheduledRefreshOverrideForTests { event, _ in
+                    events.append(event)
+                    if events.count == 1 { await withCheckedContinuation { release = $0; started.fulfill() } }
+                    else { finished.fulfill() }
+                }
+                defer { release?.resume(); setScheduledRefreshOverrideForTests(nil) }
+                scheduleRefreshSession(.hotkeyBinding)
+                await fulfillment(of: [started], timeout: 2)
+                scheduleRefreshSession(parkingFirst ? .onWindowParkingDrift : other)
+                scheduleRefreshSession(parkingFirst ? other : .onWindowParkingDrift)
+                release?.resume(); release = nil
+                await fulfillment(of: [finished], timeout: 2)
+                XCTAssertEqual(events.last?.description, other.description)
+            }
+        }
+    }
+
+    @MainActor
+    func testParkingRecoveryDoesNotAdoptAnInactiveNativeFocusedWindow() async throws {
+        setUpWorkspacesForTests()
+        TrayMenuModel.shared.isEnabled = true
+        let origin = focus.workspace
+        let original = TestWindow.new(id: 1001, parent: origin.rootTilingContainer)
+        _ = original.focusWindow()
+        let destination = Workspace.get(byName: "inactive-native-drift")
+        let appeared = TestWindow.new(id: 1002, parent: destination.rootTilingContainer)
+        appeared.nativeFocus()
+        setBlockingRefreshOverridesForTests(refresh: { XCTFail("Parking repair must not enumerate applications") },
+            normalizeLayoutReason: { XCTFail("Parking repair must not reconcile unrelated state") })
+        defer { setBlockingRefreshOverridesForTests() }
+        try await runRefreshSessionBlocking(.onWindowParkingDrift)
+        XCTAssertTrue(focus.workspace === origin)
+        XCTAssertTrue(focus.windowOrNil === original)
+    }
+
+    @MainActor
     func testLightSessionPreservesActivationAndPendingHeavyRefresh() async throws {
         setUpWorkspacesForTests()
         TrayMenuModel.shared.isEnabled = true

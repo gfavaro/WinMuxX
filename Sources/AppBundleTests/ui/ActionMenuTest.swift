@@ -41,10 +41,10 @@ final class ActionMenuTest: XCTestCase {
     func testOnlyExactConfiguredLayoutGetsShortcut() throws {
         var bindings = ActionMenuBindings(mode: try mode("""
         [mode.main.binding]
-        alt-space = 'layout dwindle'
+        alt-space = 'workspace-layout dwindle'
         alt-shift-t = 'layout floating tiling'
         """))
-        XCTAssertEqual(bindings.bindings(for: try command("layout dwindle")).map(\.notation), ["alt-space"])
+        XCTAssertEqual(bindings.bindings(for: try command("workspace-layout dwindle")).map(\.notation), ["alt-space"])
         XCTAssertEqual(bindings.bindings(for: try command("layout floating tiling")).map(\.notation), ["alt-shift-t"])
         for script in ["layout h_tiles", "layout v_tiles", "layout tab-group", "layout horizontal vertical"] {
             XCTAssertTrue(bindings.bindings(for: try command(script)).isEmpty, script)
@@ -57,7 +57,7 @@ final class ActionMenuTest: XCTestCase {
         activeMode = "main"
         config.modes["main"] = try mode("""
         [mode.main.binding]
-        alt-space = 'layout dwindle'
+        alt-space = 'workspace-layout dwindle'
         alt-shift-t = 'layout floating tiling'
         """)
         let menu = NSMenu()
@@ -151,12 +151,12 @@ final class ActionMenuTest: XCTestCase {
 
     func testNoModeStillAllowsCatalogWithoutShortcuts() throws {
         var bindings = ActionMenuBindings(mode: nil)
-        XCTAssertTrue(bindings.bindings(for: try command("layout dwindle")).isEmpty)
+        XCTAssertTrue(bindings.bindings(for: try command("workspace-layout dwindle")).isEmpty)
         XCTAssertTrue(bindings.unshown.isEmpty)
     }
 
     func testWindowRequirementsDistinguishWorkspaceAndWindowActions() throws {
-        for script in ["focus left", "layout dwindle", "fullscreen", "move-node-to-workspace 2"] {
+        for script in ["focus left", "workspace-layout dwindle", "fullscreen", "move-node-to-workspace 2"] {
             XCTAssertTrue(menuCommandRequiresWindow(try command(script)))
         }
         for script in ["workspace 2", "mode main", "enable toggle", "reload-config", "focus-monitor main"] {
@@ -225,7 +225,7 @@ final class ActionMenuTest: XCTestCase {
     func testMenuReflectsModeAndConfigurationOnEveryOpening() throws {
         let oldMode = activeMode
         defer { activeMode = oldMode }
-        config.modes["main"] = try mode("[mode.main.binding]\nalt-space = 'layout dwindle'")
+        config.modes["main"] = try mode("[mode.main.binding]\nalt-space = 'workspace-layout dwindle'")
         activeMode = "main"
         let menu = NSMenu()
         let controller = NativeActionMenu()

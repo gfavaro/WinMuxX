@@ -33,7 +33,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         field.drawsBackground = false
         field.focusRingType = .none
         field.textColor = context.environment.workspaceSidebarAppearance == .system ? .labelColor : .white
-        field.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
+        field.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         field.font = .systemFont(ofSize: 12.5, weight: .medium)
         field.lineBreakMode = .byTruncatingTail
         field.usesSingleLineMode = true
@@ -48,7 +48,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
 
     func updateNSView(_ field: NSTextField, context: Context) {
         field.textColor = context.environment.workspaceSidebarAppearance == .system ? .labelColor : .white
-        field.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
+        field.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         debugWorkspaceSidebarRenameLog("updateNSView didFocus=\(context.coordinator.didFocus) text=\(text) field=\(field.stringValue) windowKey=\(field.window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: field.window?.firstResponder))")
         if field.stringValue != text {
             field.stringValue = text

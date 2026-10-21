@@ -9,6 +9,7 @@ func singleWindowLimitedRect(available: Rect, screen: Rect, ratio: Double, minim
 
 @MainActor
 func singleWindowAspectRatioTarget(in workspace: Workspace) -> Window? {
+    guard workspace.rootTilingContainer.layout != .master else { return nil }
     let monitor = workspace.workspaceMonitor
     let ratio = config.singleWindowAspectRatio.getValue(for: monitor)
     guard ratio.isFinite, ratio > 0, monitor.rect.height > 0,

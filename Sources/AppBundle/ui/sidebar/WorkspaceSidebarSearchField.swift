@@ -1,25 +1,17 @@
 import AppKit
 import SwiftUI
 
-final class WorkspaceSidebarNativeSearchField: NSSearchField {
-    var onAttach: (@MainActor () -> Void)?
-
-    override func viewDidMoveToWindow() {
-        super.viewDidMoveToWindow()
-        onAttach?()
-    }
-}
-
 struct WorkspaceSidebarSearchField: NSViewRepresentable {
     @Binding var text: String
     let requestsFocus: Bool
     let onEditorReady: @MainActor (WorkspaceSidebarPanel) -> Void
     let onCommand: @MainActor (WorkspaceSidebarInlineTextKey) -> Void
 
-    func makeNSView(context: Context) -> WorkspaceSidebarNativeSearchField {
-        let field = WorkspaceSidebarNativeSearchField()
-        field.placeholderString = "Search windows…"
+    func makeNSView(context: Context) -> NativeSearchField {
+        let field = NativeSearchField()
+        field.placeholderString = "Search or use ↑ ↓…"
         field.setAccessibilityLabel("Search windows")
+        field.setAccessibilityHelp("Up and down select a workspace or window. Return activates it. Escape closes the sidebar.")
         field.controlSize = .small
         field.font = .systemFont(ofSize: 12)
         field.sendsSearchStringImmediately = true
@@ -35,15 +27,16 @@ struct WorkspaceSidebarSearchField: NSViewRepresentable {
         return field
     }
 
-    func updateNSView(_ field: WorkspaceSidebarNativeSearchField, context: Context) {
+    func updateNSView(_ field: NativeSearchField, context: Context) {
         context.coordinator.parent = self
-        field.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
+        let appearance: NSAppearance.Name = context.environment.colorScheme == .dark ? .darkAqua : .aqua
+        if field.appearance?.name != appearance { field.appearance = NSAppearance(named: appearance) }
         if field.stringValue != text { field.stringValue = text }
         if !requestsFocus { context.coordinator.didFocus = false }
         context.coordinator.scheduleFocus(field)
     }
 
-    static func dismantleNSView(_ field: WorkspaceSidebarNativeSearchField, coordinator: Coordinator) {
+    static func dismantleNSView(_ field: NativeSearchField, coordinator: Coordinator) {
         field.onAttach = nil
         field.delegate = nil
         field.target = nil

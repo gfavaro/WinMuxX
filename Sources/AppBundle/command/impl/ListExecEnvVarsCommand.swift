@@ -2,6 +2,7 @@ import AppKit
 import Common
 
 struct ListExecEnvVarsCommand: Command {
+    let isQuery = true
     let args: ListExecEnvVarsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
 

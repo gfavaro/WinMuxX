@@ -32,7 +32,7 @@ struct WorkspaceSidebarNativeProjectMenu: NSViewRepresentable {
         coordinator.parent = self
         coordinator.button = button
         coordinator.appearance = context.environment.workspaceSidebarAppearance
-        button.appearance = NSAppearance(named: coordinator.appearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
+        button.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         if coordinator.isTracking {
             if !isMenuOpen { button.menu?.cancelTrackingWithoutAnimation() }
             return

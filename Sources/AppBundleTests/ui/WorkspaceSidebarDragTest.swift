@@ -123,6 +123,33 @@ private func workspaceSidebarSnapshotForTopFilterBar(
 }
 
 final class WorkspaceSidebarDragTest: XCTestCase {
+    func testUnfilteredKeyboardNavigationIncludesWorkspaceHeadersAndWindows() {
+        let workspaces = makeWorkspaceSidebarSearchFixture()
+        let targets = workspaceSidebarSearchSelections(workspaces: workspaces, includeWorkspaceHeaders: true)
+        XCTAssertEqual(Array(targets.prefix(6)), [.workspace("coding"), .window(101), .window(102),
+            .workspace("research"), .window(202), .window(203)])
+        XCTAssertEqual(Set(targets).count, targets.count)
+        XCTAssertEqual(workspaceSidebarInitialNavigationSelection(workspaces: workspaces), .workspace("coding"))
+    }
+
+    func testSidebarArrowNavigationClampsAndHandlesRemovedTargets() {
+        let targets: [WorkspaceSidebarSearchSelection] = [.workspace("coding"), .window(101), .workspace("empty")]
+        XCTAssertEqual(workspaceSidebarSelectionAfterMoving(.workspace("coding"), selections: targets, delta: -1), .workspace("coding"))
+        XCTAssertEqual(workspaceSidebarSelectionAfterMoving(.workspace("coding"), selections: targets, delta: 1), .window(101))
+        XCTAssertEqual(workspaceSidebarSelectionAfterMoving(.workspace("empty"), selections: targets, delta: 1), .workspace("empty"))
+        XCTAssertEqual(workspaceSidebarSelectionAfterMoving(.window(999), selections: targets, delta: -1), .workspace("empty"))
+        XCTAssertNil(workspaceSidebarSelectionAfterMoving(.window(101), selections: [], delta: 1))
+    }
+
+    func testSidebarInitialSelectionStartsAtFocusedWorkspace() {
+        let focused = WorkspaceSidebarWorkspaceViewModel(name: "focused", projectId: workspaceProjectDefaultId,
+            displayName: "Focused", sidebarLabel: "Focused", isGeneratedName: false,
+            monitorScopeId: workspaceSidebarDefaultScopeId, monitorName: nil, isFocused: true, isVisible: true, items: [])
+        let workspaces = makeWorkspaceSidebarSearchFixture() + [focused]
+        XCTAssertEqual(workspaceSidebarInitialNavigationSelection(workspaces: workspaces), .workspace("focused"))
+        XCTAssertEqual(workspaceSidebarSearchSelections(workspaces: [focused], includeWorkspaceHeaders: true), [.workspace("focused")])
+        XCTAssertNil(workspaceSidebarInitialNavigationSelection(workspaces: []))
+    }
     func testCompactClockAccessibilityHonorsSecondsVisibility() {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let timeWithoutSeconds = date.formatted(date: .omitted, time: .shortened)
@@ -734,16 +761,27 @@ final class WorkspaceSidebarDragTest: XCTestCase {
         )
     }
 
-    func testWorkspaceSidebarAutoHideUsesZeroRestingWidthAndKeepsConfiguredEdgeActivationWidth() {
+    func testWorkspaceSidebarAutoHideUsesZeroRestingWidthAndNarrowEdgeActivation() {
         var sidebarConfig = WorkspaceSidebarConfig()
         sidebarConfig.autoHide = true
         sidebarConfig.collapsedWidth = 36
 
         XCTAssertEqual(workspaceSidebarRestingWidth(sidebarConfig), 0)
-        XCTAssertEqual(workspaceSidebarHoverActivationWidth(sidebarConfig), 36)
+        XCTAssertEqual(workspaceSidebarHoverActivationWidth(sidebarConfig), 2)
 
         sidebarConfig.autoHide = false
         XCTAssertEqual(workspaceSidebarRestingWidth(sidebarConfig), 36)
+    }
+
+    func testAutoHideEdgeTriggerDoesNotGrowWithCollapsedRailWidth() {
+        var sidebarConfig = WorkspaceSidebarConfig()
+        sidebarConfig.autoHide = true
+        for width in [36, 44, 56, 100] {
+            sidebarConfig.collapsedWidth = width
+            XCTAssertEqual(workspaceSidebarHoverActivationWidth(sidebarConfig), 2)
+            XCTAssertEqual(workspaceSidebarBackingWidth(config: sidebarConfig, visibleWidth: 0,
+                isExpanded: false, isAnimating: false), 2)
+        }
     }
 
     func testAlwaysExpandedSidebarUsesExpandedRestingAndActivationWidths() {
@@ -827,6 +865,21 @@ final class WorkspaceSidebarDragTest: XCTestCase {
                 isMouseWindowDragInProgress: true,
             ),
         )
+    }
+
+    func testTextSelectionSuppressesHoverWithoutBlockingSidebarClicksOrWindowDrops() {
+        func suppress(expanded: Bool = false, held: Bool = true, inside: Bool = false,
+                      windowDrag: Bool = false, sidebarDrag: Bool = false) -> Bool {
+            shouldSuppressWorkspaceSidebarHoverForPointerPress(
+                isExpanded: expanded, isLeftMouseButtonDown: held,
+                pressStartedInsideSidebar: inside, isWindowDrag: windowDrag, isSidebarDrag: sidebarDrag)
+        }
+        XCTAssertTrue(suppress()) // Press in an app, then drag text across the edge.
+        XCTAssertFalse(suppress(held: false)) // Mouse-up permits a fresh dwell.
+        XCTAssertFalse(suppress(inside: true)) // Clicking a rail item still works.
+        XCTAssertFalse(suppress(windowDrag: true)) // Preserve external window drops.
+        XCTAssertFalse(suppress(sidebarDrag: true)) // Preserve sidebar reordering.
+        XCTAssertFalse(suppress(expanded: true)) // Explicit command opening still works.
     }
 
     func testWorkspaceSidebarHoverExpansionIsSuppressedForSidebarOriginatedDrags() {

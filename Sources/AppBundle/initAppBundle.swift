@@ -13,6 +13,10 @@ import Foundation
         }
         do {
             bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
+            let editable = bootstrappedConfigUrl ?? preferredEditableConfigUrl()
+            if FileManager.default.fileExists(atPath: editable.path) {
+                try migrateLegacyConfiguration(at: editable)
+            }
         } catch {
             MessageModel.shared.message = Message(
                 description: "Config Bootstrap Error",

@@ -7,23 +7,32 @@ final class WindowRecoveryController {
     private var journal: WindowRecoveryJournal?
     private var didInitialize = false
     private var initializationError: String?
-    private(set) var isRecovering = false
+    private var stagedOriginals: [UInt32: RecoveryWindowEntry] = [:]
+    private var isCrashRecovering = false
+    var isRecovering: Bool { isCrashRecovering || restoreCoordinator.isRunning }
+    private var managedIdentities: [UInt32: RecoveryWindowIdentity] = [:]
+    private let restoreCoordinator = WindowRestoreCoordinator()
+    private let restoreTracker = OriginalWindowRestoreTracker()
     private(set) var isGeometryPaused = false
 
     private(set) var isTerminating = false
 
     func beginTermination() { isTerminating = true }
 
-    var suppressAutomaticFrameWrites: Bool { isTerminating || (isGeometryPaused && !TrayMenuModel.shared.isEnabled) }
+    var suppressAutomaticFrameWrites: Bool { isTerminating || !TrayMenuModel.shared.isEnabled }
 
-    func resumeTiling() { isGeometryPaused = false }
+    func resumeTiling() {
+        isGeometryPaused = false
+        restoreTracker.reset()
+        for window in MacWindow.allWindows { window.resumeFromVisibleNativeGeometry() }
+    }
 
     private func initializeIfNeeded() {
         guard !didInitialize else { return }
         didInitialize = true
         guard !isUnitTest, !serverArgs.isReadOnly else { return }
         let application = NSRunningApplication.current
-        guard let launchDate = application.launchDate else {
+        guard let launchDate = application.launchDate ?? recoveryProcessLaunchDate(application.processIdentifier) else {
             initializationError = "App launch identity is unavailable; recovery recording disabled."
             return
         }
@@ -35,7 +44,8 @@ final class WindowRecoveryController {
         journal = WindowRecoveryJournal(url: url, owner: owner) { previous in
             guard let running = NSRunningApplication(processIdentifier: previous.pid) else { return false }
             return !running.isTerminated && running.bundleIdentifier == previous.bundleId &&
-                running.launchDate == previous.applicationLaunchDate
+                (running.launchDate == previous.applicationLaunchDate ||
+                 recoveryProcessLaunchDate(previous.pid) == previous.applicationLaunchDate)
         }
     }
 
@@ -45,16 +55,33 @@ final class WindowRecoveryController {
                                       bundleId: window.macApp.rawAppBundleId, applicationLaunchDate: launchDate)
     }
 
-    func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
+    func stageOriginalFrame(_ window: MacWindow, originalRect: Rect?) {
         guard TrayMenuModel.shared.isEnabled, !isRecovering, window.nodeWorkspace != nil,
               let rect = originalRect, let identity = identity(for: window) else { return }
+        guard journal?.entries[window.windowId]?.identity != identity else { return }
+        guard stagedOriginals[window.windowId]?.identity != identity else { return }
+        stagedOriginals[window.windowId] = RecoveryWindowEntry(identity: identity,
+            originalFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+    }
+
+    func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
+        guard TrayMenuModel.shared.isEnabled, !isRecovering else { return }
+        if let identity = identity(for: window) { managedIdentities[window.windowId] = identity }
+        stageOriginalFrame(window, originalRect: originalRect)
+        guard !stagedOriginals.isEmpty else { journal?.retryFailedSaveIfNeeded(); return }
         initializeIfNeeded()
-        journal?.record(identity: identity, originalFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+        guard let journal else { return }
+        journal.record(Array(stagedOriginals.values))
+        stagedOriginals.removeAll(keepingCapacity: true)
     }
 
     func forget(_ window: MacWindow) {
-        guard let identity = identity(for: window) else { return }
-        journal?.forget(identity)
+        guard let identity = identity(for: window) ?? managedIdentities[window.windowId],
+              identity.pid == window.macApp.pid else { return }
+        if stagedOriginals[window.windowId]?.identity == identity { stagedOriginals[window.windowId] = nil }
+        if managedIdentities[window.windowId] == identity { managedIdentities[window.windowId] = nil }
+        restoreTracker.forget(identity)
+        journal?.forget(identity, deferSave: true)
     }
 
     var recoverableEntries: [RecoveryWindowEntry] {
@@ -72,6 +99,62 @@ final class WindowRecoveryController {
 
     func finishCleanly(preserving identities: [RecoveryWindowIdentity] = []) { journal?.finishCleanly(preserving: identities) }
 
+    /// Explicit disable/quit only. Each app has its own bounded AX budget and queue.
+    func restoreManagedWindows() async -> [RecoveryWindowIdentity] {
+        await restoreCoordinator.run { [self] in
+            guard !managedIdentities.isEmpty, !serverArgs.isReadOnly else { return [] }
+            return await performManagedRestore()
+        }
+    }
+
+    private func performManagedRestore() async -> [RecoveryWindowIdentity] {
+        initializeIfNeeded()
+        let byApp = Dictionary(grouping: MacWindow.allWindows, by: { $0.macApp.pid })
+            .mapValues { $0.map(\.windowId) }
+        return await withTaskGroup(of: [RecoveryWindowIdentity].self) { group in
+            for windowIds in byApp.values {
+                group.addTask { await self.restoreAppWindows(windowIds) }
+            }
+            var failed: [RecoveryWindowIdentity] = []
+            for await appFailures in group { failed.append(contentsOf: appFailures) }
+            return failed
+        }
+    }
+
+    private func restoreAppWindows(_ windowIds: [UInt32]) async -> [RecoveryWindowIdentity] {
+        return await AXReadBudget.$current.withValue(AXReadBudget()) {
+            let failedIds = await restoreTerminationWindows(windowIds) { windowId in
+                guard let window = MacWindow.allWindowsMap[windowId],
+                      let identity = identity(for: window), managedIdentities[window.windowId] == identity else { return }
+                let original = journal?.entries[window.windowId].flatMap { $0.identity == identity ? $0 : nil }
+                let fallback = window.isHiddenInCorner ? window.fallbackFrameForRecovery() : nil
+                guard let frame = original?.originalFrame ?? fallback else { return }
+                let entry = original ?? RecoveryWindowEntry(identity: identity, originalFrame: frame)
+                if original == nil { journal?.record([entry]) }
+                let baseline = window.nativeFrameForRecovery()
+                guard restoreTracker.shouldRestore(identity, currentFrame: baseline) else { return }
+                guard entry.hasValidFrame, MacWindow.allWindowsMap[window.windowId] === window,
+                      recoveryFrameIntersectsDisplay(entry.originalFrame, displays: sortedMonitors.map {
+                          CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size)
+                      }),
+                      let state = try await window.readNativeState(), !state.fullscreen, !state.minimized,
+                      MacWindow.allWindowsMap[window.windowId] === window,
+                      restoreTracker.frameIsUnchanged(baseline, window.nativeFrameForRecovery()) else {
+                    throw OriginalWindowRestoreError.unavailable
+                }
+                try await window.setAxFrameBlocking(entry.originalFrame.origin, entry.originalFrame.size, positionFirst: true)
+                guard let actual = try await window.getAxRect(), recoveryFrameMatches(
+                    actual: CGRect(origin: actual.topLeftCorner, size: actual.size), expected: entry.originalFrame)
+                else { throw OriginalWindowRestoreError.rejected }
+                restoreTracker.succeeded(identity)
+            } onFailure: { windowId, _ in
+                guard let window = MacWindow.allWindowsMap[windowId], let identity = identity(for: window) else { return }
+                restoreTracker.failed(identity, frame: window.nativeFrameForRecovery())
+            }
+            return failedIds.compactMap { id in MacWindow.allWindowsMap[id].flatMap { identity(for: $0) } }
+        }
+    }
+
     /// Explicit user action only. Pausing first prevents the next refresh from undoing
     /// recovered geometry. Never move native Spaces or force-unminimize/fullscreen windows.
     func recoverAfterCrash() async -> String {
@@ -79,8 +162,8 @@ final class WindowRecoveryController {
         guard !serverArgs.isReadOnly else { return "Recovery is unavailable in read-only mode." }
         let entries = recoverableEntries
         guard !entries.isEmpty else { return "No matching windows from a previous session were found." }
-        isRecovering = true
-        defer { isRecovering = false }
+        isCrashRecovering = true
+        defer { isCrashRecovering = false }
         var restored = 0
         var failures: [String] = []
         do {

@@ -9,16 +9,12 @@ certification. Existing dependency versions were not upgraded.
 | --- | --- | --- |
 | HotKey | 0.2.1 | Keep: runtime hotkey registration, key codes and keyboard-layout mapping. |
 | MASShortcut | 2f9fbb3f959b7a683c6faaf9638d22afad37a235 | Keep: native shortcut recorder and validation in Settings; a different responsibility from runtime registration. |
-| TOMLKit | 0.5.5 | Keep: configuration decoding, validation and structured settings writes. |
+| TOMLKit | Vendored 0.5.5 | Configuration decoding, validation and structured settings writes; local native-memory ownership patch described below. |
 | swift-collections | 1.3.0 | Keep: ordered workspace configuration and ordered diagnostic records; replacing these needs equivalent ordering and uniqueness guarantees. |
 | Sparkle | 2.9.6 | Keep: isolated automatic-update integration. Personal fork releases continue to disable updates. |
 
-ISSoundAdditions 2.0.1 was removed. Volume commands now use a small CoreAudio
-boundary with the same virtual-main-volume property, 1/16 steps, clamping,
-0.005 automatic-mute threshold, best-effort failure behavior and existing panel.
-Mute writes use CoreAudio's UInt32 property size. Tests exercise command policy
-without changing the machine's audio. Real output-device compatibility remains
-a separate runtime check.
+Volume controls, their CoreAudio implementation and the volume HUD were removed.
+ISSoundAdditions is no longer a dependency.
 
 ANTLR 4.13.1 was removed from the app dependency graph in build 72. A fresh
 index and whole-repository call-site review then confirmed the unfinished shell
@@ -26,7 +22,7 @@ parser was unreachable. Its experimental source, commented-out tests, generated
 standalone package and unused ANTLR installer support were removed in the Settings
 cleanup. Existing command tokenization and Bash execution are unchanged.
 
-The app has five external packages, all pinned. Apple frameworks and the local
+The app has four external packages, all pinned, and a vendored TOMLKit. Apple frameworks and the local
 PrivateApi C/Objective-C target are not third-party packages. Network.framework
 Unix-socket IPC remains: changing transport would add work without a demonstrated
 reliability or performance benefit.
@@ -48,3 +44,19 @@ local verification.
 `make check` uses SwiftPM's forced resolved versions, rejecting an out-of-date
 lockfile before tests instead of silently resolving changes. Deliberate dependency
 edits require `swift package resolve` and review of Package.resolved.
+
+## TOMLKit native ownership (2026-10-17)
+
+The release leak scan exposed native TOML allocations with no retaining roots.
+Inspection of the pinned 0.5.5 wrapper confirmed missing destruction of native
+tables/arrays/scalars and missing cleanup of getter, key, formatting and error
+buffers. An isolated 1,000-cycle fixture against that exact revision reported
+173,000 leaks / 10,864,000 bytes. The local patch reported zero leaks for the same
+fixture. This supersedes the earlier keep-without-changes decision for TOMLKit.
+
+`Vendor/TOMLKit` retains the original parser and license, adds shared root ownership
+for nested views, and frees temporary buffers with their matching allocator.
+It replaces the remote package without changing other dependency pins. Provenance,
+the mutation contract and the standalone leak-check command are in
+[the vendored README](../Vendor/TOMLKit/README.md). Root tests cover document/view
+lifetime, removed copies, temporary literals/encoded values and error cleanup.

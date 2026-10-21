@@ -56,3 +56,21 @@ func dwindleFocusFrames(in workspace: Workspace) -> [UInt32: Rect] {
         geometry[ObjectIdentifier(window)].map { (window.windowId, $0) }
     })
 }
+
+@MainActor
+func spatialWrapFocusTarget(in workspace: Workspace, from currentWindow: Window?, direction: CardinalDirection,
+                            excludingMoveNode: TreeNode? = nil) -> Window? {
+        let frames = dwindleFocusFrames(in: workspace)
+        let current = currentWindow.flatMap { frames[$0.windowId] }
+        let candidates = workspace.rootTilingContainer.allLeafWindowsRecursive.compactMap { window -> (Window, [CGFloat])? in
+            guard window.moveNode != excludingMoveNode, let rect = frames[window.windowId], window.participatesInWorkspaceFocus else { return nil }
+            let edge = direction.orientation == .h
+                ? (direction.isPositive ? rect.minX : -rect.maxX)
+                : (direction.isPositive ? rect.minY : -rect.maxY)
+            let cross = current.map { direction.orientation == .h ? abs(rect.center.y - $0.center.y) : abs(rect.center.x - $0.center.x) } ?? 0
+            return (window, [edge, cross])
+        }
+        return candidates.min { lhs, rhs in
+            lhs.1 == rhs.1 ? lhs.0.windowId < rhs.0.windowId : lhs.1.lexicographicallyPrecedes(rhs.1)
+        }?.0
+}

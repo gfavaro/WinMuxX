@@ -12,6 +12,16 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
+        if target.workspace.rootTilingContainer.layout == .master {
+            if let neighbor = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction, excludingMoveNode: currentNode) {
+                swapWindows(currentWindow, neighbor)
+                return true
+            }
+            // Master slots stay fixed; crossing a pane edge must not wrap the
+            // master root in an implicit split and silently abandon its policy.
+            if args.boundaries == .workspace { return args.boundariesAction == .stop }
+            return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
+        }
         if currentWindow.nodeWorkspace?.rootTilingContainer.layout == .dwindle,
            let neighbor = dwindleDirectionalFocusTarget(
                from: currentWindow,

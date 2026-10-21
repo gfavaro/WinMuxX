@@ -182,22 +182,44 @@ func workspaceSidebarWallpaperChanges(
 }
 
 struct WorkspaceSidebarWallpaperContrast: ViewModifier {
-    let snapshot: WorkspaceSidebarSnapshot
+    let configuration: WorkspaceSidebarConfiguration
+    let visibleWidth: CGFloat
+    let targetMonitorScopeId: String
+
+    init(snapshot: WorkspaceSidebarSnapshot, refreshGeneration: UInt64) {
+        self.init(configuration: snapshot.configuration, visibleWidth: snapshot.visibleWidth,
+            targetMonitorScopeId: snapshot.targetMonitorScopeId, refreshGeneration: refreshGeneration)
+    }
+
+    init(configuration: WorkspaceSidebarConfiguration, visibleWidth: CGFloat, targetMonitorScopeId: String, refreshGeneration: UInt64) {
+        self.configuration = configuration
+        self.visibleWidth = visibleWidth
+        self.targetMonitorScopeId = targetMonitorScopeId
+        self.refreshGeneration = refreshGeneration
+    }
     let refreshGeneration: UInt64
     @State private var wallpaperSample: WorkspaceSidebarWallpaperSample?
     @State private var localRefreshGeneration = 0
     @Environment(\.colorScheme) private var systemColorScheme
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
+    @Environment(\.workspaceSidebarPreviewAccessibility) private var previewAccessibility
+
     private var samplingEnabled: Bool {
-        snapshot.configuration.usesWallpaperContrast(
-            visibleWidth: snapshot.visibleWidth,
-            reduceTransparency: reduceTransparency
+        configuration.usesWallpaperContrast(
+            visibleWidth: visibleWidth,
+            reduceTransparency: reduceTransparency || previewAccessibility.reduceTransparency
         )
     }
 
     private var resolvedColorScheme: ColorScheme {
-        guard samplingEnabled else { return systemColorScheme }
+        let themeScheme = configuration.theme.colorScheme(system: systemColorScheme)
+        // Only the compact rail needs wallpaper-based contrast to meet the menu
+        // bar. Expanded chrome follows the app theme, like tabs and overlays.
+        guard configuration.theme == .system,
+              !configuration.alwaysExpanded,
+              visibleWidth <= configuration.collapsedWidth + 8,
+              samplingEnabled else { return themeScheme }
         return workspaceSidebarResolvedColorScheme(
             menuBarColorScheme: WorkspaceSidebarPanel.menuBarColorScheme,
             wallpaperTone: wallpaperSample?.tone,
@@ -206,9 +228,9 @@ struct WorkspaceSidebarWallpaperContrast: ViewModifier {
     }
 
     private var sampledWidth: CGFloat {
-        snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8
-            ? snapshot.configuration.expandedWidth
-            : snapshot.configuration.collapsedWidth
+        visibleWidth > configuration.collapsedWidth + 8
+            ? configuration.expandedWidth
+            : configuration.collapsedWidth
     }
 
     func body(content: Content) -> some View {
@@ -218,10 +240,10 @@ struct WorkspaceSidebarWallpaperContrast: ViewModifier {
             .onReceive(workspaceSidebarWallpaperChanges(
                 applicationCenter: .default, workspaceCenter: NSWorkspace.shared.notificationCenter
             )) { _ in
-                guard snapshot.configuration.appearance == .system else { return }
+                guard configuration.appearance == .system else { return }
                 localRefreshGeneration &+= 1
             }
-            .task(id: "\(refreshGeneration)-\(localRefreshGeneration)-\(systemColorScheme)-\(samplingEnabled)-\(snapshot.targetMonitorScopeId)-\(snapshot.configuration.collapsedWidth)-\(snapshot.configuration.expandedWidth)-\(sampledWidth)-\(snapshot.configuration.position.rawValue)-\(snapshot.configuration.frostedTint == .automatic)") {
+            .task(id: "\(refreshGeneration)-\(localRefreshGeneration)-\(systemColorScheme)-\(samplingEnabled)-\(targetMonitorScopeId)-\(configuration.collapsedWidth)-\(configuration.expandedWidth)-\(sampledWidth)-\(configuration.position.rawValue)-\(configuration.frostedTint == .automatic)") {
                 wallpaperSample = nil
                 guard samplingEnabled else { return }
                 // Resolve each sidebar from the wallpaper under its own monitor.
@@ -236,7 +258,7 @@ struct WorkspaceSidebarWallpaperContrast: ViewModifier {
 
     @MainActor
     private func request(width: CGFloat) -> WorkspaceSidebarWallpaperRequest? {
-        guard let monitor = workspaceSidebarMonitor(forScopeId: snapshot.targetMonitorScopeId) else { return nil }
+        guard let monitor = workspaceSidebarMonitor(forScopeId: targetMonitorScopeId) else { return nil }
         let screens = NSScreen.screens
         let index = monitor.monitorAppKitNsScreenScreensId - 1
         guard screens.indices.contains(index) else { return nil }
@@ -250,7 +272,7 @@ struct WorkspaceSidebarWallpaperContrast: ViewModifier {
             scaling: (options[.imageScaling] as? NSNumber)?.uintValue ?? NSImageScaling.scaleProportionallyUpOrDown.rawValue,
             allowClipping: options[.allowClipping] as? Bool ?? true,
             fillRed: fill.redComponent, fillGreen: fill.greenComponent, fillBlue: fill.blueComponent,
-            position: snapshot.configuration.position
+            position: configuration.position
         )
     }
 }

@@ -1,6 +1,7 @@
 import CoreGraphics
 
 struct WindowTabGroupChromeContent: Equatable {
+    let theme: AppAppearance
     let workspaceName: String
     let activeWindowId: UInt32?
     let activeWindowCornerRadius: CGFloat
@@ -12,6 +13,7 @@ struct WindowTabGroupChromeContent: Equatable {
     let frostedTint: WorkspaceSidebarFrostedTint
 
     @MainActor init(strip: WindowTabStripViewModel) {
+        theme = config.appearance
         workspaceName = strip.workspaceName
         activeWindowId = strip.activeWindowId
         activeWindowCornerRadius = strip.activeWindowCornerRadius

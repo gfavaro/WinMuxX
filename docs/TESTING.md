@@ -459,3 +459,185 @@ reported valid configuration, granted permissions and a listening raw-touch
 backend. Post-check window assignments/config were unchanged. A new sign-in
 capture is still required to verify that specific popup; no browser classification
 change or user configuration rule was added.
+
+## Runtime efficiency and TOML ownership (builds 82–83)
+
+The runtime changes and native measurement limits are recorded in
+[RUNTIME_EFFICIENCY.md](RUNTIME_EFFICIENCY.md). The full local check passed **1,131
+Swift tests and 20 Python tests**. Two focused Thread Sanitizer regressions passed
+for cancellation and persistence-worker ordering. The steady six-window layout
+benchmark now requires six frame writes over ten layouts; geometry-triggered
+reassertion still requires sixty.
+
+Seven TOML lifetime regressions cover root release, nested document views, literal
+and encoded temporaries, independent removed copies, value-array ownership,
+repeated parse/release and date-time/error buffers. An isolated optimized fixture
+repeated 1,000 parse/read/format/encode/error cycles against the original pinned
+TOMLKit sources and the local ownership patch. `leaks --atExit` reported 173,000
+leaks / 10,864,000 bytes before and zero leaks after. The patched fixture also
+passed Address Sanitizer with no reports. It only uses synthetic documents.
+
+Build 82 preserved configuration bytes, window/workspace assignments, populated
+display/visibility state and restored focus across installation. Uninstrumented
+100-query runs measured CLI p50 41.72 → 20.79 ms and zero app writes after the
+query fast path, versus 720,896 logical bytes in build 81. These are single local
+runs including CLI process launch. Both builds were quiet when settled; there is
+no measured battery-life claim. Native interaction and external-display/hotplug
+checks remain pending because computer-use access was denied and only the built-in
+display was connected.
+
+Signed build 83 includes the vendored TOML ownership patch and is installed with
+the same designated signing requirement. Strict/deep verification and unchanged
+configuration checks passed. The session locked during installation, leaving AX
+window enumeration empty. After unlock, the five window/workspace assignments,
+populated display ownership, focus and configuration bytes matched the pre-install
+snapshot without corrective window moves.
+
+Extended validation includes a 100,000-cycle optimized TOML fixture (zero detected
+leaks and a passing Address Sanitizer run), 1,000 live CLI queries over 127 seconds,
+and a 1,000-cycle offscreen preview regression that checks panel/controller release
+across 20 lifetimes. Before/after live scans reported the same six allocations /
+432 bytes at identical addresses, with `NSMutableDictionary` roots. The earlier
+locked-process display-link report was absent. Allocation origins remain
+unconfirmed. The query workload overlapped other desktop/test activity, so its
+modest footprint variation and writes cannot be attributed to queries alone.
+Another 500 queries succeeded. A final 30-second settled sample recorded zero
+logical/disk writes, unchanged 72.24 MiB footprint and 0.00047% CPU of one core.
+
+## Sustained observation and model lifecycle follow-up
+
+The latest `make check` passed **1,133 Swift tests and 26 Python checks**. A model
+stress test cycles 32 windows through 40 fullscreen/minimize/restore rounds,
+workspace focus changes and 160 close/replacements, asserting no lost or duplicate
+live windows. It does not open desktop windows or exercise native AX events.
+
+The stress case initially passed alone but failed in the full suite: three mock
+windows from earlier cases survived in process-lifetime minimized/popup roots.
+The shared workspace fixture now clears those roots as well as workspace children.
+A regression verifies that a reset empties the roots and releases their windows.
+No production native registry or AX thread ownership was changed for this fix.
+
+Six Python tests validate process-counter units, the SDK v4 ABI size, PID reuse,
+interruption/coverage reporting and counter resets in `script/profile_runtime.py`.
+Native smoke checks verified completed and terminated partial reports. A detached
+two-hour observation is running; see [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+for its report path and the checks that remain blocked or unmeasured.
+
+## Workspace overview regression boundary
+
+`WorkspaceOverviewDependencies` injects model snapshots, display/project context,
+ordering/capture, panel creation and navigation. Controller tests exercise real
+queue/lifetime logic with synthetic images and cancellation-ignoring captures.
+`WorkspaceOverviewModelTest` uses `WorkspaceNavigationFixture` to check inactive
+workspace geometry and ownership without native AX traffic. Gesture integration
+tests inject action callbacks into the shared axis router and cover independent
+feature flags. Synthetic view rendering and native panel allocation/teardown are
+separate from real desktop and physical trackpad validation. See
+[overview documentation](WORKSPACE_OVERVIEW.md) for the resource budgets.
+
+## Dinky 0.20 adaptations (build 98)
+
+The full local suite passes **1,218 Swift tests and 26 Python checks**.
+The 24 additional Swift regressions cover:
+
+- `MasterLayoutTest`: four-side 60/40 geometry, perpendicular stack, promotion,
+  appending, root/nested tab-group preservation, directional move/swap/wrap,
+  layout toggle, resize/preview agreement, minimum fitting, persistence, policy
+  re-entry, empty defaults, released stack references, and 500 insert/close cycles.
+- `OriginalWindowRestoreTrackerTest`: one successful restore per enabled interval,
+  retry failures, protect off-state manual changes, unknown geometry, identity
+  reuse, close cleanup, and preservation of a known baseline when bounds disappear.
+- `WindowRestoreCoordinatorTest`: concurrent disable/quit shares its failure result;
+  a later disable can start a new retry without retaining a completed task.
+- `FollowAppActivationTest`: bool/table parsing, exclusions, same-workspace focus,
+  explicit navigation, and browser overlay levels.
+- `RecoveryProcessLaunchDateTest`: stable kernel birth time for direct app launches
+  and rejection of unavailable processes.
+- Disabled config reload leaves the existing layout/orientation alone.
+
+Native build 98 checks passed for master 60/40 placement, swap preserving focus,
+keyboard resize and leaving master mode. Disable confirmed original frames without
+reporting failures; repeating disable preserved a manual Safari Zoom size change.
+The recovery journal's owner matches the direct-launched process. Clean termination
+removed all current-session entries; restart preserved all five assignments,
+original focus and configuration SHA-256.
+
+A local silent video in a disposable Safari tab entered native PiP with WinMuxX
+enabled. Its native accessibility placeholder remained in PiP after selecting the
+original terminal workspace. The inventory remained at five managed windows and
+focus stayed on the requested terminal window. Closing the fixture tab closed PiP
+and restored the original 12 Safari tabs. This is Safari validation on the current
+macOS version, rather than coverage of every browser's PiP implementation.
+
+Private logs and scripts: `.local/validation/dinky-020-build98/`. Process-counter
+samples are finite observations, not battery-life or sustained leak certification.
+
+## Master stack layout toggle (build 100)
+
+The full suite passes **1,223 Swift tests and 26 Python checks**. Five additional
+regressions cover stack-only toggling from the master, stack, explicit window IDs
+and tab groups; four-side master geometry/focus preservation; floating-window
+rejection; empty-stack recreation and weak-reference release; JSON persistence
+and older snapshots; explicit config overrides; and direct moves into a solo
+master root retaining the configured share.
+
+Native Safari/Helium checks passed for toggling from both panes, explicit targets
+without changing focus, removal/recreation of an accordion stack while preserving
+the 60/40 split, and leaving master mode with `layout dwindle`. Configuration,
+window assignments, monitor assignments and focus were restored. The harness uses
+stable workspace IDs through agent operations for moves because numeric CLI
+arguments address display indices and can shift when a workspace empties.
+
+Build 99 exposed the pre-existing ratio reset on direct insertion into a solo
+master root; build 100 fixes it and passes the same native check. All 48 command
+help paths passed with the server stopped. Evidence is under
+`.local/validation/master-stack-build100/`. No new timers or AX queries were added
+to the runtime toggle path.
+
+## Runtime and UI reliability checks (2026-10-20)
+
+Run `make check` for the Swift suite, Python tooling checks and pinned dependency
+resolution. The reliability changes passed 1,271 Swift tests and 47 Python checks.
+Native palette fixtures are written to `.build/native-overlay-fixtures/`; CI
+uploads these with `.build/test-output.log`. Pixel assertions use the same AppKit
+color-profile pipeline for actual and reference images. Resolver tests cover
+wallpaper/system fallback, explicit tint, custom color and accessibility policy;
+native container tests cover surface ownership and appearance. These tests do
+not certify live blur, animation smoothness or multi-display appearance.
+
+The focused lifecycle scenario is:
+
+```sh
+swift test --filter RuntimePerformanceScenarioTest
+```
+
+It performs 20 warm-up and 100 measured cycles of palette/sidebar cleanup and
+workspace navigation, asserting balanced monitors and cleared deferred work.
+Overview tests separately exercise capture bounds, late callbacks and 1,000
+presentation sessions. No desktop applications are moved by these fixtures.
+
+For process measurements, record build, OS, display arrangement, config hash and
+scenario alongside the output. After a 30-second warm-up, sample the app for
+120 seconds using `script/profile_runtime.py --help`. Keep the workload and
+hardware comparable; run idle sampling without UI automation. Compare summaries:
+
+```sh
+python3 script/compare_runtime_profiles.py \
+  --baseline baseline/summary.json --candidate candidate/summary.json \
+  --output comparison.json \
+  --baseline-environment baseline/environment.json \
+  --candidate-environment candidate/environment.json
+```
+
+A candidate above the CPU baseline by max(0.5 percentage points, 25%), above
+wakeups by max(1/second, 25%), or growing by max(5 MiB, 5% of initial footprint)
+requests repeats. Pass three `--candidate` arguments to use their medians before
+calling it a confirmed regression. Incomplete or interrupted samples cannot pass.
+Environment files contain `os`, `monitors` and `config_sha256`; missing fields
+or a mismatch make the comparison inconclusive. Omit both environment arguments
+only for summaries whose environment was verified separately. Counters describe
+this process, not battery life or WindowServer energy.
+
+Manual acceptance still includes light/dark glass, Reduce Transparency, increased
+contrast, both sidebar edges, multiple displays, IME, outside-click delivery and
+rapid close/reopen. Record unavailable hardware or unperformed cases explicitly.

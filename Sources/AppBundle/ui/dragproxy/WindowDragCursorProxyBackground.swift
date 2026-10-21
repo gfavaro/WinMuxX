@@ -5,11 +5,12 @@ struct WindowDragCursorProxyBackground: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: workspaceSidebarRowCornerRadius, style: .continuous)
-            .fill(Color.white.opacity(isGroup ? GlassToken.fillActive : GlassToken.fillHover))
+            .fill(Color.primary.opacity(isGroup ? GlassToken.fillActive : GlassToken.fillHover))
             .overlay {
                 RoundedRectangle(cornerRadius: workspaceSidebarRowCornerRadius, style: .continuous)
-                    .strokeBorder(Color.white.opacity(GlassToken.strokeHover), lineWidth: StrokeToken.control)
+                    .strokeBorder(Color.primary.opacity(GlassToken.strokeHover), lineWidth: StrokeToken.control)
             }
+            .background(OverlaySurface(cornerRadius: workspaceSidebarRowCornerRadius))
             .glassShadow(.resting)
     }
 }

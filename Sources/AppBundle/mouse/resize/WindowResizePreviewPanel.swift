@@ -3,6 +3,7 @@ import Common
 
 @MainActor
 final class WindowResizePreviewPanel: NSPanelHud {
+    private(set) static weak var existing: WindowResizePreviewPanel?
     static let shared = WindowResizePreviewPanel()
 
     private let compositorView = WindowResizePreviewCompositorView()
@@ -11,6 +12,7 @@ final class WindowResizePreviewPanel: NSPanelHud {
 
     override private init() {
         super.init()
+        Self.existing = self
         identifier = NSUserInterfaceItemIdentifier("WinMux.resizePreview")
         hasShadow = false
         isFloatingPanel = true
@@ -24,6 +26,8 @@ final class WindowResizePreviewPanel: NSPanelHud {
         compositorView.autoresizingMask = [.width, .height]
         contentView = compositorView
     }
+
+    func refreshAppearance() { compositorView.refreshAppearance() }
 
     func beginStableFrame(_ frame: CGRect) {
         stableFrame = frame.alignedToBackingPixels()

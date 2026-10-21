@@ -18,8 +18,11 @@ struct LayoutCommand: Command {
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)
         }
-        let targetDescription = args.toggleBetween.val.first(where: { !window.matchesDescription($0) })
-            ?? args.toggleBetween.val.first.orDie()
+        if window.parent is TilingContainer, target.workspace.rootTilingContainer.layout == .master,
+           args.toggleBetween.val.allSatisfy({ $0 == .tiles || $0 == .stacked }) {
+            return target.workspace.changeMasterStackLayout(between: args.toggleBetween.val.map { $0 == .tiles ? .tiles : .stacked })
+        }
+        let targetDescription = nextLayout(in: args.toggleBetween.val, matching: { window.matchesDescription($0) })
         if window.matchesDescription(targetDescription) { return false }
         switch targetDescription {
             case .hTabGroup:
@@ -34,8 +37,6 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: nil, window: window)
             case .stacked:
                 return changeTilingLayout(io, targetLayout: .stacked, targetOrientation: nil, window: window)
-            case .dwindle:
-                return changeTilingLayout(io, targetLayout: .dwindle, targetOrientation: nil, window: window)
             case .tiles:
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: nil, window: window)
             case .auto:
@@ -76,7 +77,15 @@ struct LayoutCommand: Command {
 @MainActor private func changeTilingLayout(_ io: CmdIo, targetLayout: Layout?, targetOrientation: Orientation?, window: Window) -> Bool {
     guard let parent = window.parent else { return false }
     switch parent.cases {
-        case .tilingContainer(let parent):
+        case .tilingContainer(let immediateParent):
+            let root = window.nodeWorkspace?.rootTilingContainer
+            if root?.layout == .master, targetLayout == nil {
+                return io.err("Configure [master].side to change the master orientation")
+            }
+            if root?.layout == .master {
+                return io.err("In master layout, use tiles or accordion to change the stack; configure [master].side to change its orientation")
+            }
+            let parent = immediateParent
             let requestedOrientation = targetOrientation
             let targetOrientation = targetOrientation ?? parent.orientation
             let targetLayout = targetLayout ?? parent.layout
@@ -93,19 +102,20 @@ struct LayoutCommand: Command {
 }
 
 extension Window {
-    fileprivate func matchesDescription(_ layout: LayoutCmdArgs.LayoutDescription) -> Bool {
+    @MainActor fileprivate func matchesDescription(_ layout: LayoutCmdArgs.LayoutDescription) -> Bool {
+        let layoutParent = nodeWorkspace?.rootTilingContainer.layout == .master
+            ? nodeWorkspace?.rootTilingContainer : parent as? TilingContainer
         return switch layout {
-            case .stacked: (parent as? TilingContainer)?.layout == .stacked
-            case .tabGroup:   (parent as? TilingContainer)?.layout == .tabGroup
-            case .dwindle:    (parent as? TilingContainer)?.layout == .dwindle
-            case .tiles:       (parent as? TilingContainer)?.layout == .tiles
-            case .auto: (parent as? TilingContainer).map { $0.layout == .dwindle && $0.dwindleOrientation == nil } == true
-            case .horizontal: (parent as? TilingContainer).map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .h } == true
-            case .vertical: (parent as? TilingContainer).map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .v } == true
-            case .hTabGroup:   (parent as? TilingContainer).map { $0.layout == .tabGroup && $0.orientation == .h } == true
-            case .vTabGroup:   (parent as? TilingContainer).map { $0.layout == .tabGroup && $0.orientation == .v } == true
-            case .h_tiles:     (parent as? TilingContainer).map { $0.layout == .tiles && $0.orientation == .h } == true
-            case .v_tiles:     (parent as? TilingContainer).map { $0.layout == .tiles && $0.orientation == .v } == true
+            case .stacked: layoutParent?.layout == .stacked
+            case .tabGroup:   layoutParent?.layout == .tabGroup
+            case .tiles:       layoutParent?.layout == .tiles
+            case .auto: layoutParent.map { $0.layout == .dwindle && $0.dwindleOrientation == nil } == true
+            case .horizontal: layoutParent.map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .h } == true
+            case .vertical: layoutParent.map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .v } == true
+            case .hTabGroup:   layoutParent.map { $0.layout == .tabGroup && $0.orientation == .h } == true
+            case .vTabGroup:   layoutParent.map { $0.layout == .tabGroup && $0.orientation == .v } == true
+            case .h_tiles:     layoutParent.map { $0.layout == .tiles && $0.orientation == .h } == true
+            case .v_tiles:     layoutParent.map { $0.layout == .tiles && $0.orientation == .v } == true
             case .tiling:      parent is TilingContainer
             case .floating:    parent is Workspace
         }

@@ -62,8 +62,13 @@ let join_with_help_generated = """
     """
 let layout_help_generated = """
     USAGE: layout [-h|--help] [--window-id <window-id>]
-                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|accordion|dwindle|horizontal|vertical|auto|tiling|floating)...
+                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|accordion|horizontal|vertical|auto|tiling|floating)...
        OR: layout [-h|--help] --for-next-detected-window (tiling|floating)
+
+    Change the focused window's container, or float/tile the window.
+    In master layout, tiles/accordion choices change only the stack.
+    Multiple choices cycle after the last matching state, wrapping to the first.
+    Use 'workspace-layout dwindle master' to switch workspace modes.
     """
 let list_apps_help_generated = """
     USAGE: list-apps [-h|--help] [--macos-native-hidden [no]] [--format <output-format>] [--count] [--json]
@@ -157,11 +162,6 @@ let swap_help_generated = """
     """
 let trigger_binding_help_generated = """
     USAGE: trigger-binding [-h|--help] <binding> --mode <mode-id>
-    """
-let volume_help_generated = """
-    USAGE: volume [-h|--help] (up|down) [--no-gui]
-       OR: volume [-h|--help] (mute-toggle|mute-off|mute-on) [--no-gui]
-       OR: volume [-h|--help] set <number> [--no-gui]
     """
 let workspace_back_and_forth_help_generated = """
     USAGE: workspace-back-and-forth [-h|--help]

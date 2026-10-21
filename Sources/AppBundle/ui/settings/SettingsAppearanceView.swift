@@ -2,8 +2,9 @@ import SwiftUI
 
 struct ShortcutAppearanceSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @State private var menuBarIndicator = ExperimentalUISettings().indicator
-    @State private var menuBarIconAppearance = ExperimentalUISettings().iconAppearance
+    @SettingsDraft("appearance", load: { config.appearance }) private var appearance: AppAppearance
+    @SettingsDraft("menu-bar.indicator", load: { config.menuBar.indicator }) private var menuBarIndicator: MenuBarIndicator
+    @SettingsDraft("menu-bar.icon-appearance", load: { config.menuBar.iconAppearance }) private var menuBarIconAppearance: MenuBarIconAppearance
     @SettingsDraft("workspace-sidebar.chrome-style", load: { config.workspaceSidebar.chromeStyle }) private var chromeStyle: ChromeStyle
     @SettingsDraft("workspace-sidebar.solid-chrome-color", load: { config.workspaceSidebar.solidChromeColor }) private var solidChromeColor: ChromeSolidColor
     @SettingsDraft("workspace-sidebar.solid-chrome-custom-color", load: { config.workspaceSidebar.solidChromeCustomColor }) private var solidChromeCustomColor: String
@@ -28,6 +29,13 @@ struct ShortcutAppearanceSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Shared style") {
+                SettingsPicker("Theme", id: "appearance", selection: $appearance,
+                               help: "Apply System, Light or Dark to WinMuxX windows, the sidebar, palette, workspace overview and tab groups.") {
+                    Text("System").tag(AppAppearance.system)
+                    Text("Light").tag(AppAppearance.light)
+                    Text("Dark").tag(AppAppearance.dark)
+                } onChange: { persist(nil, "appearance", "'\(appearance.rawValue)'") }
+
                 SettingsPicker("Shared appearance", id: "workspace-sidebar.chrome-style", selection: $chromeStyle,
                                help: "Choose the shared appearance for the sidebar, tab groups and switcher.") {
                     Text("Liquid Glass").tag(ChromeStyle.liquidGlass)
@@ -45,25 +53,20 @@ struct ShortcutAppearanceSettingsView: View {
 
             }
             SettingsSection("Menu bar") {
-                SettingsPicker("Menu bar indicator", id: "ui.menu-bar-indicator", selection: $menuBarIndicator,
+                SettingsPicker("Menu bar indicator", id: "menu-bar.indicator", selection: $menuBarIndicator,
                                help: "Workspace follows the focused display: label initial when named, workspace number otherwise.") {
                     Text("Icon").tag(MenuBarIndicator.icon)
                     Text("Workspace").tag(MenuBarIndicator.workspace)
                 } onChange: {
-                    var settings = ExperimentalUISettings()
-                    settings.indicator = menuBarIndicator
-                    TrayMenuModel.shared.experimentalUISettings = settings
-                    updateTrayText()
+                    persist("menu-bar", "indicator", "'\(menuBarIndicator.rawValue)'")
                 }
                 if menuBarIndicator == .icon {
-                    SettingsPicker("Icon appearance", id: "ui.menu-bar-icon-appearance", selection: $menuBarIconAppearance, help: "Choose a color or monochrome tray icon.") {
+                    SettingsPicker("Icon appearance", id: "menu-bar.icon-appearance", selection: $menuBarIconAppearance, help: "Choose a color or monochrome tray icon.") {
                         ForEach(MenuBarIconAppearance.allCases) { appearance in
                             Text(appearance.title).tag(appearance)
                         }
                     } onChange: {
-                        var settings = ExperimentalUISettings()
-                        settings.iconAppearance = menuBarIconAppearance
-                        TrayMenuModel.shared.experimentalUISettings = settings
+                        persist("menu-bar", "icon-appearance", "'\(menuBarIconAppearance.rawValue)'")
                     }
                 }
             }

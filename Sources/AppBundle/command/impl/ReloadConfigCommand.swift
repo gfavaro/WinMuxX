@@ -106,7 +106,7 @@ struct ReloadConfigCommand: Command {
                 let previousRootOrientation = config.defaultRootContainerOrientation
                 resetHotKeys()
                 runtime.configuration.publish(parsedConfig, from: url)
-                WorkspaceSwipeController.shared.syncConfiguration()
+                WorkspaceGestureCoordinator.shared.syncConfiguration()
                 materializePersistedWorkspaces()
                 applyUpdatedDefaultWindowLayout(previousLayout: previousRootLayout)
                 applyUpdatedDwindleOrientation(previousOrientation: previousRootOrientation)
@@ -131,7 +131,7 @@ struct ReloadConfigCommand: Command {
 
 @MainActor
 func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
-    guard isWinMuxRuntimeReady, previousLayout != config.defaultRootContainerLayout else { return }
+    guard isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled, previousLayout != config.defaultRootContainerLayout else { return }
     if applyDwindleToExistingTiledWorkspaces() { syncClosedWindowsCacheToCurrentWorld() }
 }
 
@@ -139,6 +139,12 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 /// reload rather than individual Settings controls, so GUI edits, config-editor saves, and
 /// filesystem auto-reloads share the same live-update behavior.
 @MainActor private func applyReloadedConfigurationToRunningApp() {
+    if !isUnitTest {
+        NSApp?.appearance = config.appearance.nativeAppearance
+        WindowResizePreviewPanel.existing?.refreshAppearance()
+    }
+    TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, config.menuBar)
+    updateTrayText()
     ShortcutSettingsModel.shared.reload()
     WorkspaceSidebarPanel.refreshAll()
     WindowTabStripPanelController.shared.refresh()
@@ -150,7 +156,7 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 
 @MainActor
 func applyUpdatedDwindleOrientation(previousOrientation: DefaultContainerOrientation) {
-    guard isWinMuxRuntimeReady, previousOrientation != config.defaultRootContainerOrientation else { return }
+    guard isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled, previousOrientation != config.defaultRootContainerOrientation else { return }
     for workspace in Workspace.all where workspace.rootTilingContainer.layout == .dwindle &&
         config.workspaceLayouts[workspace.name]?.settings(on: workspace.workspaceMonitor).orientation == nil {
         workspace.rootTilingContainer.dwindleOrientation = switch config.defaultRootContainerOrientation {

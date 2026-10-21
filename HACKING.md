@@ -93,7 +93,7 @@ binding, including across suspension. Deferred work can use `runtime.task` to re
 its originating binding. A Workspace is used within its runtime binding; IDs are
 unique within a registry, while object equality remains identity. Legacy serial
 fixtures replace the runtime as a unit. Native window registries, UI singletons,
-refresh scheduling and persistence adapters still have process lifetimes, so this
+persistence adapters and UI singletons still have process lifetimes, so this
 does not make the complete suite parallel-safe. Do not replace production runtime
 state or alter AX/multitouch thread ownership to simplify a test.
 
@@ -102,6 +102,12 @@ moves. `Workspace.assignedMonitor` is the ownership lookup; `workspaceMonitor` a
 a fallback for unassigned slots. Selection preserves ownership. Explicit moves
 invalidate recovery state and replace secondary slots, returning displaced owners
 to main without activating them. Startup/restoration only seed ownership.
+
+`WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
+Recognizer policy, the bounded mailbox, native device ownership and the shared
+spring each have separate modules. The overview presentation owns panel-only
+motion; the horizontal controller owns horizontal navigation. Keep new gesture
+behavior out of startup/configuration/observer entry points beyond delegation.
 
 The swipe preview uses `WorkspaceSwipePreviewPhase` to wait for both the animation
 and workspace layout before removing its overlay. Async completions must check their
@@ -115,7 +121,9 @@ Settings navigation lives in `ui/settings/ShortcutSettingsView.swift`. Each conf
 pane has a `Settings*View.swift` file; controls and TOML persistence are shared in
 `SettingsControls.swift` and `SettingsConfigPersistence.swift`. A TOML edit is
 validated, written, reloaded and reflected through the settings model. Menu-bar
-preferences use UserDefaults and publish through TrayMenuModel. Add controls to
+preferences use `[menu-bar]` in TOML and publish through TrayMenuModel. Double-sided
+windows use `[window-tabs].double-sided-windows`. UserDefaults is restricted to
+session/cache data and one-time legacy preference import. Add controls to
 the destination used by navigation, not to a detached alternative screen.
 
 The sidebar panel controller owns panel instances and monitor-local models. Its
@@ -136,3 +144,25 @@ feedback loops.
 - Test both monitor edges, multiple displays and accessibility settings when changing sidebar geometry or materials.
 - Keep README/FORK current; label historical investigations rather than treating them as current configuration guides.
 - Make commits independently understandable. Reorganize unpublished history only; preserve published commits and upstream contribution branches.
+
+## Runtime and overlay ownership
+
+`WinMuxRuntime.refresh` owns refresh tasks, coalesced requests and activation
+state. Schedule refresh work through the originating runtime's `throwingTask`;
+this preserves its TaskLocal binding across suspension. Replacing a test runtime
+invalidates its coordinator before installing the next one.
+
+Palette item loading and outside-click callbacks belong to a presentation
+generation. Dismissal invalidates that generation before releasing monitors.
+A late completion must never populate or dismiss the next presentation. Sidebar
+search adoption follows the panel's reveal generation and retirement state.
+
+`ChromeAppearanceInputs` is the shared policy for expanded sidebar and overlay
+colors. Pass wallpaper tone, system scheme and accessibility state explicitly;
+do not create a full sidebar snapshot to resolve an overlay color. Native glass
+still requires desktop inspection because offscreen bitmaps cannot verify the
+WindowServer's backdrop composition.
+
+`WorkspaceSidebarView` retains its SwiftUI state. Paging, controls and surface
+composition live in separate extension files; moving presentation code must not
+introduce another owner for selection, search, rename or gesture state.

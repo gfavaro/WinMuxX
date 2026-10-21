@@ -12,7 +12,7 @@ struct WorkspaceSidebarView: View {
         workspaceSidebarSolidColorScheme(snapshot.configuration.resolvedSolidChromeColor)
     }
     var sidebarColors: WorkspaceSidebarPalette {
-        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : colorScheme)
+        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : snapshot.configuration.theme.colorScheme(system: colorScheme))
     }
     let snapshot: WorkspaceSidebarSnapshot
     let actions: WorkspaceSidebarActions
@@ -94,7 +94,7 @@ struct WorkspaceSidebarView: View {
             if reduceMotion { transaction.animation = nil }
         }
         .environment(\.workspaceSidebarAppearance, snapshot.configuration.appearance)
-        .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme))
+        .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme, theme: snapshot.configuration.theme))
         .onChange(of: snapshot.visibleWidth) { visibleWidth in
             if visibleWidth <= collapsedWidth + 0.5 {
                 resetTransientSidebarState()
@@ -184,7 +184,10 @@ struct WorkspaceSidebarView: View {
             isSidebarCollapsing = false
             isSidebarExpanding = true
             let panel = notificationPanel(from: notification)
+            let generation = panel?.hoverRevealGeneration
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+                guard let panel, !panel.isRetired, panel.viewModel.isWorkspaceSidebarExpanded,
+                      panel.hoverRevealGeneration == generation else { return }
                 beginSidebarSearchIfNeeded(panel: panel)
             }
         }
@@ -244,455 +247,6 @@ struct WorkspaceSidebarContainerView: View {
 }
 extension WorkspaceSidebarView {
     @ViewBuilder
-    func projectPagerContent(
-        expansionProgress: CGFloat,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-        topPadding: CGFloat,
-        visibleWorkspacesByProject: [WorkspaceProjectId: [WorkspaceSidebarWorkspaceViewModel]],
-        swipeDirection: Int?,
-    ) -> some View {
-        if let browsedProjectId,
-           browsedProjectId != snapshot.activeProjectId
-        {
-            splitWorkspacePage(
-                activeProjectId: snapshot.activeProjectId,
-                browsedProjectId: browsedProjectId,
-                expansionProgress: expansionProgress,
-                leadingInset: leadingInset,
-                trailingInset: trailingInset,
-                topPadding: topPadding,
-                visibleWorkspacesByProject: visibleWorkspacesByProject
-            )
-        } else if snapshot.projects.isEmpty {
-            workspacePage(
-                projectId: snapshot.activeProjectId,
-                workspaces: visibleWorkspacesByProject[snapshot.activeProjectId] ?? [],
-                expansionProgress: expansionProgress,
-                leadingInset: leadingInset,
-                trailingInset: trailingInset,
-                topPadding: topPadding,
-                isInteractive: true,
-                showsPinnedActiveWorkspace: true,
-                showsCreateWorkspace: true,
-                allowsActivation: allowsWorkspaceActivation(projectId: snapshot.activeProjectId),
-            )
-        } else {
-            projectPagerPages(
-                expansionProgress: expansionProgress,
-                leadingInset: leadingInset,
-                trailingInset: trailingInset,
-                topPadding: topPadding,
-                visibleWorkspacesByProject: visibleWorkspacesByProject,
-                swipeDirection: swipeDirection,
-            )
-        }
-    }
-
-    func projectPagerPages(
-        expansionProgress: CGFloat,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-        topPadding: CGFloat,
-        visibleWorkspacesByProject: [WorkspaceProjectId: [WorkspaceSidebarWorkspaceViewModel]],
-        swipeDirection: Int?,
-    ) -> some View {
-        GeometryReader { geometry in
-            let pageWidth = max(geometry.size.width, 1)
-            let displayIndex = projectPagerDisplayIndex ?? 0
-            let dragOffset = workspaceSidebarProjectPagerDragOffset(
-                horizontalTranslation: projectSwipeTranslation,
-                currentIndex: displayIndex,
-                projectCount: snapshot.projects.count,
-                pageWidth: pageWidth,
-            )
-
-            HStack(alignment: .top, spacing: 0) {
-                ForEach(Array(snapshot.projects.enumerated()), id: \.element.id) { index, project in
-                    projectPageSlot(
-                        index: index,
-                        project: project,
-                        displayIndex: displayIndex,
-                        pageWidth: pageWidth,
-                        expansionProgress: expansionProgress,
-                        leadingInset: leadingInset,
-                        trailingInset: trailingInset,
-                        topPadding: topPadding,
-                        visibleWorkspacesByProject: visibleWorkspacesByProject,
-                        swipeDirection: swipeDirection,
-                    )
-                }
-            }
-            .offset(x: -CGFloat(displayIndex) * pageWidth + dragOffset)
-            .onAppear { projectPagerWidth = pageWidth }
-            .onChange(of: pageWidth) { projectPagerWidth = $0 }
-        }
-        .clipped()
-    }
-}
-extension WorkspaceSidebarView {
-    func projectPagerSection(
-        expansionProgress: CGFloat,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-        swipeDirection: Int?,
-        switchProgress: CGFloat,
-        measuring: Bool = false,
-    ) -> some View {
-        WorkspaceSidebarProjectPager(
-            projects: snapshot.projects,
-            selectedProjectId: snapshot.activeProjectId,
-            expansionProgress: expansionProgress,
-            layout: snapshot.configuration,
-            isProjectMenuOpen: $isProjectMenuOpen,
-            renamingProjectId: $renamingProjectId,
-            renamingProjectText: $renamingProjectText,
-            onSelectProject: { projectId in
-                debugWorkspaceSidebarProjectLog(
-                    "pagerSectionSelect project=\(projectId.rawValue) active=\(snapshot.activeProjectId.rawValue) browsed=\(browsedProjectId?.rawValue ?? "nil")"
-                )
-                browseMode = .activeProject
-                actions.send(.selectProject(projectId))
-            },
-            onCreateProject: { actions.send(.createProject) },
-            onBeginRenameProject: { project in
-                beginProjectRename(project)
-            },
-            onCommitRenameProject: {
-                finishProjectRename()
-            },
-            onCancelRenameProject: {
-                finishProjectRename(cancelled: true)
-            },
-            onSetProjectColor: { project, colorHex in
-                actions.send(.setProjectColor(project.id, colorHex: colorHex))
-            },
-            onDeleteProject: { project in
-                actions.send(.deleteProject(project.id))
-            },
-            measuring: measuring,
-        )
-        .zIndex(2)
-        .padding(.leading, leadingInset)
-        .padding(.trailing, trailingInset)
-        .padding(.top, 6)
-        .padding(.bottom, 2)
-    }
-}
-extension WorkspaceSidebarView {
-    func validProjectSwipeEndDirection(
-        horizontalTranslation: CGFloat,
-        verticalTranslation: CGFloat,
-        expansionProgress: CGFloat,
-    ) -> Int? {
-        guard shouldHandleProjectSwipe(
-            horizontalTranslation: horizontalTranslation,
-            verticalTranslation: verticalTranslation,
-            expansionProgress: expansionProgress,
-        ) else {
-            return nil
-        }
-        return workspaceSidebarProjectSwipeDirection(
-            horizontalTranslation: horizontalTranslation,
-            verticalTranslation: verticalTranslation,
-        )
-    }
-
-    func finishProjectSwipeNavigation(to projectId: WorkspaceProjectId, direction: Int) {
-        let startProjectId = projectSwipeStartProjectId
-        let fullPageOffset = -CGFloat(direction) * max(projectPagerWidth, snapshot.configuration.expandedWidth, 1)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
-            projectSwipeTranslation = fullPageOffset
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
-            guard projectSwipeStartProjectId == startProjectId else { return }
-            actions.send(.selectProject(projectId))
-            resetProjectSwipeWithoutAnimation()
-        }
-    }
-
-
-}
-extension WorkspaceSidebarView {
-    func handleProjectSwipeEnded(
-        horizontalTranslation: CGFloat,
-        verticalTranslation: CGFloat,
-        expansionProgress: CGFloat,
-    ) {
-        guard let direction = validProjectSwipeEndDirection(
-            horizontalTranslation: horizontalTranslation,
-            verticalTranslation: verticalTranslation,
-            expansionProgress: expansionProgress,
-        ) else {
-            finishProjectSwipeSnapBack()
-            return
-        }
-        if projectSwipeStartProjectId == nil,
-           let selectedProjectIndex {
-            projectSwipeStartProjectId = snapshot.projects[selectedProjectIndex].id
-        }
-        finishProjectSwipeNavigationIfNeeded(direction: direction, distance: abs(horizontalTranslation))
-    }
-
-    func finishProjectSwipeSnapBack() {
-        withAnimation(reduceMotion ? nil : .interactiveSpring(response: 0.18, dampingFraction: 0.9)) {
-            resetProjectSwipe()
-        }
-    }
-
-    private func finishProjectSwipeNavigationIfNeeded(direction: Int, distance: CGFloat) {
-        guard let nextIndex = workspaceSidebarProjectSwipeTarget(
-            currentIndex: projectPagerDisplayIndex,
-            projectCount: snapshot.projects.count,
-            direction: direction,
-            distance: distance
-        ) else {
-            performWorkspaceSidebarProjectHaptic(.alignment)
-            finishProjectSwipeSnapBack()
-            return
-        }
-        finishProjectSwipeNavigation(to: snapshot.projects[nextIndex].id, direction: direction)
-    }
-}
-extension WorkspaceSidebarView {
-    var selectedProjectIndex: Int? {
-        let projectId = browsedProjectId ?? snapshot.activeProjectId
-        return snapshot.projects.firstIndex { $0.id == projectId }
-            ?? snapshot.projects.indices.first
-    }
-
-    var projectPagerDisplayIndex: Int? {
-        if let projectSwipeStartProjectId,
-           let index = snapshot.projects.firstIndex(where: { $0.id == projectSwipeStartProjectId }) {
-            return index
-        }
-        return selectedProjectIndex
-    }
-
-    func resetProjectSwipe() {
-        projectSwipeTranslation = 0
-        projectSwipeStartProjectId = nil
-        projectSwipeDidCrossBreakPoint = false
-    }
-
-    func resetProjectSwipeWithoutAnimation() {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            resetProjectSwipe()
-        }
-    }
-
-    func resetTransientSidebarState() {
-        browseMode = .activeProject
-        showsPinnedActiveWorkspaceForBrowsedProject = true
-        activeInUseOverrideWorkspaceName = nil
-        isProjectMenuOpen = false
-        isSidebarCollapsing = false
-        isSidebarExpanding = false
-        finishWorkspaceRename(cancelled: true)
-        resetProjectEdgeDrag()
-        resetProjectSwipeWithoutAnimation()
-    }
-
-    func performWorkspaceSidebarProjectHaptic(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
-        NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
-    }
-
-    func handleProjectEdgeDrag(pointer: CGPoint, expansionProgress: CGFloat) {
-        resetProjectEdgeDrag()
-    }
-
-    func resetProjectEdgeDrag() {
-        lastProjectEdgeDragDirection = nil
-        lastProjectEdgeDragSwitchAt = .distantPast
-    }
-
-}
-extension WorkspaceSidebarView {
-    func monitorSelectorSection(
-        expansionProgress: CGFloat,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-        measuring: Bool = false,
-    ) -> some View {
-        WorkspaceSidebarMonitorSelector(
-            scopes: snapshot.monitorScopes,
-            projects: snapshot.projects,
-            selectedScopeId: snapshot.selectedMonitorScopeId,
-            activeProjectId: snapshot.activeProjectId,
-            browsedProjectId: browsedProjectId,
-            expansionProgress: expansionProgress,
-            sectionWidth: workspaceSidebarTopSectionWidth(expansionProgress: expansionProgress),
-            onSelectScope: { scopeId in
-                if scopeId == workspaceSidebarDefaultScopeId {
-                    browseMode = .activeProject
-                }
-                actions.send(.selectMonitorScope(scopeId))
-            },
-            onSelectProject: { projectId in
-                WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)?.cancelExpansionWork()
-                browseMode = projectId.map { .split(otherProjectId: $0) } ?? .activeProject
-                showsPinnedActiveWorkspaceForBrowsedProject = false
-            },
-            onRenameProject: { project in
-                beginProjectRename(project)
-            },
-            renamingProjectId: $renamingProjectId,
-            renamingProjectText: $renamingProjectText,
-            onCommitRenameProject: {
-                finishProjectRename()
-            },
-            onCancelRenameProject: {
-                finishProjectRename(cancelled: true)
-            },
-            onSetProjectColor: { project, colorHex in
-                actions.send(.setProjectColor(project.id, colorHex: colorHex))
-            },
-            onDeleteProject: { project in
-                actions.send(.deleteProject(project.id))
-            },
-            measuring: measuring,
-        )
-        .padding(.leading, leadingInset)
-        .padding(.trailing, trailingInset)
-        .padding(.top, snapshot.configuration.topPadding)
-        .padding(.bottom, workspaceSidebarSectionGap)
-        .zIndex(100)
-    }
-
-    func workspaceSidebarTopSectionWidth(expansionProgress: CGFloat) -> CGFloat {
-        if browsedProjectId != nil {
-            return workspaceSidebarSplitSectionWidth(expansionProgress: expansionProgress)
-        }
-        return workspaceSidebarSectionWidth(expansionProgress, layout: snapshot.configuration)
-    }
-
-    func statusSection(
-        expansionProgress: CGFloat,
-        isCompact: Bool,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-    ) -> some View {
-        WorkspaceSidebarStatusView(
-            sectionWidth: workspaceSidebarSectionWidth(expansionProgress, layout: snapshot.configuration),
-            isCompact: isCompact,
-            showsSeconds: snapshot.configuration.showsSeconds,
-            showsDate: snapshot.configuration.showsDate,
-            showsWeekday: snapshot.configuration.showsWeekday,
-        )
-        .padding(.leading, leadingInset)
-        .padding(.trailing, trailingInset)
-        .padding(.top, 4)
-        .padding(.bottom, workspaceSidebarStatusBottomPadding(isCompact: isCompact) + 4)
-    }
-
-    func sidebarSearchSection(
-        expansionProgress: CGFloat,
-        leadingInset: CGFloat,
-        trailingInset: CGFloat,
-    ) -> some View {
-        WorkspaceSidebarSearchField(
-            text: $searchText,
-            requestsFocus: searchUsesNativeEditor,
-            onEditorReady: sidebarSearchEditorReady,
-            onCommand: handleSidebarSearchKey
-        )
-        .frame(width: workspaceSidebarSectionWidth(expansionProgress, layout: snapshot.configuration), height: workspaceSidebarSearchHeight)
-        .padding(.leading, leadingInset)
-        .padding(.trailing, trailingInset)
-        .padding(.bottom, workspaceSidebarSectionGap)
-        .transition(.opacity.combined(with: .move(edge: .top)))
-    }
-}
-extension WorkspaceSidebarView {
-    var sidebarShape: some Shape {
-        let progress = snapshot.configuration.transparentExpansionProgress(visibleWidth: snapshot.visibleWidth)
-        let radius = progress < workspaceSidebarRowsRevealProgress ? 0 : workspaceSidebarPanelRightCornerRadius
-        return WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: snapshot.configuration.position)
-    }
-
-    @ViewBuilder
-    func sidebarSurface<S: Shape>(in shape: S) -> some View {
-        // The sidebar meets the display edge, so an outline around all four sides reads as a
-        // second, lighter panel behind the content. Keep the material flat and use only the
-        // trailing separator to define its boundary.
-        if snapshot.configuration.appearance == .system {
-            // The panel's NSVisualEffectView is the parent of this hosting
-            // hierarchy. Keeping this layer clear lets AppKit apply vibrancy
-            // to semantic SwiftUI foreground colors.
-            Color.clear
-                .overlay {
-                    if snapshot.configuration.frostedTint != .automatic,
-                       snapshot.configuration.alwaysExpanded || snapshot.visibleWidth > snapshot.configuration.collapsedWidth + 8 {
-                        WorkspaceSidebarFrostedVeil(tint: snapshot.configuration.frostedTint)
-                    }
-                }
-                .clipShape(shape)
-        } else {
-            GlassSurface(
-                shape: shape,
-                hasBorder: false,
-                style: snapshot.configuration.chromeStyle,
-                solidColor: snapshot.configuration.resolvedSolidChromeColor,
-            )
-            // Keep the native glass backing layer inside the rounded trailing corners.
-            .clipShape(shape)
-        }
-    }
-
-    func sidebarSwipeCaptureOverlay(expansionProgress: CGFloat) -> some View {
-        WorkspaceSidebarProjectSwipeScrollCapture(
-            isEnabled: !snapshot.projects.isEmpty,
-            onChanged: { horizontalTranslation, verticalTranslation in
-                handleProjectSwipeChanged(
-                    horizontalTranslation: horizontalTranslation,
-                    verticalTranslation: verticalTranslation,
-                    expansionProgress: expansionProgress,
-                )
-            },
-            onEnded: { horizontalTranslation, verticalTranslation in
-                handleProjectSwipeEnded(
-                    horizontalTranslation: horizontalTranslation,
-                    verticalTranslation: verticalTranslation,
-                    expansionProgress: expansionProgress,
-                )
-            },
-        )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(false)
-    }
-}
-
-struct WorkspaceSidebarPanelShape: Shape {
-    let rightCornerRadius: CGFloat
-    var position: WorkspaceSidebarPosition = .left
-
-    func path(in rect: CGRect) -> Path {
-        let radius = min(rightCornerRadius, rect.width / 2, rect.height / 2)
-
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX - radius, y: rect.minY))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX, y: rect.minY + radius),
-            control: CGPoint(x: rect.maxX, y: rect.minY)
-        )
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - radius))
-        path.addQuadCurve(
-            to: CGPoint(x: rect.maxX - radius, y: rect.maxY),
-            control: CGPoint(x: rect.maxX, y: rect.maxY)
-        )
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        if position == .right {
-            return path.applying(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.minX + rect.maxX, ty: 0))
-        }
-        return path
-    }
-}
-extension WorkspaceSidebarView {
-    @ViewBuilder
     func projectPageSlot(
         index: Int,
         project: WorkspaceSidebarProjectViewModel,
@@ -744,11 +298,18 @@ extension WorkspaceSidebarView {
         showsCreateWorkspace: Bool = true,
         allowsActivation: Bool? = nil,
     ) -> some View {
-        ScrollView {
-            workspacePageContent(projectId: projectId, workspaces: workspaces, expansionProgress: expansionProgress,
+        ScrollViewReader { proxy in
+            ScrollView {
+                workspacePageContent(projectId: projectId, workspaces: workspaces, expansionProgress: expansionProgress,
                                  leadingInset: leadingInset, trailingInset: trailingInset, topPadding: topPadding,
                                  showsPinnedActiveWorkspace: showsPinnedActiveWorkspace, showsCreateWorkspace: showsCreateWorkspace,
                                  allowsActivation: allowsActivation)
+            }
+            .onChange(of: selectedSearchTarget) { target in
+                guard isInteractive, let target,
+                    workspaceSidebarSearchSelections(workspaces: workspaces, includeWorkspaceHeaders: true).contains(target) else { return }
+                proxy.scrollTo(target, anchor: .top)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -920,7 +481,7 @@ extension WorkspaceSidebarView {
             onCancelRenameWorkspace: {
                 finishWorkspaceRename(cancelled: true)
             },
-            selectedSearchTarget: searchText.isEmpty ? nil : selectedSearchTarget,
+            selectedSearchTarget: isSearchEditing ? selectedSearchTarget : nil,
             isSearchFiltering: !searchText.isEmpty,
             activeInUseOverrideWorkspaceName: $activeInUseOverrideWorkspaceName,
             actions: actions,

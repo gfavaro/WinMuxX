@@ -58,7 +58,7 @@ final class DoubleSidedWindowGesture {
             case .leftMouseDown:
                 pending = nil
                 guard TrayMenuModel.shared.isEnabled,
-                      ExperimentalUISettings().doubleSidedWindows,
+                      config.windowTabs.doubleSidedWindows,
                       event.flags.intersection([.maskAlternate, .maskCommand, .maskControl, .maskShift]) == .maskAlternate,
                       !DoubleSidedWindowController.shared.isAnimating,
                       let id = windowId(at: event.location),
@@ -105,7 +105,7 @@ final class DoubleSidedWindowGesture {
         if isTabHeld { return true }
         guard isDoubleSidedFlipShortcut(keyCode: keyCode, flags: event.flags),
               TrayMenuModel.shared.isEnabled,
-              ExperimentalUISettings().doubleSidedWindows,
+              config.windowTabs.doubleSidedWindows,
               let window = nativeFocusedPairWindow()
         else { return false }
         isTabHeld = true
@@ -124,7 +124,7 @@ final class DoubleSidedWindowGesture {
         var focused: CFTypeRef?
         guard AXUIElementCopyAttributeValue(element, kAXFocusedWindowAttribute as CFString, &focused) == .success,
               let focused, CFGetTypeID(focused) == AXUIElementGetTypeID(),
-              let id = (focused as! AXUIElement).containingWindowId(),
+              let id = (focused as! AXUIElement).containingWindowIdWithError(timeout: 0.05).windowId,
               let window = Window.get(byId: id),
               let group = window.nearestWindowTabGroup,
               group.usesDoubleSidedWindows, group.tabActiveWindow === window

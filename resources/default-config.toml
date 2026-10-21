@@ -1,6 +1,6 @@
-# Minimum total across all projects; 0 disables the configured minimum.
-# Active monitors and every project still retain their required workspaces.
-minimum-workspace-count = 1
+# Stable workspace names in sidebar order. These slots remain available when empty.
+# Other empty workspaces are collected after use; displays/projects retain a usable slot.
+persistent-workspaces = []
 
 # Center a lone tiled window on screens with width/height >= 2.3.
 # 1.5 means 3:2; 0 disables. Supports per-monitor values like gaps.
@@ -14,8 +14,10 @@ config-version = 2
 # Use the menu's Open Config / Diagnostics actions to locate the loaded file.
 # Menu actions display only shortcuts configured for the active mode.
 # Diagnostics, manual crash recovery and session-local minimum-size observation
-# do not require additional TOML options. Learned minima do not constrain layout yet.
+# do not require additional TOML options. Learned minimum sizes are session data.
 
+# Theme for WinMuxX UI: system follows macOS, or choose light / dark.
+appearance = 'system'
 start-at-login = false
 # Reset workspace placement at launch; explicit assignments still apply.
 start-workspaces-on-main-monitor = false
@@ -84,10 +86,13 @@ on-mode-changed = []
     enabled = true
     # Offer a 'Focused' monitor scope in the sidebar's monitor selector.
     enable-focus = false
-    # Hide the compact rail until the pointer reaches the selected display edge.
+    # Hide the compact rail; reveal only in the outermost 2 pt of the display edge.
     auto-hide = false
     # Keep the full sidebar open and reserve its width for tiled windows.
     always-expanded = false
+    # Wait before hover reveals the sidebar (0–5000 ms). Text-selection drags
+    # do not reveal it; commands and recognized window drags remain immediate.
+    hover-open-delay-ms = 400
     collapsed-width = 50
     width = 280
     # Omit monitor to show an independent sidebar on every display.
@@ -104,10 +109,10 @@ on-mode-changed = []
     show-seconds = true
     show-date = false
     show-weekday = true
-    # Liquid Glass uses native menu-bar-inspired glass and adaptive wallpaper contrast.
+    # Liquid Glass follows the root appearance theme; the compact rail can adapt to wallpaper.
     # Solid uses the selected opaque color. Also applies to tab groups and switcher.
     # Legacy appearance/background/frosted-tint keys remain accepted but no longer
-    # override this style. The Settings UI calls this choice Sidebar appearance.
+    # override this style. Settings exposes Shared appearance separately from Theme.
     # Compact Liquid Glass sidebar only: false shows wallpaper without glass.
     # Expanded Liquid Glass always uses a frosted background.
     # Reduce Transparency overrides this with an opaque system background.
@@ -233,3 +238,8 @@ enabled = false
 reverse-direction = false
 # Finger-tracked preview; release past halfway to commit. Zero disables visuals.
 animation-duration-ms = 220
+
+# Menu bar appearance. Settings edits these same values.
+[menu-bar]
+    indicator = 'icon' # icon or workspace
+    icon-appearance = 'color' # color or monochrome

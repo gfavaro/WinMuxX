@@ -4,6 +4,18 @@ import Common
 import XCTest
 
 extension ConfigTest {
+    func testSidebarHoverDelayDefaultsAcceptsBoundsAndRejectsInvalidValues() {
+        XCTAssertEqual(parseConfig("").config.workspaceSidebar.hoverOpenDelayMs, 400)
+        for value in [0, 400, 750, 5000] {
+            let result = parseConfig("[workspace-sidebar]\nhover-open-delay-ms = \(value)")
+            XCTAssertTrue(result.errors.isEmpty, "\(result.errors)")
+            XCTAssertEqual(result.config.workspaceSidebar.hoverOpenDelayMs, value)
+        }
+        for value in ["-1", "5001", "0.4", "'400'", "true"] {
+            XCTAssertFalse(parseConfig("[workspace-sidebar]\nhover-open-delay-ms = \(value)").errors.isEmpty)
+        }
+    }
+
     func testParseWorkspaceSidebar() {
         let (parsed, errors) = parseConfig(
             """

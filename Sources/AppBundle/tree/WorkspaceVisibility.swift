@@ -31,20 +31,14 @@ func workspaceHasLifecycleWindows(_ workspace: Workspace) -> Bool {
 
 @MainActor
 func isUserFacingWorkspace(_ workspace: Workspace, focusedWorkspace: Workspace? = nil) -> Bool {
-    if config.minimumWorkspaceCount != nil {
-        return !workspace.isArchived &&
-            (workspaceShouldSurviveReconciliation(workspace, retainedEmptyWorkspaceIds: [:]) ||
-                minimumWorkspaceRetentionIds().contains(workspace.id))
-    }
     return !workspace.isArchived &&
         (
             workspaceHasSidebarVisibleWindows(workspace) ||
                 workspace.isVisible ||
                 workspace.isConfiguredPersistent ||
-                workspaceHasPendingRestartWindows(workspace.name) ||
+                (!isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
                 !workspaceOwnedMinimizedWindows(workspace).isEmpty ||
-                workspaceIsRetainedEmptySlot(workspace) ||
-                minimumWorkspaceRetentionIds().contains(workspace.id)
+                workspaceIsRetainedEmptySlot(workspace)
         )
 }
 

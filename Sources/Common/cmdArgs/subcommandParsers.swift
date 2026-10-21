@@ -1,5 +1,8 @@
 let subcommandParsers: [String: any SubCommandParserProtocol] = initSubcommands()
 
+/// Commands accepted by the CLI, including compatibility aliases.
+public var cliSubcommandNames: [String] { subcommandParsers.keys.sorted() }
+
 protocol SubCommandParserProtocol<T>: Sendable {
     associatedtype T where T: CmdArgs
     var _parse: @Sendable (StrArrSlice) -> ParsedCmd<T> { get }

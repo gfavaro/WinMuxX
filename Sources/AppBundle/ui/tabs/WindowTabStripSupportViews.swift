@@ -29,6 +29,7 @@ struct WindowTabStripScrollContentFramePreferenceKey: PreferenceKey {
 }
 
 struct WindowTabGroupHandleView: View {
+    @SidebarColors var colors
     let windowId: UInt32?
     let workspaceName: String
 
@@ -36,7 +37,7 @@ struct WindowTabGroupHandleView: View {
         VStack(spacing: 2.5) {
             ForEach(0..<2, id: \.self) { _ in
                 Capsule(style: .continuous)
-                    .fill(Color.white.opacity(0.22))
+                    .fill(colors.text(opacity: GlassToken.textSecondary))
                     .frame(width: 9, height: 1.5)
             }
         }

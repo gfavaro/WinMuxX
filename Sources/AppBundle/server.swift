@@ -95,9 +95,10 @@ private func newConnection(_ connection: NWConnection) async { // todo add exit 
         }
         if let command {
             let _answer: Result<ServerAnswer, Error> = await Result {
-                try await runLightSession(
+                try await runCommandSession(
                     .socketServer(command.args),
                     token,
+                    isQuery: command.isQuery || command.isPresentation,
                     shouldSchedulePostRefresh: !command.canSkipPostCommandRefresh
                 ) { () throws in
                     let env = CmdEnv.init(

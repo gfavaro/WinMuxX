@@ -108,6 +108,7 @@ extension AxUiElementMock {
         _ activationPolicy: NSApplication.ActivationPolicy,
         _ windowLevel: MacOsWindowLevel?,
     ) -> Bool {
+        if isBrowserFocusOverlay(app: id, level: windowLevel) { return false }
         if windowLevel != .normalWindow &&
             // Slowly roll out windowLevel for applications for which we have the appropriate dumps
             (id == .slack || id == .chrome || id?.isFirefox == true || id == .braveBrowser || id == .screenstudio || id == .cleanshotx || id == .iterm2)
@@ -207,5 +208,15 @@ extension AxUiElementMock {
             isWindow: isWindowHeuristic(axApp: axApp, id, activationPolicy, windowLevel),
             isDialog: { isDialogHeuristic(id, windowLevel, accessory: accessory) },
         )
+    }
+}
+
+/// Browser document tags alone also describe always-on-top video surfaces.
+func isBrowserFocusOverlay(app: KnownBundleId?, level: MacOsWindowLevel?) -> Bool {
+    guard app?.isBrowser == true, let level else { return false }
+    switch level {
+        case .normalWindow: return false
+        case .alwaysOnTopWindow: return true
+        case .unknown(let value): return value > 0
     }
 }

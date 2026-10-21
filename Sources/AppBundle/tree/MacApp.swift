@@ -204,7 +204,7 @@ final class MacApp: AbstractApp {
     }
 
     @MainActor func nativeFocus(_ windowId: UInt32, forceRaise: Bool = false) {
-        if serverArgs.isReadOnly { return }
+        if serverArgs.isReadOnly || !TrayMenuModel.shared.isEnabled || WindowRecoveryController.shared.isTerminating { return }
         MacApp.focusJob?.cancel()
         // Performance optimization. If possible avoid doing AX requests
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
@@ -223,14 +223,23 @@ final class MacApp: AbstractApp {
             nsApp.activate(options: .activateIgnoringOtherApps)
         } else {
             MacApp.focusJob = withWindowAsync(windowId) { [nsApp, axApp] window, job in
+                try job.checkCancellation()
                 AXUIElementSetAttributeValue(axApp.threadGuarded, kAXFocusedWindowAttribute as CFString, window)
+                try job.checkCancellation()
                 // Raise firstly to make sure that by the time we activate the app, the window would be already on top
                 window.set(Ax.isMainAttr, true)
+                try job.checkCancellation()
                 let raiseError = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
                 AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
+                try job.checkCancellation()
                 nsApp.activate(options: .activateIgnoringOtherApps)
             }
         }
+    }
+
+    @MainActor static func cancelPendingFocus() {
+        focusJob?.cancel()
+        focusJob = nil
     }
 
     @MainActor
@@ -396,11 +405,11 @@ final class MacApp: AbstractApp {
         }
     }
 
-    /// Upper bound on how long one app may hold up the window-refresh barrier. A CPU-starved
+    /// Cooperative cancellation deadline for one app's window refresh. A CPU-starved
     /// app answers each AX message only at the messaging timeout, so its enumeration can take
-    /// (windows × timeout); every other app's layout would wait behind it. On deadline the app
-    /// falls back to the model's current windows (equivalent to "nothing changed"), and a later
-    /// refresh reconciles once the app responds.
+    /// (windows × timeout); every other app's layout would wait behind it. Cancellation skips
+    /// remaining reads, then falls back to current model windows. An AX call already in flight
+    /// must finish or time out before the thread can acknowledge cancellation.
     private static let singleAppRefreshDeadline: Duration = .milliseconds(1500)
 
     @MainActor
@@ -531,9 +540,11 @@ final class MacApp: AbstractApp {
                 }
             }
 
+            try job.checkCancellation()
             windows.threadGuarded = alive
             return (Array(alive.keys), Array(dead.keys))
         }
+        try checkCancellation()
         windowsCount = alive.count
         for windowId in dead {
             setFrameJobs.removeValue(forKey: windowId)?.cancel()

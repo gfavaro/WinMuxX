@@ -32,7 +32,7 @@ struct WorkspaceSwipeDependencies {
              canNavigate: {
                  config.workspaceSwipe.enabled && isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
                      !WindowBorderController.shared.isMissionControlActive &&
-                     !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress()
+                     !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress() && !WorkspaceOverviewController.shared.isOpen
              }, reversed: { config.workspaceSwipe.reverseDirection }, navigate: { activate in
                  guard let token: RunSessionGuard = .isServerEnabled else { return false }
                  return try await runLightSession(.globalObserver("workspaceSwipe"), token, shouldSchedulePostRefresh: false, body: activate)
@@ -59,13 +59,6 @@ final class WorkspaceSwipeController {
     private var gesture: Gesture?
     private(set) var pending: Task<Void, Never>?
     private var generation = 0
-
-    func syncConfiguration() {
-        reset()
-        recognizer = WorkspaceTouchRecognizer()
-        RawWorkspaceTouchSource.shared.onFrame = { [weak self] frame in self?.handle(frame) }
-        RawWorkspaceTouchSource.shared.syncConfiguration()
-    }
 
     func reset() {
         cancelVisualInteraction()

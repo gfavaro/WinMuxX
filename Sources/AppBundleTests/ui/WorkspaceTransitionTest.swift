@@ -20,8 +20,10 @@ final class WorkspaceTransitionTest: XCTestCase {
         XCTAssertFalse(hidden.isVisible)
 
         updateFocusCache(document, now: now.addingTimeInterval(0.3))
+        XCTAssertEqual(runtime.modelInvariantViolations(), [])
         XCTAssertTrue(focus.workspace === hidden, "Normal native focus resumes after the closure settles")
         XCTAssertTrue(focus.windowOrNil === document)
+        XCTAssertEqual(runtime.modelInvariantViolations(), [])
     }
 
     func testExplicitWorkspaceChangeEndsLastWindowClosureHold() {
@@ -36,5 +38,6 @@ final class WorkspaceTransitionTest: XCTestCase {
         updateFocusCache(document, now: now.addingTimeInterval(0.1))
         XCTAssertTrue(focus.workspace === destination)
         XCTAssertTrue(focus.windowOrNil === document)
+        XCTAssertEqual(runtime.modelInvariantViolations(), [])
     }
 }

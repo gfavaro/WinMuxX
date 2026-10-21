@@ -2,6 +2,7 @@ import AppKit
 import Common
 
 struct ListWindowsCommand: Command {
+    let isQuery = true
     let args: ListWindowsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
 

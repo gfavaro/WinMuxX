@@ -23,6 +23,27 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
     }
 
+    func testReconciliationRepairsHiddenSecondaryAssignmentsWithoutChangingVisibleSlots() {
+        spaces[2].preferredMonitorPoint = displays[1].rect.topLeftCorner
+        spaces[3].preferredMonitorPoint = displays[2].rect.topLeftCorner
+        let visibleBefore = displays.map { $0.activeWorkspace.id }
+        let focusBefore = focus.workspace
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(displays.map { $0.activeWorkspace.id }, visibleBefore)
+        XCTAssertTrue(focus.workspace === focusBefore)
+        XCTAssertEqual(spaces[2].assignedMonitor?.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertEqual(spaces[3].assignedMonitor?.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(displays.map { $0.activeWorkspace.id }, visibleBefore)
+    }
+
+    func testSecondaryRepairHonorsExplicitForceAssignment() {
+        config.workspaceToMonitorForceAssignment = [spaces[2].name: [.sequenceNumber(2)]]
+        spaces[2].preferredMonitorPoint = displays[1].rect.topLeftCorner
+        reconcileSecondaryWorkspaceAssignments()
+        XCTAssertEqual(spaces[2].assignedMonitor?.rect.topLeftCorner, displays[1].rect.topLeftCorner)
+    }
+
     func testSwipePreviewTargetSelectionDoesNotChangeAnyViewport() {
         spaces[2].seedMonitorIfNeeded(displays[1])
         spaces[3].seedMonitorIfNeeded(displays[2])
@@ -200,25 +221,25 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(displays[2].activeWorkspace, spaces[4])
     }
 
-    func testHistoryIsIndependentAndMonitorFocusDoesNotChangeIt() async throws {
+    func testSecondaryHistoryFollowsDisplacedWorkspaceBackToMain() async throws {
         try await run("workspace --name 3")
         try await run("workspace --monitor 2 --name 4")
         XCTAssertEqual(focus.workspace, spaces[3])
         try await run("workspace-back-and-forth")
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[2])
-        XCTAssertTrue(spaces[2].focusWorkspace())
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[3])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
+        XCTAssertEqual(focus.workspace, spaces[1])
         try await run("workspace-back-and-forth")
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[2])
     }
 
-    func testExplicitMonitorAutoBackAndForthUsesItsOwnHistory() async throws {
+    func testExplicitMonitorAutoBackAndForthFollowsDisplacedWorkspaceToMain() async throws {
         try await run("workspace --monitor 2 --name 4")
         XCTAssertTrue(spaces[0].focusWorkspace())
         try await run("workspace --monitor 2 --name 4 --auto-back-and-forth")
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[3])
         XCTAssertEqual(focus.workspace, spaces[1])
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[1])
     }
 
     func testForcedSourceAssignmentDoesNotBlockCrossMonitorFocus() async throws {

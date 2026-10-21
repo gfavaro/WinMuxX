@@ -72,4 +72,48 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
         }
     }
 
+    func testThousandPreviewCyclesReleasePanelsAcrossRepeatedInvalidation() throws {
+        let rect = Rect(topLeftX: -20000, topLeftY: -20000, width: 160, height: 90)
+        let request = WorkspaceSwipeSnapshotRequest(key: WorkspaceSwipeSnapshotKey(
+            workspace: WorkspaceId("lifetime-stress"), display: "synthetic",
+            rect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)))
+        let context = try XCTUnwrap(CGContext(data: nil, width: 16, height: 16,
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let picture = try XCTUnwrap(context.makeImage())
+        for _ in 0..<20 {
+            weak var releasedPanel: NSWindow?
+            weak var releasedPreview: WorkspaceSwipePreview?
+            try autoreleasepool {
+                let snapshots = WorkspaceSwipeSnapshots(renderer: { _ in
+                    WorkspaceSwipeSnapshotResult(image: picture, renderMs: 0)
+                })
+                snapshots.cache.insert(picture, for: request.key)
+                let preview = WorkspaceSwipePreview(snapshots: snapshots)
+                releasedPreview = preview
+                defer { preview.invalidate() }
+                let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
+                for cycle in 0..<50 {
+                    preview.begin(request: request, front: picture, rect: rect, slidesLeft: cycle.isMultiple(of: 2))
+                    let panel = try XCTUnwrap(NSApplication.shared.windows.first {
+                        !existing.contains(ObjectIdentifier($0)) && $0.isVisible
+                    })
+                    releasedPanel = panel
+                    preview.update(0.6)
+                    preview.cancel()
+                    XCTAssertFalse(panel.isVisible)
+                    for layer in panel.contentView?.layer?.sublayers ?? [] {
+                        XCTAssertNil(layer.contents)
+                        XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
+                    }
+                }
+                XCTAssertEqual(preview.surfaceCreations, 1)
+                preview.invalidate()
+                XCTAssertEqual(snapshots.cache.count, 0)
+            }
+            XCTAssertNil(releasedPreview)
+            XCTAssertNil(releasedPanel, "Invalidation must release each native panel, not accumulate closed panels")
+        }
+    }
+
 }

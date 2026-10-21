@@ -31,6 +31,7 @@ extension WorkspaceSidebarPanel {
               workspaceSidebarAllowsLeftEdgeTrap(config.workspaceSidebar),
               !currentSessionModifierFlags().contains(.maskShift),
               !isMouseWindowDragInProgress(),
+              !shouldSuppressHoverForPointerPress,
               !isWorkspaceSidebarItemDragActive(),
               viewModel.workspaceSidebarVisibleWidth <= collapsedWidth + 0.5
         else {

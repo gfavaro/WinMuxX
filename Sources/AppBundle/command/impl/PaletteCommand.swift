@@ -6,7 +6,7 @@ struct PaletteCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
-        await SwitcherPalettePanel.shared.toggle()
+        await SwitcherPalettePanel.shared.toggle(groupByWorkspace: args.groupByWorkspace)
         return true
     }
 }

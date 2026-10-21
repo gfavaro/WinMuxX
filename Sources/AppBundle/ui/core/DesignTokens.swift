@@ -1,10 +1,7 @@
 import SwiftUI
 
-// WinMux design tokens: the single source of truth for the app's visual language — a dark
-// macOS-glass surface (glass/blur base + dark scrim + neutral tint + top highlight + hairline
-// border) with one shared scale of radii, strokes, shadows, and motion. Every piece of chrome
-// should pull from here so all surfaces read as the same material. The glass recipe is pure
-// opacity layers over a single base, so it stays cheap to composite.
+// Shared geometry, opacity and motion tokens. Resolve semantic colors and material
+// through ChromeAppearance so helper surfaces follow the selected app theme.
 
 enum GlassToken {
     // Surface recipe (originally the sidebar surface, now shared by all chrome)

@@ -184,8 +184,11 @@ extension CGPoint {
     @MainActor
     func findIn(tree: TilingContainer, virtual: Bool) -> Window? {
         let point = self
+        guard (virtual ? tree.lastAppliedLayoutVirtualRect : tree.lastAppliedLayoutPhysicalRect)?.contains(point) == true else {
+            return nil
+        }
         let target: TreeNode? = switch tree.layout {
-            case .tiles, .dwindle:
+            case .tiles, .master, .dwindle:
                 tree.children.first(where: {
                     (virtual ? $0.lastAppliedLayoutVirtualRect : $0.lastAppliedLayoutPhysicalRect)?.contains(point) == true
                 })

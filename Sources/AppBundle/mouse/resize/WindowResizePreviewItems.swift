@@ -113,7 +113,7 @@ private func windowResizePreviewContainerItems(
                     virtual: frame, context: context, activeWindowId: activeWindowId,
                 )
             }
-        case .tiles:
+        case .tiles, .master:
             return windowResizePreviewTileItems(
                 container: container,
                 point: point,

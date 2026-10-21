@@ -5,6 +5,9 @@ open class Window: TreeNode, Hashable {
     let windowId: UInt32
     let app: any AbstractApp
     var restartIdentity: RestartWindowIdentity?
+    /// Last trustworthy pre-parking frame in desktop unit coordinates; survives restart.
+    var workspacePreviewFrame: CGRect?
+    var preserveRestoredWorkspacePreview = false
     var lastFloatingSize: CGSize?
     // Width chosen by the user for a lone tile on ultrawide, persisted with its layout.
     var singleWindowManualWidth: CGFloat?
@@ -29,6 +32,7 @@ open class Window: TreeNode, Hashable {
 
     @MainActor
     func invalidateLastKnownNativeState() {
+        if !isUnitTest { WorkspaceOverviewController.shared.nativeWindowChanged(windowId) }
         lastKnownNativeStateGeneration += 1
         lastKnownActualRect = nil
         lastKnownNativeFullscreen = nil
@@ -43,6 +47,9 @@ open class Window: TreeNode, Hashable {
     func recordObservedActualRect(_ rect: Rect?, token: UInt64) {
         if lastKnownNativeStateGeneration == token {
             lastKnownActualRect = rect
+            runtime.events.record(.nativeFrameObserved, source: .nativeState, generation: token, windowID: windowId, observedFrame: rect)
+        } else {
+            runtime.events.record(.staleObservation, source: .nativeState, generation: token, windowID: windowId)
         }
     }
 
@@ -51,6 +58,8 @@ open class Window: TreeNode, Hashable {
         if lastKnownNativeStateGeneration == token {
             lastKnownNativeFullscreen = fullscreen
             lastKnownNativeMinimized = minimized
+        } else {
+            runtime.events.record(.staleObservation, source: .nativeState, generation: token, windowID: windowId)
         }
     }
 
@@ -61,6 +70,7 @@ open class Window: TreeNode, Hashable {
     func recordAuthoritativeActualRect(_ rect: Rect?) {
         lastKnownNativeStateGeneration += 1
         lastKnownActualRect = rect
+        runtime.events.record(.nativeFrameWritten, source: .model, generation: lastKnownNativeStateGeneration, windowID: windowId, intendedFrame: rect)
     }
 
     @MainActor

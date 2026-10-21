@@ -3,22 +3,40 @@ import PrivateApi
 import Common
 
 @MainActor
-private var activeRefreshTask: Task<(), any Error>? = nil
+private var activeRefreshTask: Task<(), any Error>? {
+    get { runtime.refresh.activeRefreshTask }
+    set { runtime.refresh.activeRefreshTask = newValue }
+}
 
 @MainActor
-private var activeScheduledRefreshEvent: RefreshSessionEvent? = nil
+private var activeScheduledRefreshEvent: RefreshSessionEvent? {
+    get { runtime.refresh.activeScheduledRefreshEvent }
+    set { runtime.refresh.activeScheduledRefreshEvent = newValue }
+}
 
 @MainActor
-private var activeScheduledRefreshGeneration: UInt64 = 0
+private var activeScheduledRefreshGeneration: UInt64 {
+    get { runtime.refresh.activeScheduledRefreshGeneration }
+    set { runtime.refresh.activeScheduledRefreshGeneration = newValue }
+}
 
 @MainActor
-private var scheduledRefreshOverrideForTests: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)? = nil
+private var scheduledRefreshOverrideForTests: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)? {
+    get { runtime.refresh.scheduledRefreshOverrideForTests }
+    set { runtime.refresh.scheduledRefreshOverrideForTests = newValue }
+}
 
 @MainActor
-private var refreshOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
+private var refreshOverrideForTests: (@MainActor @Sendable () async throws -> Void)? {
+    get { runtime.refresh.refreshOverrideForTests }
+    set { runtime.refresh.refreshOverrideForTests = newValue }
+}
 
 @MainActor
-private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
+private var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? {
+    get { runtime.refresh.normalizeLayoutReasonOverrideForTests }
+    set { runtime.refresh.normalizeLayoutReasonOverrideForTests = newValue }
+}
 
 /// Activation survives event coalescing and cancelled sessions until focus is reconciled.
 struct RefreshActivationContext: Equatable, Sendable {
@@ -33,8 +51,16 @@ struct RefreshActivationContext: Equatable, Sendable {
     }
 }
 
-@MainActor private var activationGeneration: UInt64 = 0
-@MainActor private var pendingActivation: RefreshActivationContext?
+@MainActor
+private var activationGeneration: UInt64 {
+    get { runtime.refresh.activationGeneration }
+    set { runtime.refresh.activationGeneration = newValue }
+}
+@MainActor
+private var pendingActivation: RefreshActivationContext? {
+    get { runtime.refresh.pendingActivation }
+    set { runtime.refresh.pendingActivation = newValue }
+}
 
 @MainActor
 func recordRefreshActivation(workspaceName: String, pid: Int32) {
@@ -66,6 +92,13 @@ func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
     frontmostActivationPolicy: NSApplication.ActivationPolicy?,
 ) -> Bool {
+    if ignoresCrossWorkspaceActivation(nativeFocused) {
+        switch refreshSessionEvent {
+            case .socketServer, .hotkeyBinding, .menuBarButton: break
+            case .globalObserver(let name) where name == "workspaceSwipe" || name == "workspaceOverviewSelection": break
+            default: return false
+        }
+    }
     if nativeFocused?.participatesInWorkspaceFocus == false {
         return false
     }
@@ -76,11 +109,18 @@ func shouldSyncFocusBackToMacOs(
 }
 
 @MainActor
-private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? = nil
+private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? {
+    get { runtime.refresh.pendingRefreshRequest }
+    set { runtime.refresh.pendingRefreshRequest = newValue }
+}
 
 /// When two refresh requests coalesce, keep the event whose session does more work, so the
 /// follow-up session covers the requirements of every event that arrived while one was running.
 private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessionEvent) -> RefreshSessionEvent {
+    // Parking repair is a placement-only pass. Never let it replace a pending
+    // focus/tab/activation reconciliation, including one with the same cost score.
+    if case .onWindowParkingDrift = new { return old }
+    if case .onWindowParkingDrift = old { return new }
     func score(_ e: RefreshSessionEvent) -> Int {
         (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
     }
@@ -93,6 +133,7 @@ func scheduleRefreshSession(
     optimisticallyPreLayoutWorkspaces: Bool = false,
     recordsActivation: Bool = true,
 ) {
+    runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
     guard isUnitTest || isWinMuxRuntimeReady else { return }
@@ -112,6 +153,7 @@ func scheduleRefreshSession(
     // and never completed until the burst quieted down. Let the active session finish, then
     // run a single follow-up session on behalf of all events that arrived in the meantime.
     if activeRefreshTask != nil {
+        runtime.events.record(.refreshCoalesced, source: .refresh, generation: activeScheduledRefreshGeneration)
         pendingRefreshRequest = pendingRefreshRequest.map {
             (mergeRefreshEvents($0.event, event), $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
         } ?? (event, optimisticallyPreLayoutWorkspaces)
@@ -127,7 +169,7 @@ func scheduleRefreshSession(
     let generation = activeScheduledRefreshGeneration
     activeScheduledRefreshEvent = request.event
     let override = scheduledRefreshOverrideForTests
-    activeRefreshTask = Task { @MainActor in
+    activeRefreshTask = runtime.throwingTask {
         defer {
             // Generation mismatch means someone took over (light session, test setup); they are
             // responsible for the next refresh, so don't drain the pending request from here.
@@ -148,7 +190,9 @@ func scheduleRefreshSession(
             } else {
                 try await runRefreshSessionBlocking(request.event, optimisticallyPreLayoutWorkspaces: request.optimisticallyPreLayoutWorkspaces)
             }
+            runtime.events.record(.refreshCompleted, source: .refresh, generation: generation)
         } catch is CancellationError {
+            runtime.events.record(.cancelled, source: .refresh, generation: generation)
             return
         }
     }
@@ -164,6 +208,16 @@ func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: B
     // Settled topology work can coalesce with another native event. Its pending
     // state belongs to the display owner, rather than the winning event's name.
     if layoutWorkspaces, event.requiresWindowRefreshBarrier { runSettledDisplayChangeHook() }
+}
+
+@MainActor
+func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
+                          isQuery: Bool, shouldSchedulePostRefresh: Bool,
+                          body: @MainActor () async throws -> T) async throws -> T {
+    if isQuery {
+        return try await AXReadBudget.$current.withValue(AXReadBudget(), operation: body)
+    }
+    return try await runLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
 }
 
 @MainActor
@@ -184,6 +238,13 @@ private func performRefreshSession(
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
     if !TrayMenuModel.shared.isEnabled { return }
+    if case .onWindowParkingDrift = event {
+        guard !WindowBorderController.shared.isMissionControlActive else { return }
+        // A native window can move without an AX event. Repair placement promptly
+        // while preserving logical focus and avoiding unrelated AX enumeration.
+        try await $refreshSessionEvent.withValue(event) { try await layoutWorkspaces() }
+        return
+    }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
     let activation = pendingActivation
     debugFocusLog("runRefreshSessionBlocking begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
@@ -297,6 +358,17 @@ private func performLightSession<T>(
     // follow-up session in the middle of this light session. The post-refresh scheduled at
     // the end of the light session (or any later event) picks the pending request up instead.
     activeScheduledRefreshGeneration += 1
+    let generation = activeScheduledRefreshGeneration
+    // Errors and cancellation must also drain interrupted native work. A newer
+    // session owns its own completion and must not be disturbed by this one.
+    defer {
+        if activeScheduledRefreshGeneration == generation, activeRefreshTask == nil,
+           let pending = pendingRefreshRequest {
+            scheduleRefreshSession(pending.event,
+                optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
+                recordsActivation: false)
+        }
+    }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
     debugFocusLog("runLightSession begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
     return try await $refreshSessionEvent.withValue(event) {
@@ -413,6 +485,7 @@ func refreshModel() {
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
+    if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 
 @MainActor
@@ -502,28 +575,9 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     }
 }
 
-enum OptimalHideCorner {
-    case bottomLeftCorner, bottomRightCorner
-}
-
 @MainActor
 private func layoutWorkspaces() async throws {
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
-    if !TrayMenuModel.shared.isEnabled {
-        for workspace in Workspace.all {
-            for window in workspace.allLeafWindowsRecursive {
-                try checkCancellation()
-                guard let macWindow = window as? MacWindow else { continue }
-                if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
-                    continue
-                }
-                try await macWindow.unhideFromCorner()
-            }
-            try await workspace.layoutWorkspace() // Unhide tiling windows from corner
-            try checkCancellation()
-        }
-        return
-    }
     let monitors = monitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]
     for monitor in monitors {
@@ -568,7 +622,10 @@ private func layoutWorkspaces() async throws {
             if geometryUnconfirmed {
                 _ = try? await macWindow.getAxRect()
             }
-            try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows || geometryUnconfirmed)
+            // Geometry invalidation also follows our own parking notifications. Let
+            // hideInCorner confirm native placement, including safe OS clamping,
+            // instead of forcing the same rejected position on every refresh.
+            try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows)
         }
     }
     // Reveal incoming windows only after outgoing workspaces are parked.

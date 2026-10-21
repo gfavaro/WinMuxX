@@ -17,6 +17,8 @@ struct ShortcutSidebarSettingsView: View {
     @SettingsDraft("workspace-sidebar.position", load: { config.workspaceSidebar.position }) private var sidebarPosition: WorkspaceSidebarPosition
     @SettingsDraft("workspace-sidebar.height-mode", load: { config.workspaceSidebar.heightMode ?? .standard }) private var sidebarHeightMode: WorkspaceSidebarHeightMode
 
+    @SettingsDraft("workspace-sidebar.hover-open-delay-ms", load: { config.workspaceSidebar.hoverOpenDelayMs }) private var hoverOpenDelayMs: Int
+
     var body: some View {
         SettingsScrollView {
             SettingsSection("Sidebar") {
@@ -36,6 +38,18 @@ struct ShortcutSidebarSettingsView: View {
                     Text("Always expanded").tag(SettingsSidebarDisplayMode.expanded)
                 } onChange: { persistSidebarDisplayMode() }
                 .disabled(!sidebarEnabled)
+                SettingsPicker("Hover reveal delay", id: "workspace-sidebar.hover-open-delay-ms", selection: $hoverOpenDelayMs,
+                               help: "Wait before revealing the sidebar at the edge. Text-selection drags do not reveal it. Commands and window dragging remain immediate.") {
+                    Text("Immediate").tag(0)
+                    Text("200 ms").tag(200)
+                    Text("400 ms (default)").tag(400)
+                    Text("600 ms").tag(600)
+                    Text("1 second").tag(1000)
+                    if ![0, 200, 400, 600, 1000].contains(hoverOpenDelayMs) {
+                        Text("Custom (\(hoverOpenDelayMs) ms)").tag(hoverOpenDelayMs)
+                    }
+                } onChange: { sidebarInt("hover-open-delay-ms", hoverOpenDelayMs) }
+                .disabled(!sidebarEnabled || sidebarDisplayMode == .expanded)
                 SettingsPicker("Expanded sidebar size", id: "workspace-sidebar.width", selection: $sidebarWidth,
                                help: "Width of the expanded sidebar: Small 200 pt, Medium 240 pt, Large 280 pt.") {
                     Text("Small").tag(200).disabled(collapsedWidth >= 200)

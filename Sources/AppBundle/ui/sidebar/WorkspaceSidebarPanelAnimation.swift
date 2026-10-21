@@ -5,6 +5,7 @@ import SwiftUI
 
 extension WorkspaceSidebarPanel {
     func animateVisibleSidebarWidth(_ width: CGFloat, animation: Animation) {
+        guard !isRetired else { return }
         debugWorkspaceSidebarHoverLog("animateWidth panel=\(monitorScopeId) from=\(viewModel.workspaceSidebarVisibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(viewModel.isWorkspaceSidebarExpanded)")
         pendingBackingResize?.cancel()
         let resize = DispatchWorkItem { [weak self] in
@@ -34,14 +35,27 @@ extension WorkspaceSidebarPanel {
     }
 
     func expandSidebar(to expandedWidth: CGFloat) {
+        guard !isRetired else { return }
         debugWorkspaceSidebarHoverLog("expandSidebar panel=\(monitorScopeId) target=\(expandedWidth) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
-        pendingExpand?.cancel()
-        pendingExpand = nil
+        // Search focus and hover updates may request the same reveal again.
+        // Keep its notification and animation intact instead of restarting them.
+        if viewModel.isWorkspaceSidebarExpanded, viewModel.workspaceSidebarVisibleWidth == expandedWidth,
+           pendingCollapse == nil, pendingCollapseFinalize == nil {
+            updateMousePassthrough()
+            return
+        }
+        cancelHoverReveal()
         NotificationCenter.default.post(name: workspaceSidebarWillExpandNotification, object: self)
-        viewModel.isWorkspaceSidebarExpanded = true
+        pendingCollapse?.cancel()
+        pendingCollapse = nil
+        pendingCollapseFinalize?.cancel()
+        pendingCollapseFinalize = nil
+        // Restore the collapsed panel before setting the expansion target. Otherwise
+        // refresh() installs the full width before SwiftUI can animate its reveal.
         if !isVisible {
             refresh()
         }
+        viewModel.isWorkspaceSidebarExpanded = true
         guard viewModel.workspaceSidebarVisibleWidth != expandedWidth else {
             updateMousePassthrough()
             return
@@ -53,8 +67,7 @@ extension WorkspaceSidebarPanel {
         debugWorkspaceSidebarHoverLog("cancelExpansionWork panel=\(monitorScopeId) pendingExpand=\(pendingExpand != nil) pendingCollapse=\(pendingCollapse != nil) pendingFinalize=\(pendingCollapseFinalize != nil)")
         pendingBackingResize?.cancel()
         pendingBackingResize = nil
-        pendingExpand?.cancel()
-        pendingExpand = nil
+        cancelHoverReveal()
         pendingCollapse?.cancel()
         pendingCollapse = nil
         pendingCollapseFinalize?.cancel()

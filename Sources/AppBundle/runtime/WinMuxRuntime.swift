@@ -12,6 +12,8 @@ final class WinMuxRuntime {
     let displays = MonitorState()
     let hotkeys = HotkeyState()
     let recovery = WorkspaceRecoveryState()
+    let refresh = RefreshCoordinator()
+    let events = RuntimeEventRecorder()
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)
@@ -35,9 +37,14 @@ final class WinMuxRuntime {
         withValue { Task { @MainActor in await operation() } }
     }
 
+    func throwingTask(_ operation: @escaping @MainActor () async throws -> Void) -> Task<Void, any Error> {
+        withValue { Task { @MainActor in try await operation() } }
+    }
+
     static func replaceForTests() {
         precondition(isUnitTest)
         precondition(bound == nil, "Replace the fixture outside a scoped runtime binding")
+        process.refresh.invalidate()
         process.recovery.reset()
         process.displays.displayChangeTask?.cancel()
         process.configuration.reloadScheduler?.cancelPending()

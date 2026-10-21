@@ -3,8 +3,8 @@ import Foundation
 import Network
 
 private struct Subscriber {
-    let connection: NWConnection
     let events: Set<ServerEventType>
+    let writer: SubscriberEventWriter
 }
 
 @MainActor private var subscribers: [UniqueToken: Subscriber] = [:]
@@ -12,8 +12,11 @@ private struct Subscriber {
 @MainActor
 func handleSubscribeAndWaitTillError(_ connection: NWConnection, _ args: SubscribeCmdArgs) async {
     let id = UniqueToken()
-    subscribers[id] = Subscriber(connection: connection, events: args.events)
-    defer { subscribers.removeValue(forKey: id) }
+    let writer = SubscriberEventWriter(send: { payload in
+        await connection.writeAtomicPayload(payload).error == nil
+    }, disconnect: { connection.cancel() })
+    subscribers[id] = Subscriber(events: args.events, writer: writer)
+    defer { writer.close(); subscribers.removeValue(forKey: id) }
     if args.sendInitial {
         let f = focus
         for eventType in args.events {
@@ -32,9 +35,8 @@ func handleSubscribeAndWaitTillError(_ connection: NWConnection, _ args: Subscri
                     )
                 case .windowDetected, .bindingTriggered: continue
             }
-            if await connection.writeAtomic(event, jsonEncoder).error != nil {
-                return
-            }
+            guard let payload = try? jsonEncoder.encode(event) else { writer.close(); return }
+            writer.enqueue(payload)
         }
     }
 
@@ -48,13 +50,12 @@ private let jsonEncoder: JSONEncoder = {
     return e
 }()
 
+@MainActor
 func broadcastEvent(_ event: ServerEvent) {
-    Task { @MainActor in
-        for (id, subscriber) in subscribers {
-            guard subscriber.events.contains(event.eventType) else { continue }
-            if await subscriber.connection.writeAtomic(event, jsonEncoder).error != nil {
-                _ = subscribers.removeValue(forKey: id)
-            }
-        }
+    let recipients = subscribers.filter { $0.value.events.contains(event.eventType) }
+    guard !recipients.isEmpty, let payload = try? jsonEncoder.encode(event) else { return }
+    for (id, subscriber) in recipients {
+        subscriber.writer.enqueue(payload)
+        if subscriber.writer.isClosed { subscribers.removeValue(forKey: id) }
     }
 }

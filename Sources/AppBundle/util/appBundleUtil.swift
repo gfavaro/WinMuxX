@@ -52,9 +52,10 @@ private struct AppServerTerminationHandler: TerminationHandler {
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()
             WindowRecoveryController.shared.beginTermination()
+            MacApp.cancelPendingFocus()
             persistFrozenWorldForRestartIfPossible()
             for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }
-            let pending = await makeAllWindowsVisibleAndRestoreSize()
+            let pending = await WindowRecoveryController.shared.restoreManagedWindows()
             WindowRecoveryController.shared.finishCleanly(preserving: pending)
             await toggleReleaseServerIfDebug(.on)
         }
@@ -71,30 +72,6 @@ func terminationFrame(visibleFrame: CGRect, floatingSize: CGSize?) -> CGRect {
                   y: visibleFrame.minY + (visibleFrame.height - size.height) / 2,
                   width: size.width, height: size.height)
 }
-
-@MainActor
-private func makeAllWindowsVisibleAndRestoreSize() async -> [RecoveryWindowIdentity] {
-    guard !serverArgs.isReadOnly else { return [] }
-    // Snapshot without accessing the tree: an internal error may leave windows unbound.
-    let failed = await restoreTerminationWindows(Array(MacWindow.allWindowsMap.values)) { window in
-        guard try await !window.isMacosFullscreen, try await !window.isMacosMinimized else {
-            throw WindowTerminationError.nativeState
-        }
-        let monitor = (try? await window.getCenter())?.monitorApproximation ?? mainMonitor
-        let rect = monitor.visibleRect
-        let frame = terminationFrame(visibleFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height),
-                                     floatingSize: window.lastFloatingSize)
-        try await window.setAxFrameBlocking(frame.origin, frame.size)
-        guard let actual = try await window.getAxRect(), recoveryFrameMatches(
-            actual: CGRect(x: actual.minX, y: actual.minY, width: actual.width, height: actual.height), expected: frame
-        ) else { throw WindowTerminationError.frameRejected }
-    } onFailure: { window, error in
-        NSLog("WinMux: unable to restore window %u: %@", window.windowId, String(describing: error))
-    }
-    return failed.compactMap { WindowRecoveryController.shared.identity(for: $0) }
-}
-
-private enum WindowTerminationError: Error { case frameRejected, nativeState }
 
 @MainActor
 public final class WinMuxApplicationDelegate: NSObject, NSApplicationDelegate {

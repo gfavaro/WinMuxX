@@ -13,7 +13,7 @@ extension TilingContainer {
 
     @MainActor
     var usesDoubleSidedWindows: Bool {
-        usesWindowTabBehavior && ExperimentalUISettings().doubleSidedWindows &&
+        usesWindowTabBehavior && config.windowTabs.doubleSidedWindows &&
             children.count == 2 && children.allSatisfy { $0 is Window } && !hasFullscreenTab
     }
 

@@ -52,8 +52,9 @@ Selecting a workspace already visible on another monitor now focuses it there,
 without exchanging workspaces or changing either monitor's history. This applies
 to shortcuts, explicit `workspace --monitor`, back-and-forth, and ordinary activation commands. Sidebar clicks ask for override confirmation
 when the target workspace is visible on another display.
-Hidden workspaces still activate on the requested/focused monitor, respecting
-forced assignments. Explicit move/summon commands retain their own behavior.
+Hidden workspaces also retain their assigned display during ordinary selection.
+Only unassigned/new workspaces use the requested/focused display. Explicit move
+and summon commands relocate workspaces; forced assignments still constrain them.
 
 ### Border compatibility
 
@@ -90,7 +91,9 @@ explicit height-mode and cannot reduce the mandatory system reservation.
 
 Settings → Appearance → Menu bar chooses Icon or Workspace. Workspace shows the
 initial of a configured label, otherwise the workspace number, on the focused
-monitor. Icon supports color/monochrome. These preferences live in UserDefaults.
+monitor. Icon supports color/monochrome. `[menu-bar]` stores these preferences in
+TOML; `[window-tabs].double-sided-windows` stores the two-sided group preference.
+Legacy preferences are imported once. See [configuration](CONFIGURATION.md).
 
 For architecture and validation commands, see [HACKING.md](../HACKING.md).
 Investigation and visual-review notes are indexed in [docs/README.md](README.md);

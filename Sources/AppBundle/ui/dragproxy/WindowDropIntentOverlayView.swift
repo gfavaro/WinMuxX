@@ -6,7 +6,7 @@ struct WindowDropIntentOverlayView: View {
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
         ZStack {
-            overlaySurface(shape: shape)
+            OverlaySurface(cornerRadius: cornerRadius)
 
             ForEach(localZones) { zone in
                 dropZoneView(zone)
@@ -15,6 +15,7 @@ struct WindowDropIntentOverlayView: View {
         .clipShape(shape)
         .frame(width: model.targetFrame.width, height: model.targetFrame.height)
         .compositingGroup()
+        .modifier(ChromeResolvedAppearance())
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }
@@ -30,25 +31,6 @@ struct WindowDropIntentOverlayView: View {
             width: model.targetFrame.width,
             height: model.targetFrame.height
         ))
-    }
-
-    @ViewBuilder
-    private func overlaySurface<S: Shape>(shape: S) -> some View {
-        if config.workspaceSidebar.chromeStyle == .solid {
-            // Intent feedback remains translucent even with solid chrome selected. The selected
-            // color tints the shared glass material instead of replacing it with an opaque fill.
-            ZStack {
-                GlassSurface(shape: shape)
-                shape.fill(config.workspaceSidebar.resolvedSolidChromeColor.opacity(0.42))
-            }
-            .clipShape(shape)
-        } else {
-            GlassSurface(
-                shape: shape,
-                style: .liquidGlass,
-                solidColor: config.workspaceSidebar.resolvedSolidChromeColor
-            )
-        }
     }
 
     private func dropZoneView(_ zone: WindowIntentZone) -> some View {

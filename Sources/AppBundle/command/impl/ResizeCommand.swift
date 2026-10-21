@@ -23,7 +23,7 @@ struct ResizeCommand: Command {
         let candidates: [WindowResizeCommandTarget] = target.windowOrNil?.parentsWithSelf.flatMap { node -> [WindowResizeCommandTarget] in
             guard let parent = node.parent as? TilingContainer else { return [] }
             switch parent.layout {
-                case .tiles: return [.tiles(node, parent)]
+                case .tiles, .master: return [.tiles(node, parent)]
                 case .dwindle: return node.dwindleResizeTargets().map(WindowResizeCommandTarget.dwindle)
                 case .tabGroup, .stacked: return []
             }
