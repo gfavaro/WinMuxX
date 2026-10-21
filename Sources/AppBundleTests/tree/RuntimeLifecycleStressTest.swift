@@ -78,6 +78,7 @@ final class RuntimeLifecycleStressTest: WorkspaceTestCase {
     }
 
     private func assertUniqueLiveWindows(_ expected: [TestWindow], file: StaticString = #filePath, line: UInt = #line) {
+        XCTAssertEqual(runtime.modelInvariantViolations(expectedWindows: expected), [], file: file, line: line)
         let bound = Workspace.all.flatMap(\.allLeafWindowsRecursive) +
             macosMinimizedWindowsContainer.children.compactMap { $0 as? Window }
         XCTAssertEqual(bound.count, expected.count, file: file, line: line)

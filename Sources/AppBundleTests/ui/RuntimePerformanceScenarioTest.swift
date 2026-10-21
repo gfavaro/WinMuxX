@@ -24,6 +24,7 @@ final class RuntimePerformanceScenarioTest: WorkspaceTestCase {
             sidebar.resetHiddenSidebarState()
             sidebar.viewModel.isWorkspaceSidebarExpanded = false
             if iteration >= 20 { _ = (iteration.isMultiple(of: 2) ? first : second).focusWorkspace() }
+            XCTAssertEqual(runtime.modelInvariantViolations(), [], "iteration=\(iteration)")
             XCTAssertNil(sidebar.pendingBackingResize)
             XCTAssertNil(sidebar.pendingExpand)
             XCTAssertEqual(palette.ownedMonitorCount, 0)
