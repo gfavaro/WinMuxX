@@ -14,6 +14,26 @@ final class WindowResizePreviewCompositorView: NSView {
     private var materialViews: [UInt32: NSVisualEffectView] = [:]
     private var tintLayers: [UInt32: CALayer] = [:]
 
+    private var presentedItems: [WindowResizePreviewItem] = []
+    private var presentation: WindowResizePreviewPresentation = .detailed
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshAppearance()
+    }
+
+    func refreshAppearance() {
+        guard !presentedItems.isEmpty else { return }
+        update(presentedItems, presentation: presentation)
+    }
+
+    private var resolvedAppearance: ResolvedChromeAppearance {
+        workspaceSidebarConfiguration().chromeAppearance(
+            systemScheme: effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? .dark : .light,
+            reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency,
+            increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
+    }
+
     override var isFlipped: Bool { true }
 
     override init(frame frameRect: NSRect) {
@@ -32,6 +52,10 @@ final class WindowResizePreviewCompositorView: NSView {
     }
 
     func update(_ items: [WindowResizePreviewItem], presentation: WindowResizePreviewPresentation) {
+        presentedItems = items
+        self.presentation = presentation
+        let palette = ResizePreviewPalette(appearance: resolvedAppearance,
+            increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
         let visibleIds = Set(items.map(\.id))
         var appearingLayers: [WindowResizePreviewItemLayer] = []
         CATransaction.begin()
@@ -59,6 +83,7 @@ final class WindowResizePreviewCompositorView: NSView {
                 layer?.addSublayer(itemLayer)
                 appearingLayers.append(itemLayer)
             }
+            itemLayer.palette = palette
             itemLayer.update(item, scale: scale, presentation: presentation, iconResolver: resolvedIconImage)
         }
         CATransaction.commit()
@@ -71,6 +96,7 @@ final class WindowResizePreviewCompositorView: NSView {
     }
 
     func clear() {
+        presentedItems = []
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for itemLayer in itemLayers.values {
@@ -94,10 +120,12 @@ final class WindowResizePreviewCompositorView: NSView {
         materialView.layer?.masksToBounds = true
 
         let tintLayer = tintLayers[item.id] ?? makeTintLayer(for: item.id, in: materialView)
-        let usesSolidTint = config.workspaceSidebar.chromeStyle == .solid
+        let resolved = resolvedAppearance
+        materialView.appearance = NSAppearance(named: resolved.scheme == .dark ? .darkAqua : .aqua)
+        let usesSolidTint = resolved.material != .glass || config.workspaceSidebar.chromeStyle == .solid
         tintLayer.frame = materialView.bounds
-        tintLayer.backgroundColor = NSColor(config.workspaceSidebar.resolvedSolidChromeColor)
-            .withAlphaComponent(0.42)
+        tintLayer.backgroundColor = NSColor(resolved.fill ?? config.workspaceSidebar.resolvedSolidChromeColor)
+            .withAlphaComponent(resolved.material == .glass ? 0.42 : 1)
             .cgColor
         tintLayer.isHidden = !usesSolidTint
     }

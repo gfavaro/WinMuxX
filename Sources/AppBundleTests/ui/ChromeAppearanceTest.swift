@@ -86,3 +86,28 @@ final class ChromeAppearanceTest: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class HelperChromeAppearanceTest: XCTestCase {
+    func testLayerPaletteResolvesAllThemesAccessibilityAndCustomColor() {
+        for theme in AppAppearance.allCases {
+            for system in [ColorScheme.light, .dark] {
+                for opaque in [false, true] {
+                    for contrast in [false, true] {
+                        let resolved = resolveChromeAppearance(inputs: .init(theme: theme, systemScheme: system,
+                            reduceTransparency: opaque, increasedContrast: contrast))
+                        let palette = ResizePreviewPalette(appearance: resolved, increasedContrast: contrast)
+                        XCTAssertEqual(palette.fill.alpha, 1)
+                        XCTAssertGreaterThanOrEqual(palette.stroke.alpha, contrast ? 0.35 : 0.12)
+                        let components = palette.fill.components ?? []
+                        XCTAssertFalse(components.isEmpty)
+                    }
+                }
+            }
+        }
+        let white = ResizePreviewPalette(appearance: resolveChromeAppearance(inputs: .init(appearance: .custom, solidColor: .white)), increasedContrast: false)
+        let black = ResizePreviewPalette(appearance: resolveChromeAppearance(inputs: .init(appearance: .custom, solidColor: .black)), increasedContrast: false)
+        XCTAssertNotEqual(white.fill, black.fill)
+        XCTAssertNotEqual(white.stroke, black.stroke)
+    }
+}

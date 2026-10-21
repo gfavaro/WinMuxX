@@ -2,6 +2,7 @@ import AppKit
 import Common
 
 final class WindowResizePreviewItemLayer: CALayer {
+    var palette = ResizePreviewPalette(appearance: resolveChromeAppearance(inputs: .init()), increasedContrast: false)
     private let surfaceLayer = CAShapeLayer()
     private let topBarLayer = CAShapeLayer()
     private let mockTabStrokeLayer = CAShapeLayer()
@@ -13,13 +14,13 @@ final class WindowResizePreviewItemLayer: CALayer {
         masksToBounds = false
         disableResizePreviewLayerActions(self)
 
-        surfaceLayer.fillColor = ResizePreviewPalette.fill
+        surfaceLayer.fillColor = palette.fill
         strokeLayer.fillColor = NSColor.clear.cgColor
-        strokeLayer.strokeColor = ResizePreviewPalette.stroke
+        strokeLayer.strokeColor = palette.stroke
         strokeLayer.lineWidth = 0.7
-        topBarLayer.fillColor = ResizePreviewPalette.tabGroupBar
+        topBarLayer.fillColor = palette.tabGroupBar
         mockTabStrokeLayer.fillColor = NSColor.clear.cgColor
-        mockTabStrokeLayer.strokeColor = ResizePreviewPalette.sourceMockTabStroke
+        mockTabStrokeLayer.strokeColor = palette.sourceMockTabStroke
         mockTabStrokeLayer.lineWidth = 0.7
         [surfaceLayer, topBarLayer, mockTabStrokeLayer, strokeLayer].forEach {
             disableResizePreviewLayerActions($0)
@@ -68,13 +69,13 @@ final class WindowResizePreviewItemLayer: CALayer {
         surfaceLayer.isHidden = false
         let path = CGPath(roundedRect: localBounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
         surfaceLayer.fillRule = .nonZero
-        surfaceLayer.fillColor = ResizePreviewPalette.fill
+        surfaceLayer.fillColor = palette.fill
         surfaceLayer.frame = localBounds
         surfaceLayer.path = path
         surfaceLayer.contentsScale = scale
         mockTabStrokeLayer.isHidden = true
         mockTabStrokeLayer.path = nil
-        strokeLayer.strokeColor = ResizePreviewPalette.stroke
+        strokeLayer.strokeColor = palette.stroke
         strokeLayer.lineWidth = 0.7
         strokeLayer.frame = localBounds
         strokeLayer.path = path
@@ -94,7 +95,7 @@ final class WindowResizePreviewItemLayer: CALayer {
 
         let radius = windowResizePreviewCornerRadius(for: bounds)
         strokeLayer.isHidden = false
-        strokeLayer.strokeColor = NSColor.white.withAlphaComponent(GlassToken.borderOpacity).cgColor
+        strokeLayer.strokeColor = palette.stroke
         strokeLayer.lineWidth = StrokeToken.hairline
         strokeLayer.frame = bounds
         strokeLayer.path = CGPath(roundedRect: bounds, cornerWidth: radius, cornerHeight: radius, transform: nil)
@@ -115,25 +116,25 @@ final class WindowResizePreviewItemLayer: CALayer {
             tabCount: item.icons.count,
         )
         surfaceLayer.fillRule = .evenOdd
-        surfaceLayer.fillColor = ResizePreviewPalette.sourceFrameFill
+        surfaceLayer.fillColor = palette.sourceFrameFill
         surfaceLayer.frame = localBounds
         surfaceLayer.path = shellPath
         surfaceLayer.contentsScale = scale
 
         topBarLayer.isHidden = false
-        topBarLayer.fillColor = ResizePreviewPalette.sourceMockTabFill
+        topBarLayer.fillColor = palette.sourceMockTabFill
         topBarLayer.frame = localBounds
         topBarLayer.path = mockTabsPath
         topBarLayer.contentsScale = scale
 
         mockTabStrokeLayer.isHidden = false
-        mockTabStrokeLayer.strokeColor = ResizePreviewPalette.sourceMockTabStroke
+        mockTabStrokeLayer.strokeColor = palette.sourceMockTabStroke
         mockTabStrokeLayer.lineWidth = 0.7
         mockTabStrokeLayer.frame = localBounds
         mockTabStrokeLayer.path = mockTabsPath
         mockTabStrokeLayer.contentsScale = scale
 
-        strokeLayer.strokeColor = ResizePreviewPalette.sourceFrameStroke
+        strokeLayer.strokeColor = palette.sourceFrameStroke
         strokeLayer.lineWidth = 0.8
         strokeLayer.frame = localBounds
         strokeLayer.path = shellPath
@@ -150,7 +151,7 @@ final class WindowResizePreviewItemLayer: CALayer {
         let height = min(max(item.frame.height * 0.12, 16), 30)
         let insetBounds = localBounds.insetBy(dx: 4, dy: 4)
         let barRect = CGRect(x: insetBounds.minX, y: insetBounds.minY, width: insetBounds.width, height: height)
-        topBarLayer.fillColor = ResizePreviewPalette.tabGroupBar
+        topBarLayer.fillColor = palette.tabGroupBar
         topBarLayer.frame = localBounds
         topBarLayer.path = CGPath(
             roundedRect: barRect,
@@ -186,7 +187,7 @@ final class WindowResizePreviewItemLayer: CALayer {
             iconLayer.isHidden = false
             iconLayer.contentsScale = scale
             iconLayer.cornerRadius = max(iconSize * 0.18, 6)
-            iconLayer.backgroundColor = ResizePreviewPalette.fallbackIconFill
+            iconLayer.backgroundColor = palette.fallbackIconFill
             let icon = visibleIcons.getOrNil(atIndex: index)
             iconLayer.contents = icon.flatMap(iconResolver)
             if iconLayer.contents == nil {

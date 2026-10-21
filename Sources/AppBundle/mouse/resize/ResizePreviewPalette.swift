@@ -1,12 +1,32 @@
 import AppKit
+import SwiftUI
 
-enum ResizePreviewPalette {
-    static let fill = mattePanelNSColor.cgColor
-    static let stroke = NSColor.white.withAlphaComponent(0.04).cgColor
-    static let tabGroupBar = NSColor.white.withAlphaComponent(0.055).cgColor
-    static let fallbackIconFill = NSColor.white.withAlphaComponent(0.12).cgColor
-    static let sourceFrameFill = mattePanelNSColor.cgColor
-    static let sourceFrameStroke = NSColor.white.withAlphaComponent(0.055).cgColor
-    static let sourceMockTabFill = NSColor.white.withAlphaComponent(0.085).cgColor
-    static let sourceMockTabStroke = NSColor.white.withAlphaComponent(0.075).cgColor
+/// A resolved snapshot, recreated at presentation/appearance boundaries. CGColors
+/// are never static: CALayer cannot automatically resolve dynamic NSColors.
+struct ResizePreviewPalette {
+    let fill: CGColor
+    let stroke: CGColor
+    let tabGroupBar: CGColor
+    let fallbackIconFill: CGColor
+    let sourceFrameFill: CGColor
+    let sourceFrameStroke: CGColor
+    let sourceMockTabFill: CGColor
+    let sourceMockTabStroke: CGColor
+
+    init(appearance: ResolvedChromeAppearance, increasedContrast: Bool) {
+        let foreground: NSColor = appearance.scheme == .dark ? .white : .black
+        let background: NSColor = appearance.fill.map(NSColor.init) ??
+            (appearance.scheme == .dark ? NSColor(calibratedWhite: 0.10, alpha: 1) : NSColor(calibratedWhite: 0.94, alpha: 1))
+        func ink(_ opacity: CGFloat) -> CGColor {
+            foreground.withAlphaComponent(increasedContrast ? max(opacity, 0.35) : opacity).cgColor
+        }
+        fill = background.cgColor
+        stroke = ink(0.12)
+        tabGroupBar = ink(0.055)
+        fallbackIconFill = ink(0.12)
+        sourceFrameFill = background.cgColor
+        sourceFrameStroke = ink(0.12)
+        sourceMockTabFill = ink(0.085)
+        sourceMockTabStroke = ink(0.12)
+    }
 }
