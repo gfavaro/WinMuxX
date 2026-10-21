@@ -444,3 +444,36 @@ comparison correctly reports **inconclusive**. It does not establish a memory,
 energy or battery-life improvement. Evidence is in the ignored directory
 `.build/reliability-review/`, including full suite logs, process samples,
 environment metadata, comparison output and native window inventories.
+
+## Canonical TOML configuration — build 118 (2026-10-20)
+
+The full check passes **1,286 Swift tests and 47 Python checks**. New coverage
+checks sparse persistent names, removal of count-based retention, temporary blank
+lifecycle, version-1 migration, quoted/escaped legacy keys, invalid imports,
+backup/idempotence, TOML precedence, preference removal and live reload/dry-run
+publication. Tab-group borders also passed geometry, movement/resize target,
+switching, nested split, native-fallback and 1×/2× rendering regressions.
+
+Build 118 identifies app source `bfac35b3` and is installed with the existing
+persistent local signing identity. Strict deep signature verification, CLI
+startup, agent query and dry-run config validation passed. All six managed window
+IDs and workspace assignments matched the fresh pre-install snapshot.
+
+The startup migration removed the personal config's zero minimum count and
+imported its Workspace menu-bar indicator and monochrome icon appearance.
+An exact text comparison verified that these were the only file changes; the
+persistent names and other settings were preserved. The original TOML is saved
+as `winmux.toml.backup.1`. Private copies of the original file and legacy preference
+domain are under `.release/` and are not committed. The migrated preference keys
+were removed from UserDefaults after the write succeeded.
+
+The installer correctly reported `config_changed`. After comparing the exact
+migration and its backup, the report recorded the reviewed before/after hashes;
+read-only resume then returned `validated`. The report is
+`.release/install-build118.json`. The build-117 app rollback archive is beside it.
+Rolling back to build 117 also requires restoring the backed-up TOML and legacy
+preferences, because that older app does not understand the new settings.
+
+No new live light-mode, accessibility-mode, IME or pointer-drag validation is
+claimed in this delivery. Automated UI policy and lifecycle coverage is described
+above. Current configuration semantics are documented in [configuration](CONFIGURATION.md).
