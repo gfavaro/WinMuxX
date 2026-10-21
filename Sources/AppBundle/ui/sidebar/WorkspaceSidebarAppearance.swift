@@ -348,10 +348,11 @@ extension WorkspaceSidebarFrostedTint {
 struct WorkspaceSidebarColorScheme: ViewModifier {
     let appearance: WorkspaceSidebarAppearance
     var solidColorScheme: ColorScheme = .dark
+    var theme: AppAppearance = .system
     @Environment(\.colorScheme) var systemColorScheme
 
     func body(content: Content) -> some View {
-        content.environment(\.colorScheme, appearance == .custom ? solidColorScheme : systemColorScheme)
+        content.environment(\.colorScheme, appearance == .custom ? solidColorScheme : theme.colorScheme(system: systemColorScheme))
     }
 }
 

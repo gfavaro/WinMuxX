@@ -16,6 +16,8 @@ config-version = 2
 # Diagnostics, manual crash recovery and session-local minimum-size observation
 # do not require additional TOML options. Learned minimum sizes are session data.
 
+# Theme for WinMuxX UI: system follows macOS, or choose light / dark.
+appearance = 'system'
 start-at-login = false
 # Reset workspace placement at launch; explicit assignments still apply.
 start-workspaces-on-main-monitor = false
@@ -107,10 +109,10 @@ on-mode-changed = []
     show-seconds = true
     show-date = false
     show-weekday = true
-    # Liquid Glass uses native menu-bar-inspired glass and adaptive wallpaper contrast.
+    # Liquid Glass follows the root appearance theme; the compact rail can adapt to wallpaper.
     # Solid uses the selected opaque color. Also applies to tab groups and switcher.
     # Legacy appearance/background/frosted-tint keys remain accepted but no longer
-    # override this style. The Settings UI calls this choice Sidebar appearance.
+    # override this style. Settings exposes Shared appearance separately from Theme.
     # Compact Liquid Glass sidebar only: false shows wallpaper without glass.
     # Expanded Liquid Glass always uses a frosted background.
     # Reduce Transparency overrides this with an opaque system background.

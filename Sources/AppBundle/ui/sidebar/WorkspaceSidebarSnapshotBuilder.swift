@@ -12,6 +12,7 @@ func workspaceSidebarConfiguration() -> WorkspaceSidebarConfiguration {
         showsDate: config.workspaceSidebar.showDate,
         showsWeekday: config.workspaceSidebar.showWeekday,
         showsStatusPills: config.workspaceSidebar.showStatusPills,
+        theme: config.appearance,
         appearance: config.workspaceSidebar.effectiveAppearance,
         background: config.workspaceSidebar.background,
         position: config.workspaceSidebar.position,

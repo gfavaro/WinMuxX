@@ -213,7 +213,13 @@ struct WorkspaceSidebarWallpaperContrast: ViewModifier {
     }
 
     private var resolvedColorScheme: ColorScheme {
-        guard samplingEnabled else { return systemColorScheme }
+        let themeScheme = configuration.theme.colorScheme(system: systemColorScheme)
+        // Only the compact rail needs wallpaper-based contrast to meet the menu
+        // bar. Expanded chrome follows the app theme, like tabs and overlays.
+        guard configuration.theme == .system,
+              !configuration.alwaysExpanded,
+              visibleWidth <= configuration.collapsedWidth + 8,
+              samplingEnabled else { return themeScheme }
         return workspaceSidebarResolvedColorScheme(
             menuBarColorScheme: WorkspaceSidebarPanel.menuBarColorScheme,
             wallpaperTone: wallpaperSample?.tone,

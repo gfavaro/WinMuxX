@@ -40,6 +40,7 @@ var defaultConfigUrl: URL {
 }
 
 struct Config: ConvenienceCopyable {
+    var appearance: AppAppearance = .system
     var configVersion: Int = 1
     var afterLoginCommand: [any Command] = []
     var afterStartupCommand: [any Command] = []
@@ -89,6 +90,18 @@ struct Config: ConvenienceCopyable {
     var modes: [String: Mode] = [:]
     var onWindowDetected: [WindowDetectedCallback] = []
     var onModeChanged: [any Command] = []
+}
+
+enum AppAppearance: String, CaseIterable, Identifiable, Sendable {
+    case system, light, dark
+    var id: String { rawValue }
+    var nativeAppearance: NSAppearance? {
+        switch self {
+            case .system: nil
+            case .light: NSAppearance(named: .aqua)
+            case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
 }
 
 enum DefaultContainerOrientation: String {

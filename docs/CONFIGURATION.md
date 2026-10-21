@@ -74,3 +74,20 @@ project/session layout, crash recovery and learned app minimum sizes are runtime
 state. The last-opened Settings page is UI state. These remain outside TOML and
 do not override its preferences. macOS permissions and login-service registration
 are OS state; the TOML `start-at-login` preference controls the desired registration.
+
+## App theme
+
+Set the root-level key before any TOML table:
+
+```toml
+appearance = 'system' # system, light, or dark
+```
+
+The same value appears in Settings → Appearance → Theme. It applies to WinMuxX
+windows, the expanded sidebar, palette, workspace overview, and tab chrome.
+System follows macOS Light/Dark appearance and updates when macOS changes it.
+Light and Dark override the system for WinMuxX. Wallpaper and decorative tint do
+not select the theme of expanded surfaces. The compact rail can still adapt to
+its wallpaper to meet the menu bar. Explicit themes override that adaptation.
+Custom solid surface colors retain a contrasting foreground. Reduce Transparency
+and Increase Contrast continue to apply in every theme.

@@ -139,6 +139,7 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 /// reload rather than individual Settings controls, so GUI edits, config-editor saves, and
 /// filesystem auto-reloads share the same live-update behavior.
 @MainActor private func applyReloadedConfigurationToRunningApp() {
+    if !isUnitTest { NSApp?.appearance = config.appearance.nativeAppearance }
     TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, config.menuBar)
     updateTrayText()
     ShortcutSettingsModel.shared.reload()

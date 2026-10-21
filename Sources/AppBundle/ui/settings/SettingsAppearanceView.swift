@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ShortcutAppearanceSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
+    @SettingsDraft("appearance", load: { config.appearance }) private var appearance: AppAppearance
     @SettingsDraft("menu-bar.indicator", load: { config.menuBar.indicator }) private var menuBarIndicator: MenuBarIndicator
     @SettingsDraft("menu-bar.icon-appearance", load: { config.menuBar.iconAppearance }) private var menuBarIconAppearance: MenuBarIconAppearance
     @SettingsDraft("workspace-sidebar.chrome-style", load: { config.workspaceSidebar.chromeStyle }) private var chromeStyle: ChromeStyle
@@ -28,6 +29,13 @@ struct ShortcutAppearanceSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Shared style") {
+                SettingsPicker("Theme", id: "appearance", selection: $appearance,
+                               help: "Apply System, Light or Dark to WinMuxX windows, the sidebar, palette, workspace overview and tab groups.") {
+                    Text("System").tag(AppAppearance.system)
+                    Text("Light").tag(AppAppearance.light)
+                    Text("Dark").tag(AppAppearance.dark)
+                } onChange: { persist(nil, "appearance", "'\(appearance.rawValue)'") }
+
                 SettingsPicker("Shared appearance", id: "workspace-sidebar.chrome-style", selection: $chromeStyle,
                                help: "Choose the shared appearance for the sidebar, tab groups and switcher.") {
                     Text("Liquid Glass").tag(ChromeStyle.liquidGlass)

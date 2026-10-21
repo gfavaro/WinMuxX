@@ -20,7 +20,7 @@ struct WorkspaceSidebarScopeSegmentedControl: NSViewRepresentable {
 
     func updateNSView(_ control: NSSegmentedControl, context: Context) {
         context.coordinator.parent = self
-        control.appearance = NSAppearance(named: context.environment.workspaceSidebarAppearance == .custom || context.environment.colorScheme == .dark ? .darkAqua : .aqua)
+        control.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
         control.segmentCount = scopes.count
         for (index, scope) in scopes.enumerated() {
             control.setLabel(scope.id == workspaceSidebarFocusedScopeId ? "Focus" : scope.displayName, forSegment: index)

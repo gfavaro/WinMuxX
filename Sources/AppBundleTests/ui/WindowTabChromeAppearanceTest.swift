@@ -13,6 +13,9 @@ final class WindowTabChromeAppearanceTest: XCTestCase {
             groupFrame: CGRect(x: 0, y: 0, width: 300, height: 208),
             activeWindowId: 1, activeWindowCornerRadius: 12, tabs: [], occludingFloatingWindowFrames: [])
         let initial = WindowTabGroupChromeContent(strip: strip)
+        config.appearance = .dark
+        XCTAssertNotEqual(initial, WindowTabGroupChromeContent(strip: strip))
+        config.appearance = previous.appearance
         config.workspaceSidebar.solidChromeCustomColor = "#123456"
         let custom = WindowTabGroupChromeContent(strip: strip)
         XCTAssertNotEqual(initial, custom)

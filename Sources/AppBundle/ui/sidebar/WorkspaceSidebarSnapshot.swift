@@ -38,6 +38,7 @@ struct WorkspaceSidebarConfiguration: Equatable {
     var showsDate: Bool
     var showsWeekday: Bool
     var showsStatusPills: Bool
+    var theme: AppAppearance = .system
     var appearance: WorkspaceSidebarAppearance = .system
     var background: WorkspaceSidebarBackground = .sidebar
     var position: WorkspaceSidebarPosition = .left

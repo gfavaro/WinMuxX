@@ -2,12 +2,11 @@ import AppKit
 import SwiftUI
 
 struct ChromeAppearanceInputs {
+    var theme: AppAppearance = .system
     var appearance: WorkspaceSidebarAppearance = .system
     var solidColor: Color = .black
     var tint: WorkspaceSidebarFrostedTint = .automatic
     var systemScheme: ColorScheme = .light
-    var menuBarScheme: ColorScheme?
-    var wallpaperTone: WorkspaceSidebarWallpaperTone?
     var reduceTransparency = false
     var increasedContrast = false
 }
@@ -23,10 +22,10 @@ struct ResolvedChromeAppearance: Equatable {
 
 func resolveChromeAppearance(inputs: ChromeAppearanceInputs) -> ResolvedChromeAppearance {
     let custom = inputs.appearance == .custom
+    // Theme is independent of wallpaper and decorative tint. Custom solid colors
+    // retain a contrasting foreground even when the selected theme differs.
     let scheme = custom ? workspaceSidebarSolidColorScheme(inputs.solidColor)
-        : inputs.tint.preferredColorScheme ?? (inputs.reduceTransparency ? inputs.systemScheme
-            : workspaceSidebarResolvedColorScheme(menuBarColorScheme: inputs.menuBarScheme,
-                wallpaperTone: inputs.wallpaperTone, systemColorScheme: inputs.systemScheme))
+        : inputs.theme.colorScheme(system: inputs.systemScheme)
     return ResolvedChromeAppearance(material: custom ? .solid : inputs.reduceTransparency ? .opaque : .glass,
         scheme: scheme,
         fill: custom ? inputs.solidColor : inputs.reduceTransparency
@@ -36,10 +35,20 @@ func resolveChromeAppearance(inputs: ChromeAppearanceInputs) -> ResolvedChromeAp
 }
 
 extension WorkspaceSidebarConfiguration {
-    func chromeAppearance(systemScheme: ColorScheme, wallpaperTone: WorkspaceSidebarWallpaperTone? = nil,
+    func chromeAppearance(systemScheme: ColorScheme,
                           reduceTransparency: Bool, increasedContrast: Bool = false) -> ResolvedChromeAppearance {
-        resolveChromeAppearance(inputs: ChromeAppearanceInputs(appearance: appearance,
+        resolveChromeAppearance(inputs: ChromeAppearanceInputs(theme: theme, appearance: appearance,
             solidColor: resolvedSolidChromeColor, tint: frostedTint, systemScheme: systemScheme,
-            wallpaperTone: wallpaperTone, reduceTransparency: reduceTransparency, increasedContrast: increasedContrast))
+            reduceTransparency: reduceTransparency, increasedContrast: increasedContrast))
+    }
+}
+
+extension AppAppearance {
+    func colorScheme(system: ColorScheme) -> ColorScheme {
+        switch self {
+            case .system: system
+            case .light: .light
+            case .dark: .dark
+        }
     }
 }

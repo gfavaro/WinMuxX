@@ -12,7 +12,7 @@ struct WorkspaceSidebarView: View {
         workspaceSidebarSolidColorScheme(snapshot.configuration.resolvedSolidChromeColor)
     }
     var sidebarColors: WorkspaceSidebarPalette {
-        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : colorScheme)
+        WorkspaceSidebarPalette(appearance: snapshot.configuration.appearance, increasedContrast: sidebarContrast == .increased || previewAccessibility.increasedContrast, colorScheme: snapshot.configuration.appearance == .custom ? solidColorScheme : snapshot.configuration.theme.colorScheme(system: colorScheme))
     }
     let snapshot: WorkspaceSidebarSnapshot
     let actions: WorkspaceSidebarActions
@@ -94,7 +94,7 @@ struct WorkspaceSidebarView: View {
             if reduceMotion { transaction.animation = nil }
         }
         .environment(\.workspaceSidebarAppearance, snapshot.configuration.appearance)
-        .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme))
+        .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme, theme: snapshot.configuration.theme))
         .onChange(of: snapshot.visibleWidth) { visibleWidth in
             if visibleWidth <= collapsedWidth + 0.5 {
                 resetTransientSidebarState()

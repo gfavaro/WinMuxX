@@ -331,8 +331,10 @@ final class WorkspaceSidebarMaterialContainer: NSView {
             let systemScheme: ColorScheme = contentColorScheme ??
                 (NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light)
             let resolved = configuration.chromeAppearance(systemScheme: systemScheme,
-                wallpaperTone: wallpaperTone, reduceTransparency: reduceTransparency())
+                reduceTransparency: reduceTransparency())
             appearance = NSAppearance(named: resolved.scheme == .dark ? .darkAqua : .aqua)
+        } else if system, configuration.theme != .system {
+            appearance = configuration.theme.nativeAppearance
         } else if system, !reduceTransparency(), let scheme = contentColorScheme ?? wallpaperTone?.colorScheme {
             appearance = NSAppearance(named: scheme == .dark ? .darkAqua : .aqua)
         } else { appearance = nil }
