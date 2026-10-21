@@ -67,7 +67,6 @@ final class WorkspaceNamingTest: XCTestCase {
     }
 
     func testFixedWorkspacesAllowOnlyOneAdjacentTransientBlank() throws {
-        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
         materializePersistedWorkspaces()
         let fixed = Workspace.get(byName: "5")
@@ -83,7 +82,6 @@ final class WorkspaceNamingTest: XCTestCase {
     }
 
     func testFixedWorkspaceNumbersRemainStableAlongsideAutomaticWorkspaces() {
-        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["1", "2", "3", "4", "5"]
         materializePersistedWorkspaces()
         Workspace.get(byName: "2").markAsAutomaticallyNamed()
@@ -101,7 +99,6 @@ final class WorkspaceNamingTest: XCTestCase {
     }
 
     func testSidebarNumbersIncludeEmptyPersistentWorkspaces() {
-        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = ["1", "2"]
         materializePersistedWorkspaces()
         let first = Workspace.get(byName: "1")
@@ -274,7 +271,6 @@ final class WorkspaceNamingTest: XCTestCase {
     }
 
     func testDeletingRestoredWorkspaceFiveRenumbersSixInSidebar() async throws {
-        config.minimumWorkspaceCount = nil
         config.persistentWorkspaces = []
         let workspaces = (1...6).map { number in
             let workspace = Workspace.get(byName: String(number))

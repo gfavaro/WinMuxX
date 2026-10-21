@@ -216,9 +216,6 @@ func shortcutSettingsWorkspaceNumbers() -> [String] {
     }
 }
 
-func minimumWorkspaceCountConfigEdits(_ count: Int) -> [SettingsConfigEdit] {
-    [.init(section: nil, key: "minimum-workspace-count", renderedValue: String(count))]
-}
 
 func workspaceCommand(_ workspaceName: String, kind: ShortcutSettingsModel.WorkspaceShortcutKind) -> String {
     switch kind {

@@ -82,12 +82,12 @@ final class SettingsPersistenceRegressionTest: XCTestCase {
         window-tabs.enabled = true
         """
         let updated = applyingSettingsConfigEdits([
-            .init(section: nil, key: "minimum-workspace-count", renderedValue: "0"),
+            .init(section: "menu-bar", key: "indicator", renderedValue: "'workspace'"),
             .init(section: nil, key: "persistent-workspaces", renderedValue: nil),
         ], to: original)
         let parsed = parseConfig(updated)
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
-        XCTAssertEqual(parsed.config.minimumWorkspaceCount, 0)
+        XCTAssertEqual(parsed.config.menuBar.indicator, .workspace)
         XCTAssertTrue(parsed.config.persistentWorkspaces.isEmpty)
         XCTAssertTrue(parsed.config.windowTabs.enabled)
         XCTAssertTrue(updated.contains("# named slot"))

@@ -32,8 +32,8 @@ final class WorkspacePresentationOrderTest: WorkspaceTestCase {
         await assertLiveOrderAfterRemoval()
     }
 
-    func testRemovingEmptyWorkspaceKeepsDisplayOrderWithConfiguredMinimum() async {
-        config.minimumWorkspaceCount = 5
+    func testRemovingEmptyWorkspaceKeepsDisplayOrderWithPersistentSlotsInAnotherProject() async {
+        config.persistentWorkspaces = ["keep"]
         await assertLiveOrderAfterRemoval()
     }
 

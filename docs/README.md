@@ -31,3 +31,5 @@ guides above for today's settings and development workflow.
 - [Simplification review](SIMPLIFY_REVIEW.md)
 - [Window motion](WINDOW_MOTION.md)
 - [Plano de limpeza e controles nativos](CODE_HEALTH_NATIVE_UI_PLAN.md)
+
+- [Configuration and migration](CONFIGURATION.md): TOML preferences, persistent workspace names and legacy preference import.

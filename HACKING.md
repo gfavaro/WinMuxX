@@ -93,7 +93,7 @@ binding, including across suspension. Deferred work can use `runtime.task` to re
 its originating binding. A Workspace is used within its runtime binding; IDs are
 unique within a registry, while object equality remains identity. Legacy serial
 fixtures replace the runtime as a unit. Native window registries, UI singletons,
-refresh scheduling and persistence adapters still have process lifetimes, so this
+persistence adapters and UI singletons still have process lifetimes, so this
 does not make the complete suite parallel-safe. Do not replace production runtime
 state or alter AX/multitouch thread ownership to simplify a test.
 
@@ -121,7 +121,9 @@ Settings navigation lives in `ui/settings/ShortcutSettingsView.swift`. Each conf
 pane has a `Settings*View.swift` file; controls and TOML persistence are shared in
 `SettingsControls.swift` and `SettingsConfigPersistence.swift`. A TOML edit is
 validated, written, reloaded and reflected through the settings model. Menu-bar
-preferences use UserDefaults and publish through TrayMenuModel. Add controls to
+preferences use `[menu-bar]` in TOML and publish through TrayMenuModel. Double-sided
+windows use `[window-tabs].double-sided-windows`. UserDefaults is restricted to
+session/cache data and one-time legacy preference import. Add controls to
 the destination used by navigation, not to a detached alternative screen.
 
 The sidebar panel controller owns panel instances and monitor-local models. Its

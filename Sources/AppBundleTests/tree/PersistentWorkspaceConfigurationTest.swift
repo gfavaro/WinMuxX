@@ -4,9 +4,10 @@ import XCTest
 
 @MainActor
 final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
-    func testPersistentArrayOrderNamesAndMinimumSlotsIgnoreOldNamingMetadata() async throws {
-        config.minimumWorkspaceCount = 6
+    func testPersistentArrayOrderAndNamesIgnoreOldNamingMetadata() async throws {
         config.persistentWorkspaces = ["7", "1", "Code", "3"]
+        materializePersistedWorkspaces()
+        _ = Workspace.get(byName: "7").focusWorkspace()
         Workspace.reconcileWorkspaceState()
         for name in config.persistentWorkspaces {
             let workspace = try XCTUnwrap(Workspace.existing(byName: name))
@@ -14,13 +15,13 @@ final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
             workspace.restoredDisplayIndex = 99
         }
         let spaces = orderedUserFacingWorkspaces(in: workspaceProjectDefaultId)
-        XCTAssertEqual(spaces.count, 6)
+        XCTAssertEqual(spaces.count, 4)
         XCTAssertEqual(spaces.prefix(4).map(\.name), ["7", "1", "Code", "3"])
         XCTAssertEqual(spaces.map { workspaceDisplayName($0.name) },
-            ["Workspace 7", "Workspace 1", "Code", "Workspace 3", "Workspace 2", "Workspace 4"])
+            ["Workspace 7", "Workspace 1", "Code", "Workspace 3"])
         let rows = await buildWorkspaceSidebarWorkspaceViewModels(currentFocus: focus, workspaceLabels: [:], availableMonitors: monitors)
         XCTAssertEqual(rows.filter { $0.projectId == workspaceProjectDefaultId }.map(\.displayName),
-            ["Workspace 7", "Workspace 1", "Code", "Workspace 3", "Workspace 2", "Workspace 4"])
+            ["Workspace 7", "Workspace 1", "Code", "Workspace 3"])
         for _ in 0..<3 { Workspace.reconcileWorkspaceState() }
         XCTAssertEqual(orderedUserFacingWorkspaces(in: workspaceProjectDefaultId).map(\.id), spaces.map(\.id))
         try renameWorkspaceForSidebar(workspaceName: "1", displayName: "Browser")
@@ -33,7 +34,6 @@ final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
     }
 
     func testAdjacentAutomaticSlotUsesFirstUnreservedNumber() throws {
-        config.minimumWorkspaceCount = 4
         config.persistentWorkspaces = ["1", "3", "5", "7"]
         Workspace.reconcileWorkspaceState()
         let current = try XCTUnwrap(Workspace.existing(byName: "1"))
@@ -45,9 +45,10 @@ final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
     }
 
     func testSparsePersistentNumbersAndAutomaticGapsResolveForFocusAndMoves() async throws {
-        config.minimumWorkspaceCount = 5
         config.persistentWorkspaces = ["1", "3", "5", "7"]
         Workspace.reconcileWorkspaceState()
+        let added = createBlankWorkspace(projectId: workspaceProjectDefaultId, monitor: mainMonitor)
+        _ = TestWindow.new(id: 9819, parent: added.rootTilingContainer)
         for number in [1, 2, 3, 5, 7] {
             let expected = try XCTUnwrap(orderedUserFacingWorkspaces(in: workspaceProjectDefaultId).first {
                 workspacePresentationDisplayIndex($0) == number
@@ -63,15 +64,15 @@ final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
         let moved = try await parseCommand("move-node-to-workspace 2").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(moved.exitCode, 0)
         XCTAssertTrue(window.nodeWorkspace === dynamic)
-        config.minimumWorkspaceCount = 0
         Workspace.reconcileWorkspaceState()
         XCTAssertTrue(config.persistentWorkspaces.allSatisfy { Workspace.existing(byName: $0)?.isConfiguredPersistent == true })
         XCTAssertTrue(window.nodeWorkspace === dynamic)
     }
 
-    func testPersistentEmptySlotsSurviveZeroMinimum() {
-        config.minimumWorkspaceCount = 0
+    func testPersistentEmptySlotsSurviveWithoutAMinimum() {
         config.persistentWorkspaces = ["Browser", "Code"]
+        materializePersistedWorkspaces()
+        _ = Workspace.get(byName: "Browser").focusWorkspace()
         Workspace.reconcileWorkspaceState()
         XCTAssertEqual(orderedUserFacingWorkspaces(in: workspaceProjectDefaultId).map(\.name), ["Browser", "Code"])
         XCTAssertTrue(Workspace.all.allSatisfy(\.isEffectivelyEmpty))
@@ -88,20 +89,19 @@ final class PersistentWorkspaceConfigurationTest: WorkspaceTestCase {
         XCTAssertTrue(focus.workspace === fixture.spaces[1])
     }
 
-    func testSavingMinimumInSettingsPreservesPersistentArrayAndComments() {
+    func testSavingAppearancePreservesPersistentArrayAndComments() {
         let original = """
         config-version = 2
         persistent-workspaces = [
             "7", # primary task
             "Code"
         ]
-        minimum-workspace-count = 5
         """
-        let updated = applyingSettingsConfigEdits(minimumWorkspaceCountConfigEdits(0), to: original)
+        let updated = applyingSettingsConfigEdits([.init(section: "menu-bar", key: "indicator", renderedValue: "'workspace'")], to: original)
         let parsed = parseConfig(updated)
         XCTAssertTrue(parsed.errors.isEmpty)
         XCTAssertEqual(Array(parsed.config.persistentWorkspaces), ["7", "Code"])
-        XCTAssertEqual(parsed.config.minimumWorkspaceCount, 0)
+        XCTAssertEqual(parsed.config.menuBar.indicator, .workspace)
         XCTAssertTrue(updated.contains("# primary task"))
     }
 }

@@ -75,7 +75,6 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         rearrangeWorkspacesOnMonitors()
         reconcileSecondaryWorkspaceAssignments()
         ensureMinimumWorkspaceForAllProjects()
-        ensureConfiguredMinimumWorkspaces()
         pruneEmptyWorkspaces()
         clearOrphanedWorkspaceSidebarLabels()
         ensureVisibleActiveProjectWorkspaces()

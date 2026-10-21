@@ -162,10 +162,9 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace) {
 @MainActor
 func pruneEmptyWorkspaces() {
     let retainedEmptyWorkspaceIds = retainedEmptyWorkspaceIdsByScope()
-    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     let focusedWorkspaceBeforePrune = focus.workspace
     let workspacesToRemove = Workspace.all.filter {
-        !workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) && !minimumWorkspaceIds.contains($0.id)
+        !workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds)
     }
     var focusedReplacement: Workspace?
 
@@ -206,23 +205,8 @@ func workspaceShouldSurviveReconciliation(
     retainedEmptyWorkspaceIds: [WorkspaceScope: WorkspaceId],
 ) -> Bool {
     guard !workspace.isArchived else { return false }
-    if workspace.isConfiguredPersistent { return true }
-    if config.minimumWorkspaceCount != nil {
-        // Saved assignments and spare empty slots are not live windows. Only
-        // minimum retention may keep them, apart from required project/display slots.
-        return workspaceHasLifecycleWindows(workspace) ||
-            (!isUnitTest && !isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
-            projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived }.count == 1 ||
-            (workspace.isVisible && !Workspace.all.contains {
-                $0 !== workspace && (workspaceHasLifecycleWindows($0) || $0.isConfiguredPersistent) &&
-                    $0.projectId == workspace.projectId &&
-                    workspaceIsAvailableForMonitor($0, monitor: workspace.workspaceMonitor)
-            })
-    }
-    return workspace.isVisible ||
-        workspaceHasLifecycleWindows(workspace) ||
-        workspace.isConfiguredPersistent ||
-        workspaceHasPendingRestartWindows(workspace.name) ||
+    return workspace.isVisible || workspaceHasLifecycleWindows(workspace) || workspace.isConfiguredPersistent ||
+        (!isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
         projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived }.count == 1 ||
         retainedEmptyWorkspaceIds[WorkspaceScope(projectId: workspace.projectId)] == workspace.id
 }
@@ -233,10 +217,8 @@ func replacementWorkspaceForPrunedWorkspace(
     retainedEmptyWorkspaceIds: [WorkspaceScope: WorkspaceId],
 ) -> Workspace? {
     let scope = WorkspaceScope(projectId: workspace.projectId)
-    let minimumWorkspaceIds = minimumWorkspaceRetentionIds()
     if let retainedWorkspaceId = retainedEmptyWorkspaceIds[scope],
        retainedWorkspaceId != workspace.id,
-       config.minimumWorkspaceCount == nil || minimumWorkspaceIds.contains(retainedWorkspaceId),
        let retainedWorkspace = runtime.workspaces.workspaceById[retainedWorkspaceId],
        workspaceIsAvailableForMonitor(retainedWorkspace, monitor: workspace.workspaceMonitor)
     {
@@ -244,8 +226,8 @@ func replacementWorkspaceForPrunedWorkspace(
     }
     if let candidate = orderedWorkspaces(in: scope).first(where: {
         $0.id != workspace.id &&
-            (workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) || minimumWorkspaceIds.contains($0.id)) &&
-            (workspaceHasSidebarVisibleWindows($0) || $0.isConfiguredPersistent || minimumWorkspaceIds.contains($0.id)) &&
+            workspaceShouldSurviveReconciliation($0, retainedEmptyWorkspaceIds: retainedEmptyWorkspaceIds) &&
+            (workspaceHasSidebarVisibleWindows($0) || $0.isConfiguredPersistent) &&
             workspaceIsAvailableForMonitor($0, monitor: workspace.workspaceMonitor)
     }) {
         return candidate

@@ -42,7 +42,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.experimentalUISettings.iconAppearance, indicator: model.experimentalUISettings.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
         if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name { return }
         lastIconState = state
         if model.isEnabled && state.indicator == .workspace {
@@ -59,7 +59,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" : "WinMux disabled")
         let image: NSImage?
         if model.isEnabled {
-            let monochrome = model.experimentalUISettings.iconAppearance != .color
+            let monochrome = model.menuBarConfiguration.iconAppearance != .color
             image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
             image?.isTemplate = monochrome
         } else {

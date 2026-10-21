@@ -185,7 +185,6 @@ struct ShortcutCategoryView: View {
     @SettingsDraft("modifiers.shift", load: { config.modifierSides.shift.rawValue }) private var shiftSide: String
     @SettingsDraft("workspace-sidebar.project-deletion-action", load: { config.workspaceSidebar.projectDeletionAction }) private var projectDeletionAction: WorkspaceProjectDeletionAction
     @SettingsDraft("persistent-workspaces", load: { config.persistentWorkspaces.joined(separator: ", ") }) private var persistentWorkspaces: String
-    @SettingsDraft("minimum-workspace-count", load: { config.effectiveMinimumWorkspaceCount }) private var minimumWorkspaceCount: Int
 
     var body: some View {
         let searching = !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -207,14 +206,7 @@ struct ShortcutCategoryView: View {
                         persistSettingsConfig(section: nil, key: "persistent-workspaces",
                             renderedValue: tomlCommaSeparatedStringArray(persistentWorkspaces), model: model)
                     }
-                    SettingsStepper("Minimum workspace count", id: "minimum-workspace-count", value: $minimumWorkspaceCount,
-                        range: 0...Int.max, help: "Keep at least this many workspaces across all projects. 0 disables the configured minimum.", unit: "") {
-                        saveMinimumWorkspaceCount()
-                    }
-                    SettingsDescription("Each project and active display still keeps its required workspace. Occupied workspaces count toward this minimum.")
-                    if !config.persistentWorkspaces.isEmpty {
-                        SettingsDescription("Persistent workspaces stay available even when empty and count toward this minimum. Their configured names and order are preserved.")
-                    }
+                    SettingsDescription("Persistent workspaces keep their configured order and names. Other empty workspaces close automatically; each project and display keeps a usable workspace.")
                 }
                 Section("Projects") {
                     SettingsPicker("Deleting projects", id: "workspace-sidebar.project-deletion-action", selection: $projectDeletionAction,
@@ -282,10 +274,7 @@ struct ShortcutCategoryView: View {
         }
     }
 
-    private func saveMinimumWorkspaceCount() {
-        model.activeSettingTitle = "Workspaces to keep"
-        persistSettingsConfigEdits(minimumWorkspaceCountConfigEdits(minimumWorkspaceCount), model: model)
-    }
+
 
 }
 

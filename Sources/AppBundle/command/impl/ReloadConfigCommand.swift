@@ -139,6 +139,8 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
 /// reload rather than individual Settings controls, so GUI edits, config-editor saves, and
 /// filesystem auto-reloads share the same live-update behavior.
 @MainActor private func applyReloadedConfigurationToRunningApp() {
+    TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, config.menuBar)
+    updateTrayText()
     ShortcutSettingsModel.shared.reload()
     WorkspaceSidebarPanel.refreshAll()
     WindowTabStripPanelController.shared.refresh()

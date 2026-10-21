@@ -27,7 +27,7 @@ These are the defaults and features maintained here:
 - Dwindle is the default layout, with built-in window borders enabled.
 - A single tiled window has a configurable width limit and alignment on ultrawide
   displays; manual width resizing is respected.
-- A global minimum keeps workspaces available without maintaining a list of names.
+- `persistent-workspaces` keeps the named slots you choose, in the configured order.
 - Settings has separate Sidebar and Appearance pages, accessible controls, and
   animated spacing previews.
 - Sidebar, tab groups and the switcher share glass or solid styling. Expanded glass
@@ -55,7 +55,7 @@ Transparency, and increased contrast.
 | Page | Options |
 | --- | --- |
 | General | Start at login and automatic configuration reload |
-| Workspaces | Minimum quantity, project deletion behavior and workspace shortcuts |
+| Workspaces | Persistent workspace names/order, project deletion behavior and workspace shortcuts |
 | Windows | New-window behavior, layout, ultrawide ratio/alignment, pointer focus and tab strips |
 | Sidebar | Visibility, placement, widths, display mode, clock and status content |
 | Appearance | Shared glass/solid style, menu-bar indicator, motion, spacing and borders |
@@ -67,7 +67,10 @@ Settings apply through configuration reload. Your drafts stay in place when you
 switch pages or reload; if saving fails, you can retry the same edit. The editor
 preserves dotted TOML properties, table sections, comments and multiline monitor
 rules.
-Menu-bar and double-sided window preferences are stored locally in UserDefaults.
+TOML stores all behavior and appearance preferences, including the menu bar and
+double-sided windows. Settings writes the same file and reloads it. Window placement,
+learned application sizes and the last-opened Settings page remain local session data.
+See [configuration and migration](docs/CONFIGURATION.md).
 
 ## How it works
 
@@ -75,7 +78,7 @@ Menu-bar and double-sided window preferences are stored locally in UserDefaults.
 
 One tiled window is centered at a maximum 3:2 ratio on ultrawide screens
 (screen width/height at least 2.3). The limit applies only when the workspace has
-one available window; an extra floating window prevents it. Minimized windows,
+one tiled window; floating windows do not count. Minimized windows,
 hidden apps and popups do not count. Tab groups and WinMuxX fullscreen bypass
 the limit. The available area accounts for the sidebar and
 outer gaps; known application minimum widths take priority.
@@ -154,7 +157,13 @@ reduce the mandatory system reservation.
 Settings → Appearance → Menu bar offers Icon or Workspace. Workspace follows the
 focused monitor and shows the label initial, or the workspace number when there
 is no label. Icon supports color or monochrome appearance. Both open the same
-native action menu. These choices persist locally, outside the TOML config.
+native action menu. Settings saves these choices to TOML:
+
+```toml
+[menu-bar]
+indicator = 'icon'          # icon or workspace
+icon-appearance = 'color'  # color or monochrome
+```
 
 ### Layout for the next window
 
@@ -241,46 +250,33 @@ the fallback follows the current position in the project's presented list.
 Renaming in the sidebar saves the custom label to TOML. Internal workspace IDs
 remain unchanged.
 
-Settings → Workspaces → Workspaces to keep sets a minimum total across all
-projects. The default is **1**; **0** disables the configured minimum:
-
-```toml
-minimum-workspace-count = 1
-```
-
-Occupied workspaces count. Each project and active display retains its required
-workspace even with a minimum of zero. Existing empty slots are reused; missing
-slots are created in the default project without changing focus. Reducing the
-minimum allows excess empty slots to be collected.
-
-With an explicit minimum, saved restart assignments do not keep additional empty
-workspaces alive after startup. Only live windows, the minimum empty slots, and
-required display/project slots retain a workspace. Minimized and hidden windows
-still count as live windows.
-
-Restart restoration uses the latest saved placement of each window from a verified
-app process. Older copies of the same window do not compete with its current
-placement when its title changes. Window IDs from different process launches
-remain separate.
-After you explicitly select a workspace, apps launched afterward open in your
-current workspace instead of returning to an old saved destination. Windows of
-apps already running remain eligible for restart restoration.
-
-Use `persistent-workspaces` to keep specific slots in array order, followed by
-automatic slots. This works together with the minimum; saving the count in
-Settings preserves the array. For example:
+Settings → Workspaces → Persistent workspaces saves the names to keep, in array
+order. Other empty workspaces are collected when no longer needed. Each project
+and active display retains a usable workspace, and a temporary blank can stay
+visible while you open a window there.
 
 ```toml
 persistent-workspaces = ["1", "3", "5", "7"]
-minimum-workspace-count = 5
 ```
 
-The sidebar shows Workspace 1, Workspace 3, Workspace 5, Workspace 7, then an
-automatic Workspace 2. Numeric workspace commands match those displayed numbers.
-The four persistent slots remain even if the minimum is reduced to zero.
-Named entries such as `"Code"` keep their name and can be selected with
-`workspace Code`. Custom TOML labels override their display names without changing
-their internal names or shortcut targets.
+The sidebar lists Workspace 1, Workspace 3, Workspace 5 and Workspace 7 in that
+order. A newly created automatic workspace uses the first unreserved number,
+Workspace 2. Numeric workspace commands match those displayed numbers. Named
+entries such as `"Code"` keep their name; use `workspace --name Code` to select the
+internal name explicitly. Custom labels override display names without changing
+internal names or shortcut targets.
+
+`minimum-workspace-count` is removed. Startup converts an older count to explicit
+persistent names and saves a backup. Existing names and their order are preserved;
+missing slots receive the first unused positive numeric names. There is no ongoing
+count-based creation or retention. See [migration details](docs/CONFIGURATION.md).
+
+Saved restart assignments protect workspaces while startup is rebuilding their
+windows. After startup, stale assignments alone cannot retain an empty workspace.
+Live minimized and hidden windows still protect their owning workspaces.
+After you explicitly select a workspace, apps launched afterward open there
+instead of returning to an old saved destination. Windows of apps already running
+remain eligible for restart restoration.
 
 ### Projects
 
@@ -398,7 +394,7 @@ Drag a tab into another window's [intent zone](#managed-tiling-mode) or move it 
 another workspace through the sidebar.
 
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
-keeps the group as overlapping windows with offsets. Double-sided windows replaces
+keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace
 the strip for two-window groups when enabled; three or more windows continue to
 use tabs. Option-click or Option-Tab flips between the two sides. This preference
 requires Show tab strips and Screen Recording access, and respects Reduce Motion.
@@ -442,8 +438,8 @@ enable-shake-to-toggle-tiling = false
 
 ### Workspace navigation
 
-Empty workspaces are collected when no longer needed. The configured minimum,
-legacy persistent names, and active display/project requirements keep the
+Empty workspaces are collected when no longer needed. Explicit persistent names,
+a visible temporary blank and active display/project requirements keep the
 workspaces that still need to exist. Numeric workspace arguments are display positions; use `workspace --name <name>` to
 select an internal workspace name directly.
 

@@ -166,8 +166,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         // Equality-guarded: this runs several times per refresh session, and each unguarded
         // @Published write would invalidate the whole sidebar SwiftUI tree even when nothing
         // changed. workspaceSidebarVisibleWidth/isWorkspaceSidebarExpanded are panel-local and
-        // never synced. experimentalUISettings is stateless (reads UserDefaults live) and only
-        // the native menu bar observes it, so it isn't synced either.
+        // never synced. Menu-bar configuration belongs to the shared native menu model.
         viewModel.setIfChanged(\.isEnabled, TrayMenuModel.shared.isEnabled)
         viewModel.setIfChanged(\.workspaces, TrayMenuModel.shared.workspaces)
         viewModel.setIfChanged(\.workspaceSidebarWorkspaces, TrayMenuModel.shared.workspaceSidebarWorkspaces)

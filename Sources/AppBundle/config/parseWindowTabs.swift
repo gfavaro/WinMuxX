@@ -1,6 +1,7 @@
 import TOMLKit
 
 private let windowTabsParser: [String: any ParserProtocol<WindowTabsConfig>] = [
+    "double-sided-windows": Parser(\.doubleSidedWindows, parseBool),
     "enabled": Parser(\.enabled, parseBool),
     "height": Parser(\.height, parseWindowTabsHeight),
 ]

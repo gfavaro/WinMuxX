@@ -28,7 +28,7 @@ public final class TrayMenuModel: ObservableObject {
     @Published var workspaceSidebarVisibleWidth: CGFloat = 0
     @Published var workspaceSidebarTopPadding: CGFloat = 12
     @Published var workspaceSidebarHoveredWorkspaceName: String? = nil
-    @Published var experimentalUISettings: ExperimentalUISettings = ExperimentalUISettings()
+    @Published var menuBarConfiguration = MenuBarConfig()
 
     var visibleWorkspaceSidebarWorkspaces: [WorkspaceSidebarWorkspaceViewModel] {
         workspaceSidebarWorkspaces.filter {

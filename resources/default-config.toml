@@ -1,7 +1,5 @@
-# Minimum total across all projects; 0 disables the configured minimum.
-# Active monitors and every project still retain their required workspaces.
-minimum-workspace-count = 1
-# Stable workspace names in sidebar order; kept even when empty, alongside the minimum.
+# Stable workspace names in sidebar order. These slots remain available when empty.
+# Other empty workspaces are collected after use; displays/projects retain a usable slot.
 persistent-workspaces = []
 
 # Center a lone tiled window on screens with width/height >= 2.3.
@@ -16,7 +14,7 @@ config-version = 2
 # Use the menu's Open Config / Diagnostics actions to locate the loaded file.
 # Menu actions display only shortcuts configured for the active mode.
 # Diagnostics, manual crash recovery and session-local minimum-size observation
-# do not require additional TOML options. Learned minima do not constrain layout yet.
+# do not require additional TOML options. Learned minimum sizes are session data.
 
 start-at-login = false
 # Reset workspace placement at launch; explicit assignments still apply.
@@ -238,3 +236,8 @@ enabled = false
 reverse-direction = false
 # Finger-tracked preview; release past halfway to commit. Zero disables visuals.
 animation-duration-ms = 220
+
+# Menu bar appearance. Settings edits these same values.
+[menu-bar]
+    indicator = 'icon' # icon or workspace
+    icon-appearance = 'color' # color or monochrome

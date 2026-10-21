@@ -11,7 +11,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
-    @State private var doubleSidedWindows = ExperimentalUISettings().doubleSidedWindows
+    @SettingsDraft("window-tabs.double-sided-windows", load: { config.windowTabs.doubleSidedWindows }) private var doubleSidedWindows: Bool
     @SettingsDraft("automatically-tile-new-windows", load: { config.automaticallyTileNewWindows }) private var automaticallyTileNewWindows: Bool
     @SettingsDraft("auto-add-new-windows-to-tab-group", load: { config.autoAddNewWindowsToTabGroup }) private var autoAddNewWindowsToTabGroup: Bool
     @SettingsDraft("enable-shake-to-toggle-tiling", load: { config.enableShakeToToggleTiling }) private var enableShakeToToggleTiling: Bool
@@ -112,11 +112,11 @@ struct ShortcutBehaviorSettingsView: View {
                 .disabled(!tabEnabled)
 
 
-                SettingsToggle("Double-sided windows", id: "ui.double-sided-windows", isOn: $doubleSidedWindows, help: "Replace two-window tab strips with two sides. Option-click anywhere in the window or press Option-Tab to flip.") {
-                    var settings = ExperimentalUISettings()
-                    settings.doubleSidedWindows = doubleSidedWindows
-                    if doubleSidedWindows { requestScreenRecordingPermissionsIfNeeded() }
-                    scheduleRefreshSession(.menuBarButton)
+                SettingsToggle("Double-sided windows", id: "window-tabs.double-sided-windows", isOn: $doubleSidedWindows, help: "Replace two-window tab strips with two sides. Option-click anywhere in the window or press Option-Tab to flip.") {
+                    persistSettingsConfig(section: "window-tabs", key: "double-sided-windows",
+                        renderedValue: doubleSidedWindows ? "true" : "false", model: model) {
+                        if config.windowTabs.doubleSidedWindows { requestScreenRecordingPermissionsIfNeeded() }
+                    }
                 }
                 .disabled(!tabEnabled)
                 Text("Option-click anywhere in the window or press Option-Tab to flip between two windows. Three or more windows use tabs. Show tab strips must be enabled. When it is off, groups use overlapping windows with offsets. Rotation uses Screen Recording access and respects Reduce Motion.")

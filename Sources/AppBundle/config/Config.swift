@@ -64,8 +64,6 @@ struct Config: ConvenienceCopyable {
     var dragStackLayout: Layout = .tabGroup
     var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
-    var minimumWorkspaceCount: Int? = nil
-    var effectiveMinimumWorkspaceCount: Int { minimumWorkspaceCount ?? max(1, persistentWorkspaces.count) }
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
     var modifierSides = ModifierSides()
@@ -82,6 +80,7 @@ struct Config: ConvenienceCopyable {
     var singleWindowAspectRatio: DynamicConfigValue<Double> = .constant(1.5)
     var gaps: Gaps = .zero
     var workspaceSidebar = WorkspaceSidebarConfig()
+    var menuBar = MenuBarConfig()
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
     var animations = AnimationsConfig()
@@ -289,6 +288,7 @@ enum WorkspaceProjectDeletionAction: String, CaseIterable, Identifiable, Sendabl
 }
 
 struct WindowTabsConfig: ConvenienceCopyable, Equatable, Sendable {
+    var doubleSidedWindows: Bool = false
     var enabled: Bool = true
     var height: Int = 36
 }

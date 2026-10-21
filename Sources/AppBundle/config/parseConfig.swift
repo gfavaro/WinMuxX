@@ -80,11 +80,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
         }
     },
     "tab-group-padding": Parser(\.tabGroupPadding, parseInt),
-    "minimum-workspace-count": Parser(\.minimumWorkspaceCount) { raw, backtrace in
-        parseInt(raw, backtrace)
-            .filter(.semantic(backtrace, "Must be a non-negative integer")) { $0 >= 0 }
-            .map { Optional($0) }
-    },
     persistentWorkspacesKey: Parser(\.persistentWorkspaces, parsePersistentWorkspaces),
     "exec-on-workspace-change": Parser(\.execOnWorkspaceChange, parseArrayOfStrings),
     "exec": Parser(\.execConfig, parseExecConfig),
@@ -103,6 +98,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "workspace-swipe": Parser(\.workspaceSwipe, parseWorkspaceSwipe),
     "workspace-overview": Parser(\.workspaceOverview, parseWorkspaceOverview),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
+    "menu-bar": Parser(\.menuBar, parseMenuBar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
@@ -162,7 +158,7 @@ func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]
 @MainActor func parseConfig(_ rawToml: String) -> (config: Config, errors: [TomlParseError]) { // todo change return value to Result
     let rawTable: TOMLTable
     do {
-        rawTable = try TOMLTable(string: rawToml)
+        rawTable = try TOMLTable(string: migratingLegacyMinimumWorkspaceCount(in: rawToml))
     } catch let e as TOMLParseError {
         return (defaultConfig, [.syntax(e.debugDescription)])
     } catch let e {
