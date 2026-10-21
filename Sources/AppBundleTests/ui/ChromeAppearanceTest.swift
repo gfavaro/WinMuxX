@@ -88,7 +88,30 @@ final class ChromeAppearanceTest: XCTestCase {
 }
 
 @MainActor
-final class HelperChromeAppearanceTest: XCTestCase {
+final class HelperChromeAppearanceTest: WorkspaceTestCase {
+    func testNativeLayerAppearanceRefreshReusesLayersAndClearReleasesThem() throws {
+        let compositor = WindowResizePreviewCompositorView(frame: .init(x: 0, y: 0, width: 300, height: 200))
+        let item = WindowResizePreviewItem(id: 1, frame: .init(x: 0, y: 0, width: 300, height: 200),
+            appName: "Fixture", icons: [], isTabGroup: true, drawsFrameOnly: false, frameOnlyHeaderHeight: 20)
+        config.appearance = .light
+        compositor.update([item], presentation: .detailed)
+        let layer = try XCTUnwrap(compositor.layer?.sublayers?.first as? WindowResizePreviewItemLayer)
+        let light = layer.palette.fill
+        for _ in 0..<20 {
+            config.appearance = .dark
+            compositor.refreshAppearance()
+            XCTAssertTrue(compositor.layer?.sublayers?.first === layer)
+            XCTAssertNotEqual(layer.palette.fill, light)
+            config.appearance = .light
+            compositor.refreshAppearance()
+            XCTAssertEqual(layer.palette.fill, light)
+        }
+        compositor.clear()
+        XCTAssertTrue(compositor.layer?.sublayers?.isEmpty ?? true)
+        compositor.refreshAppearance()
+        XCTAssertTrue(compositor.layer?.sublayers?.isEmpty ?? true)
+    }
+
     func testLayerPaletteResolvesAllThemesAccessibilityAndCustomColor() {
         for theme in AppAppearance.allCases {
             for system in [ColorScheme.light, .dark] {
