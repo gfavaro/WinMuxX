@@ -125,7 +125,12 @@ final class WindowBorderController {
               let border = borders[windowId] else { return }
         var frame = CGRect.zero
         guard winmux_window_frame(windowId, &frame) else { return }
-        border.update(frame: frame, active: focus.windowOrNil?.windowId == windowId, settings: config.windowBorders)
+        guard let target = windowBorderTarget(for: window, nativeFrame: frame) else {
+            remove(windowId: windowId)
+            return
+        }
+        border.update(frame: target.frame, active: focus.windowOrNil?.windowId == windowId,
+            settings: config.windowBorders, corners: target.corners)
     }
     func refresh(nativeSnapshot: [[String: Any]]? = nil) {
         guard !isUnitTest else { return }
@@ -148,15 +153,17 @@ final class WindowBorderController {
                 if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
                 guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen,
                       let snapshot = frames[window.windowId], snapshot.width > 0, snapshot.height > 0 else { continue }
-                visible.insert(window.windowId)
                 // Overview thumbnails can have transformed bounds; native bounds
                 // retain the application's actual frame throughout the transition.
                 var nativeFrame = CGRect.zero
                 let hasNativeFrame = winmux_window_frame(window.windowId, &nativeFrame)
                 let frame = resolvedWindowBorderFrame(snapshot: snapshot, nativeFrame: hasNativeFrame ? nativeFrame : nil)
+                guard let target = windowBorderTarget(for: window, nativeFrame: frame) else { continue }
+                visible.insert(window.windowId)
                 let border = borders[window.windowId] ?? WindowBorder(target: window.windowId)
                 borders[window.windowId] = border
-                border.update(frame: frame, active: focus.windowOrNil?.windowId == window.windowId, settings: settings)
+                border.update(frame: target.frame, active: focus.windowOrNil?.windowId == window.windowId,
+                    settings: settings, corners: target.corners)
             }
         }
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
@@ -216,6 +223,7 @@ final class WindowBorder {
     private var nativeID: OpaquePointer?
     private var frame: CGRect?
     private var geometry: WindowBorderGeometry?
+    private var corners: WindowBorderCornerRadii?
     private var appearance: Appearance?
     private var scale: CGFloat = 0
     private var fallbackPanels: [WindowBorderFallbackPanel] = []
@@ -247,13 +255,14 @@ final class WindowBorder {
         fallbackPanels.forEach { $0.close() }
     }
 
-    func update(frame: CGRect, active: Bool, settings: WindowBordersConfig) {
+    func update(frame: CGRect, active: Bool, settings: WindowBordersConfig, corners: WindowBorderCornerRadii? = nil) {
+        let nextCorners = corners ?? .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius())
         let cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
                                 width: frame.width, height: frame.height)
         let center = CGPoint(x: cocoaFrame.midX, y: cocoaFrame.midY)
         let nextScale = NSScreen.screens.first(where: { $0.frame.contains(center) })?.backingScaleFactor ?? 2
         if !fallbackPanels.isEmpty {
-            updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+            updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale, corners: nextCorners)
             return
         }
         if nativeID == nil || scale != nextScale {
@@ -262,7 +271,7 @@ final class WindowBorder {
             guard createNativeBorder(Float(nextScale), &nativeID) else {
                 if let nativeID { destroyNativeBorder(nativeID) }
                 nativeID = nil
-                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale, corners: nextCorners)
                 return
             }
             scale = nextScale
@@ -270,16 +279,16 @@ final class WindowBorder {
             appearance = nil
         }
         let nextAppearance = Appearance(settings: settings, active: active)
-        if appearance == nextAppearance, self.frame == frame { return }
-        if appearance != nextAppearance || self.frame?.size != frame.size {
-            let radius = systemWindowCornerRadius()
+        if appearance == nextAppearance, self.frame == frame, self.corners == nextCorners { return }
+        if appearance != nextAppearance || self.frame?.size != frame.size || self.corners != nextCorners {
+            let radius = nextCorners.maximum
             let outerSize = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width)).size
-            let path = borderGeometry(size: outerSize, radius: radius, width: CGFloat(settings.width), scale: nextScale).path
+            let path = borderGeometry(size: outerSize, corners: nextCorners, width: CGFloat(settings.width), scale: nextScale).path
             guard updateNativeBorder(nativeID, target, frame, Float(radius),
                                        nextAppearance.rgba, Float(settings.width), settings.order == .above, path) else {
                 if let nativeID { destroyNativeBorder(nativeID) }
                 nativeID = nil
-                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale, corners: nextCorners)
                 return
             }
             appearance = nextAppearance
@@ -287,26 +296,28 @@ final class WindowBorder {
             if !winmux_border_move(nativeID, target, frame, Float(settings.width), settings.order == .above) {
                 if let nativeID { destroyNativeBorder(nativeID) }
                 nativeID = nil
-                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale)
+                updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale, corners: nextCorners)
                 return
             }
         }
         self.frame = frame
+        self.corners = nextCorners
     }
 
-    private func borderGeometry(size: CGSize, radius: CGFloat, width: CGFloat, scale: CGFloat) -> WindowBorderGeometry {
-        let key = WindowBorderGeometry.Key(size: size, radius: radius, width: width, scale: scale)
+    private func borderGeometry(size: CGSize, corners: WindowBorderCornerRadii, width: CGFloat, scale: CGFloat) -> WindowBorderGeometry {
+        let bottomRadius = corners.bottom == corners.top ? nil : corners.bottom
+        let key = WindowBorderGeometry.Key(size: size, radius: corners.top, width: width, scale: scale, bottomRadius: bottomRadius)
         if let geometry, geometry.key == key { return geometry }
-        let updated = WindowBorderGeometry(size: size, radius: radius, width: width, scale: scale)
+        let updated = WindowBorderGeometry(size: size, radius: corners.top, width: width, scale: scale, bottomRadius: bottomRadius)
         geometry = updated
         return updated
     }
 
-    private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat) {
+    private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
         if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
         let outer = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
-        let radius = systemWindowCornerRadius()
-        let path = borderGeometry(size: outer.size, radius: radius, width: CGFloat(settings.width), scale: scale).path
+        let radius = corners.maximum
+        let path = borderGeometry(size: outer.size, corners: corners, width: CGFloat(settings.width), scale: scale).path
         for (index, panel) in fallbackPanels.enumerated() {
             let piece = winmux_border_piece(outer.size, Float(radius), Float(settings.width), Float(scale), Int32(index))
             panel.update(outer: outer, piece: piece, radius: radius, path: path, windowId: target, active: active, settings: settings)
@@ -363,7 +374,8 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
 
     func update(outer: CGRect, piece: CGRect, radius: CGFloat, path: CGPath, windowId: UInt32, active: Bool, settings: WindowBordersConfig) {
         guard !piece.isEmpty else { orderOut(nil); return }
-        let frame = piece.offsetBy(dx: outer.minX, dy: outer.minY)
+        let frame = CGRect(x: outer.minX + piece.minX, y: outer.maxY - piece.maxY,
+            width: piece.width, height: piece.height)
         if self.frame != frame { setFrame(frame, display: false) }
         let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path !== path
         if geometryChanged || borderView.settings != settings || borderView.active != active {
@@ -381,6 +393,7 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
 
 @MainActor
 private final class WindowBorderFallbackView: NSView {
+    override var isFlipped: Bool { true }
     var settings = WindowBordersConfig()
     var active = false
     var outerSize = CGSize.zero

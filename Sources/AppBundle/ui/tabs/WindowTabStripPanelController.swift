@@ -63,7 +63,8 @@ extension WindowTabStripPanelController {
 }
 
 extension WindowTabStripPanelController {
-    func refresh() {
+    func refresh(updateBorders: Bool = true) {
+        defer { if updateBorders { WindowBorderController.shared.refresh() } }
         guard TrayMenuModel.shared.isEnabled, config.windowTabs.enabled else {
             hideAll()
             return

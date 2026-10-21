@@ -74,6 +74,26 @@ final class WindowBorderPiecesTest: XCTestCase {
         }
     }
 
+    func testTabGroupCornersAndTranslucentPiecesMatchAtBothScales() throws {
+        for scale: CGFloat in [1, 2] {
+            for size in [CGSize(width: 800, height: 600), CGSize(width: 19, height: 12)] {
+                for width: CGFloat in [0.5, 4, 12] {
+                    let geometry = WindowBorderGeometry(size: size, radius: 12, width: width,
+                        scale: scale, bottomRadius: 19)
+                    XCTAssertEqual(geometry.key.partitionRadius, 19)
+                    XCTAssertEqual(try renderContinuous(geometry, pieces: false),
+                        try renderContinuous(geometry, pieces: true))
+                }
+            }
+        }
+        // The tab strip's tighter top corners and the app shell's broader bottom
+        // corners must stay distinguishable, rather than becoming a uniform ring.
+        let geometry = WindowBorderGeometry(size: CGSize(width: 800, height: 600),
+            radius: 12, width: 4, scale: 2, bottomRadius: 19)
+        XCTAssertNotEqual(geometry.path.contains(CGPoint(x: 6, y: 6), using: .evenOdd),
+            geometry.path.contains(CGPoint(x: 6, y: 594), using: .evenOdd))
+    }
+
     private func renderContinuous(_ geometry: WindowBorderGeometry, pieces: Bool) throws -> Data {
         let key = geometry.key
         let width = Int(ceil(key.size.width * key.scale))
@@ -83,7 +103,7 @@ final class WindowBorderPiecesTest: XCTestCase {
         context.scaleBy(x: key.scale, y: key.scale)
         if pieces {
             for index in 0..<4 {
-                let piece = winmux_border_piece(key.size, Float(key.radius), Float(key.width), Float(key.scale), Int32(index))
+                let piece = winmux_border_piece(key.size, Float(key.partitionRadius), Float(key.width), Float(key.scale), Int32(index))
                 if piece.isEmpty { continue }
                 context.saveGState()
                 context.translateBy(x: piece.minX, y: piece.minY)

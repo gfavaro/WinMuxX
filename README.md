@@ -341,7 +341,8 @@ and are independently controlled; for example, `show-date = false` with
 ### Window borders
 
 WinMux draws click-through borders around visible managed windows, with a different color for the
-focused window. Built-in borders are enabled by default. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
+focused window. In tabbed layouts, one border encloses the tab panel and the active
+window together, using the group’s outer corner shape. Built-in borders are enabled by default. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
 
 ```toml
 [borders]
