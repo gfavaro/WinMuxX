@@ -63,8 +63,9 @@ def summarize(samples, interval, status, error=None):
     # leak verdict. Workload phases and process lifetime must still be matched.
     times = [sample["elapsed"] - first["elapsed"] for sample in samples]
     center = statistics.mean(times)
+    memory_center = statistics.mean(footprints)
     denominator = sum((value - center) ** 2 for value in times)
-    slope = (sum((value - center) * (memory - statistics.mean(footprints))
+    slope = (sum((value - center) * (memory - memory_center)
                  for value, memory in zip(times, footprints)) / denominator * 60
              if denominator else None)
     result["footprint_trend_mib_per_minute"] = slope
