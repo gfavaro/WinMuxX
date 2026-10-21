@@ -4,7 +4,38 @@ import Common
 import XCTest
 
 @MainActor
-final class RuntimeEventRecorderTest: XCTestCase {
+final class RuntimeEventRecorderTest: WorkspaceTestCase {
+    func testDiagnosticFlagsUseQueryPathWithoutLayoutOrNativeStateReads() async throws {
+        let window = TestWindow.new(id: 99, parent: focus.workspace.rootTilingContainer)
+        let untouched = Workspace.get(byName: "unreconciled-empty")
+        for index in 0..<3 {
+            var args = DebugWindowsCmdArgs(rawArgs: [])
+            args.eventsStart = index == 0
+            args.checkModel = index == 1
+            args.eventsStop = index == 2
+            let command = DebugWindowsCommand(args: args)
+            XCTAssertTrue(command.isQuery)
+            _ = try await runCommandSession(.socketServer(args), .forceRun,
+                isQuery: command.isQuery, shouldSchedulePostRefresh: !command.canSkipPostCommandRefresh) {
+                try await command.run(.defaultEnv, .emptyStdin)
+            }
+        }
+        XCTAssertNil(window.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(window.nativeStateFetchCount, 0)
+        XCTAssertTrue(Workspace.existing(byName: untouched.name) === untouched)
+        XCTAssertFalse(runtime.events.isRecording)
+    }
+
+    func testExplicitModelScanRefusesUnsettledRefresh() async throws {
+        var args = DebugWindowsCmdArgs(rawArgs: [])
+        args.checkModel = true
+        let active = Task<Void, Error> { }
+        runtime.refresh.activeRefreshTask = active
+        defer { runtime.refresh.activeRefreshTask = nil; active.cancel() }
+        let accepted = try await DebugWindowsCommand(args: args).run(.defaultEnv, .emptyStdin)
+        XCTAssertFalse(accepted)
+    }
+
     func testDisabledOverflowResetAndOrdering() {
         let recorder = RuntimeEventRecorder(eventLimit: 2)
         recorder.record(.cancelled, source: .refresh, generation: 0)

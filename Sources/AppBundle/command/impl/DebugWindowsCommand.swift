@@ -22,6 +22,7 @@ enum DebugWindowsState {
 struct DebugWindowsCommand: Command {
     let args: DebugWindowsCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = false
+    var isQuery: Bool { args.eventsStart || args.eventsStop || args.eventsExport || args.checkModel }
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         let eventFlags = [args.eventsStart, args.eventsStop, args.eventsExport, args.checkModel].filter { $0 }.count
@@ -31,6 +32,9 @@ struct DebugWindowsCommand: Command {
         if args.eventsStart { runtime.events.start(); io.out("Event history started"); return true }
         if args.eventsStop { runtime.events.stop(); io.out("Event history stopped and cleared"); return true }
         if args.checkModel {
+            guard runtime.refresh.activeRefreshTask == nil else {
+                return io.err("A model refresh is in progress; retry after it settles")
+            }
             let violations = runtime.modelInvariantViolations()
             io.out(violations.map { "\($0.kind.rawValue): \($0.identity)" }.joined(separator: "\n"))
             return violations.isEmpty
