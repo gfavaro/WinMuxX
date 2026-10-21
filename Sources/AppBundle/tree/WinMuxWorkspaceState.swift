@@ -138,6 +138,7 @@ struct WinMuxWorkspaceState {
             viewport.activeWorkspaceId.flatMap { workspaceById[$0] }?.preferredMonitorPoint = viewportId.topLeftCorner
             viewport.previousWorkspaceId = viewport.activeWorkspaceId
         }
+        runtime.events.record(.workspaceActivated, source: .model, generation: runtime.refresh.activeScheduledRefreshGeneration, workspaceID: workspace.id, viewport: viewportId)
         workspace.preferredMonitorPoint = viewportId.topLeftCorner
         viewport.activeWorkspaceId = workspace.id
         viewport.lastActiveWorkspaceByProject[workspace.projectId] = workspace.id

@@ -47,6 +47,9 @@ open class Window: TreeNode, Hashable {
     func recordObservedActualRect(_ rect: Rect?, token: UInt64) {
         if lastKnownNativeStateGeneration == token {
             lastKnownActualRect = rect
+            runtime.events.record(.nativeFrameObserved, source: .nativeState, generation: token, windowID: windowId, observedFrame: rect)
+        } else {
+            runtime.events.record(.staleObservation, source: .nativeState, generation: token, windowID: windowId)
         }
     }
 
@@ -55,6 +58,8 @@ open class Window: TreeNode, Hashable {
         if lastKnownNativeStateGeneration == token {
             lastKnownNativeFullscreen = fullscreen
             lastKnownNativeMinimized = minimized
+        } else {
+            runtime.events.record(.staleObservation, source: .nativeState, generation: token, windowID: windowId)
         }
     }
 
@@ -65,6 +70,7 @@ open class Window: TreeNode, Hashable {
     func recordAuthoritativeActualRect(_ rect: Rect?) {
         lastKnownNativeStateGeneration += 1
         lastKnownActualRect = rect
+        runtime.events.record(.nativeFrameWritten, source: .model, generation: lastKnownNativeStateGeneration, windowID: windowId, intendedFrame: rect)
     }
 
     @MainActor

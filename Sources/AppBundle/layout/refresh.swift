@@ -133,6 +133,7 @@ func scheduleRefreshSession(
     optimisticallyPreLayoutWorkspaces: Bool = false,
     recordsActivation: Bool = true,
 ) {
+    runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
     guard isUnitTest || isWinMuxRuntimeReady else { return }
@@ -152,6 +153,7 @@ func scheduleRefreshSession(
     // and never completed until the burst quieted down. Let the active session finish, then
     // run a single follow-up session on behalf of all events that arrived in the meantime.
     if activeRefreshTask != nil {
+        runtime.events.record(.refreshCoalesced, source: .refresh, generation: activeScheduledRefreshGeneration)
         pendingRefreshRequest = pendingRefreshRequest.map {
             (mergeRefreshEvents($0.event, event), $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
         } ?? (event, optimisticallyPreLayoutWorkspaces)
@@ -188,7 +190,9 @@ func scheduleRefreshSession(
             } else {
                 try await runRefreshSessionBlocking(request.event, optimisticallyPreLayoutWorkspaces: request.optimisticallyPreLayoutWorkspaces)
             }
+            runtime.events.record(.refreshCompleted, source: .refresh, generation: generation)
         } catch is CancellationError {
+            runtime.events.record(.cancelled, source: .refresh, generation: generation)
             return
         }
     }

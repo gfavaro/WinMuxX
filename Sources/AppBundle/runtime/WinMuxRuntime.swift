@@ -13,6 +13,7 @@ final class WinMuxRuntime {
     let hotkeys = HotkeyState()
     let recovery = WorkspaceRecoveryState()
     let refresh = RefreshCoordinator()
+    let events = RuntimeEventRecorder()
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)
