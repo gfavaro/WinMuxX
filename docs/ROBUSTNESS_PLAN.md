@@ -8,18 +8,20 @@ passed 1,288 Swift and 47 Python tests before runtime edits. A private 30-second
 build-120 idle sample is in `.build/robustness/baseline/`: 31 samples, no gaps,
 119.032 → 119.064 MiB footprint, 0.00458% of one CPU core, zero logical/disk
 writes and zero package-idle wakeups. macOS 27.2 (26B118), built-in Retina only;
-9 managed windows were present at the following environment snapshot. The process
+8 managed apps / 9 managed windows were present at the following environment snapshot. The process
 was long-lived and user activity was uncontrolled. This is an idle baseline only;
 no equivalent active native workload or energy improvement is claimed.
 
 Stages 1–3: read-only structured invariant scan, negative fixtures and controlled
 continuation overlaps are implemented. Existing lifecycle/transition/performance
-fixtures reuse the scan. First full implementation check passed 1,302 Swift tests;
-final checks follow diagnostics/appearance/sampler additions. No demonstrated
+fixtures reuse the scan. Final implementation `make check` passed 1,306 Swift tests and 48 Python
+tests, including the offscreen native-layer reuse check and query isolation. No demonstrated
 runtime management defect required a new transaction architecture.
 
 Stage 4: explicit runtime-local bounded circular event history and private atomic
-export are implemented. Original AX `debug-windows` recording remains available.
+export are implemented. A regression reproduces the initial diagnostic-command
+layout side effect (five failed assertions before the query-path fix), and passes
+with the fix. The explicit scan refuses in-progress refreshes. Original AX `debug-windows` recording remains available.
 Stage 5: intent/proxy surfaces and resize layer colors now use shared appearance.
 Stage 6: existing profiler adds resident memory and all-sample footprint trend;
 the finite native protocol and multi-display checklist are documented. Live physical

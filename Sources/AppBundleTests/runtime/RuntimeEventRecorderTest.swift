@@ -33,7 +33,7 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         runtime.refresh.activeRefreshTask = active
         defer { runtime.refresh.activeRefreshTask = nil; active.cancel() }
         let accepted = try await DebugWindowsCommand(args: args).run(.defaultEnv, .emptyStdin)
-        XCTAssertFalse(accepted)
+        XCTAssertEqual(accepted.exitCode, 1)
     }
 
     func testDisabledOverflowResetAndOrdering() {

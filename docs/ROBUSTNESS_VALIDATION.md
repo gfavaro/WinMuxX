@@ -11,7 +11,9 @@ one visible slot, while hidden workspaces return to the main display preference.
 Run `modelInvariantViolations` only after a completed model operation or refresh.
 It reads model fields without AX, WindowServer enumeration, scheduling, or repair.
 Normal Release refreshes never call it. `debug-windows --check-model` explicitly
-requests a scan of the currently settled MainActor model. It checks both registry
+requests a scan of the currently settled MainActor model; it refuses the request
+while a scheduled refresh is active. Diagnostic flags use the query path, so they
+do not cancel refreshes or trigger AX/layout/UI/persistence work. It checks both registry
 indexes, project membership, active references/uniqueness, tree parent links,
 repeated object identities and repeated window IDs. Native bound windows must be
 reachable. Tests can additionally supply the exact expected live objects.
@@ -92,6 +94,10 @@ an all-sample footprint trend in MiB/minute. Neither metric certifies leak freed
 
 The existing comparison script's guard bands are screening heuristics, not measured
 universal CPU/RSS limits. A single short run cannot establish regression thresholds.
+The final implementation check passes 1,306 Swift and 48 Python tests. An
+offscreen native compositor regression changes Light/Dark twenty times, verifies
+layer reuse and clears all item layers. It does not present a real drag helper.
+
 Model CI assertions remain deterministic: write counts, bounded queues/caches,
 monitor balance, helper retirement and object release.
 
