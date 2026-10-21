@@ -498,3 +498,29 @@ initial install could not confirm restored focus; a read-only resume validated
 without replaying focus. All managed window IDs and workspace assignments were
 preserved, with no config or topology changes. Private report:
 `.release/install-build119.json`; the previous app is archived by the installer.
+
+## Build 120 — shared app theme
+
+Root `appearance = 'system' | 'light' | 'dark'` is the single theme choice.
+Settings → Appearance → Theme edits that TOML key. Native app appearance changes
+on reload; shared chrome resolves the same theme. Wallpaper and decorative tint
+no longer select the expanded sidebar/overlay theme. Compact rails retain their
+wallpaper contrast in System mode; explicit themes take priority. Custom solid
+colors continue to select a contrasting foreground.
+
+`make check` passed 1,288 Swift tests and 47 Python tests. Coverage includes
+parsing/defaults/rejection of invalid themes, explicit themes against opposing
+system/tint/accessibility inputs, native expanded-sidebar backing, and tab cache
+invalidation. Live TOML reloads verified Light and Dark tab strips and palettes;
+the overview was inspected in Dark and System (macOS Light). Settings picker
+interaction was not verified live: automation selected a hidden sidebar panel.
+No live expanded-sidebar or macOS automatic theme-transition test is claimed.
+
+The signed build passed installer dry-run. Initial validation observed focus
+changing; read-only resume returned `validated`, preserving managed window IDs
+and workspace assignments. Private report: `.release/install-build120.json`.
+After installation, the user's configuration was backed up privately at
+`.release/config-before-theme120.toml`; the only final edit was prepending
+`appearance = 'system'`. A final CLI config dry-run passed. A rollback to build
+119 also needs that configuration backup, because 119 does not parse this key.
+No personal configuration or screen captures are committed.
