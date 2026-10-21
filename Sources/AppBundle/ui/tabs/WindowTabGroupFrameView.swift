@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct WindowTabGroupFrameView: View {
+    @SidebarColors var colors
     let strip: WindowTabStripViewModel
     let groupSize: CGSize
 
@@ -20,11 +21,11 @@ struct WindowTabGroupFrameView: View {
                 }
 
             outerShape
-                .stroke(Color.white.opacity(GlassToken.borderOpacity), lineWidth: windowTabGroupFrameStrokeWidth)
+                .stroke(colors.foreground.opacity(GlassToken.borderOpacity), lineWidth: windowTabGroupFrameStrokeWidth)
                 .glassShadow(.raised)
 
             Rectangle()
-                .fill(Color.white.opacity(GlassToken.separatorOpacity))
+                .fill(colors.separator)
                 .frame(height: StrokeToken.hairline)
                 .offset(y: tabHeight - StrokeToken.hairline)
 
@@ -40,16 +41,7 @@ struct WindowTabGroupFrameView: View {
 
     @ViewBuilder
     private func groupSurface<S: Shape>(in shape: S) -> some View {
-        if config.workspaceSidebar.chromeStyle == .solid {
-            GlassSurface(shape: shape, style: .solid,
-                solidColor: config.workspaceSidebar.resolvedSolidChromeColor)
-        } else {
-            WorkspaceSidebarFrostedSurface(tint: config.workspaceSidebar.frostedTint)
-                .clipShape(shape)
-                .environment(\.colorScheme, config.workspaceSidebar.frostedTint.preferredColorScheme ?? colorScheme)
-        }
+        OverlaySurface()
+            .clipShape(shape)
     }
-
-    @Environment(\.colorScheme) private var colorScheme
-
 }

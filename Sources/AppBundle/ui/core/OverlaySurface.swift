@@ -35,19 +35,21 @@ struct OverlayAppearance: ViewModifier {
         let scope = monitor.flatMap { id in
             sortedMonitors.first { MonitorViewportId($0) == id }.map(workspaceSidebarMonitorScopeId)
         } ?? tray.workspaceSidebarFocusedMonitorScopeId
-        content.modifier(OverlayResolvedAppearance())
+        content.modifier(ChromeResolvedAppearance())
             .modifier(WorkspaceSidebarWallpaperContrast(configuration: configuration, visibleWidth: configuration.expandedWidth, targetMonitorScopeId: scope,
                 refreshGeneration: tray.workspaceSidebarWallpaperRefreshGeneration))
     }
 }
 
-private struct OverlayResolvedAppearance: ViewModifier {
+struct ChromeResolvedAppearance: ViewModifier {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.workspaceSidebarPreviewAccessibility) private var previewAccessibility
 
     func body(content: Content) -> some View {
         let configuration = workspaceSidebarConfiguration()
         let resolved = configuration.chromeAppearance(systemScheme: colorScheme,
-            reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+            reduceTransparency: reduceTransparency || previewAccessibility.reduceTransparency)
         content.environment(\.colorScheme, resolved.scheme)
             .environment(\.workspaceSidebarAppearance, configuration.appearance)
     }

@@ -11,6 +11,7 @@ struct WindowTabGroupVisualView: View {
             )
             .frame(width: proxy.size.width, height: proxy.size.height)
         }
+        .modifier(ChromeResolvedAppearance())
         .windowTabOcclusionMasked(
             panelFrame: strip.groupFrame,
             occludingScreenFrames: strip.occludingFloatingWindowFrames,

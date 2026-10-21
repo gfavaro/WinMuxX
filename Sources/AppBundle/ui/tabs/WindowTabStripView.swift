@@ -24,6 +24,7 @@ struct WindowTabStripView: View {
                 stripHeight: max(proxy.size.height, 0),
             )
         }
+        .modifier(ChromeResolvedAppearance())
     }
 }
 

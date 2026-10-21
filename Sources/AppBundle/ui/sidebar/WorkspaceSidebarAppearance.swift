@@ -140,7 +140,7 @@ extension EnvironmentValues {
     }
 }
 
-/// Kept local to sidebar descendants; shared tab/switcher chrome is not affected.
+/// Semantic colors shared by sidebar, overlay, and tab chrome descendants.
 @propertyWrapper
 struct SidebarColors: DynamicProperty {
     @Environment(\.workspaceSidebarAppearance) var appearance
