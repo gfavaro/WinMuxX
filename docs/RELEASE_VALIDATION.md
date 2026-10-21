@@ -524,3 +524,50 @@ After installation, the user's configuration was backed up privately at
 `appearance = 'system'`. A final CLI config dry-run passed. A rollback to build
 119 also needs that configuration backup, because 119 does not parse this key.
 No personal configuration or screen captures are committed.
+
+## Build 121 — bounded robustness diagnostics (2026-10-21)
+
+`make check` passes **1,306 Swift tests and 48 Python checks**. The additions cover
+settled model invariants, controlled overlapping native observations/refreshes,
+fixed-seed rapid switching, diagnostic bounds/privacy/export failures/query
+isolation, native helper-layer reuse and memory trend calculations. The initial
+diagnostic-command implementation failed its query-isolation regression before
+the focused fix. The rule-to-test table and repeatable local protocol are in
+[ROBUSTNESS_VALIDATION.md](ROBUSTNESS_VALIDATION.md).
+
+Build **121** is signed with `WinMuxX Local Code Signing` and installed at
+`/Applications/WinMuxX.app`. Both client and server identify app source
+`1ed8115febd56afffd52b2929377e7ef0753b52a`; subsequent commits change only tests,
+documentation and the generated source record. Candidate and installed strict/deep
+signature verification and installer dry-run passed. The recoverable build-120
+archive and private report are retained under `.release/`; the report is
+`install-build121.json`.
+
+Installation and a read-only resume both returned **needs_review** with
+`focus_changed_during_validation` on the active desktop. No stale focus was
+replayed. The latest comparison contains seven surviving managed windows with
+zero workspace-assignment moves; three pre-install windows closed and no new
+windows opened. Config bytes and display topology stayed unchanged. This records
+successful bundle replacement/startup and preserved surviving assignments; it
+does not claim the installer's focus acceptance gate passed.
+
+The installed client/server passed explicit event start, model scan, export and
+stop commands, plus config dry-run. The private JSON export had `0600` permissions,
+a config fingerprint and the expected build hash. Recording was stopped afterward.
+The scan returned no violations. No personal TOML or desktop assignment was edited.
+
+A 30-second pre-change build-120 observation recorded 119.032 → 119.064 MiB
+footprint, 0.00458% of one core and zero logical/disk writes. A separate 30-second
+build-121 startup/resume observation recorded 90.689 → 91.939 MiB footprint,
+145.844 → 145.672 MiB resident memory, 0.162% of one core, 999,424 logical bytes
+written, 819,200 disk bytes written and 116 package-idle wakeups. Both had 31
+samples without gaps. The second sample overlapped startup verification and user
+activity; the processes had different lifetimes. These are not equivalent idle
+workloads and establish no memory/CPU/energy improvement or persistent-growth
+bound. Private artifacts are in `.build/robustness/`.
+
+Only the built-in display was connected. Physical hotplug/sleep/wake, active
+20-switch/palette/overview/tab native workload, live pointer drag/resize and
+accessibility-setting changes were not performed in this delivery. Offscreen
+native layers and resolver tests cover deterministic appearance/lifecycle policy;
+they do not establish native material rendering or physical gesture feel.

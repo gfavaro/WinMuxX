@@ -37,7 +37,7 @@ ownership error; topology reconciliation owns its retirement.
 | Valid/invalid reload with queued refresh | OverlappingRuntimeEventsTest, WinMuxRuntimeTest |
 | Disable/shutdown invalidation and replacement isolation | OverlappingRuntimeEventsTest, RefreshCoordinatorOwnershipTest |
 | Rapid switches and stale observations | OverlappingRuntimeEventsTest (fixed seed `0x574D2026`) |
-| Animation target closure/cancellation | WorkspaceSwipeControllerTest, WorkspaceSwipePreviewPhaseTest, WorkspaceSwipeSnapshotsTest |
+| Animation motion retirement/cancellation | WindowMotionTest, WorkspaceSwipeControllerTest, WorkspaceSwipePreviewPhaseTest, WorkspaceSwipeSnapshotsTest |
 | Retired overview/tab/palette helpers | WorkspaceOverviewTest, WindowTabsTestTabStrip, RuntimePerformanceScenarioTest |
 | Unchanged layout AX-write budget | AxRefreshBenchmarkTest, PostCommandRefreshBenchmarkTest |
 
