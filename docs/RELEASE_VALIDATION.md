@@ -477,3 +477,24 @@ preferences, because that older app does not understand the new settings.
 No new live light-mode, accessibility-mode, IME or pointer-drag validation is
 claimed in this delivery. Automated UI policy and lifecycle coverage is described
 above. Current configuration semantics are documented in [configuration](CONFIGURATION.md).
+
+## Build 119 — adaptive tab chrome
+
+The tab strip and group shell now share the sidebar/overlay appearance resolver.
+Labels, fallback icons, selection fills, outlines and the drag handle use adaptive
+foreground colors. The shell uses the shared overlay surface, including opaque
+backing for Reduce Transparency. Increased Contrast strengthens text and tab
+outlines. No capture polling or new helper windows were added.
+
+Validation: `make check` passed 1,286 Swift tests and 47 Python tests. Temporary
+code-rendered proofs verified light and dark chrome with Reduce Transparency,
+including Increased Contrast. The temporary proof generator was removed; personal
+screen captures and proof images are not committed. The installed light-mode tab
+strip was inspected visually and its labels were readable against the light shell.
+No live dark-mode or pointer-drag validation is claimed for this change.
+
+Build 119 passed strict/deep signature verification and installer dry-run. The
+initial install could not confirm restored focus; a read-only resume validated
+without replaying focus. All managed window IDs and workspace assignments were
+preserved, with no config or topology changes. Private report:
+`.release/install-build119.json`; the previous app is archived by the installer.
