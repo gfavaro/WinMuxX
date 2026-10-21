@@ -59,6 +59,19 @@ def summarize(samples, interval, status, error=None):
     elapsed = last["elapsed"] - first["elapsed"]
     result.update(elapsed_seconds=elapsed, started_utc=first["utc"], last_sample_utc=last["utc"])
     footprints = [s["phys_footprint"] / 1024**2 for s in samples]
+    # Linear trend uses all samples; report it alongside edge medians, never as a
+    # leak verdict. Workload phases and process lifetime must still be matched.
+    times = [sample["elapsed"] - first["elapsed"] for sample in samples]
+    center = statistics.mean(times)
+    denominator = sum((value - center) ** 2 for value in times)
+    slope = (sum((value - center) * (memory - statistics.mean(footprints))
+                 for value, memory in zip(times, footprints)) / denominator * 60
+             if denominator else None)
+    result["footprint_trend_mib_per_minute"] = slope
+    if all("resident_size" in sample for sample in samples):
+        resident = [sample["resident_size"] / 1024**2 for sample in samples]
+        result.update(resident_first_mib=resident[0], resident_last_mib=resident[-1],
+                      resident_peak_mib=max(resident))
     edge = max(1, len(samples) // 10)
     result.update(footprint_first_mib=footprints[0], footprint_last_mib=footprints[-1],
                   footprint_peak_mib=max(footprints), footprint_delta_mib=footprints[-1] - footprints[0],
@@ -105,7 +118,7 @@ def sample(pid, seconds, interval, directory):
                 if samples and usage["proc_start_abstime"] != samples[0]["proc_start_abstime"]:
                     raise RuntimeError("Target PID was reused; stopping instead of mixing processes")
                 # Persist only the counters needed for this report, never window titles or configuration.
-                record = {key: usage[key] for key in ["proc_start_abstime", "phys_footprint",
+                record = {key: usage[key] for key in ["proc_start_abstime", "phys_footprint", "resident_size",
                     "user_time", "system_time", "logical_writes", "diskio_byteswritten",
                     "pkg_idle_wkups", "interrupt_wkups"]}
                 record.update(elapsed=time.monotonic() - started,

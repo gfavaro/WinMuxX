@@ -20,6 +20,15 @@ class RuntimeProfileTest(unittest.TestCase):
         self.assertEqual(result["logical_writes"], 4096)
         self.assertEqual(result["status"], "completed")
 
+    def test_memory_trend_uses_all_samples_and_resident_is_separate(self):
+        samples = [point(i * 30, footprint=(10 + i) * 1024**2) for i in range(3)]
+        for sample in samples:
+            sample["resident_size"] = 20 * 1024**2
+        report = summarize(samples, 30, "completed")
+        self.assertEqual(report["footprint_trend_mib_per_minute"], 2)
+        self.assertEqual(report["resident_last_mib"], 20)
+        self.assertIsNone(summarize([point(0)], 1, "completed")["footprint_trend_mib_per_minute"])
+
     def test_reused_pid_cannot_produce_combined_metrics(self):
         with self.assertRaises(ValueError):
             summarize([point(0), point(10, start=2)], 10, "completed")
