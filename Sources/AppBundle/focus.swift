@@ -258,10 +258,11 @@ extension Workspace {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession
     let owner = runtime
+    let context = hookEnvironment(event: "focused-monitor-changed").withFocus(focus)
     Task {
         try await owner.withValue {
             try await runLightSession(.onFocusedMonitorChanged, token) {
-                _ = try await config.onFocusedMonitorChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+                _ = try await config.onFocusedMonitorChanged.runCmdSeq(context, .emptyStdin)
             }
         }
     }
@@ -275,10 +276,11 @@ extension Workspace {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession
     let owner = runtime
+    let context = hookEnvironment(event: "focus-changed").withFocus(focus)
     Task {
         try await owner.withValue {
             try await runLightSession(.onFocusChanged, token) {
-                _ = try await config.onFocusChanged.runCmdSeq(.defaultEnv.withFocus(focus), .emptyStdin)
+                _ = try await config.onFocusChanged.runCmdSeq(context, .emptyStdin)
             }
         }
     }
@@ -293,7 +295,7 @@ extension Workspace {
         let process = Process()
         process.executableURL = URL(filePath: exec)
         process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
-        var environment = config.execConfig.envVariables
+        var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
         environment[WINMUX_FOCUSED_WORKSPACE] = newWorkspace
         environment[WINMUX_PREV_WORKSPACE] = oldWorkspace
         environment[WINMUX_WORKSPACE] = newWorkspace

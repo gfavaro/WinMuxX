@@ -243,3 +243,12 @@ animation-duration-ms = 220
 [menu-bar]
     indicator = 'icon' # icon or workspace
     icon-appearance = 'color' # color or monochrome
+
+# Optional leader layer (choose an entry binding in mode.main.binding).
+# [mode.leader]
+# timeout-ms = 1500          # 0 disables inactivity expiry; range 0–60000
+# show-indicator = true     # Icon tint or workspace text suffix; default false
+# indicator-color = '#5E9EFF' # Optional; defaults to the system accent
+# [mode.leader.binding]
+# esc = 'mode main'
+# h = ['focus left', 'mode main']

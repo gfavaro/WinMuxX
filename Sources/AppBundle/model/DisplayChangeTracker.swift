@@ -25,7 +25,8 @@ func runSettledDisplayChangeHook() {
     guard let environment = runtime.displays.changes.update(displayTopologyIdentities(monitors)),
           let token: RunSessionGuard = .isServerEnabled, !config.onDisplayChanged.isEmpty else { return }
     let commands = config.onDisplayChanged
-    let context = CmdEnv.defaultEnv.withFocus(focus).copy(\.extraEnvironment, environment)
+    let base = hookEnvironment(event: "display-changed").withFocus(focus)
+    let context = base.copy(\.extraEnvironment, base.extraEnvironment + environment)
     runtime.displays.displayChangeTask?.cancel()
     runtime.displays.displayChangeTask = runtime.task {
         guard TrayMenuModel.shared.isEnabled else { return }

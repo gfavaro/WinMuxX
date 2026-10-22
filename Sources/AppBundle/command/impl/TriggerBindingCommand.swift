@@ -6,6 +6,9 @@ struct TriggerBindingCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        let session = runtime.hotkeys.modeSession
+        let token = activeMode == args.mode ? session.begin(expected: session.generation) : nil
+        defer { if let token { session.finish(token) } }
         return if let mode = config.modes[args.mode] {
             if let binding = mode.bindings.values.first(where: { $0.descriptionWithKeyNotation == args.binding.val }) {
                 // refreshSession is not needed since commands are already run in refreshSession

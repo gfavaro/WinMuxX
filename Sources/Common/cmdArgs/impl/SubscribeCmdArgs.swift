@@ -28,7 +28,7 @@ public func parseSubscribeCmdArgs(_ args: StrArrSlice) -> ParsedCmd<SubscribeCmd
             raw.allAlias.implies(raw.events.isEmpty)
         }
         .map { raw in
-            raw.allAlias ? raw.copy(\.events, Set(ServerEventType.allCases)).copy(\.allAlias, false) : raw
+            raw.allAlias ? raw.copy(\.events, Set(ServerEventType.allCases.filter { $0 != .stateChanged })).copy(\.allAlias, false) : raw
         }
 }
 
@@ -55,6 +55,7 @@ private func parseEventTypes(_ input: ArgParserInput) -> ParsedCliArgs<Set<Serve
 }
 
 public enum ServerEventType: String, Codable, CaseIterable, Sendable {
+    case stateChanged = "state-changed"
     case focusChanged = "focus-changed"
     case focusedMonitorChanged = "focused-monitor-changed"
     case workspaceChanged = "focused-workspace-changed"

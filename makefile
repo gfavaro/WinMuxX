@@ -92,6 +92,7 @@ check:
 	python3 -m unittest script/test_fork_identity.py && \
 	python3 -m unittest script/test_swift_version.py && \
 	python3 -m unittest script/test_signing_cleanup.py && \
+	python3 -m unittest script/test_sketchybar_state.py && \
 	python3 -m unittest script/test_profile_runtime.py script/test_compare_runtime_profiles.py script/test_install_fork.py && \
 	swift package --force-resolved-versions resolve'
 

@@ -21,6 +21,7 @@ final class HotkeyState {
     var lastSequencePrefixTime: DispatchTime? = nil
     /// Which prefix key was pressed last
     var lastSequencePrefixKey: Key? = nil
+    let modeSession = ModeSession()
     var activeMode: String? = mainModeId
 
     isolated deinit {
@@ -39,6 +40,8 @@ private let tapBindingTriggerDelayNs: UInt64 = 75_000_000
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
 @MainActor func resetHotKeys() {
+    hotkeyState.modeSession.invalidate()
+    TrayMenuModel.shared.setIfChanged(\.modePresentation, nil)
     // Explicitly unregister all hotkeys. We cannot always rely on destruction of the HotKey object to trigger
     // unregistration because we might be running inside a hotkey handler that is keeping its HotKey object alive.
     for (_, key) in hotkeyState.hotkeys {
@@ -81,10 +84,13 @@ extension HotKey {
         cancelPendingTapTriggers()
     }
     applyHotkeyEnabledState()
+    hotkeyState.modeSession.activate()
+    updateModePresentation()
 }
 
 @MainActor func activateMode(_ targetMode: String?) async throws {
     let owner = runtime
+    let previousMode = activeMode
     let mode = targetMode.flatMap { config.modes[$0] }
     let targetBindings = mode?.bindings ?? [:]
     hotkeyState.sideFilteredBindings = Dictionary(grouping: targetBindings.values.filter { config.modifierSides.restricts($0.modifiers) },
@@ -98,12 +104,14 @@ extension HotKey {
     cancelPendingTapTriggers()
     for binding in targetBindings.values where !config.modifierSides.restricts(binding.modifiers) && !hotkeyState.hotkeys.keys.contains(binding.descriptionWithKeyCode) {
         hotkeyState.hotkeys[binding.descriptionWithKeyCode] = HotKey(key: binding.keyCode, modifiers: binding.modifiers, keyDownHandler: { [weak owner] in
+            let generation = MainActor.assumeIsolated { owner?.hotkeys.modeSession.generation }
             Task { @MainActor in
                 guard let owner else { return }
                 owner.withValue {
-                    if hotkeyState.hotkeysSuspended { return }
+                    if hotkeyState.hotkeysSuspended || generation != hotkeyState.modeSession.generation { return }
                     noteTapBindingKeyDown()
-                    triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
+                    guard let current = activeMode.flatMap({ config.modes[$0] })?.bindings[binding.descriptionWithKeyCode] else { return }
+                    triggerBinding(current.descriptionWithKeyNotation, current.commands)
                 }
             }
         })
@@ -125,13 +133,21 @@ extension HotKey {
     }
     let oldMode = activeMode
     activeMode = targetMode
+    if oldMode != targetMode { runtime.publicState.previousMode = oldMode }
     applyHotkeyEnabledState()
+    hotkeyState.modeSession.activate(preservingAcceptedWork: true)
+    updateModePresentation()
     if oldMode != targetMode {
         broadcastEvent(.modeChanged(mode: targetMode))
         if !config.onModeChanged.isEmpty {
             guard let token: RunSessionGuard = .isServerEnabled else { return }
+            let context = hookEnvironment(event: "mode-changed", previousMode: previousMode)
+            let modeSession = hotkeyState.modeSession
+            let activity = modeSession.begin(expected: modeSession.generation)
+            defer { if let activity { modeSession.finish(activity) } }
+            let commands = config.onModeChanged
             try await runLightSession(.onModeChanged, token) {
-                _ = try await config.onModeChanged.runCmdSeq(.defaultEnv, .emptyStdin)
+                _ = try await commands.runCmdSeq(context, .emptyStdin)
             }
         }
     }
@@ -140,8 +156,13 @@ extension HotKey {
 @MainActor private func triggerBinding(_ binding: String, _ commands: [any Command]) {
     if hotkeyState.hotkeysSuspended { return }
     let owner = runtime
+    let session = hotkeyState.modeSession
+    let expected = session.generation
+    guard let token = session.begin(expected: expected) else { return }
     Task {
         try await owner.withValue {
+            defer { session.finish(token) }
+            guard session.generation == token.generation else { return }
             if let activeMode {
                 broadcastEvent(.bindingTriggered(
                     mode: activeMode,
@@ -173,6 +194,7 @@ extension HotKey {
 /// checks if this key matches a sequence binding and executes it.
 /// Returns true if the event was consumed (should not reach the app).
 @MainActor func handleSequenceKeyDown(event: NSEvent) -> Bool {
+    guard !hotkeyState.hotkeysSuspended, TrayMenuModel.shared.isEnabled else { return false }
     guard let prefix = hotkeyState.lastSequencePrefixKey,
           let lastTime = hotkeyState.lastSequencePrefixTime,
           let bindings = hotkeyState.sequenceBindingsByPrefix[prefix] else {

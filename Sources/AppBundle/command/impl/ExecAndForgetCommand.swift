@@ -9,7 +9,7 @@ struct ExecAndForgetCommand: Command {
         // todo shall exec-and-forget fork exec session?
         // It doesn't throw if exit code is non-zero
         let process = Process()
-        process.environment = execEnvironment(config.execConfig.envVariables, context: env.asMap,
+        process.environment = execEnvironment(config.execConfig.envVariables, context: hookEnvironment(event: "command").asMap + env.asMap,
             cliDirectory: bundledCliDirectory)
         process.executableURL = URL(filePath: "/bin/bash")
         process.arguments = ["-c", args.bashScript]

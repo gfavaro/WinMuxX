@@ -12,9 +12,11 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
     private var observation: AnyCancellable?
+    private var accessibilityObservation: NSObjectProtocol?
     private var appearanceObservation: NSKeyValueObservation?
     private var checkForUpdates: (() -> Void)?
     private var bindings = ActionMenuBindings(mode: nil)
+    private var lastModePresentation: ModePresentation?
     private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
 
     func install(checkForUpdates: (() -> Void)?) {
@@ -28,10 +30,22 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if let button = item.button {
             appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
                 Task { @MainActor in
+                    self.lastIconState = nil
+                    self.updateIcon()
+                    requestPublicStateUpdate()
                     let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
                     WorkspaceSidebarPanel.menuBarColorScheme = match == .aqua ? .light : .dark
                     WorkspaceSidebarPanel.refreshWallpaperContrast()
                 }
+            }
+        }
+        accessibilityObservation = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.lastIconState = nil
+                self?.updateIcon()
+                requestPublicStateUpdate()
             }
         }
         updateIcon()
@@ -43,20 +57,27 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private func updateIcon() {
         let model = TrayMenuModel.shared
         let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name { return }
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, lastModePresentation == model.modePresentation { return }
         lastIconState = state
+        lastModePresentation = model.modePresentation
+        let mode = model.isEnabled ? model.modePresentation : nil
+        let dark = statusItem?.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        let color = mode?.color(dark: dark, increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
+        let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
         if model.isEnabled && state.indicator == .workspace {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
-            statusItem?.button?.title = state.text
+            let title = NSMutableAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor])
+            if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
+            statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display"
-            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display")
+            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + modeDescription
+            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display" + modeDescription)
             return
         }
         statusItem?.length = NSStatusItem.squareLength
-        statusItem?.button?.title = ""
-        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" : "WinMux disabled")
+        statusItem?.button?.attributedTitle = NSAttributedString(string: "")
+        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" + modeDescription : "WinMux disabled")
         let image: NSImage?
         if model.isEnabled {
             let monochrome = model.menuBarConfiguration.iconAppearance != .color
@@ -66,8 +87,20 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuxX disabled")
         }
         image?.size = NSSize(width: 18, height: 18)
+        if let color, let source = NSImage(named: "MenuBarIconMonochrome") {
+            let tinted = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
+                source.draw(in: rect)
+                color.setFill()
+                rect.fill(using: .sourceIn)
+                return true
+            }
+            tinted.isTemplate = false
+            statusItem?.button?.image = tinted
+            statusItem?.button?.toolTip = "WinMuxX" + modeDescription
+            return
+        }
         statusItem?.button?.image = image
-        statusItem?.button?.toolTip = "WinMuxX"
+        statusItem?.button?.toolTip = "WinMuxX" + modeDescription
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

@@ -10,6 +10,7 @@ extension WorkspaceSidebarPanel {
 
     func refresh(on monitor: Monitor) {
         guard !isRetired else { return }
+        defer { requestPublicStateUpdate() }
         if appliedHoverOpenDelayMs != config.workspaceSidebar.hoverOpenDelayMs {
             appliedHoverOpenDelayMs = config.workspaceSidebar.hoverOpenDelayMs
             cancelHoverReveal()
@@ -76,6 +77,7 @@ extension WorkspaceSidebarPanel {
     }
 
     func resetHiddenSidebarState() {
+        defer { requestPublicStateUpdate() }
         // Runs for every inactive panel on every refreshAll — guard the shared-model writes so
         // they don't invalidate every observer each session.
         workspaceSidebarDropTargets = []

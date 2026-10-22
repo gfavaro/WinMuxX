@@ -126,6 +126,8 @@ final class WorkspaceOverviewController {
         let displays = dependencies.displays()
         guard !displays.isEmpty else { return false }
         generation += 1; captureSession = UUID(); phase = .opening
+        runtime.publicState.overviewVisible = true
+        requestPublicStateUpdate()
         project = dependencies.project()
         attempted.removeAll(); invalidated.removeAll(); ranks.removeAll()
         if dependencies.nativeIntegration {
@@ -171,6 +173,8 @@ final class WorkspaceOverviewController {
             return
         }
         phase = .closing; generation += 1
+        runtime.publicState.overviewVisible = false
+        requestPublicStateUpdate()
         let closingGeneration = generation
         task?.cancel()
         let release = dependencies.releaseCaptureSession, session = captureSession

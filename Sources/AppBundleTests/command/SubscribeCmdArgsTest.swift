@@ -17,7 +17,7 @@ final class SubscribeCmdArgsTest: XCTestCase {
         let result = parseSubscribeCmdArgs(["--all"].slice)
         switch result {
             case .cmd(let args):
-                assertEquals(args.events, Set(ServerEventType.allCases))
+                assertEquals(args.events, Set(ServerEventType.allCases.filter { $0 != .stateChanged }))
             case .help, .failure:
                 XCTFail("Expected success")
         }
@@ -31,7 +31,7 @@ final class SubscribeCmdArgsTest: XCTestCase {
             case .failure(let err):
                 assertEquals(err, """
                     ERROR: Can't parse 'unknown-event'.
-                           Possible values: (focus-changed|focused-monitor-changed|focused-workspace-changed|mode-changed|window-detected|binding-triggered)
+                           Possible values: (state-changed|focus-changed|focused-monitor-changed|focused-workspace-changed|mode-changed|window-detected|binding-triggered)
                     """)
         }
     }

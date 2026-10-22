@@ -151,15 +151,22 @@ extension [Command] {
             keyNotationToScript[binding.descriptionWithKeyNotation] =
                 .scalar(.string(binding.commands.prettyDescription))
         }
+        for binding in mode.sequenceBindings.values {
+            keyNotationToScript[binding.descriptionWithKeyNotation] = .scalar(.string(binding.commands.prettyDescription))
+        }
         var tapKeyNotationToScript: [String: ConfigMapValue] = [:]
         for binding in mode.tapBindings.values {
             tapKeyNotationToScript[binding.descriptionWithKeyNotation] =
                 .scalar(.string(binding.commands.prettyDescription))
         }
-        return .map([
+        var fields: [String: ConfigMapValue] = [
+            "timeout-ms": .scalar(.int(mode.timeoutMs)),
+            "show-indicator": .scalar(.bool(mode.showIndicator)),
             "binding": .map(keyNotationToScript),
             "binding-tap": .map(tapKeyNotationToScript),
-        ])
+        ]
+        if let color = mode.indicatorColor { fields["indicator-color"] = .scalar(.string(color)) }
+        return .map(fields)
     }
     return .map(["mode": .map(mode)])
 }
@@ -167,11 +174,13 @@ extension [Command] {
 enum ConfigScalarValue: Encodable {
     case string(String)
     case int(Int)
+    case bool(Bool)
 
     var describe: String {
         return switch self {
             case .string(let string): string
             case .int(let int): String(int)
+            case .bool(let bool): String(bool)
         }
     }
 
@@ -179,6 +188,7 @@ enum ConfigScalarValue: Encodable {
         let value: Encodable = switch self {
             case .string(let string): string
             case .int(let int): int
+            case .bool(let bool): bool
         }
         var container = encoder.singleValueContainer()
         try container.encode(value)

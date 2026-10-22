@@ -106,6 +106,8 @@ struct ReloadConfigCommand: Command {
                 let previousRootOrientation = config.defaultRootContainerOrientation
                 resetHotKeys()
                 runtime.configuration.publish(parsedConfig, from: url)
+                runtime.publicState.configRevision &+= 1
+                requestPublicStateUpdate(structural: true)
                 WorkspaceGestureCoordinator.shared.syncConfiguration()
                 materializePersistedWorkspaces()
                 applyUpdatedDefaultWindowLayout(previousLayout: previousRootLayout)

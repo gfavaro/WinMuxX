@@ -91,3 +91,24 @@ not select the theme of expanded surfaces. The compact rail can still adapt to
 its wallpaper to meet the menu bar. Explicit themes override that adaptation.
 Custom solid surface colors retain a contrasting foreground. Reduce Transparency
 and Increase Contrast continue to apply in every theme.
+
+## Mode leaders and external state
+
+Binding modes support optional `timeout-ms = 1500`, `show-indicator = true`, and
+`indicator-color = '#5E9EFF'` in `[mode.<name>]`. Defaults are no timeout and no
+indicator. `main` never times out or displays a badge. The timeout starts at entry
+and restarts after accepted bindings finish. Unbound keys pass through and do not
+reset it. Configure `esc = 'mode main'` explicitly; append `'mode main'` to a
+binding's command array for one-shot use. Re-entering a mode starts a fresh session.
+
+The existing icon gains the mode color; the workspace indicator gains ` | L` for
+Leader. The tooltip/accessibility label gives its full name. Custom colors are
+adjusted for native menu-bar contrast. No extra overlay window or countdown runs.
+Shortcut recording suspends the deadline and badge; resuming starts a fresh interval.
+
+Read public state with `winmuxx state --json` or follow changes with
+`winmuxx subscribe state-changed`. See [the versioned state contract](STATE_API.md)
+for fields and hook variables, plus the optional SketchyBar adapter at
+`script/examples/sketchybar_state.py`. Create `winmux.workspace` and `winmux.mode`
+items in SketchyBar, then run one adapter instance; stop/restart it with your bar.
+No SketchyBar dependency or adapter is started by WinMuxX itself.

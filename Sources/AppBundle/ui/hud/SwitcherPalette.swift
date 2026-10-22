@@ -113,6 +113,8 @@ final class SwitcherPalettePanel: NSPanelHud {
         presentationGeneration &+= 1
         let generation = presentationGeneration
         isPaletteActive = true
+        runtime.publicState.paletteVisible = true
+        requestPublicStateUpdate()
         let items = await loadItems()
         // Palette construction suspends while first-sight window titles are fetched. A second
         // toggle may have dismissed the palette in the meantime.
@@ -176,6 +178,8 @@ final class SwitcherPalettePanel: NSPanelHud {
         outsideClickMonitors.removeAll()
         if isPaletteActive {
             isPaletteActive = false
+            runtime.publicState.paletteVisible = false
+            requestPublicStateUpdate()
             orderOut(nil)
             hostingView.rootView = AnyView(EmptyView())
         }

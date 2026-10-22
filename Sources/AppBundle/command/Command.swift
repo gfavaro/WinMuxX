@@ -105,7 +105,11 @@ extension [Command] {
             try WindowDetectionOperations.current?.check()
             let commandSucc = try await command.run(env, io)
             isSucc = commandSucc && isSucc
-            if !command.isQuery && !command.isPresentation { refreshModel() }
+            if !command.isQuery && !command.isPresentation {
+                refreshModel()
+                let focusOnly = command is FocusMonitorCommand || command is ModeCommand || command is ExecAndForgetCommand
+                requestPublicStateUpdate(structural: !focusOnly)
+            }
             if commandSucc && command.shouldResetClosedWindowsCache {
                 syncClosedWindowsCacheToCurrentWorld()
             }

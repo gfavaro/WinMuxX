@@ -6,6 +6,7 @@ public final class TrayMenuModel: ObservableObject {
 
     init() {}
 
+    @Published var modePresentation: ModePresentation?
     @Published var menuBarWorkspaceIndicator: String = "1"
     @Published var menuBarWorkspaceName: String = ""
     /// Is "layouting" enabled
@@ -24,7 +25,7 @@ public final class TrayMenuModel: ObservableObject {
     @Published var workspaceSidebarShowsMonitorSelector: Bool = false
     @Published var workspaceSidebarDropPreview: WorkspaceSidebarDropPreviewViewModel? = nil
     @Published var windowTabStrips: [WindowTabStripViewModel] = []
-    @Published var isWorkspaceSidebarExpanded: Bool = false
+    @Published var isWorkspaceSidebarExpanded: Bool = false { didSet { if oldValue != isWorkspaceSidebarExpanded { MainActor.assumeIsolated { requestPublicStateUpdate() } } } }
     @Published var workspaceSidebarVisibleWidth: CGFloat = 0
     @Published var workspaceSidebarTopPadding: CGFloat = 12
     @Published var workspaceSidebarHoveredWorkspaceName: String? = nil

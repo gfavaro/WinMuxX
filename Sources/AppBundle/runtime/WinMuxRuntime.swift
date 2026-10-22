@@ -11,6 +11,7 @@ final class WinMuxRuntime {
     let nativeFocus = NativeFocusState()
     let displays = MonitorState()
     let hotkeys = HotkeyState()
+    let publicState = PublicStateStore()
     let recovery = WorkspaceRecoveryState()
     let refresh = RefreshCoordinator()
     let events = RuntimeEventRecorder()
@@ -44,6 +45,7 @@ final class WinMuxRuntime {
     static func replaceForTests() {
         precondition(isUnitTest)
         precondition(bound == nil, "Replace the fixture outside a scoped runtime binding")
+        process.hotkeys.modeSession.invalidate()
         process.refresh.invalidate()
         process.recovery.reset()
         process.displays.displayChangeTask?.cancel()

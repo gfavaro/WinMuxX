@@ -40,7 +40,10 @@ private func onWindowDetected(_ window: Window) async throws {
         appName: window.app.name,
     ))
     for callback in config.onWindowDetected where try await callback.matches(window) {
-        _ = try await callback.run.runCmdSeq(.defaultEnv.copy(\.windowId, window.windowId), .emptyStdin)
+        var context = hookEnvironment(event: "window-detected").copy(\.windowId, window.windowId)
+        context.extraEnvironment["WINMUX_WORKSPACE"] = window.nodeWorkspace?.name ?? ""
+        context.extraEnvironment["WINMUX_MONITOR_UUID"] = window.nodeWorkspace?.workspaceMonitor.displayUUID ?? ""
+        _ = try await callback.run.runCmdSeq(context, .emptyStdin)
         if !callback.checkFurtherCallbacks {
             return
         }

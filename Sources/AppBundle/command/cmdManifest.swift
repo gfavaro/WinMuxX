@@ -43,6 +43,7 @@ extension CmdArgs {
             case let args as ResizeCmdArgs: ResizeCommand(args: args)
             case let args as SplitCmdArgs: SplitCommand(args: args)
             case let args as StackWithCmdArgs: StackWithCommand(args: args)
+            case let args as StateCmdArgs: StateCommand(args: args)
             case is SubscribeCmdArgs: die("subscribe is handled separately")
             case let args as SummonWorkspaceCmdArgs: SummonWorkspaceCommand(args: args)
             case let args as SwapWithMasterCmdArgs: SwapWithMasterCommand(args: args)

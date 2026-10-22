@@ -49,7 +49,7 @@ import Foundation
         try await runLightSession(.startup, .forceRun) {
             applyStartupWorkspacePlacement()
             applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
-            _ = try await config.afterStartupCommand.runCmdSeq(.defaultEnv, .emptyStdin)
+            _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
         }
         isWinMuxRuntimeReady = true
         scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.

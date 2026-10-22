@@ -3,6 +3,9 @@ import HotKey
 import TOMLKit
 
 struct Mode: ConvenienceCopyable, Equatable, Sendable {
+    var timeoutMs: Int = 0
+    var showIndicator = false
+    var indicatorColor: String?
     var bindings: [String: HotkeyBinding]
     var tapBindings: [String: TapBinding]
     var sequenceBindings: [String: SequenceBinding]
@@ -42,6 +45,18 @@ func parseMode(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors
     for (key, value) in rawTable {
         let backtrace = backtrace + .key(key)
         switch key {
+            case "timeout-ms":
+                if let v = parseInt(value, backtrace).getOrNil(appendErrorTo: &errors) {
+                    if (0...60000).contains(v) { result.timeoutMs = v }
+                    else { errors.append(.semantic(backtrace, "Must be between 0 and 60000")) }
+                }
+            case "show-indicator":
+                if let v = parseBool(value, backtrace).getOrNil(appendErrorTo: &errors) { result.showIndicator = v }
+            case "indicator-color":
+                if let v = parseString(value, backtrace).getOrNil(appendErrorTo: &errors) {
+                    if let hex = normalizedWorkspaceSidebarColorHex(v) { result.indicatorColor = hex }
+                    else { errors.append(.semantic(backtrace, "Use a six-digit hex color, such as #5E9EFF")) }
+                }
             case "binding":
                 let (chordBindings, seqBindings) = parseBindings(value, backtrace, &errors, mapping)
                 result.bindings = chordBindings

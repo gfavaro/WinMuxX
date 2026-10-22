@@ -201,6 +201,10 @@ func scheduleRefreshSession(
 @MainActor
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
                                optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
+    let stateStore = runtime.publicState
+    if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
+    stateStore.transactionDepth += 1
+    defer { stateStore.transactionDepth -= 1; requestPublicStateUpdate(structural: true) }
     try await AXReadBudget.$current.withValue(AXReadBudget()) {
         try await performRefreshSession(event, layoutWorkspaces: layoutWorkspaces,
                                         optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
@@ -224,7 +228,11 @@ func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard
 func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
                        shouldSchedulePostRefresh: Bool = true,
                        body: @MainActor () async throws -> T) async throws -> T {
-    try await AXReadBudget.$current.withValue(AXReadBudget()) {
+    let stateStore = runtime.publicState
+    if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
+    stateStore.transactionDepth += 1
+    defer { stateStore.transactionDepth -= 1; requestPublicStateUpdate() }
+    return try await AXReadBudget.$current.withValue(AXReadBudget()) {
         try await performLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
     }
 }
