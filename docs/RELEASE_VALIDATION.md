@@ -609,3 +609,42 @@ optional adapter passed payload/ordering/reconnect identity/failure fixtures.
 See [STATE_API.md](STATE_API.md) and [MODE_LEADER_PLAN.md](MODE_LEADER_PLAN.md).
 Personal config, hook environment, reports and desktop screenshots remain private
 under `.release/`; none are committed.
+
+## Build 124 — mode controls and Settings autosave (2026-10-22)
+
+`make check` passed **1,331 Swift tests and 51 Python checks**. Shortcuts → Binding
+modes now exposes timeout, indicator visibility, system accent/custom mode color,
+and mode creation with an Escape binding. Field edits preserve other bindings and
+quoted names, and refuse to recreate a mode removed externally. Existing entry
+shortcuts are unchanged.
+
+Regular text/event fields debounce valid edits and flush on exit; numeric editing
+commits on Return/focus loss. Existing rule/display-assignment edits autosave,
+while entry creation/deletion remain explicit actions. The complete TOML editor
+retains explicit Validate/Save and apply and stale-file protection. Drafts survive
+failures and newer edits during reload; reverting to the saved value clears the
+draft without writing. Only edited text schedules a debounce, so rendering an
+unchanged Settings page does not save it.
+
+Tests cover quoted/new/removed modes, metadata preservation, rule edits during a
+reload with a subsequent rebased write, failed autosave retention/no retry loop,
+and reverted drafts. Offscreen native views rendered mode controls in both light
+and dark environments with zero load-time writes, and rule editor actions fitted
+compact/wide layouts. Rendering fixtures use in-memory config access. Live desktop
+keyboard editing of every Settings field was not performed.
+
+Signed build **124** is installed at `/Applications/WinMuxX.app`; client and server
+identify source `fb7d24b0cbc3333e5c8930b3434ad16a99c505bc`. Strict/deep signature
+verification and installer dry-run passed. Initial verification reported
+`focus_not_restored`; read-only resume returned **validated**, with zero moved,
+opened or closed managed windows and no stale focus replay. The private report is
+`.release/install-build124.json`; the build-123 rollback archive is retained.
+
+Personal TOML matches the pre-install backup exactly, including edits made by the
+user since build 123. Config dry-run passed. An explicit model scan first refused
+the still-active refresh after config validation, then passed once settled.
+A half-second passive observation had zero state-revision growth. No personal
+config or private install/rendering artifacts are committed.
+
+Delivery follows the requested main-first workflow, including the previously
+reviewable leader/state commits. No history was rewritten.

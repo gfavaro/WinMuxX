@@ -288,3 +288,12 @@ Native checks used the current system appearance. Automated tests cover both
 appearance/contrast policies; physical system-theme/accessibility changes and live
 SketchyBar were not exercised. The optional adapter passed fixture tests. Private
 reports/screenshots/config backups remain in `.release/` and are not committed.
+
+### Settings follow-up (build 124)
+
+Dedicated controls now live under Shortcuts → Binding modes. Timeout, indicator
+and color edits save automatically; Add mode creates an Escape-to-main binding
+without choosing an entry shortcut. The main mode remains reserved. Regular
+Settings fields, event text and existing rule/assignment edits autosave; the raw
+Configuration editor retains explicit Save and apply. Build 124 and its checks
+are recorded in `RELEASE_VALIDATION.md`.

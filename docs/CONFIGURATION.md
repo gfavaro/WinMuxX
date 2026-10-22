@@ -120,9 +120,9 @@ indicator toggle and color. Add mode creates a named mode with Escape to return 
 main. Add its entry shortcut in Configuration; existing shortcuts are preserved.
 The main mode's timeout and mode badge remain disabled.
 
-Ordinary Settings controls save automatically. Text edits save after a short pause
-(650 ms) or when leaving the field/page; toggles, pickers and recorded shortcuts
-apply directly. Invalid edits stay visible for correction. Failed writes retain
+Ordinary Settings controls save automatically. Text fields save after a short pause
+(650 ms) or when leaving the field/page. Numeric fields commit on Return or when
+editing ends; toggles, pickers and recorded shortcuts apply directly. Invalid edits stay visible for correction. Failed writes retain
 the draft and provide Retry. Opening or reloading a page does not save its values.
 Existing rule and display-assignment edits also autosave; creating or deleting
 entries remains an explicit action. The complete TOML editor in Configuration
