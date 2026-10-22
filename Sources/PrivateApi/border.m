@@ -148,15 +148,18 @@ CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, 
     // Include the final antialiased pixel rather than clipping at a fractional edge.
     size.width = ceil(size.width * scale) / scale;
     size.height = ceil(size.height * scale) / scale;
-    // Shared boundaries land on backing pixels. Corner bands contain all curvature.
-    CGFloat requestedBand = ceil((2 * (MAX(0, radius) + width) + 1 / scale) * scale) / scale;
-    CGFloat band = MIN(requestedBand, floor(size.height * scale / 2) / scale);
-    CGFloat bottomStart = size.height <= requestedBand * 2 ? band : floor((size.height - band) * scale) / scale;
+    // WindowServer quantizes separate surface placement to whole points, even
+    // with Retina backing. A half-point partition can leave one backing row
+    // unpainted when its neighbor is placed at the next whole point.
+    // Keep internal joins integral in screen points as well as backing pixels.
+    CGFloat requestedBand = ceil(2 * (MAX(0, radius) + width) + 1 / scale);
+    CGFloat band = MIN(requestedBand, floor(size.height / 2));
+    CGFloat bottomStart = size.height <= requestedBand * 2 ? band : floor(size.height - band);
     CGFloat bottomBand = size.height - bottomStart;
     CGFloat middle = MAX(0, bottomStart - band);
-    CGFloat requestedEdge = ceil((width + 1 / scale) * scale) / scale;
-    CGFloat edge = MIN(requestedEdge, floor(size.width * scale / 2) / scale);
-    CGFloat rightStart = size.width <= requestedEdge * 2 ? edge : floor((size.width - edge) * scale) / scale;
+    CGFloat requestedEdge = ceil(width + 1 / scale);
+    CGFloat edge = MIN(requestedEdge, floor(size.width / 2));
+    CGFloat rightStart = size.width <= requestedEdge * 2 ? edge : floor(size.width - edge);
     switch (index) {
         case 0: return CGRectMake(0, 0, size.width, band);
         case 1: return CGRectMake(0, size.height - bottomBand, size.width, bottomBand);

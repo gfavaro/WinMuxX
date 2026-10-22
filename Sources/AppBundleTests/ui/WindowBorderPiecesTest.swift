@@ -4,6 +4,18 @@ import PrivateApi
 import XCTest
 
 final class WindowBorderPiecesTest: XCTestCase {
+    func testNativePartitionOriginsUseWholePointsOnRetina() {
+        // A 40.5-point top band drew through y=76.5, while WindowServer
+        // placed the neighboring side at y=77: one missing Retina row.
+        for size in [CGSize(width: 859, height: 1077), CGSize(width: 160.5, height: 100.5)] {
+            for index in 0..<4 {
+                let piece = winmux_border_piece(size, 16, 4, 2, Int32(index))
+                XCTAssertEqual(piece.minX, piece.minX.rounded())
+                XCTAssertEqual(piece.minY, piece.minY.rounded())
+            }
+        }
+    }
+
     func testScreenPartitionsStayOnBackingPixelsAtFractionalAndNegativeOrigins() {
         for scale: CGFloat in [1, 2] {
             for origin: CGFloat in [-1800.25, -0.75, 0.25, 100.5] {
