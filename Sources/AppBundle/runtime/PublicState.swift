@@ -80,6 +80,7 @@ func stateColorHex(_ color: NSColor) -> String {
             "indicatorEnabled": .bool(settings?.showIndicator == true && activeMode != mainModeId),
             "indicatorVisible": .bool(TrayMenuModel.shared.modePresentation != nil),
             "timeoutMs": .number(Double(settings?.timeoutMs ?? 0)),
+            "exitOnUnboundKey": .bool(settings?.exitOnUnboundKey ?? false),
         ]),
         "runtime": .object([
             "enabled": .bool(TrayMenuModel.shared.isEnabled), "suspended": .bool(suspended),

@@ -16,12 +16,14 @@ import XCTest
         let changed = applyingSettingsConfigEdits([
             .init(section: "mode.\"nav.dot\"", key: "timeout-ms", renderedValue: "1500"),
             .init(section: "mode.\"nav.dot\"", key: "show-indicator", renderedValue: "true"),
+            .init(section: "mode.\"nav.dot\"", key: "exit-on-unbound-key", renderedValue: "true"),
             .init(section: "mode.\"nav.dot\"", key: "indicator-color", renderedValue: "'#5E9EFF'"),
         ], to: created)
         let parsed = parseConfig(changed)
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
         XCTAssertEqual(parsed.config.modes["nav.dot"]?.timeoutMs, 1500)
         XCTAssertEqual(parsed.config.modes["nav.dot"]?.showIndicator, true)
+        XCTAssertEqual(parsed.config.modes["nav.dot"]?.exitOnUnboundKey, true)
         XCTAssertEqual(parsed.config.modes["nav.dot"]?.bindings.count, 2)
         XCTAssertEqual(parsed.config.modes["Move ✨"]?.timeoutMs, 0)
         XCTAssertEqual(parsed.config.modes["Move ✨"]?.bindings.values.first?.commands.prettyDescription, "mode main")

@@ -9,7 +9,7 @@ Snapshots contain no window titles, screen images, config contents, or keystroke
 
 | Domain | Owner / commit boundary | Fields / missing values |
 |---|---|---|
-| mode | HotkeyState / activation, binding completion, suspension | name, initial, configured/resolved color, indicator enabled, timeout; null when no mode |
+| mode | HotkeyState / activation, binding completion, suspension | name, initial, configured/resolved color, indicator enabled, timeout, exitOnUnboundKey; null when no mode |
 | workspaces | workspace registry / command and refresh completion | stable id, command name, display name/order, project, persistent, occupancy, active viewport ids |
 | displays | monitor cache / reconciliation completion | UUID (null if unknown), current index, geometry, active workspace, focused |
 | windows/focus | managed tree / command and refresh completion | id, app identity, workspace, tiled/floating/minimized/fullscreen/popup; native unknowns are null |

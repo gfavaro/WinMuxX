@@ -39,7 +39,10 @@ private let sideFilteredCallback: CGEventTapCallBack = { _, type, event, _ in
         let key = event.getIntegerValueField(.keyboardEventKeycode)
         if type == .keyUp { return consumedKeys.remove(key) != nil }
         guard type == .keyDown else { return false }
-        let consumed = handleSideFilteredKeyDown(keyCode: key, flags: NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue)))
+        if consumedKeys.contains(key), event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return true }
+        let flags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))
+        if exitModeForUnboundKey(keyCode: key, flags: flags) { return false }
+        let consumed = handleSideFilteredKeyDown(keyCode: key, flags: flags)
         if consumed { consumedKeys.insert(key) }
         // Keep the rest of an accepted key press consumed if its command changed mode.
         return consumed || (consumedKeys.contains(key) && event.getIntegerValueField(.keyboardEventAutorepeat) != 0)

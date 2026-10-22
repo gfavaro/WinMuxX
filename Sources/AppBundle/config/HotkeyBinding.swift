@@ -23,6 +23,7 @@ final class HotkeyState {
     var lastSequencePrefixKey: Key? = nil
     let modeSession = ModeSession()
     var activeMode: String? = mainModeId
+    var pendingUnboundModeExit = false
 
     isolated deinit {
         for task in pendingTapTriggerTasks.values { task.cancel() }
@@ -40,6 +41,7 @@ private let tapBindingTriggerDelayNs: UInt64 = 75_000_000
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
 @MainActor func resetHotKeys() {
+    hotkeyState.pendingUnboundModeExit = false
     hotkeyState.modeSession.invalidate()
     TrayMenuModel.shared.setIfChanged(\.modePresentation, nil)
     // Explicitly unregister all hotkeys. We cannot always rely on destruction of the HotKey object to trigger
@@ -78,6 +80,7 @@ extension HotKey {
 @MainActor func setHotkeysSuspended(_ suspended: Bool) {
     if hotkeyState.hotkeysSuspended == suspended { return }
     hotkeyState.hotkeysSuspended = suspended
+    hotkeyState.pendingUnboundModeExit = false
     if suspended {
         hotkeyState.pendingTapBindings = [:]
         hotkeyState.pressedTapModifiers = []
@@ -89,6 +92,7 @@ extension HotKey {
 }
 
 @MainActor func activateMode(_ targetMode: String?) async throws {
+    hotkeyState.pendingUnboundModeExit = false
     let owner = runtime
     let previousMode = activeMode
     let mode = targetMode.flatMap { config.modes[$0] }
@@ -127,9 +131,9 @@ extension HotKey {
             sequenceBindingsPrefixKeys.insert(seq.prefix)
         }
     }
-    if targetBindings.values.contains(where: { config.modifierSides.restricts($0.modifiers) }),
+    if mode?.exitOnUnboundKey == true || targetBindings.values.contains(where: { config.modifierSides.restricts($0.modifiers) }),
        !SideFilteredHotkeys.shared.install() {
-        MessageModel.shared.message = Message(description: "Shortcut modifiers", body: "Could not install side-filtered shortcuts. Check WinMuxX Accessibility access, then reload the configuration.")
+        MessageModel.shared.message = Message(description: "Keyboard shortcuts", body: "Could not install keyboard event handling for side-filtered shortcuts or exiting on unbound keys. Check WinMuxX Accessibility access, then reload the configuration.")
     }
     let oldMode = activeMode
     activeMode = targetMode
@@ -154,7 +158,7 @@ extension HotKey {
 }
 
 @MainActor private func triggerBinding(_ binding: String, _ commands: [any Command]) {
-    if hotkeyState.hotkeysSuspended { return }
+    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit { return }
     let owner = runtime
     let session = hotkeyState.modeSession
     let expected = session.generation
@@ -230,7 +234,7 @@ extension HotKey {
 }
 
 @MainActor func noteTapBindingFlagsChanged(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
-    if hotkeyState.hotkeysSuspended { return }
+    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit { return }
     if hotkeyState.activeTapBindings.isEmpty && hotkeyState.pendingTapBindings.isEmpty && hotkeyState.pendingTapTriggerTasks.isEmpty { return }
     guard let tapModifier = TapModifierKey(keyCode: keyCode) else { return }
     cancelPendingTapTriggers()
@@ -303,8 +307,43 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
 }
 
 @MainActor func sideFilteredBinding(keyCode: Int64, flags: NSEvent.ModifierFlags) -> HotkeyBinding? {
-    guard !hotkeyState.hotkeysSuspended, TrayMenuModel.shared.isEnabled, activeMode != nil else { return nil }
+    guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit, TrayMenuModel.shared.isEnabled, activeMode != nil else { return nil }
     return hotkeyState.sideFilteredBindings[keyCode]?.first { config.modifierSides.matches($0.modifiers, flags: flags) }
+}
+
+/// Observe before Carbon dispatch, but let the original event reach its app.
+/// Disable the old layer immediately. Register main on the next main-actor turn
+/// so this same event cannot accidentally trigger one of main's shortcuts.
+@MainActor @discardableResult
+func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {
+    guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit,
+          TrayMenuModel.shared.isEnabled, let name = activeMode, name != mainModeId,
+          let mode = config.modes[name], mode.exitOnUnboundKey else { return false }
+    if mode.bindings.values.contains(where: {
+        Int64($0.keyCode.carbonKeyCode) == keyCode && config.modifierSides.matches($0.modifiers, flags: flags)
+    }) { return false }
+    // Preserve sequence prefixes and a valid pending continuation.
+    let plain = flags.intersection([.command, .control, .option, .shift]).isEmpty
+    if plain, sequenceBindingsPrefixKeys.contains(where: { Int64($0.carbonKeyCode) == keyCode }) { return false }
+    if plain, let prefix = hotkeyState.lastSequencePrefixKey,
+       let time = hotkeyState.lastSequencePrefixTime,
+       DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds < sequenceChordTimeoutNs,
+       hotkeyState.sequenceBindingsByPrefix[prefix]?.contains(where: { Int64($0.key.carbonKeyCode) == keyCode }) == true {
+        return false
+    }
+    let owner = runtime
+    hotkeyState.pendingUnboundModeExit = true
+    hotkeyState.modeSession.invalidate()
+    let generation = hotkeyState.modeSession.generation
+    for key in hotkeyState.hotkeys.values { key.isEnabled = false }
+    hotkeyState.pendingTapBindings = [:]
+    cancelPendingTapTriggers()
+    owner.task {
+        guard hotkeyState.modeSession.generation == generation, hotkeyState.pendingUnboundModeExit else { return }
+        do { try await activateMode(mainModeId) }
+        catch { NSLog("WinMuxX unbound-key mode exit failed: %@", String(describing: error)) }
+    }
+    return true
 }
 
 @MainActor func handleSideFilteredKeyDown(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {

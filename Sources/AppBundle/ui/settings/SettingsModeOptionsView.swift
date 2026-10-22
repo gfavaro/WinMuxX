@@ -73,6 +73,12 @@ private struct SettingsModeFields: View {
         if name == mainModeId {
             SettingsDescription("Main is the default mode. It never times out or shows a mode indicator.")
         } else {
+            SettingsToggle("Exit on unassigned key", id: prefix + ".exit-on-unbound-key",
+                           isOn: binding("exit-on-unbound-key", fallback: { mode.exitOnUnboundKey }),
+                           help: "Return to main when a key has no binding in this mode. The key continues to the focused app.") {
+                let value: Bool = drafts.value(for: prefix + ".exit-on-unbound-key", fallback: { mode.exitOnUnboundKey })
+                persist("exit-on-unbound-key", String(value))
+            }
             SettingsStepper("Inactivity timeout", id: prefix + ".timeout-ms",
                             value: binding("timeout-ms", fallback: { mode.timeoutMs }), range: 0...60000,
                             help: "0 keeps the mode active until you leave it. Accepted shortcuts restart the timeout after their commands finish.", unit: "ms") {

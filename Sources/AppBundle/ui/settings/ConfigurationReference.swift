@@ -52,7 +52,7 @@ var configurationReferenceSections: [ConfigurationReferenceSection] {
         inner.horizontal = [{ monitor.main = 4 }, 8]
         outer.left = [{ monitor.secondary = 12 }, 8]
         """, pane: .appearance),
-        .init(id: "keyboard", title: "[key-mapping] and shortcut modes", description: "Keyboard presets: qwerty, dvorak or colemak. [key-mapping.key-notation-to-key-code] adds custom key names. [mode.<name>.binding] defines command shortcuts and sequences; hyper means alt-ctrl-cmd-shift and meh means alt-ctrl-shift; [mode.<name>.binding-tap] defines tap-only shortcuts. A mode can set timeout-ms (0–60000; default 0), show-indicator (default false), and indicator-color (#RRGGBB; default system accent). The main mode never expires or displays a mode badge.", defaults: "qwerty; no custom key mappings.", example: """
+        .init(id: "keyboard", title: "[key-mapping] and shortcut modes", description: "Keyboard presets: qwerty, dvorak or colemak. [key-mapping.key-notation-to-key-code] adds custom key names. [mode.<name>.binding] defines command shortcuts and sequences; hyper means alt-ctrl-cmd-shift and meh means alt-ctrl-shift; [mode.<name>.binding-tap] defines tap-only shortcuts. A mode can set timeout-ms (0–60000; default 0), show-indicator (default false), indicator-color (#RRGGBB; default system accent), and exit-on-unbound-key (default false; unassigned keys return to main and pass through to the app). The main mode never expires or displays a mode badge.", defaults: "qwerty; no custom key mappings.", example: """
         [key-mapping]
         preset = 'qwerty'
 

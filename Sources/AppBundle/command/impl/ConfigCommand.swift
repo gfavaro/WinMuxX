@@ -162,6 +162,7 @@ extension [Command] {
         var fields: [String: ConfigMapValue] = [
             "timeout-ms": .scalar(.int(mode.timeoutMs)),
             "show-indicator": .scalar(.bool(mode.showIndicator)),
+            "exit-on-unbound-key": .scalar(.bool(mode.exitOnUnboundKey)),
             "binding": .map(keyNotationToScript),
             "binding-tap": .map(tapKeyNotationToScript),
         ]

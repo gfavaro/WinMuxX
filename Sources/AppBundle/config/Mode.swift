@@ -5,6 +5,7 @@ import TOMLKit
 struct Mode: ConvenienceCopyable, Equatable, Sendable {
     var timeoutMs: Int = 0
     var showIndicator = false
+    var exitOnUnboundKey = false
     var indicatorColor: String?
     var bindings: [String: HotkeyBinding]
     var tapBindings: [String: TapBinding]
@@ -52,6 +53,8 @@ func parseMode(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace, _ errors
                 }
             case "show-indicator":
                 if let v = parseBool(value, backtrace).getOrNil(appendErrorTo: &errors) { result.showIndicator = v }
+            case "exit-on-unbound-key":
+                if let v = parseBool(value, backtrace).getOrNil(appendErrorTo: &errors) { result.exitOnUnboundKey = v }
             case "indicator-color":
                 if let v = parseString(value, backtrace).getOrNil(appendErrorTo: &errors) {
                     if let hex = normalizedWorkspaceSidebarColorHex(v) { result.indicatorColor = hex }

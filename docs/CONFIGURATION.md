@@ -98,7 +98,9 @@ Binding modes support optional `timeout-ms = 1500`, `show-indicator = true`, and
 `indicator-color = '#5E9EFF'` in `[mode.<name>]`. Defaults are no timeout and no
 indicator. `main` never times out or displays a badge. The timeout starts at entry
 and restarts after accepted bindings finish. Unbound keys pass through and do not
-reset it. Configure `esc = 'mode main'` explicitly; append `'mode main'` to a
+reset it. Set `exit-on-unbound-key = true` to return to `main` when an unassigned
+key is pressed, passing that key through to the focused app. This is opt-in and
+ignored in `main`. Modifier-only taps do not exit the mode. Configure `esc = 'mode main'` explicitly; append `'mode main'` to a
 binding's command array for one-shot use. Re-entering a mode starts a fresh session.
 
 The existing icon gains the mode color; the workspace indicator gains ` | L` for
@@ -116,7 +118,7 @@ No SketchyBar dependency or adapter is started by WinMuxX itself.
 ### Settings saves and mode controls
 
 Shortcuts → Binding modes exposes each configured mode's inactivity timeout,
-indicator toggle and color. Add mode creates a named mode with Escape to return to
+indicator toggle and color, and whether an unassigned key exits the mode. Add mode creates a named mode with Escape to return to
 main. Add its entry shortcut in Configuration; existing shortcuts are preserved.
 The main mode's timeout and mode badge remain disabled.
 

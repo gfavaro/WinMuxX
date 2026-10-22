@@ -297,3 +297,22 @@ without choosing an entry shortcut. The main mode remains reserved. Regular
 Settings fields, event text and existing rule/assignment edits autosave; the raw
 Configuration editor retains explicit Save and apply. Build 124 and its checks
 are recorded in `RELEASE_VALIDATION.md`.
+
+## Repeatable navigation follow-up
+
+Modes can opt into `exit-on-unbound-key = true` (default false). The existing
+keyboard event tap observes key-down events before Carbon, checks the current
+mode's chord and sequence bindings (including configured modifier sides), and
+passes unassigned keys through unchanged. It disables the old layer immediately,
+invalidates its deadline and queued bindings, then activates main on the next
+main-actor turn. The triggering key cannot run an old navigation binding. Mode
+changes, reload and suspension invalidate a pending exit. Modifier taps retain
+their existing semantics; no extra event tap or polling timer is introduced.
+
+Settings → Shortcuts → Binding modes exposes the option. Config serialization and
+public state (`mode.exitOnUnboundKey`) include it. Main ignores the option.
+
+A personal navigation layer can use a right-Command tap to enter/exit, a 3000 ms
+inactivity timeout and a blue N indicator. Focus, move, display and workspace
+bindings stay in navigation; Escape/Return exit, and sidebar/palette actions return
+to main. These personal bindings are not installed as application defaults.

@@ -25,10 +25,98 @@ import XCTest
         XCTAssertEqual(config.modes["leader"]?.indicatorColor, "#5E9EFF")
         XCTAssertEqual(config.modes["main"]?.timeoutMs, 0)
         XCTAssertEqual(config.modes["main"]?.showIndicator, false)
-        for body in ["timeout-ms = -1", "timeout-ms = 60001", "timeout-ms = true", "timeout-ms = 1.5", "show-indicator = 'yes'", "indicator-color = '#fff'"] {
+        XCTAssertEqual(config.modes["leader"]?.exitOnUnboundKey, false)
+        XCTAssertEqual(parseConfig("[mode.nav]\nexit-on-unbound-key = true").config.modes["nav"]?.exitOnUnboundKey, true)
+        for body in ["timeout-ms = -1", "timeout-ms = 60001", "timeout-ms = true", "timeout-ms = 1.5", "show-indicator = 'yes'", "exit-on-unbound-key = 'yes'", "indicator-color = '#fff'"] {
             XCTAssertFalse(parseConfig("[mode.main]\n[mode.test]\n" + body).errors.isEmpty, body)
         }
         for timeout in [0, 60000] { XCTAssertTrue(parseConfig("[mode.main]\n[mode.test]\ntimeout-ms = \(timeout)").errors.isEmpty) }
+    }
+
+    func testUnboundExitImmediatelyDisablesOldBindingsAndCancelsDeadline() async throws {
+        var fires: [@MainActor () -> Void] = []
+        runtime.hotkeys.modeSession.schedule = { _, fire in fires.append(fire); return {} }
+        config.modes["leader"]?.exitOnUnboundKey = true
+        try await activateMode("leader")
+        let key = try XCTUnwrap(runtime.hotkeys.hotkeys.values.first)
+        XCTAssertTrue(key.isEnabled)
+        let oldGeneration = runtime.hotkeys.modeSession.generation
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: [])) // Q is unassigned.
+        XCTAssertFalse(key.isEnabled)
+        XCTAssertNotEqual(runtime.hotkeys.modeSession.generation, oldGeneration)
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []), "Queue only one exit")
+        fires[0]()
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
+        XCTAssertFalse(runtime.hotkeys.pendingUnboundModeExit)
+        XCTAssertNil(TrayMenuModel.shared.modePresentation)
+    }
+
+    func testUnboundExitPreservesBoundKeysAndUsesExactModifiers() async throws {
+        config.modes["leader"]?.exitOnUnboundKey = true
+        try await activateMode("leader")
+        let h = try XCTUnwrap(config.modes["leader"]?.bindings.values.first { $0.descriptionWithKeyNotation == "h" })
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: Int64(h.keyCode.carbonKeyCode), flags: [.capsLock, .function]))
+        XCTAssertEqual(activeMode, "leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: Int64(h.keyCode.carbonKeyCode), flags: [.command]))
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
+    }
+
+    func testUnboundExitIsOptInAndIgnoredWhileDisabledSuspendedOrInMain() async throws {
+        try await activateMode("leader")
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []))
+        config.modes["leader"]?.exitOnUnboundKey = true
+        setHotkeysSuspended(true)
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []))
+        setHotkeysSuspended(false)
+        TrayMenuModel.shared.isEnabled = false
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []))
+        TrayMenuModel.shared.isEnabled = true
+        config.modes["main"]?.exitOnUnboundKey = true
+        try await activateMode("main")
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []))
+    }
+
+    func testPendingUnboundExitCannotOverrideNewModeActivationOrSuspension() async throws {
+        config.modes["leader"]?.exitOnUnboundKey = true
+        try await activateMode("leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
+        try await activateMode("leader")
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
+        setHotkeysSuspended(true)
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "leader")
+        XCTAssertFalse(runtime.hotkeys.pendingUnboundModeExit)
+    }
+
+    func testUnboundExitPreservesSequencesAndHonorsModifierSides() async throws {
+        let parsed = parseConfig("""
+        [modifiers]
+        alt = 'left'
+        [mode.main.binding]
+        [mode.leader]
+        exit-on-unbound-key = true
+        [mode.leader.binding]
+        esc-q = 'mode main'
+        alt-h = 'focus left'
+        """)
+        XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
+        config = parsed.config
+        try await activateMode("leader")
+        let sequence = try XCTUnwrap(config.modes["leader"]?.sequenceBindings.values.first)
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: Int64(sequence.prefix.carbonKeyCode), flags: []))
+        noteSequencePrefixKeyPressed(sequence.prefix)
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: Int64(sequence.key.carbonKeyCode), flags: []))
+        let h = try XCTUnwrap(config.modes["leader"]?.bindings.values.first)
+        let left: NSEvent.ModifierFlags = [.option, TapModifierKey.leftAlt.deviceSpecificModifierFlag]
+        let right: NSEvent.ModifierFlags = [.option, TapModifierKey.rightAlt.deviceSpecificModifierFlag]
+        XCTAssertFalse(exitModeForUnboundKey(keyCode: Int64(h.keyCode.carbonKeyCode), flags: left))
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: Int64(h.keyCode.carbonKeyCode), flags: right))
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
     }
 
     func testOneShotDeadlineReentryAndStaleCompletion() async throws {
@@ -204,12 +292,13 @@ import XCTest
         for (name, initial) in [(" navigation", "N"), ("ßmode", "S"), ("👩🏽‍💻 tools", "👩🏽‍💻"), (" ", "?")] {
             XCTAssertEqual(ModePresentation(name: name, mode: .zero).initial, initial)
         }
-        let original = "[mode.leader]\ntimeout-ms = 1500\nshow-indicator = true\nindicator-color = '#5E9EFF'\n[mode.leader.binding]\nh = 'focus left'\n"
+        let original = "[mode.leader]\ntimeout-ms = 1500\nshow-indicator = true\nexit-on-unbound-key = true\nindicator-color = '#5E9EFF'\n[mode.leader.binding]\nh = 'focus left'\n"
         let edited = updateModeBindingConfig(in: original, modeName: "leader", managedCommands: ["focus left"], assignments: ["j": "focus down"])
         let mode = parseConfig(edited).config.modes["leader"]
         XCTAssertEqual(mode?.timeoutMs, 1500)
         XCTAssertEqual(mode?.indicatorColor, "#5E9EFF")
         XCTAssertEqual(mode?.showIndicator, true)
+        XCTAssertEqual(mode?.exitOnUnboundKey, true)
     }
 
     func testPublicStateAndHookContextContainSameModeWithoutNativeReads() async throws {

@@ -247,6 +247,7 @@ animation-duration-ms = 220
 # Optional leader layer (choose an entry binding in mode.main.binding).
 # [mode.leader]
 # timeout-ms = 1500          # 0 disables inactivity expiry; range 0–60000
+# exit-on-unbound-key = false # true exits to main and passes unassigned keys to the app
 # show-indicator = true     # Icon tint or workspace text suffix; default false
 # indicator-color = '#5E9EFF' # Optional; defaults to the system accent
 # [mode.leader.binding]
