@@ -300,6 +300,14 @@ import XCTest
         XCTAssertNil(runtime.publicState.publicationTask)
     }
 
+    func testDirectUISessionInvalidatesStructuralCache() async throws {
+        let before = publicStateSnapshot()
+        try await runLightSession(.menuBarButton, .forceRun, shouldSchedulePostRefresh: false) {
+            _ = TestWindow.new(id: 91093, parent: focus.workspace.rootTilingContainer)
+        }
+        XCTAssertNotEqual(publicStateSnapshot().state["windows"], before.state["windows"])
+    }
+
     func testStateRemainsAvailableWhenManagementIsDisabled() async throws {
         TrayMenuModel.shared.isEnabled = false
         defer { TrayMenuModel.shared.isEnabled = true }

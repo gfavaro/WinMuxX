@@ -231,7 +231,16 @@ func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
-    defer { stateStore.transactionDepth -= 1; requestPublicStateUpdate() }
+    defer {
+        stateStore.transactionDepth -= 1
+        // Command sequences mark their own changed domains. UI/gesture bodies may
+        // mutate the tree directly and must invalidate structural snapshots here.
+        let structural: Bool = switch event {
+            case .hotkeyBinding, .socketServer, .onModeChanged: false
+            default: true
+        }
+        requestPublicStateUpdate(structural: structural)
+    }
     return try await AXReadBudget.$current.withValue(AXReadBudget()) {
         try await performLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
     }
