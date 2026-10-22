@@ -168,6 +168,23 @@ import XCTest
         updateModePresentation()
     }
 
+    func testRepeatedAndReentrantMenuAppearanceNotificationsDoNotRepaint() {
+        var gate = MenuBarAppearanceGate()
+        var paints = 0
+        func notify(_ scheme: NSAppearance.Name) {
+            guard gate.accept(scheme) else { return }
+            paints += 1
+            // Rendering may emit a notification before the observer returns.
+            XCTAssertFalse(gate.accept(scheme))
+        }
+        for _ in 0..<1000 { notify(.aqua) }
+        XCTAssertEqual(paints, 1)
+        for _ in 0..<1000 { notify(.darkAqua) }
+        XCTAssertEqual(paints, 2)
+        notify(.aqua)
+        XCTAssertEqual(paints, 3)
+    }
+
     func testModeColorAdjustsExtremeColorsForBothMenuAppearances() {
         for hex in ["#000000", "#FFFFFF", "#5E9EFF"] {
             var mode = Mode.zero

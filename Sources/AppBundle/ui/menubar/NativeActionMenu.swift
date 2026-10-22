@@ -2,6 +2,17 @@ import AppKit
 import Combine
 import Common
 
+/// AppKit can notify effectiveAppearance again while a status button is rendered.
+/// Accept only actual scheme changes so rendering cannot feed its own observer.
+struct MenuBarAppearanceGate {
+    private var previous: NSAppearance.Name?
+    mutating func accept(_ name: NSAppearance.Name) -> Bool {
+        guard previous != name else { return false }
+        previous = name
+        return true
+    }
+}
+
 @MainActor
 public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
     NativeActionMenu.shared.install(checkForUpdates: checkForUpdates)
@@ -16,6 +27,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var appearanceObservation: NSKeyValueObservation?
     private var checkForUpdates: (() -> Void)?
     private var bindings = ActionMenuBindings(mode: nil)
+    private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
     private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
 
@@ -30,11 +42,12 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if let button = item.button {
             appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
                 Task { @MainActor in
+                    let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) ?? .aqua
+                    guard self.appearanceGate.accept(match) else { return }
+                    WorkspaceSidebarPanel.menuBarColorScheme = match == .aqua ? .light : .dark
                     self.lastIconState = nil
                     self.updateIcon()
                     requestPublicStateUpdate()
-                    let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
-                    WorkspaceSidebarPanel.menuBarColorScheme = match == .aqua ? .light : .dark
                     WorkspaceSidebarPanel.refreshWallpaperContrast()
                 }
             }

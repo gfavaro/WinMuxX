@@ -243,11 +243,25 @@ existing modes remain unchanged, full checks pass, and release evidence is recor
   mid-transaction receives its initial snapshot at completion even if state is
   otherwise unchanged. A query with no previously committed snapshot returns a
   retry error while the model is settling rather than exposing partial state.
-- `make check` passed 1,325 Swift and 51 Python tests. Focused coverage includes
+- `make check` passed 1,327 Swift and 51 Python tests. Focused coverage includes
   stale deadlines, same-mode re-entry, accepted concurrent work, entry-sequence
   completion, hook re-entry, failed commands, suspension, runtime isolation,
   Unicode initials, contrast, reused Carbon registrations, metadata edits, initial
-  subscription ordering/reconnect, legacy payloads and a zero-native-read query.
+  subscription ordering/reconnect, legacy payloads, disabled management, direct UI
+  mutation cache invalidation and a zero-native-read query.
 - Native indicator/theme behavior and live SketchyBar remain separate from model
   tests. Record the signed build/install and actual native results below before
   declaring delivery complete.
+
+### Native trial correction
+
+Build 122 passed the automated suite and installer checks, but native observation
+found repeated menu-bar effective-appearance notifications feeding repaint back
+into the observer. A half-second idle observation advanced the state revision by
+128,885 and process CPU was high. The build was rolled back to 121, and exact
+personal config restoration was verified. Appearance updates now accept only an
+actual light/dark scheme change before repainting. A 2,000-notification plus
+re-entry regression checks bounded rendering; final native validation is pending.
+The temporary live-config helper also needed to preserve root dotted menu-bar
+keys; its first invalid test edit was rejected and restored without changing
+surviving window assignments.
