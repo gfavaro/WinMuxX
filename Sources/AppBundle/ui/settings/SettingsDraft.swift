@@ -43,7 +43,11 @@ struct SettingsDraft<Value: Equatable>: DynamicProperty {
         get { store.value(for: id, fallback: load) }
         nonmutating set {
             guard newValue != wrappedValue else { return }
-            store.set(newValue, for: id)
+            if newValue == load() {
+                store.acknowledge(store.entries.filter { $0.key == id })
+            } else {
+                store.set(newValue, for: id)
+            }
         }
     }
 

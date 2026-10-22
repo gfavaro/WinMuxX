@@ -23,6 +23,8 @@ final class SettingsDraftAndPreviewTest: XCTestCase {
         XCTAssertNil(SettingsDraftStore.shared.entries[id])
         draft.wrappedValue = 8
         XCTAssertEqual(draft.wrappedValue, 8)
+        draft.wrappedValue = 7
+        XCTAssertNil(SettingsDraftStore.shared.entries[id], "Undoing an edit must not leave an unsaved draft")
         SettingsDraftStore.shared.acknowledge(SettingsDraftStore.shared.entries.filter { $0.key == id })
     }
 

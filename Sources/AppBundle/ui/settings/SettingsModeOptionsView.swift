@@ -54,7 +54,11 @@ private struct SettingsModeFields: View {
 
     private func binding<T: Equatable>(_ key: String, fallback: @escaping @MainActor () -> T) -> Binding<T> {
         Binding(get: { drafts.value(for: prefix + "." + key, fallback: fallback) },
-                set: { drafts.set($0, for: prefix + "." + key) })
+                set: { value in
+                    let id = prefix + "." + key
+                    if value == fallback() { drafts.acknowledge(drafts.entries.filter { $0.key == id }) }
+                    else { drafts.set(value, for: id) }
+                })
     }
     private func persist(_ key: String, _ value: String?) {
         let id = prefix + "." + key
