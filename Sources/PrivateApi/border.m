@@ -296,7 +296,12 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
         CGRect piece = winmux_border_piece(bounds.size, radius, width, border->scale, i);
         border->pieces[i] = piece;
         if (CGRectIsEmpty(piece)) continue;
-        CGRect local = { CGPointZero, piece.size };
+        // SkyLight can drop the final backing row at an exact surface boundary
+        // even when adjacent windows have identical pixel-aligned bounds. Keep
+        // a transparent guard pixel outside the painted partition. The drawing
+        // clip remains `piece`, so translucent edges never paint twice.
+        CGFloat guardPixel = 1 / MAX(1, border->scale);
+        CGRect local = CGRectMake(0, 0, piece.size.width + guardPixel, piece.size.height + guardPixel);
         CFTypeRef region = NULL;
         success = !SYM("CGSNewRegionWithRect", Region)(&local, &region) && region;
         if (!success) break;
@@ -306,6 +311,7 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
         // Allocate only this edge's backing surface, after reshaping.
         CGContextRef context = SYM("SLWindowContextCreate", Context)(cid(), border->windows[i], NULL);
         if (!context) { success = false; break; }
+        CGContextClearRect(context, local);
         winmux_border_draw_path(context, piece, path, rgba);
         CGContextFlush(context);
         CGContextRelease(context);
