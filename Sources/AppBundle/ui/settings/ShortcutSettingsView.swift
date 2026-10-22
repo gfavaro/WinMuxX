@@ -221,6 +221,7 @@ struct ShortcutCategoryView: View {
             }
 
             if category == .managed && !searching {
+                SettingsModeOptionsView(model: model)
                 Section("Modifier keys") {
                     modifierSidePicker("Option", key: "alt", selection: $altSide)
                     modifierSidePicker("Command", key: "cmd", selection: $cmdSide)

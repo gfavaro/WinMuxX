@@ -80,6 +80,8 @@ struct SettingsDisplaysView: View {
     @ObservedObject var model: ShortcutSettingsModel
     @ObservedObject var displays: SettingsDisplaysModel
     @ObservedObject private var tray = TrayMenuModel.shared
+    @State private var isSavingAssignment = false
+    @State private var attemptedAssignment: SettingsAssignmentDraft?
     @State private var workspace = ""
     @State private var selectedDisplay: String?
     @State private var pendingMove: (workspace: String, selector: String, visibleWorkspace: String?, displayName: String)?
@@ -207,14 +209,23 @@ struct SettingsDisplaysView: View {
                 SettingsDescription("Use UUIDs for exact displays. Arrays retain ordered alternatives. Unavailable assignments are kept until you explicitly change them.")
             }
             HStack {
-                Button(displays.assignment.isEditing ? "Save changes" : "Save assignment") { saveAssignment() }
-                    .disabled(!displays.assignment.isDirty || displays.assignment.workspace.isEmpty || displays.assignment.selector.isEmpty)
+                if !displays.assignment.isEditing {
+                    Button("Add assignment") { saveAssignment() }
+                        .disabled(!displays.assignment.isDirty || displays.assignment.workspace.isEmpty || displays.assignment.selector.isEmpty)
+                }
+                if isSavingAssignment { Text("Saving…").foregroundStyle(.secondary) }
                 if displays.assignment.isDirty || displays.assignment.isEditing {
-                    Button("Revert") { displays.assignment = SettingsAssignmentDraft() }
+                    Button(displays.assignment.isDirty ? "Discard changes" : "Done") { displays.assignment = SettingsAssignmentDraft() }
                 }
             }
         }
-        .disabled(model.savingSettingIDs.contains("workspace-to-monitor-force-assignment"))
+        .disabled(isSavingAssignment || model.savingSettingIDs.contains("workspace-to-monitor-force-assignment"))
+        .settingsAutosave(value: displays.assignment, enabled: displays.assignment.isEditing && displays.assignment.isDirty && !isSavingAssignment && displays.assignment != attemptedAssignment) {
+            guard displays.assignment.isDirty, displays.assignment != attemptedAssignment else { return }
+            do { _ = try displays.assignment.renderedSelectors() }
+            catch { self.error = error.localizedDescription; return }
+            saveAssignment()
+        }
     }
 
     private func assignmentSummary(_ name: String) -> String {
@@ -226,21 +237,33 @@ struct SettingsDisplaysView: View {
     }
 
     private func editAssignment(_ name: String) {
-        guard !displays.assignment.isDirty else { error = "Save or revert the current assignment first."; return }
+        guard !displays.assignment.isDirty else { error = "Finish or discard the current assignment first."; return }
         displays.assignment = .editing(workspace: name, selectors: config.workspaceToMonitorForceAssignment[name, default: []].map(\.selector), connectedSelectors: Set(displays.rows.filter { $0.uuid != nil }.map(\.id)))
         error = nil
     }
 
     private func saveAssignment() {
+        guard !isSavingAssignment else { return }
         let submitted = displays.assignment
+        attemptedAssignment = submitted
+        isSavingAssignment = true
         model.activeSettingTitle = "Display assignment"
         persistSettingsDocumentEdit(model: model, settingIDs: ["workspace-to-monitor-force-assignment"], onSaved: {
-            if displays.assignment == submitted { displays.assignment = SettingsAssignmentDraft() }
+            isSavingAssignment = false
+            if displays.assignment == submitted {
+                displays.assignment = .editing(workspace: submitted.workspace,
+                    selectors: config.workspaceToMonitorForceAssignment[submitted.workspace, default: []].map(\.selector),
+                    connectedSelectors: Set(displays.rows.filter { $0.uuid != nil }.map(\.id)))
+            }
+            error = nil
+        }, onFailure: { failure in
+            isSavingAssignment = false
+            error = failure.localizedDescription
         }) { current in try submitted.applying(to: current) }
     }
 
     private func removeAssignment(_ name: String) {
-        guard !displays.assignment.isDirty else { error = "Save or revert the current assignment first."; return }
+        guard !displays.assignment.isDirty else { error = "Finish or discard the current assignment first."; return }
         let original = config.workspaceToMonitorForceAssignment[name]?.map(\.selector)
         model.activeSettingTitle = "Display assignment"
         persistSettingsDocumentEdit(model: model, settingIDs: ["workspace-to-monitor-force-assignment"], onSaved: {

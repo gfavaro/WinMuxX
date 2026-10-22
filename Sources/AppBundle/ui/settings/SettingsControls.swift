@@ -44,6 +44,7 @@ struct SettingsToggle: View {
             }))
             .frame(minHeight: 28)
             .accessibilityIdentifier(id)
+            .accessibilityLabel(title)
             .accessibilityHint(help ?? "")
             if let help { SettingsDescription(help) }
         }
@@ -90,6 +91,7 @@ struct SettingsStepper: View {
         }
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { submitted = value }
+        .onDisappear { commit() }
         .onChange(of: focused) { if !$0 { commit() } }
         .onChange(of: value) { newValue in
             if !focused { submitted = newValue }
@@ -150,6 +152,7 @@ struct SettingsDoubleStepper: View {
         }
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { submitted = value }
+        .onDisappear { commit() }
         .onChange(of: focused) { if !$0 { commit() } }
     }
 
@@ -209,6 +212,7 @@ struct SettingsBorderColor: View {
 struct SettingsTextField: View {
     @FocusState private var isFocused: Bool
     @State private var committedText: String?
+    @State private var wasEdited = false
     let title: String
     let id: String
     @Binding var text: String
@@ -228,12 +232,16 @@ struct SettingsTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            TextField(title, text: $text)
+            TextField(title, text: Binding(get: { text }, set: { value in
+                text = value
+                wasEdited = true
+            }))
                 .focused($isFocused)
                 .onAppear { committedText = text }
                 .onSubmit(commit)
                 .onChange(of: isFocused) { focused in if !focused { commit() } }
                 .onDisappear { commit() }
+                .settingsAutosave(value: text, enabled: wasEdited, commit: commit)
                 .help(help)
                 .accessibilityIdentifier(id)
                 .accessibilityLabel(title)
@@ -246,8 +254,9 @@ struct SettingsTextField: View {
     }
 
     private func commit() {
-        guard let committedText, committedText != text, validate(text) == nil else { return }
+        guard wasEdited, let committedText, committedText != text, validate(text) == nil else { return }
         self.committedText = text
+        wasEdited = false
         ShortcutSettingsModel.shared.activeSettingTitle = title
         save()
     }
@@ -263,6 +272,8 @@ func settingsHexColorError(_ text: String) -> String? {
 struct SettingsMultilineField: View {
     @State private var savedText: String?
     @State private var isSaving = false
+    @State private var attemptedText: String?
+    @State private var wasEdited = false
     let title: String
     let id: String
     @Binding var text: String
@@ -283,34 +294,39 @@ struct SettingsMultilineField: View {
         VStack(alignment: .leading, spacing: 5) {
             Text(title)
             SettingsDescription(help)
-            TextEditor(text: $text)
+            TextEditor(text: Binding(get: { text }, set: { value in
+                text = value
+                wasEdited = true
+            }))
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 80)
                 .accessibilityLabel(title).accessibilityHint(help)
                 .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: .separatorColor)))
-            Button(isSaving ? "Saving…" : "Save and apply") {
-                let submittedText = text
-                isSaving = true
-                ShortcutSettingsModel.shared.activeSettingTitle = title
-                save {
-                    savedText = submittedText
-                    isSaving = false
-                }
-            }
-            .controlSize(.regular)
-            .disabled(isSaving || savedText == text)
-            if savedText != text {
-                Text("Unsaved changes").font(.callout).foregroundStyle(.secondary)
-            }
+            if isSaving { Text("Saving…").font(.callout).foregroundStyle(.secondary) }
         }
         .padding(12)
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { savedText = savedValue }
         .onChange(of: savedValue) { savedText = $0; isSaving = false }
+        .settingsAutosave(value: text, enabled: wasEdited && !isSaving) { commit() }
         .onReceive(ShortcutSettingsModel.shared.$failedSettingID) { failedID in
             if failedID == id { isSaving = false }
         }
     }
+
+    private func commit() {
+        guard wasEdited, !isSaving, savedText != text, attemptedText != text else { return }
+        let submitted = text
+        attemptedText = submitted
+        isSaving = true
+        ShortcutSettingsModel.shared.activeSettingTitle = title
+        save {
+            savedText = submitted
+            if text == submitted { wasEdited = false }
+            isSaving = false
+        }
+    }
+
 }
 
 struct SettingsPicker<Selection: Hashable, Content: View>: View {

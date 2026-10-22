@@ -116,6 +116,8 @@ final class SettingsWindowRulesModel: ObservableObject {
         self.readText = readText
     }
     @Published private(set) var isNewRule = false
+    @Published private(set) var isSaving = false
+    private var attemptedDraft: SettingsRuleDraft?
     var isDirty: Bool { isNewRule || draft != original }
 
     func load() {
@@ -136,30 +138,43 @@ final class SettingsWindowRulesModel: ObservableObject {
     }
 
     func select(_ index: Int) {
-        guard !isDirty else { error = "Save or revert the current rule before selecting another."; return }
+        guard !isDirty else { error = "Finish or discard the current rule before selecting another."; return }
         do { try selectDraft(index); error = nil } catch { self.error = error.localizedDescription }
     }
 
     private func selectDraft(_ index: Int) throws {
         let value = try SettingsRuleDraft(block: document.entries[index].text)
+        attemptedDraft = nil
         selection = index; draft = value; original = value
     }
 
     func revert() {
+        attemptedDraft = nil
         if isNewRule { isNewRule = false; selection = nil; draft = nil; original = nil }
         else { draft = original }
         load()
     }
 
     func save(using model: ShortcutSettingsModel) {
-        guard let selection, let draft, let original else { return }
+        guard !isSaving, let selection, let draft, let original else { return }
+        isSaving = true
+        attemptedDraft = draft
         let baseline = document
         let creating = isNewRule
         persistSettingsDocumentEdit(model: model, settingIDs: ["on-window-detected"], onSaved: { [weak self] in
             guard let self else { return }
+            self.isSaving = false
             self.isNewRule = false
             self.original = draft
-            self.load()
+            do {
+                self.document = SettingsRuleDocument(try self.readText())
+                self.rows = self.document.entries.enumerated().map { SettingsRuleRow(id: $0.offset, block: $0.element.text) }
+                self.load()
+                self.autosave(using: model)
+            } catch { self.error = error.localizedDescription }
+        }, onFailure: { [weak self] error in
+            self?.isSaving = false
+            self?.error = error.localizedDescription
         }) { current in
             let block = creating ? "[[on-window-detected]]\nrun = 'layout tiling'\n" : baseline.entries[selection].text
             let replacement = try SettingsRuleDocument.editing(block, edits: draft.edits(from: original))
@@ -170,8 +185,16 @@ final class SettingsWindowRulesModel: ObservableObject {
         }
     }
 
+    var canAutosave: Bool { !isNewRule && !isSaving && isDirty && draft != attemptedDraft }
+
+    func autosave(using model: ShortcutSettingsModel) {
+        guard canAutosave else { return }
+        save(using: model)
+    }
+
     func add() {
-        guard !isDirty else { error = "Save or revert the current rule first."; return }
+        attemptedDraft = nil
+        guard !isDirty else { error = "Finish or discard the current rule first."; return }
         load()
         guard error == nil else { return }
         do {
@@ -182,7 +205,7 @@ final class SettingsWindowRulesModel: ObservableObject {
     }
 
     func change(using model: ShortcutSettingsModel, delete: Bool = false, offset: Int = 0) {
-        guard let selection, !isDirty else { error = "Save or revert the current rule first."; return }
+        guard let selection, !isDirty else { error = "Finish or discard the current rule first."; return }
         let baseline = document
         persistSettingsDocumentEdit(model: model, settingIDs: ["on-window-detected"], onSaved: { [weak self] in
             self?.selection = nil; self?.draft = nil; self?.original = nil; self?.load()
@@ -279,6 +302,8 @@ struct SettingsWindowRulesView: View {
                     Toggle("Continue to later matching rules", isOn: field(\.continues))
                 }
             }.formStyle(.grouped)
+                .disabled(rules.isSaving)
+                .settingsAutosave(value: rules.draft, enabled: rules.canAutosave) { rules.autosave(using: model) }
         } else {
             VStack(spacing: 8) {
                 Text(rules.rows.isEmpty ? "Add your first rule" : "Select a rule").font(.headline)
@@ -291,8 +316,9 @@ struct SettingsWindowRulesView: View {
         VStack(alignment: .leading, spacing: 8) {
             Divider()
             HStack {
-                Button("Save") { rules.save(using: model) }.disabled(!rules.isDirty)
-                Button("Revert") { rules.revert() }.disabled(!rules.isDirty)
+                if rules.isNewRule { Button("Create rule") { rules.save(using: model) }.disabled(rules.isSaving) }
+                if rules.isDirty { Button(rules.isNewRule ? "Cancel" : "Discard changes") { rules.revert() }.disabled(rules.isSaving) }
+                if rules.isSaving { Text("Saving…").foregroundStyle(.secondary) }
                 Spacer()
                 Button("Move up") { rules.change(using: model, offset: -1) }.disabled((rules.selection ?? 0) == 0 || rules.isDirty)
                 Button("Move down") { rules.change(using: model, offset: 1) }.disabled((rules.selection ?? 0) >= rules.document.entries.count - 1 || rules.isDirty)
