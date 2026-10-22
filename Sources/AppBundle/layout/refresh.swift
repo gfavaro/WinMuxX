@@ -462,7 +462,7 @@ struct RunSessionGuard: Sendable {
     static var isServerEnabled: RunSessionGuard? { TrayMenuModel.shared.isEnabled ? forceRun : nil }
     @MainActor
     static func isServerEnabled(orIsEnableCommand command: (any Command)?) -> RunSessionGuard? {
-        command is EnableCommand ? .forceRun : .isServerEnabled
+        (command is EnableCommand || command is StateCommand) ? .forceRun : .isServerEnabled
     }
     @MainActor
     static func checkServerIsEnabledOrDie(

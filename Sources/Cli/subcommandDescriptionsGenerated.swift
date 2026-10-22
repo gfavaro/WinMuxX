@@ -41,6 +41,7 @@ let subcommandDescriptions = [
     ["  resize", "Resize the focused window"],
     ["  split", "Split focused window"],
     ["  stack-with", "Put the focused window into the same tab group as the nearest window in the specified direction."],
+    ["  state", "Read a versioned snapshot of managed state without refreshing native windows"],
     ["  subscribe", "Subscribe to WinMuxX events and receive notifications via socket"],
     ["  summon-workspace", "Move the requested workspace to the focused monitor."],
     ["  swap-with-master", "Swap the target pane with the master pane"],

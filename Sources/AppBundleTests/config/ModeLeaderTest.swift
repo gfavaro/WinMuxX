@@ -300,6 +300,18 @@ import XCTest
         XCTAssertNil(runtime.publicState.publicationTask)
     }
 
+    func testStateRemainsAvailableWhenManagementIsDisabled() async throws {
+        TrayMenuModel.shared.isEnabled = false
+        defer { TrayMenuModel.shared.isEnabled = true }
+        let command = StateCommand(args: StateCmdArgs(rawArgs: []))
+        XCTAssertNotNil(RunSessionGuard.isServerEnabled(orIsEnableCommand: command))
+        XCTAssertNil(RunSessionGuard.isServerEnabled(orIsEnableCommand: ModeCommand(args: ModeCmdArgs(rawArgs: []))))
+        let result = try await command.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 0)
+        guard case .object(let state) = publicStateSnapshot().state["runtime"] else { return XCTFail() }
+        XCTAssertEqual(state["enabled"], .bool(false))
+    }
+
     func testStructureChangesUnknownNativeStateAndConfigMetadataSerialize() async throws {
         let workspace = Workspace.get(byName: "named")
         let window = TestWindow.new(id: 91092, parent: workspace.rootTilingContainer)

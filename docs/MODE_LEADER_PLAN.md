@@ -243,7 +243,7 @@ existing modes remain unchanged, full checks pass, and release evidence is recor
   mid-transaction receives its initial snapshot at completion even if state is
   otherwise unchanged. A query with no previously committed snapshot returns a
   retry error while the model is settling rather than exposing partial state.
-- `make check` passed 1,324 Swift and 51 Python tests. Focused coverage includes
+- `make check` passed 1,325 Swift and 51 Python tests. Focused coverage includes
   stale deadlines, same-mode re-entry, accepted concurrent work, entry-sequence
   completion, hook re-entry, failed commands, suspension, runtime isolation,
   Unicode initials, contrast, reused Carbon registrations, metadata edits, initial

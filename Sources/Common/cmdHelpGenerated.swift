@@ -151,6 +151,7 @@ let stack_with_help_generated = """
     """
 let subscribe_help_generated = """
     USAGE: subscribe [-h|--help] [--all] [--no-send-initial] [<event>...]
+    Request state-changed explicitly for versioned snapshots; --all retains legacy events.
     """
 let summon_workspace_help_generated = """
     USAGE: summon-workspace [-h|--help] [--fail-if-noop] <workspace>
