@@ -1,6 +1,18 @@
 import AppKit
 import SwiftUI
 
+/// Separate edge surfaces must share a backing-pixel phase on screen, too.
+/// Local pixel-aligned partitions alone still acquire seams when the compositor
+/// samples each surface at a fractional screen origin. Preserve the path's size.
+func pixelAlignedWindowBorderFrame(_ frame: CGRect, width: CGFloat, scale: CGFloat) -> CGRect {
+    let scale = max(1, scale)
+    let outer = frame.insetBy(dx: -width, dy: -width)
+    return frame.offsetBy(
+        dx: (outer.minX * scale).rounded() / scale - outer.minX,
+        dy: (outer.minY * scale).rounded() / scale - outer.minY,
+    )
+}
+
 /// Shared vector geometry; no full-window bitmap is allocated.
 struct WindowBorderGeometry {
     struct Key: Equatable {

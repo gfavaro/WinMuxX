@@ -257,10 +257,13 @@ final class WindowBorder {
 
     func update(frame: CGRect, active: Bool, settings: WindowBordersConfig, corners: WindowBorderCornerRadii? = nil) {
         let nextCorners = corners ?? .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius())
-        let cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
+        var cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
                                 width: frame.width, height: frame.height)
         let center = CGPoint(x: cocoaFrame.midX, y: cocoaFrame.midY)
         let nextScale = NSScreen.screens.first(where: { $0.frame.contains(center) })?.backingScaleFactor ?? 2
+        let frame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: nextScale)
+        cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
+            width: frame.width, height: frame.height)
         if !fallbackPanels.isEmpty {
             updateFallback(frame: cocoaFrame, active: active, settings: settings, scale: nextScale, corners: nextCorners)
             return
@@ -315,7 +318,8 @@ final class WindowBorder {
 
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
         if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
-        let outer = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
+        let alignedFrame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: scale)
+        let outer = alignedFrame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = corners.maximum
         let path = borderGeometry(size: outer.size, corners: corners, width: CGFloat(settings.width), scale: scale).path
         for (index, panel) in fallbackPanels.enumerated() {

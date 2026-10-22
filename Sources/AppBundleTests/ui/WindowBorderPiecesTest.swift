@@ -4,6 +4,28 @@ import PrivateApi
 import XCTest
 
 final class WindowBorderPiecesTest: XCTestCase {
+    func testScreenPartitionsStayOnBackingPixelsAtFractionalAndNegativeOrigins() {
+        for scale: CGFloat in [1, 2] {
+            for origin: CGFloat in [-1800.25, -0.75, 0.25, 100.5] {
+                for width: CGFloat in [0.5, 4, 4.5] {
+                    let frame = CGRect(x: origin, y: origin + 0.25, width: 800.5, height: 600.5)
+                    let aligned = pixelAlignedWindowBorderFrame(frame, width: width, scale: scale)
+                    XCTAssertEqual(aligned.size, frame.size)
+                    XCTAssertLessThanOrEqual(abs(aligned.minX - frame.minX), 0.5 / scale)
+                    XCTAssertLessThanOrEqual(abs(aligned.minY - frame.minY), 0.5 / scale)
+                    XCTAssertEqual(pixelAlignedWindowBorderFrame(aligned, width: width, scale: scale), aligned)
+                    let outer = aligned.insetBy(dx: -width, dy: -width)
+                    for index in 0..<4 {
+                        let piece = winmux_border_piece(outer.size, 19, Float(width), Float(scale), Int32(index))
+                        for coordinate in [outer.minX + piece.minX, outer.minY + piece.minY] {
+                            XCTAssertEqual(coordinate * scale, (coordinate * scale).rounded(), accuracy: 0.000001)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     func testPartitionsAreDisjointAndContainTheRingAtBothScales() {
         for scale: Float in [1, 2] {
             for size in [CGSize(width: 1700, height: 1400), CGSize(width: 20, height: 14), CGSize(width: 5, height: 3), CGSize(width: 5, height: 100), CGSize(width: 160.5, height: 100.5)] {
