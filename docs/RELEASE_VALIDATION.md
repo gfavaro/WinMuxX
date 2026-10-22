@@ -571,3 +571,41 @@ Only the built-in display was connected. Physical hotplug/sleep/wake, active
 accessibility-setting changes were not performed in this delivery. Offscreen
 native layers and resolver tests cover deterministic appearance/lifecycle policy;
 they do not establish native material rendering or physical gesture feel.
+
+## Build 123 — timed modes and external state (2026-10-22)
+
+`make check` passed **1,327 Swift tests and 51 Python checks**. Full checks include
+mode activation/deadline/accepted-work ownership, suspension/re-entry, shared Carbon
+registrations, mode metadata edits, contrast, bounded appearance notifications,
+state query isolation, disabled management, direct UI cache invalidation,
+subscription ordering/reconnect/legacy compatibility and adapter fixtures.
+
+Signed build **123** is installed at `/Applications/WinMuxX.app`; client and server
+identify source `33d5041f7951a8bd92ba409f95c5426fa3ca550e`. Strict/deep signature
+verification and installer dry-run passed. Initial verification reported
+`focus_not_restored`. Read-only resume then returned **validated**, with zero moved,
+closed or opened windows. No stale focus was replayed. Private report:
+`.release/install-build123.json`; build 121 rollback archive is retained.
+
+An earlier build-122 native trial exposed an appearance-notification repaint loop
+that model tests did not reproduce. Build 122 was rolled back to 121. The corrected
+observer accepts only actual scheme changes; a repeated/re-entrant notification
+regression and the final native check cover the correction. In build 123 six idle
+samples had identical revision 36, and a separate post-test one-second sample had
+zero revision growth. These bounded observations establish correction of the
+observed loop, not a general CPU/battery benchmark.
+
+Temporary mode configs verified both native icon tint and `| M` workspace suffix.
+Mode-hook child variables matched the queried mode/initial/resolved color. A
+1,500-ms deadline returned to `main`; an actual IPC subscription received eight
+ordered snapshots. Focus and all seven window assignments remained unchanged.
+Personal config was restored byte-for-byte, including the original indicator
+preference, and config dry-run passed. No leader shortcut was added permanently.
+
+Native theme checks used the current macOS appearance; explicit physical theme
+and accessibility toggles were not performed. Both scheme/contrast resolution
+policies are covered in automated tests. Live SketchyBar was not exercised; its
+optional adapter passed payload/ordering/reconnect identity/failure fixtures.
+See [STATE_API.md](STATE_API.md) and [MODE_LEADER_PLAN.md](MODE_LEADER_PLAN.md).
+Personal config, hook environment, reports and desktop screenshots remain private
+under `.release/`; none are committed.

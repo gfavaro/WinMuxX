@@ -38,5 +38,6 @@ instance/revision or use a single subscriber. Existing callback command order is
 preserved. There is no new shell hook for every native event.
 
 The built-in menu-bar indicator and snapshot mode fields use the same presentation
-resolver. Hiding the built-in indicator does not disable queries/subscriptions.
+resolver. `indicatorVisible` describes the logical mode badge; macOS menu-bar
+auto-hide can still conceal it. Hiding the built-in indicator does not disable queries/subscriptions.
 See `script/examples/sketchybar_state.py` for a reconnecting optional adapter.

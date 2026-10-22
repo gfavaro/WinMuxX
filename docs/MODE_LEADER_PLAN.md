@@ -1,6 +1,6 @@
 # Mode timeout and indicator
 
-Status: implemented; release installation and native smoke validation pending.
+Status: implemented, verified and installed as signed build 123.
 The personal leader shortcut remains unconfigured.
 
 ## User behavior
@@ -261,7 +261,30 @@ into the observer. A half-second idle observation advanced the state revision by
 128,885 and process CPU was high. The build was rolled back to 121, and exact
 personal config restoration was verified. Appearance updates now accept only an
 actual light/dark scheme change before repainting. A 2,000-notification plus
-re-entry regression checks bounded rendering; final native validation is pending.
+re-entry regression checks bounded rendering; build 123 native validation confirmed idle
+revisions no longer advance and the process returned to idle.
 The temporary live-config helper also needed to preserve root dotted menu-bar
 keys; its first invalid test edit was rejected and restored without changing
 surviving window assignments.
+
+### Build 123 delivery
+
+`make check` passed 1,327 Swift tests and 51 Python tests. Signed build 123 embeds
+app/client source `33d5041f7951a8bd92ba409f95c5426fa3ca550e`. Candidate dry-run and
+strict/deep signatures passed. Initial installer verification flagged
+`focus_not_restored`; a read-only resume validated the installation with no moved,
+opened or closed windows. It did not replay stale focus.
+
+Native temporary-mode checks confirmed icon tint, workspace `| M` suffix, captured
+mode-hook variables matching the state API, and 1,500-ms timeout returning to main.
+The persistent subscription delivered eight ordered snapshots. Focus and all seven
+surviving assignments remained unchanged. Exact personal TOML bytes were restored,
+including its original indicator preference; no leader shortcut is enabled.
+Six successive idle samples kept revision 36 unchanged; a separate post-test
+one-second observation also had zero revision growth. These finite checks rule out
+the observed notification loop in those runs, not all possible energy regressions.
+
+Native checks used the current system appearance. Automated tests cover both
+appearance/contrast policies; physical system-theme/accessibility changes and live
+SketchyBar were not exercised. The optional adapter passed fixture tests. Private
+reports/screenshots/config backups remain in `.release/` and are not committed.
