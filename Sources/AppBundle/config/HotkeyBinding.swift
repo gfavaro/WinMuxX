@@ -25,6 +25,7 @@ final class HotkeyState {
     var activeMode: String? = mainModeId
     var pendingUnboundModeExit = false
     var unboundPassthroughKeyCode: Int64?
+    var unboundPassthroughGeneration: UInt64 = 0
 
     isolated deinit {
         for task in pendingTapTriggerTasks.values { task.cancel() }
@@ -339,6 +340,7 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     let owner = runtime
     hotkeyState.pendingUnboundModeExit = true
     hotkeyState.unboundPassthroughKeyCode = keyCode
+    hotkeyState.unboundPassthroughGeneration &+= 1
     hotkeyState.modeSession.invalidate()
     let generation = hotkeyState.modeSession.generation
     for key in hotkeyState.hotkeys.values { key.isEnabled = false }
@@ -352,12 +354,19 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     return true
 }
 
-/// Called before forwarding key-up. A nil key clears a gate after tap recovery.
+/// Observe key-up before forwarding it, but restore shortcuts only after returning
+/// from the tap. Registering Carbon inside this callback can treat the original
+/// chord as still held and immediately consume it. A nil key handles tap recovery.
 @MainActor func finishUnboundKeyPassThrough(keyCode: Int64?) {
     guard let held = hotkeyState.unboundPassthroughKeyCode,
           keyCode == nil || keyCode == held else { return }
-    hotkeyState.unboundPassthroughKeyCode = nil
-    applyHotkeyEnabledState()
+    let generation = hotkeyState.unboundPassthroughGeneration
+    runtime.task {
+        guard hotkeyState.unboundPassthroughGeneration == generation,
+              hotkeyState.unboundPassthroughKeyCode == held else { return }
+        hotkeyState.unboundPassthroughKeyCode = nil
+        applyHotkeyEnabledState()
+    }
 }
 
 @MainActor func handleSideFilteredKeyDown(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {

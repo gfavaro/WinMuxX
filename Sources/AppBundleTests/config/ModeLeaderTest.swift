@@ -87,6 +87,8 @@ import XCTest
         finishUnboundKeyPassThrough(keyCode: 0) // An unrelated key-up cannot release Q's gate.
         XCTAssertFalse(mainKey.isEnabled)
         finishUnboundKeyPassThrough(keyCode: 12)
+        XCTAssertFalse(mainKey.isEnabled, "Do not register Carbon while still inside the key-up callback")
+        for _ in 0..<30 { await Task.yield() }
         XCTAssertTrue(mainKey.isEnabled)
         mainKey.keyDownHandler?()
         for _ in 0..<30 { await Task.yield() }
@@ -106,6 +108,7 @@ import XCTest
         XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
         for _ in 0..<30 { await Task.yield() }
         finishUnboundKeyPassThrough(keyCode: nil)
+        for _ in 0..<30 { await Task.yield() }
         XCTAssertNil(runtime.hotkeys.unboundPassthroughKeyCode)
         XCTAssertTrue(runtime.hotkeys.hotkeys.values.contains { $0.isEnabled })
     }

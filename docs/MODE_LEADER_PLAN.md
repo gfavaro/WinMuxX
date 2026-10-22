@@ -308,7 +308,8 @@ passes unassigned keys through unchanged. It disables the old layer immediately,
 invalidates its deadline and queued bindings, then activates main on the next
 main-actor turn. Shortcuts remain disabled until the triggering key is released,
 so neither old navigation bindings nor newly enabled main shortcuts can consume
-the original key press. Tap recovery clears the release gate. Mode
+the original key press. Registration resumes on the actor turn after the key-up
+event tap returns, allowing WindowServer to finish the release first. Tap recovery clears the release gate. Mode
 changes, reload and suspension invalidate a pending exit. Modifier taps retain
 their existing semantics; no extra event tap or polling timer is introduced.
 
