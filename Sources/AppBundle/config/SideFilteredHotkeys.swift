@@ -33,11 +33,15 @@ private let sideFilteredCallback: CGEventTapCallBack = { _, type, event, _ in
     func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             consumedKeys.removeAll()
+            finishUnboundKeyPassThrough(keyCode: nil)
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
             return false
         }
         let key = event.getIntegerValueField(.keyboardEventKeycode)
-        if type == .keyUp { return consumedKeys.remove(key) != nil }
+        if type == .keyUp {
+            finishUnboundKeyPassThrough(keyCode: key)
+            return consumedKeys.remove(key) != nil
+        }
         guard type == .keyDown else { return false }
         if consumedKeys.contains(key), event.getIntegerValueField(.keyboardEventAutorepeat) != 0 { return true }
         let flags = NSEvent.ModifierFlags(rawValue: UInt(event.flags.rawValue))

@@ -63,6 +63,53 @@ import XCTest
         XCTAssertEqual(activeMode, "main")
     }
 
+    func testUnboundKeyCannotTriggerMainUntilItsRelease() async throws {
+        let parsed = parseConfig("""
+        [mode.main.binding]
+        q = 'mode leader'
+        [mode.leader]
+        exit-on-unbound-key = true
+        [mode.leader.binding]
+        h = 'focus left'
+        """)
+        XCTAssertTrue(parsed.errors.isEmpty)
+        config = parsed.config
+        try await activateMode("main")
+        let mainKey = try XCTUnwrap(runtime.hotkeys.hotkeys.values.first)
+        try await activateMode("leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
+        XCTAssertFalse(mainKey.isEnabled, "The original Q must reach the app, including repeats")
+        mainKey.keyDownHandler?()
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
+        finishUnboundKeyPassThrough(keyCode: 0) // An unrelated key-up cannot release Q's gate.
+        XCTAssertFalse(mainKey.isEnabled)
+        finishUnboundKeyPassThrough(keyCode: 12)
+        XCTAssertTrue(mainKey.isEnabled)
+        mainKey.keyDownHandler?()
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "leader", "The next Q can use main's binding normally")
+    }
+
+    func testUnboundReleaseBeforeActivationDoesNotReenableOldModeAndTapRecoveryClearsGate() async throws {
+        config.modes["leader"]?.exitOnUnboundKey = true
+        try await activateMode("main")
+        try await activateMode("leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
+        finishUnboundKeyPassThrough(keyCode: 12)
+        XCTAssertTrue(runtime.hotkeys.hotkeys.values.allSatisfy { !$0.isEnabled })
+        for _ in 0..<30 { await Task.yield() }
+        XCTAssertEqual(activeMode, "main")
+        try await activateMode("leader")
+        XCTAssertTrue(exitModeForUnboundKey(keyCode: 12, flags: []))
+        for _ in 0..<30 { await Task.yield() }
+        finishUnboundKeyPassThrough(keyCode: nil)
+        XCTAssertNil(runtime.hotkeys.unboundPassthroughKeyCode)
+        XCTAssertTrue(runtime.hotkeys.hotkeys.values.contains { $0.isEnabled })
+    }
+
     func testUnboundExitIsOptInAndIgnoredWhileDisabledSuspendedOrInMain() async throws {
         try await activateMode("leader")
         XCTAssertFalse(exitModeForUnboundKey(keyCode: 12, flags: []))

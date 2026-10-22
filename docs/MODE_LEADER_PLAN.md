@@ -1,7 +1,8 @@
 # Mode timeout and indicator
 
-Status: implemented, verified and installed as signed build 123.
-The personal leader shortcut remains unconfigured.
+Base implementation: verified and installed as signed build 123.
+The repeatable navigation follow-up is described below; personal entry shortcuts
+remain a user configuration choice.
 
 ## User behavior
 
@@ -305,7 +306,9 @@ keyboard event tap observes key-down events before Carbon, checks the current
 mode's chord and sequence bindings (including configured modifier sides), and
 passes unassigned keys through unchanged. It disables the old layer immediately,
 invalidates its deadline and queued bindings, then activates main on the next
-main-actor turn. The triggering key cannot run an old navigation binding. Mode
+main-actor turn. Shortcuts remain disabled until the triggering key is released,
+so neither old navigation bindings nor newly enabled main shortcuts can consume
+the original key press. Tap recovery clears the release gate. Mode
 changes, reload and suspension invalidate a pending exit. Modifier taps retain
 their existing semantics; no extra event tap or polling timer is introduced.
 

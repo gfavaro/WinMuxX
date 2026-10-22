@@ -24,6 +24,7 @@ final class HotkeyState {
     let modeSession = ModeSession()
     var activeMode: String? = mainModeId
     var pendingUnboundModeExit = false
+    var unboundPassthroughKeyCode: Int64?
 
     isolated deinit {
         for task in pendingTapTriggerTasks.values { task.cancel() }
@@ -42,6 +43,7 @@ private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
 @MainActor func resetHotKeys() {
     hotkeyState.pendingUnboundModeExit = false
+    hotkeyState.unboundPassthroughKeyCode = nil
     hotkeyState.modeSession.invalidate()
     TrayMenuModel.shared.setIfChanged(\.modePresentation, nil)
     // Explicitly unregister all hotkeys. We cannot always rely on destruction of the HotKey object to trigger
@@ -81,6 +83,7 @@ extension HotKey {
     if hotkeyState.hotkeysSuspended == suspended { return }
     hotkeyState.hotkeysSuspended = suspended
     hotkeyState.pendingUnboundModeExit = false
+    hotkeyState.unboundPassthroughKeyCode = nil
     if suspended {
         hotkeyState.pendingTapBindings = [:]
         hotkeyState.pressedTapModifiers = []
@@ -91,8 +94,9 @@ extension HotKey {
     updateModePresentation()
 }
 
-@MainActor func activateMode(_ targetMode: String?) async throws {
+@MainActor func activateMode(_ targetMode: String?, preservingUnboundKey: Bool = false) async throws {
     hotkeyState.pendingUnboundModeExit = false
+    if !preservingUnboundKey { hotkeyState.unboundPassthroughKeyCode = nil }
     let owner = runtime
     let previousMode = activeMode
     let mode = targetMode.flatMap { config.modes[$0] }
@@ -158,7 +162,7 @@ extension HotKey {
 }
 
 @MainActor private func triggerBinding(_ binding: String, _ commands: [any Command]) {
-    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit { return }
+    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit || hotkeyState.unboundPassthroughKeyCode != nil { return }
     let owner = runtime
     let session = hotkeyState.modeSession
     let expected = session.generation
@@ -198,7 +202,7 @@ extension HotKey {
 /// checks if this key matches a sequence binding and executes it.
 /// Returns true if the event was consumed (should not reach the app).
 @MainActor func handleSequenceKeyDown(event: NSEvent) -> Bool {
-    guard !hotkeyState.hotkeysSuspended, TrayMenuModel.shared.isEnabled else { return false }
+    guard !hotkeyState.hotkeysSuspended, hotkeyState.unboundPassthroughKeyCode == nil, TrayMenuModel.shared.isEnabled else { return false }
     guard let prefix = hotkeyState.lastSequencePrefixKey,
           let lastTime = hotkeyState.lastSequencePrefixTime,
           let bindings = hotkeyState.sequenceBindingsByPrefix[prefix] else {
@@ -234,7 +238,7 @@ extension HotKey {
 }
 
 @MainActor func noteTapBindingFlagsChanged(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
-    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit { return }
+    if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit || hotkeyState.unboundPassthroughKeyCode != nil { return }
     if hotkeyState.activeTapBindings.isEmpty && hotkeyState.pendingTapBindings.isEmpty && hotkeyState.pendingTapTriggerTasks.isEmpty { return }
     guard let tapModifier = TapModifierKey(keyCode: keyCode) else { return }
     cancelPendingTapTriggers()
@@ -294,7 +298,7 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
 @MainActor private func applyHotkeyEnabledState() {
     let targetBindings = activeMode.flatMap { config.modes[$0] }?.bindings ?? [:]
     for (binding, key) in hotkeyState.hotkeys {
-        key.isEnabled = !hotkeyState.hotkeysSuspended && targetBindings[binding].map { !config.modifierSides.restricts($0.modifiers) } == true
+        key.isEnabled = !hotkeyState.hotkeysSuspended && !hotkeyState.pendingUnboundModeExit && hotkeyState.unboundPassthroughKeyCode == nil && targetBindings[binding].map { !config.modifierSides.restricts($0.modifiers) } == true
     }
 }
 
@@ -307,13 +311,14 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
 }
 
 @MainActor func sideFilteredBinding(keyCode: Int64, flags: NSEvent.ModifierFlags) -> HotkeyBinding? {
-    guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit, TrayMenuModel.shared.isEnabled, activeMode != nil else { return nil }
+    guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit, hotkeyState.unboundPassthroughKeyCode == nil, TrayMenuModel.shared.isEnabled, activeMode != nil else { return nil }
     return hotkeyState.sideFilteredBindings[keyCode]?.first { config.modifierSides.matches($0.modifiers, flags: flags) }
 }
 
 /// Observe before Carbon dispatch, but let the original event reach its app.
-/// Disable the old layer immediately. Register main on the next main-actor turn
-/// so this same event cannot accidentally trigger one of main's shortcuts.
+/// Disable the old layer immediately and activate main on the next actor turn.
+/// Keep shortcuts disabled through key-up: Carbon dispatch can happen after that
+/// turn, so merely deferring activation does not protect the original key-down.
 @MainActor @discardableResult
 func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {
     guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit,
@@ -333,6 +338,7 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     }
     let owner = runtime
     hotkeyState.pendingUnboundModeExit = true
+    hotkeyState.unboundPassthroughKeyCode = keyCode
     hotkeyState.modeSession.invalidate()
     let generation = hotkeyState.modeSession.generation
     for key in hotkeyState.hotkeys.values { key.isEnabled = false }
@@ -340,10 +346,18 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     cancelPendingTapTriggers()
     owner.task {
         guard hotkeyState.modeSession.generation == generation, hotkeyState.pendingUnboundModeExit else { return }
-        do { try await activateMode(mainModeId) }
+        do { try await activateMode(mainModeId, preservingUnboundKey: true) }
         catch { NSLog("WinMuxX unbound-key mode exit failed: %@", String(describing: error)) }
     }
     return true
+}
+
+/// Called before forwarding key-up. A nil key clears a gate after tap recovery.
+@MainActor func finishUnboundKeyPassThrough(keyCode: Int64?) {
+    guard let held = hotkeyState.unboundPassthroughKeyCode,
+          keyCode == nil || keyCode == held else { return }
+    hotkeyState.unboundPassthroughKeyCode = nil
+    applyHotkeyEnabledState()
 }
 
 @MainActor func handleSideFilteredKeyDown(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool {
