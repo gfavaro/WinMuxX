@@ -648,3 +648,33 @@ config or private install/rendering artifacts are committed.
 
 Delivery follows the requested main-first workflow, including the previously
 reviewable leader/state commits. No history was rewritten.
+
+## Native border joins and repeatable navigation — builds 127 and 130
+
+Build 127 removed the visible native border seam by using whole-point internal
+surface joins. Live WindowServer bounds showed a half-point drawing boundary
+beside a whole-point neighbor; a fresh Retina capture confirmed the missing row
+was filled after installation. The user also confirmed the visual fix.
+
+Build **130** is installed at `/Applications/WinMuxX.app`. Client and server identify
+source `ce70e2143119414a44e57768f6bca74c40777fe4`; strict/deep signature verification
+and installer dry-run passed. Installation returned **validated** with zero moved,
+opened or closed managed windows and the existing config preserved. After enabling
+the personal navigation layer, config dry-run and the read-only model check passed.
+
+`make check` passed **1,340 Swift tests and 51 Python tests**. New coverage includes
+opt-in/default parsing, exact and side-specific modifiers, sequence preservation,
+stale exit rejection, suspension, metadata preservation, and the release gate.
+The old layer disables immediately on an unassigned key. Main activates without
+registering shortcuts until the key-up event tap has returned, preventing Carbon
+from capturing that same press as a main shortcut. Event-tap recovery clears the
+gate; no polling timer or additional event tap is introduced.
+
+An installed native text-window check verified right-Command tap entry and exit,
+blue N state presentation, repeated J/K remaining in navigation, Return/Escape
+exit, Q followed by J/K producing ordinary text, and unassigned Alt+S reaching the
+text app rather than invoking main's sidebar shortcut. Activity restarted the
+three-second deadline and inactivity returned to main. The temporary test window
+was closed afterward. Personal TOML matches the prepared candidate; its prior
+version is backed up beside the config. Private captures, configs, input probes,
+and installer reports remain untracked.

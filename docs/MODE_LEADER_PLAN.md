@@ -320,3 +320,8 @@ A personal navigation layer can use a right-Command tap to enter/exit, a 3000 ms
 inactivity timeout and a blue N indicator. Focus, move, display and workspace
 bindings stay in navigation; Escape/Return exit, and sidebar/palette actions return
 to main. These personal bindings are not installed as application defaults.
+
+Delivered and verified in signed build 130. Full checks passed (1,340 Swift and
+51 Python tests); the installed native text-window check confirmed repeatable
+navigation, tap/Return/Escape exit, deadline reset/expiry and unassigned-key pass
+through, including a chord assigned in main. See `RELEASE_VALIDATION.md`.
