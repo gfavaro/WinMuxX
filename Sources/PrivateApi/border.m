@@ -101,6 +101,56 @@ bool winmux_window_frame(uint32_t window, CGRect *frame) {
     return true;
 }
 
+bool winmux_window_is_document_kind(uint32_t parent, uint64_t tags) {
+    bool hasDocumentTag = (tags & (1ULL << 0)) ||
+        ((tags & (1ULL << 1)) && (tags & (1ULL << 31)));
+    bool attached = tags & (1ULL << 7);
+    bool ignoresCycle = tags & (1ULL << 18);
+    return parent == 0 && hasDocumentTag && !attached && !ignoresCycle;
+}
+
+int winmux_window_document_kind(uint32_t window) {
+    typedef CFTypeRef (*QueryWindows)(int, CFArrayRef, int);
+    typedef CFTypeRef (*CopyWindows)(CFTypeRef);
+    typedef bool (*AdvanceWindow)(CFTypeRef);
+    typedef uint32_t (*WindowID)(CFTypeRef);
+    typedef uint32_t (*ParentID)(CFTypeRef);
+    typedef uint64_t (*WindowTags)(CFTypeRef);
+    Connection connection = sky() ? SYM("SLSMainConnectionID", Connection) : NULL;
+    QueryWindows queryWindows = sky() ? SYM("SLSWindowQueryWindows", QueryWindows) : NULL;
+    CopyWindows copyWindows = sky() ? SYM("SLSWindowQueryResultCopyWindows", CopyWindows) : NULL;
+    AdvanceWindow advanceWindow = sky() ? SYM("SLSWindowIteratorAdvance", AdvanceWindow) : NULL;
+    WindowID windowID = sky() ? SYM("SLSWindowIteratorGetWindowID", WindowID) : NULL;
+    ParentID parentID = sky() ? SYM("SLSWindowIteratorGetParentID", ParentID) : NULL;
+    WindowTags windowTags = sky() ? SYM("SLSWindowIteratorGetTags", WindowTags) : NULL;
+    if (!connection || !queryWindows || !copyWindows || !advanceWindow || !windowID || !parentID || !windowTags)
+        return -1;
+
+    int32_t value = (int32_t)window;
+    CFNumberRef number = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &value);
+    if (!number) return -1;
+    const void *values[] = { number };
+    CFArrayRef windows = CFArrayCreate(kCFAllocatorDefault, values, 1, &kCFTypeArrayCallBacks);
+    CFRelease(number);
+    if (!windows) return -1;
+    CFTypeRef query = queryWindows(connection(), windows, 1);
+    CFRelease(windows);
+    if (!query) return -1;
+    CFTypeRef iterator = copyWindows(query);
+    CFRelease(query);
+    if (!iterator) return -1;
+
+    int result = -1;
+    while (advanceWindow(iterator)) {
+        if (windowID(iterator) == window) {
+            result = winmux_window_is_document_kind(parentID(iterator), windowTags(iterator)) ? 1 : 0;
+            break;
+        }
+    }
+    CFRelease(iterator);
+    return result;
+}
+
 static bool createWindow(float scale, uint32_t *identifier) {
     if (!identifier || !sky()) return false;
     const char *required[] = {

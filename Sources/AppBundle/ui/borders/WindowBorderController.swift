@@ -7,6 +7,7 @@ import QuartzCore
 final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
+    private var documentWindowCache: [UInt32: Bool] = [:]
     private var borderWindowIds = Set<UInt32>()
     private var watchedWindowIds = Set<UInt32>()
     private let nativeRefresh = NativeWindowRefreshScheduler()
@@ -123,6 +124,7 @@ final class WindowBorderController {
         guard config.windowBorders.enabled, !missionControlState.active,
               let window = MacWindow.allWindowsMap[windowId], !window.isHiddenInCorner,
               let border = borders[windowId] else { return }
+        guard isBorderEligibleDocument(windowId) else { remove(windowId: windowId); return }
         var frame = CGRect.zero
         guard winmux_window_frame(windowId, &frame) else { return }
         guard let target = windowBorderTarget(for: window, nativeFrame: frame) else {
@@ -153,6 +155,7 @@ final class WindowBorderController {
                 if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
                 guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen,
                       let snapshot = frames[window.windowId], snapshot.width > 0, snapshot.height > 0 else { continue }
+                guard isBorderEligibleDocument(window.windowId) else { continue }
                 // Overview thumbnails can have transformed bounds; native bounds
                 // retain the application's actual frame throughout the transition.
                 var nativeFrame = CGRect.zero
@@ -175,12 +178,24 @@ final class WindowBorderController {
         borders.values.forEach { $0.destroy() }
         borders.removeAll()
         borderWindowIds.removeAll()
+        documentWindowCache.removeAll()
     }
     func remove(windowId: UInt32) {
+        documentWindowCache.removeValue(forKey: windowId)
         if let border = borders.removeValue(forKey: windowId) {
             borderWindowIds.subtract(border.windowIds)
             border.destroy()
         }
+    }
+
+    private func isBorderEligibleDocument(_ windowId: UInt32) -> Bool {
+        if let cached = documentWindowCache[windowId] { return cached }
+        // If the private SkyLight query is unavailable, keep the previous AX-based
+        // behavior rather than suppressing borders on unsupported macOS versions.
+        let nativeResult = winmux_window_document_kind(windowId)
+        let eligible = nativeResult != 0
+        documentWindowCache[windowId] = eligible
+        return eligible
     }
 }
 

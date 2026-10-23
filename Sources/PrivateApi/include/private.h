@@ -20,6 +20,10 @@ CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, 
 // WindowServer liveness, independent of AX's cached window enumeration.
 bool winmux_window_exists(uint32_t window);
 bool winmux_window_frame(uint32_t window, CGRect *frame);
+// Returns 1 for a top-level document/modal window, 0 for an attached or
+// non-document surface, and -1 when SkyLight metadata is unavailable.
+int winmux_window_document_kind(uint32_t window);
+bool winmux_window_is_document_kind(uint32_t parent, uint64_t tags);
 typedef void (*WinMuxWindowClosedCallback)(uint32_t window);
 bool winmux_watch_window_closures(WinMuxWindowClosedCallback callback);
 void winmux_watch_windows(const uint32_t *windows, int count);

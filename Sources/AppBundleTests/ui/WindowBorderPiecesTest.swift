@@ -4,6 +4,16 @@ import PrivateApi
 import XCTest
 
 final class WindowBorderPiecesTest: XCTestCase {
+    func testNativeBorderEligibilityOnlyAcceptsTopLevelDocumentKinds() {
+        XCTAssertTrue(winmux_window_is_document_kind(0, 1 << 0)) // document
+        XCTAssertTrue(winmux_window_is_document_kind(0, (1 << 1) | (1 << 31))) // modal
+        XCTAssertFalse(winmux_window_is_document_kind(123, 1 << 0)) // child window
+        XCTAssertFalse(winmux_window_is_document_kind(0, 0)) // utility surface
+        XCTAssertFalse(winmux_window_is_document_kind(0, (1 << 0) | (1 << 7))) // attached
+        XCTAssertFalse(winmux_window_is_document_kind(0, (1 << 0) | (1 << 18))) // ignores cycle
+        XCTAssertFalse(winmux_window_is_document_kind(0, 1 << 1)) // incomplete modal tags
+    }
+
     func testNativePartitionOriginsUseWholePointsOnRetina() {
         // A 40.5-point top band drew through y=76.5, while WindowServer
         // placed the neighboring side at y=77: one missing Retina row.
