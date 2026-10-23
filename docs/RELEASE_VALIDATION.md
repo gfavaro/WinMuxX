@@ -678,3 +678,18 @@ three-second deadline and inactivity returned to main. The temporary test window
 was closed afterward. Personal TOML matches the prepared candidate; its prior
 version is backed up beside the config. Private captures, configs, input probes,
 and installer reports remain untracked.
+
+## Window management improvements — build 132
+
+`make check` passed **1,367 Swift tests and 51 Python checks**. The signed release
+build uses the existing local identity. Installer dry-run passed. Build **132** is
+installed at `/Applications/WinMuxX.app`; strict/deep signature verification
+passed, and client and server report source
+`97195f2388b9ae42359fcbbd3f837596c2da71ba`.
+
+The installer initially reported `focus_not_restored` after startup changed focus
+from workspace 5 to workspace 3. Read-only resume returned **validated** without
+replaying focus. All seven window IDs and their workspace assignments, both
+display identities, and the active configuration hash matched the pre-install
+snapshot. The installer retained build 131 as a rollback archive. Interactive
+multi-display animation behavior was not manually exercised.
