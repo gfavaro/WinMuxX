@@ -1,5 +1,38 @@
 # Configuration
 
+For TOML editor completion, use the checked-in
+[WinMuxX JSON Schema](schemas/winmuxx.schema.json) with a TOML editor that
+supports JSON Schema. Keep the schema beside your local documentation or use its
+raw GitHub URL after publication. It describes common field types and choices;
+WinMuxX's parser and runtime remain authoritative for command strings, monitor
+selectors and cross-field rules. The parser rejects unknown keys; the schema
+adds editor completion and earlier feedback.
+
+The schema is Draft 2020-12. To run the same fixture check used by `make check`,
+install the pinned Python dependencies into a local virtual environment:
+
+```sh
+python3 -m venv .deps/config-schema
+./.deps/config-schema/bin/pip install --requirement requirements-schema.txt
+./.deps/config-schema/bin/python script/test_config_schema.py
+```
+
+For Visual Studio Code with the [Even Better TOML extension](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml),
+associate the local schema from workspace settings (adjust the path if your config lives elsewhere):
+
+```json
+{
+  "evenBetterToml.schema.associations": {
+    "(^|[/\\\\])winmux\\.toml$": "./docs/schemas/winmuxx.schema.json"
+  }
+}
+```
+
+For example, `default-root-container-layout = "tiles"` receives completion,
+while `default-root-container-layout = "grid"` is flagged because `grid` is
+not a supported layout. This is editor assistance; `winmuxx doctor` and the
+application parser remain authoritative.
+
 The loaded TOML file is the source of behavior and appearance preferences.
 Settings edits that file, validates it and reloads the app. Raw edits and Settings
 changes use the same configuration fields. `winmuxx doctor` reports the loaded

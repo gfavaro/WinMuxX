@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">Dwindle splits</title><desc id="desc">Three windows split successively across a workspace.</desc>
+  <rect width="640" height="360" rx="16" fill="#f1f5f9"/>
+  <rect x="24" y="24" width="384" height="312" rx="10" fill="#bfdbfe"/>
+  <rect x="416" y="24" width="200" height="148" rx="10" fill="#bbf7d0"/>
+  <rect x="416" y="180" width="200" height="156" rx="10" fill="#fde68a"/>
+  <g font-family="system-ui,sans-serif" font-size="20" font-weight="600" text-anchor="middle" fill="#172033"><text x="216" y="185">Window 1</text><text x="516" y="103">Window 2</text><text x="516" y="263">Window 3</text></g>
+</svg>

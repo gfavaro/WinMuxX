@@ -124,6 +124,10 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if activeMode != mainModeId {
             menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
         }
+        if TrayMenuModel.shared.shortcutHealth == .unavailable {
+            menu.addItem(NSMenuItem(title: "⚠ Some keyboard shortcuts are unavailable", action: nil, keyEquivalent: ""))
+            menu.addItem(callbackItem("View shortcut diagnostics…", #selector(openDiagnostics)))
+        }
         let conflicts = runningOtherWindowManagers()
         if !conflicts.isEmpty {
             menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))

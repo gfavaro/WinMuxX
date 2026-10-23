@@ -186,10 +186,14 @@ final class ActionMenuTest: XCTestCase {
     func testDiagnosticsReportsLoadedConfigurationAndDoesNotChangeLayout() async {
         let originalConfig = config
         let originalUrl = configUrl
+        let originalShortcutHealth = TrayMenuModel.shared.shortcutHealth
+        TrayMenuModel.shared.shortcutHealth = .unavailable
+        defer { TrayMenuModel.shared.shortcutHealth = originalShortcutHealth }
         let report = await buildDiagnosticsReport()
         XCTAssertTrue(report.contains("loaded: \(configUrl.path)"))
         XCTAssertTrue(report.contains("default root layout:"))
         XCTAssertTrue(report.contains("Permissions:"))
+        XCTAssertTrue(report.contains("keyboard shortcuts: WARNING"))
         XCTAssertTrue(report.contains("Per-app AX latency"))
         XCTAssertEqual(config.defaultRootContainerLayout, originalConfig.defaultRootContainerLayout)
         XCTAssertEqual(config.modes, originalConfig.modes)
@@ -207,6 +211,21 @@ final class ActionMenuTest: XCTestCase {
         let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
         XCTAssertTrue(try XCTUnwrap(workspaces.items.first { $0.title == "Next" }).isEnabled)
         XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == "Settings…" }).isEnabled)
+    }
+
+    func testMenuShowsShortcutWarningWhenSideFilteredHandlingIsUnavailable() throws {
+        let previousEnabled = TrayMenuModel.shared.isEnabled
+        let previousHealth = TrayMenuModel.shared.shortcutHealth
+        defer {
+            TrayMenuModel.shared.isEnabled = previousEnabled
+            TrayMenuModel.shared.shortcutHealth = previousHealth
+        }
+        TrayMenuModel.shared.isEnabled = true
+        TrayMenuModel.shared.shortcutHealth = .unavailable
+        let menu = NSMenu()
+        NativeActionMenu().menuNeedsUpdate(menu)
+        XCTAssertTrue(menu.items.contains { $0.title == "⚠ Some keyboard shortcuts are unavailable" })
+        XCTAssertTrue(menu.items.contains { $0.title == "View shortcut diagnostics…" })
     }
 
     func testDisabledMenuKeepsEssentialControlsAvailable() throws {

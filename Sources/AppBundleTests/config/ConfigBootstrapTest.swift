@@ -20,6 +20,21 @@ final class ConfigBootstrapTest: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: target), original)
     }
 
+    func testBootstrapPreservesDanglingSymlinkAndCreatesItsTarget() throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: "WinMuxBootstrap-\(UUID())")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let target = directory.appending(path: "dotfiles/winmux.toml")
+        let link = directory.appending(path: "winmux.toml")
+        try FileManager.default.createSymbolicLink(at: link, withDestinationURL: target)
+
+        XCTAssertTrue(try materializeBootstrapConfigIfNeeded(targetUrl: link, existingLegacyUrls: []))
+
+        let attributes = try FileManager.default.attributesOfItem(atPath: link.path)
+        XCTAssertEqual(attributes[.type] as? FileAttributeType, .typeSymbolicLink)
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), starterConfigText())
+    }
+
     func testStarterConfigParses() {
         let (parsedConfig, errors) = parseConfig(starterConfigText())
         assertEquals(errors, [])

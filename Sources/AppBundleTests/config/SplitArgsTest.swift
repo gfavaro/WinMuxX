@@ -14,6 +14,16 @@ final class SplitArgsTest: XCTestCase {
         testFailSplit("echo 'foo")
         testFailSplit("echo foo'")
     }
+
+    func testJoinSplitRoundTripsMixedQuotesAndCombiningCharacters() {
+        let expected = ["it's \"quoted\"", "\u{0301}accent", "plain\\path"]
+        let encoded = expected.joinArgs()
+        guard case .success(let actual) = encoded.splitArgs() else {
+            XCTFail("Encoded arguments did not parse: \(encoded)")
+            return
+        }
+        XCTAssertEqual(actual, expected)
+    }
 }
 
 private func testSucSplit(_ str: String, expected: [String]) {

@@ -16,9 +16,22 @@ enum ConfigFileStore {
         catch let error as NSError where error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoSuchFileError { return nil }
     }
 
+    /// Foundation leaves a dangling final symlink unresolved. Bootstrap must write
+    /// through it so a dotfiles link survives until its target becomes available.
+    private static func writableTarget(for url: URL, depth: Int = 0) -> URL {
+        guard depth < 32,
+              let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path) else {
+            return url.resolvingSymlinksInPath().standardizedFileURL
+        }
+        let target = destination.hasPrefix("/")
+            ? URL(filePath: destination)
+            : url.deletingLastPathComponent().appending(path: destination)
+        return writableTarget(for: target.standardizedFileURL, depth: depth + 1)
+    }
+
     @discardableResult
     static func edit(at url: URL, _ transform: (String) throws -> String) throws -> Bool {
-        let target = url.resolvingSymlinksInPath()
+        let target = writableTarget(for: url)
         for _ in 0..<3 {
             let original = try read(target)
             let rendered = try transform(original ?? starterConfigText())
@@ -31,17 +44,18 @@ enum ConfigFileStore {
 
     @discardableResult
     static func replace(at url: URL, text: String, expected: String?) throws -> Bool {
-        let target = url.resolvingSymlinksInPath()
+        let target = writableTarget(for: url)
         try validate(text)
         guard try read(target) == expected else { throw Conflict() }
         return try commit(text, original: expected, to: target)
     }
 
     static func installBootstrap(_ text: String, at url: URL, legacy: Bool = false) throws {
-        guard try read(url) == nil else { return }
+        let target = writableTarget(for: url)
+        guard try read(target) == nil else { return }
         if legacy { _ = try TOMLTable(string: text) } else { try validate(text) }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try writePrivateData(Data(text.utf8), to: url)
+        try FileManager.default.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try writePrivateData(Data(text.utf8), to: target)
     }
 
     private static func validate(_ text: String) throws {

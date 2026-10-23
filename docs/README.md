@@ -3,6 +3,7 @@
 ## Current guides
 
 - [Project README](../README.md): features and current settings.
+- [Quick start](QUICK_START.md), [concepts](CONCEPTS.md), [layouts](LAYOUTS.md), [recipes](RECIPES.md) and [commands](COMMANDS.md): learn and use WinMuxX.
 - [HACKING](../HACKING.md): architecture, development, checks, builds and installation.
 - [Displays and window rules](SETTINGS_DISPLAYS_AND_RULES.md): live placement, saved constraints and rule editing.
 - [Dependencies](DEPENDENCIES.md): package inventory, removal decisions and Swift toolchain.
@@ -20,6 +21,9 @@
 
 ## Reviews and investigations
 
+- [Dinky fit and implementation plan](DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
+- [Dinky execution checklist](DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
+
 These documents preserve observations and experiments. Earlier sections may refer
 to controls, filenames or implementations subsequently replaced. Use the current
 guides above for today's settings and development workflow.
@@ -33,3 +37,4 @@ guides above for today's settings and development workflow.
 - [Plano de limpeza e controles nativos](CODE_HEALTH_NATIVE_UI_PLAN.md)
 
 - [Configuration and migration](CONFIGURATION.md): TOML preferences, persistent workspace names and legacy preference import.
+- [Configuration schema inventory](CONFIGURATION_SCHEMA_INVENTORY.md): parser-backed field map for editor completion maintenance.

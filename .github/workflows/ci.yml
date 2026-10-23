@@ -36,6 +36,11 @@ jobs:
           swift --version
           xcodebuild -version
 
+      - name: Install pinned config schema test dependencies
+        run: |
+          python3 -m venv .deps/config-schema
+          ./.deps/config-schema/bin/pip install --requirement requirements-schema.txt
+
       - name: Build and test
         run: make check
 

@@ -1,0 +1,5 @@
+config-version = 2
+
+[[on-window-detected]]
+if.app-id-regex = '^com\\.example\\..+$'
+run = 'layout tiling'

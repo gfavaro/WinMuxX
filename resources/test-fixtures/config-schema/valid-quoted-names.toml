@@ -1,0 +1,7 @@
+config-version = 2
+
+[workspace.'A quoted workspace']
+layout = 'master'
+
+[workspace.'A quoted workspace'.display.'Built-in']
+layout = 'accordion'

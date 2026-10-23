@@ -80,6 +80,7 @@ public final class WinMuxApplicationDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        SideFilteredHotkeys.shared.stopRecovery()
         Task { @MainActor in
             do { try await terminationHandler.performTerminationCleanup() }
             catch { NSLog("WinMux termination: %@", String(describing: error)) }

@@ -14,6 +14,11 @@
   <a href="docs/README.md">Documentation</a>
 </p>
 
+New to WinMuxX? Start with the [quick start](docs/QUICK_START.md), learn the
+[workspace model](docs/CONCEPTS.md), then explore [layouts](docs/LAYOUTS.md) and
+[recipes](docs/RECIPES.md). Use the [command guide](docs/COMMANDS.md) alongside
+`winmuxx --help`.
+
 Personal fork by gfavaro, based on ZimengXiong/WinMux. Automatic upstream updates
 are disabled; releases and configuration belong to this fork.
 

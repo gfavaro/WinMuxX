@@ -1,3 +1,5 @@
+import Foundation
+
 extension String {
     // Input: "  foo   bar ". Output: ["foo", "bar"]
     // Input "foo 'bar baz'". Output ["foo", "bar baz"]
@@ -5,30 +7,38 @@ extension String {
         var result: [String] = []
         var arg: String = ""
         var state: State = .parseArgWhitespaceSeparator
-        for char in self {
+        let scalars = Array(self.unicodeScalars)
+        var index = 0
+        while index < scalars.count {
+            let scalar = scalars[index]
             switch state { // State machine
                 case .parseArgWhitespaceSeparator:
-                    if char == "\"" || char == "\'" {
-                        state = .parseArg(quoteChar: char)
-                    } else if !char.isWhitespace {
+                    if scalar == "\"" || scalar == "\'" {
+                        state = .parseArg(quoteChar: Character(scalar))
+                    } else if !CharacterSet.whitespacesAndNewlines.contains(scalar) {
                         state = .parseArg(quoteChar: nil)
-                        arg.append(char)
+                        arg.unicodeScalars.append(scalar)
                     }
                 case .parseArg(let quoteChar):
-                    if quoteChar == char {
+                    if let quoteChar, scalar == "\\", index + 1 < scalars.count,
+                       (scalars[index + 1] == quoteChar.unicodeScalars.first || scalars[index + 1] == "\\") {
+                        arg.unicodeScalars.append(scalars[index + 1])
+                        index += 1
+                    } else if quoteChar?.unicodeScalars.first == scalar {
                         result.append(arg)
                         arg = ""
                         state = .parseArgWhitespaceSeparator
-                    } else if quoteChar == nil && char.isWhitespace {
+                    } else if quoteChar == nil && CharacterSet.whitespacesAndNewlines.contains(scalar) {
                         result.append(arg)
                         state = .parseArgWhitespaceSeparator
                         arg = ""
-                    } else if quoteChar == nil && char.isQuote {
-                        return .failure("Unexpected quote \(char) in argument '\(arg)'")
+                    } else if quoteChar == nil && (scalar == "\'" || scalar == "\"") {
+                        return .failure("Unexpected quote \(scalar) in argument '\(arg)'")
                     } else {
-                        arg.append(char)
+                        arg.unicodeScalars.append(scalar)
                     }
             }
+            index += 1
         }
         if case .parseArg(let quoteChar) = state {
             if let quoteChar {
@@ -39,10 +49,6 @@ extension String {
         }
         return .success(result)
     }
-}
-
-extension Character {
-    fileprivate var isQuote: Bool { self == "\'" || self == "\"" }
 }
 
 private enum State {
@@ -62,8 +68,7 @@ extension [String] {
                 case containsSingleQuote && !containsDoubleQuote:
                     $0.quoted(with: "\"")
                 case containsSingleQuote && containsDoubleQuote:
-                    // Technically shouldn't be possible according to splitArgs
-                    $0.replacing("'", with: "\\'").replacing("\"", with: "\\\"").quoted(with: "\"")
+                    $0.replacing("\\", with: "\\\\").replacing("\"", with: "\\\"").quoted(with: "\"")
                 case containsWhitespaces:
                     $0.quoted(with: "'")
                 default:

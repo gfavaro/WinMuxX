@@ -89,6 +89,7 @@ check:
 	mkdir -p .build && \
 	swift test --force-resolved-versions --no-parallel 2>&1 | tee .build/test-output.log && \
 	python3 -m unittest script/test_validate_appcast.py && \
+	./.deps/config-schema/bin/python script/test_config_schema.py && \
 	python3 -m unittest script/test_fork_identity.py && \
 	python3 -m unittest script/test_swift_version.py && \
 	python3 -m unittest script/test_signing_cleanup.py && \

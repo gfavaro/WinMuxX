@@ -43,6 +43,7 @@ private let tapBindingTriggerDelayNs: UInt64 = 75_000_000
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
 @MainActor func resetHotKeys() {
+    SideFilteredHotkeys.shared.stopRecovery()
     hotkeyState.pendingUnboundModeExit = false
     hotkeyState.unboundPassthroughKeyCode = nil
     hotkeyState.modeSession.invalidate()
@@ -139,6 +140,9 @@ extension HotKey {
     if mode?.exitOnUnboundKey == true || targetBindings.values.contains(where: { config.modifierSides.restricts($0.modifiers) }),
        !SideFilteredHotkeys.shared.install() {
         MessageModel.shared.message = Message(description: "Keyboard shortcuts", body: "Could not install keyboard event handling for side-filtered shortcuts or exiting on unbound keys. Check WinMuxX Accessibility access, then reload the configuration.")
+    } else {
+        SideFilteredHotkeys.shared.stopRecovery()
+        TrayMenuModel.shared.shortcutHealth = .available
     }
     let oldMode = activeMode
     activeMode = targetMode

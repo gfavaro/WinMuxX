@@ -10,6 +10,7 @@ func buildDiagnosticsReport() async -> String {
     io.out("Configuration:")
     io.out("  loaded: \(configUrl.path)")
     io.out("  active mode: \(activeMode ?? "none")")
+    io.out("  keyboard shortcuts: \(TrayMenuModel.shared.shortcutHealth == .available ? "available" : "WARNING — side-filtered shortcuts or mode exit may be unavailable")")
     io.out("  default root layout: \(config.defaultRootContainerLayout)")
     io.out("  enabled: \(TrayMenuModel.shared.isEnabled)")
     io.out("  crash recovery: \(WindowRecoveryController.shared.diagnosticSummary)")

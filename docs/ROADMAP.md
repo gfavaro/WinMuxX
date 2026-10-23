@@ -1,5 +1,13 @@
 # WinMuxX roadmap
 
+## Dinky fit review — 2026-10-22
+
+The [Dinky implementation plan](DINKY_FIT_PLAN.md) proposes task-based guides and
+layout illustrations, TOML editor completion, actionable shortcut health, and
+targeted reliability reproductions. It distinguishes existing adaptations from
+new work and preserves projects, tabs and explicit workspace display ownership.
+This is proposed work; the validation priorities below remain open.
+
 ## Current baseline — 2026-10-17
 
 Workspace/configuration ownership cleanup is complete in signed build 76; see

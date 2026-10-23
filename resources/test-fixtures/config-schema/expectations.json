@@ -1,0 +1,13 @@
+{
+  "valid-defaults.toml": {"parser": true, "schema": true},
+  "valid-quoted-names.toml": {"parser": true, "schema": true},
+  "valid-regex-rules.toml": {"parser": true, "schema": true},
+  "valid-monitor-arrays.toml": {"parser": true, "schema": true},
+  "valid-follow-app-boolean.toml": {"parser": true, "schema": true},
+  "valid-follow-app-table.toml": {"parser": true, "schema": true},
+  "valid-legacy-alias.toml": {"parser": true, "schema": true},
+  "invalid-wrong-type.toml": {"parser": false, "schema": false},
+  "invalid-enum.toml": {"parser": false, "schema": false},
+  "unknown-key-parser-rejected.toml": {"parser": false, "schema": false},
+  "semantic-command-schema-accepted.toml": {"parser": false, "schema": true}
+}

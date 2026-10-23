@@ -11,6 +11,7 @@ public final class TrayMenuModel: ObservableObject {
     @Published var menuBarWorkspaceName: String = ""
     /// Is "layouting" enabled
     @Published var isEnabled: Bool = true
+    @Published var shortcutHealth: ShortcutHealth = .available
     @Published var workspaces: [WorkspaceViewModel] = []
     @Published var workspaceSidebarWorkspaces: [WorkspaceSidebarWorkspaceViewModel] = []
     @Published var workspaceSidebarConfiguration: WorkspaceSidebarConfiguration = .empty

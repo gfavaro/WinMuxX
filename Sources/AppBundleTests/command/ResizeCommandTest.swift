@@ -85,6 +85,21 @@ final class ResizeCommandTest: XCTestCase {
         assertEquals(siblingContainer.hWeight, 12)
     }
 
+    func testResizeWithElevenTileSiblingsKeepsEveryWindowAndFiniteWeights() async throws {
+        let root = Workspace.get(byName: name).rootTilingContainer
+        root.layout = .tiles
+        let windows = (1...11).map { TestWindow.new(id: UInt32($0), parent: root, adaptiveWeight: 100) }
+        _ = windows[0].focusWindow()
+
+        let result = try await parseCommand("resize width +10").cmdOrDie.run(.defaultEnv, .emptyStdin)
+
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(root.children.count, windows.count)
+        XCTAssertEqual(root.allLeafWindowsRecursive.count, windows.count)
+        XCTAssertTrue(windows.allSatisfy { $0.hWeight.isFinite && $0.hWeight > 0 })
+        XCTAssertEqual(windows.reduce(0) { $0 + $1.hWeight }, 1_100, accuracy: 0.001)
+    }
+
     func testResizeFloatingWindowReturnsError() async throws {
         let workspace = Workspace.get(byName: name)
         _ = TestWindow.new(id: 1, parent: workspace, adaptiveWeight: WEIGHT_AUTO).focusWindow()

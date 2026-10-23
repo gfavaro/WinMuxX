@@ -1,0 +1,5 @@
+config-version = 2
+
+[follow-app-activation]
+enabled = true
+exclude-apps = ['com.example.Utility']

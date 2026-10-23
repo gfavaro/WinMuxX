@@ -1,0 +1,4 @@
+config-version = 2
+
+[workspace-sidebar]
+monitor = ['Built-in', 'DELL U2720Q']
