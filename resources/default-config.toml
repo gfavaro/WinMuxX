@@ -2,9 +2,9 @@
 # Other empty workspaces are collected after use; displays/projects retain a usable slot.
 persistent-workspaces = []
 
-# Center a lone tiled window on screens with width/height >= 2.3.
-# 1.5 means 3:2; 0 disables. Supports per-monitor values like gaps.
-single-window-aspect-ratio = 1.5
+# Share of usable width for lone tiled windows and WinMuxX fullscreen (0.1 to 1).
+# Display and workspace tables can override this value.
+fullscreen-width = 1.0
 # Alignment within the area remaining after sidebar and gaps: center, left, right.
 single-window-alignment = 'center'
 

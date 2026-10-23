@@ -94,9 +94,33 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertFalse(text.contains("secret"))
         XCTAssertFalse(text.contains(config.path))
         XCTAssertTrue(text.contains("configSHA256"))
+        XCTAssertTrue(text.contains("\"schema\":2"))
+        XCTAssertTrue(text.contains("workMetrics"))
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
         recorder.stop()
         XCTAssertTrue(recorder.events.isEmpty)
+    }
+
+    func testWorkMetricsAreOptInBoundedAndDiscardOldCollectionCompletions() {
+        let metrics = RuntimeWorkMetrics(sampleLimit: 2)
+        metrics.record(.axRead, failed: false, duration: 0.01, generation: 0)
+        XCTAssertEqual(metrics.snapshot().operations["axRead"], nil)
+        let old = metrics.start()
+        metrics.record(.axRead, failed: false, duration: 0.01, generation: old)
+        metrics.record(.axRead, failed: true, duration: 0.02, generation: old)
+        metrics.record(.axRead, failed: false, duration: 0.025, generation: old)
+        metrics.record(.axWrite, failed: false, duration: 0.03, generation: old)
+        XCTAssertEqual(metrics.snapshot().operations["axRead"], 3)
+        XCTAssertEqual(metrics.snapshot().operations["axWrite"], 1)
+        XCTAssertEqual(metrics.snapshot().droppedSamples, 1)
+        XCTAssertEqual(metrics.snapshot().failures, 1)
+        metrics.stop()
+        let current = metrics.start()
+        metrics.record(.axRead, failed: false, duration: 0.04, generation: old)
+        XCTAssertNil(metrics.snapshot().operations["axRead"])
+        metrics.record(.axRead, failed: false, duration: 0.04, generation: current)
+        XCTAssertEqual(metrics.snapshot().operations["axRead"], 1)
+        metrics.stop()
     }
 }

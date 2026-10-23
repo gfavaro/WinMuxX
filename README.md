@@ -79,38 +79,54 @@ See [configuration and migration](docs/CONFIGURATION.md).
 
 ## How it works
 
-### Single window on ultrawide
+### Lone windows and fullscreen width
 
-One tiled window is centered at a maximum 3:2 ratio on ultrawide screens
-(screen width/height at least 2.3). The limit applies only when the workspace has
-one tiled window; floating windows do not count. Minimized windows,
-hidden apps and popups do not count. Tab groups and WinMuxX fullscreen bypass
-the limit. The available area accounts for the sidebar and
-outer gaps; known application minimum widths take priority.
-Set `single-window-aspect-ratio = 0` to disable, or choose a different ratio in
-Settings → Windows. Per-monitor rules use the same syntax as gaps:
+Choose a share of the available width for a lone tiled window and WinMuxX's
+`fullscreen` command, on any display:
 
 ```toml
-single-window-aspect-ratio = [{ monitor."S34CG50" = 1.5 }, 0]
+fullscreen-width = 0.70
+single-window-alignment = 'center' # center | left | right
 ```
 
-Settings → Windows exposes the default ratio and alignment. Per-monitor ratio
-overrides remain available in TOML and are preserved when changing the default.
-Changes take effect on configuration reload. Monitor overrides still require an
-ultrawide screen.
+`fullscreen-width` accepts `0.1` to `1.0`; the default is `1.0`. Width is measured
+after the sidebar and outer gaps. Known application minimum widths take priority,
+up to the available width. Fullscreen stays centered; alignment applies to lone
+tiled windows. macOS native fullscreen is unaffected.
 
-Manually resizing a lone ultrawide tile overrides its default aspect-ratio width
-for the current session. The window keeps its alignment and layout height. You
-can make it wider than 3:2; available space and the app's minimum width still apply. Mouse resizing and `resize width`/`resize smart` both support this.
-The preference returns when the window becomes a lone tile again.
+A second tiled window restores the usual full-width layout. Floating windows,
+minimized windows, hidden apps and popups do not count toward the lone tile.
+Settings → Windows exposes the global width percentage and alignment, and shows
+the current workspace's resolved values. Display and workspace overrides use
+Dinky-style tables; omitted keys inherit independently:
 
-Use `single-window-alignment = 'center'`, `'left'` or `'right'` to choose its
-horizontal position, also available in Settings → Windows. Center is the default.
+```toml
+[display.'Built-in']
+fullscreen-width = 0.70
 
-For a lone ultrawide tile, a mouse resize that changes height switches the window
-to floating and preserves the resulting size and position. Width-only resizing
-keeps it tiled with the selected alignment. Small native frame rounding changes
-are ignored.
+[workspace.3]
+fullscreen-width = 0.80
+
+[workspace.3.display.'Built-in']
+single-window-alignment = 'right'
+```
+
+Precedence is workspace/display → workspace → display → global. Named display
+patterns beat main/secondary; longer names win, then lexical order. Exact UUID,
+hardware and display-number selectors take priority over name patterns. Existing
+layout/orientation policies retain their existing selector ordering. Width and
+alignment changes preserve manual layout choices and the workspace tree.
+
+Width-only mouse resizing and `resize width`/`resize smart` keep a lone window
+tiled and retain its alignment. The manual width lasts for the window's session,
+including after another tile opens and closes. A mouse resize that changes height
+makes it floating and preserves its size and position. Small native frame rounding
+changes are ignored.
+
+The old `single-window-aspect-ratio` setting remains readable for compatibility
+when no explicit width applies. New configs use `fullscreen-width`; an explicit
+width, including `1.0`, takes priority over the old setting. See
+[the migration notes](docs/DINKY_022_ADOPTION.md).
 
 ### Native sidebar appearance
 

@@ -5,9 +5,13 @@ import TOMLKit
 struct WorkspaceLayoutSettings: ConvenienceCopyable, Equatable {
     var layout: Layout?
     var orientation: DefaultContainerOrientation?
+    var fullscreenWidth: Double?
+    var singleWindowAlignment: SingleWindowAlignment?
 
     func overlaying(_ base: Self) -> Self {
-        Self(layout: layout ?? base.layout, orientation: orientation ?? base.orientation)
+        Self(layout: layout ?? base.layout, orientation: orientation ?? base.orientation,
+             fullscreenWidth: fullscreenWidth ?? base.fullscreenWidth,
+             singleWindowAlignment: singleWindowAlignment ?? base.singleWindowAlignment)
     }
 }
 
@@ -34,11 +38,15 @@ struct WorkspaceDisplayLayout {
 private let workspaceLayoutParsers: [String: any ParserProtocol<WorkspaceLayoutSettings>] = [
     "layout": Parser(\.layout, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.orientation, parseOptionalWorkspaceOrientation),
+    "fullscreen-width": Parser(\.fullscreenWidth, parseFullscreenWidth),
+    "single-window-alignment": Parser(\.singleWindowAlignment, parseOptionalSingleWindowAlignment),
 ]
 
 private let workspaceParsers: [String: any ParserProtocol<WorkspaceLayoutConfig>] = [
     "layout": Parser(\.defaults.layout, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.defaults.orientation, parseOptionalWorkspaceOrientation),
+    "fullscreen-width": Parser(\.defaults.fullscreenWidth, parseFullscreenWidth),
+    "single-window-alignment": Parser(\.defaults.singleWindowAlignment, parseOptionalSingleWindowAlignment),
     "display": Parser(\.displays, parseWorkspaceDisplayLayouts),
 ]
 
@@ -102,8 +110,13 @@ extension Workspace {
     /// survive ordinary refreshes; visiting another workspace never relocates this one.
     @MainActor
     func applyConfiguredLayout() {
-        let settings = config.workspaceLayouts[name]?.settings(on: workspaceMonitor).overlaying(
-            WorkspaceLayoutSettings(layout: config.defaultRootContainerLayout, orientation: config.defaultRootContainerOrientation))
+        let resolved = config.workspaceLayouts[name]?.settings(on: workspaceMonitor)
+        // Width/alignment policies must not reset a manually selected layout.
+        let settings = resolved.flatMap { value -> WorkspaceLayoutSettings? in
+            guard value.layout != nil || value.orientation != nil else { return nil }
+            return WorkspaceLayoutSettings(layout: value.layout ?? config.defaultRootContainerLayout,
+                                           orientation: value.orientation ?? config.defaultRootContainerOrientation)
+        }
         guard settings != lastConfiguredLayout else { return }
         let previous = lastConfiguredLayout
         lastConfiguredLayout = settings

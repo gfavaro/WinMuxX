@@ -9,7 +9,7 @@ struct ResizeCommand: Command {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
 
         if let window = target.windowOrNil, let workspace = window.nodeWorkspace,
-           singleWindowAspectRatioTarget(in: workspace) === window,
+           singleWindowWidthTarget(in: workspace) === window,
            args.dimension.val == .width || args.dimension.val == .smart {
             let current = workspaceTilingRect(workspace).width
             let width: CGFloat = switch args.units.val {

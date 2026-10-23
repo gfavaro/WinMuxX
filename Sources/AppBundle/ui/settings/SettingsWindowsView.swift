@@ -24,7 +24,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("focus-follows-mouse-dwell", load: { config.focusFollowsMouseDwell }) private var focusFollowsMouseDwell: Int
 
     @SettingsDraft("single-window-alignment", load: { config.singleWindowAlignment }) private var singleWindowAlignment: SingleWindowAlignment
-    @SettingsDraft("single-window-aspect-ratio", load: { config.singleWindowAspectRatio }) private var aspectRatio: DynamicConfigValue<Double>
+    @SettingsDraft("fullscreen-width", load: { config.fullscreenWidth ?? 1.0 }) private var fullscreenWidth: Double
 
     var body: some View {
         SettingsScrollView {
@@ -55,17 +55,29 @@ struct ShortcutBehaviorSettingsView: View {
                 .pickerStyle(.segmented)
 
             }
-            SettingsSection("Single window on ultrawide") {
+            SettingsSection("Lone windows and fullscreen") {
+                SettingsStepper("Width", id: "fullscreen-width", value: Binding(
+                    get: { Int((fullscreenWidth * 100).rounded()) },
+                    set: { fullscreenWidth = Double($0) / 100 }), range: 10...100,
+                    help: "Share of the available width for a lone tiled window or WinMuxX fullscreen. Display and workspace overrides take priority.", unit: "%") {
+                    persistConfig(section: nil, key: "fullscreen-width", value: String(fullscreenWidth))
+                }
+                Text("Applies after sidebar and outer gaps on any display. Fullscreen stays centered; alignment below applies to lone tiled windows.")
+                    .font(.callout).foregroundStyle(.secondary)
+                if let width = focus.workspace.windowWidthSettings.fullscreenWidth {
+                    Text("Current workspace: \(Int((width * 100).rounded()))% · \(focus.workspace.windowWidthSettings.singleWindowAlignment?.rawValue ?? "center") · \(focus.workspace.workspaceMonitor.name)")
+                        .font(.callout).foregroundStyle(.secondary)
+                } else {
+                    Text("Current workspace uses the legacy aspect-ratio setting. Saving a width switches to percentage sizing.")
+                        .font(.callout).foregroundStyle(.secondary)
+                }
                 SettingsPicker("Alignment", id: "single-window-alignment", selection: $singleWindowAlignment,
-                    help: "Position a lone ultrawide tile within the available area after sidebar and gaps.") {
+                    help: "Position a lone tiled window within the available area after sidebar and gaps.") {
                     Text("Centered").tag(SingleWindowAlignment.center)
                     Text("Left").tag(SingleWindowAlignment.left)
                     Text("Right").tag(SingleWindowAlignment.right)
                 } onChange: { persistRootString("single-window-alignment", singleWindowAlignment.rawValue) }
                 Text("Resizing width keeps the window tiled. Changing height makes it floating and preserves the gesture’s size and position.")
-                    .font(.callout).foregroundStyle(.secondary)
-                ratioControl("Maximum aspect ratio", value: Binding(get: { aspectRatio.defaultAspectRatio }, set: { updateRatio(defaultValue: $0) }))
-                Text("1.5 equals 3:2. 0 disables the limit. Applies only to screens with width/height ≥ 2.3.")
                     .font(.callout).foregroundStyle(.secondary)
 
             }
@@ -137,27 +149,6 @@ struct ShortcutBehaviorSettingsView: View {
         }
         .navigationTitle("Windows")
 
-    }
-
-    private func ratioControl(_ title: String, value: Binding<Double>) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField("Ratio", value: value, format: .number)
-                .frame(width: 80, height: 28)
-                .accessibilityLabel(title + " aspect ratio")
-                .accessibilityHint("1.5 means 3:2. Zero disables the limit.")
-            Stepper(title + " aspect ratio", value: value, in: 0...max(100, value.wrappedValue), step: 0.1)
-                .labelsHidden().frame(minHeight: 28)
-                .accessibilityValue(String(value.wrappedValue))
-        }
-    }
-
-    private func updateRatio(defaultValue: Double) {
-        guard defaultValue.isFinite && defaultValue >= 0 else { return }
-        let rules = aspectRatio.aspectRatioRules
-        aspectRatio = rules.isEmpty ? .constant(defaultValue) : .perMonitor(rules, default: defaultValue)
-        persistConfig(section: nil, key: "single-window-aspect-ratio", value: renderedAspectRatio(aspectRatio))
     }
 
     private func persistRootBool(_ key: String, _ value: Bool) {

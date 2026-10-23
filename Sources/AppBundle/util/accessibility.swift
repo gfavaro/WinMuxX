@@ -348,10 +348,19 @@ extension AXUIElement: AxUiElementMock {
             guard RunLoopJob.current?.isCancelled != true else {
                 return .failure(AXReadFailure(code: .cannotComplete))
             }
+            let metrics = RuntimeWorkMetrics.shared
+            let metricsGeneration = metrics.generationIfRecording()
+            let started = metricsGeneration.map { _ in DispatchTime.now().uptimeNanoseconds }
             let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
             defer { signposter.endInterval(#function, state) }
             var raw: AnyObject?
-            switch AXUIElementCopyAttributeValue(self, attr.key as CFString, &raw) {
+            let error = AXUIElementCopyAttributeValue(self, attr.key as CFString, &raw)
+            if let metricsGeneration, let started {
+                metrics.record(.axRead, failed: error != .success && error != .noValue && error != .attributeUnsupported,
+                               duration: Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000,
+                               generation: metricsGeneration)
+            }
+            switch error {
                 case .success: return .success(raw.flatMap(attr.getter))
                 case .noValue, .attributeUnsupported: return .success(nil)
                 case let error:
@@ -367,10 +376,18 @@ extension AXUIElement: AxUiElementMock {
         if serverArgs.isReadOnly { return false }
         let pid = axTaskLocalAppThreadToken?.pid
         if let pid, AXReadBudget.current?.permits(pid) == false { return false }
+        let metrics = RuntimeWorkMetrics.shared
+        let metricsGeneration = metrics.generationIfRecording()
+        let started = metricsGeneration.map { _ in DispatchTime.now().uptimeNanoseconds }
         let state = signposter.beginInterval(#function, "attr: \(attr.key) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
         defer { signposter.endInterval(#function, state) }
         guard let value = attr.setter(value) else { return false }
         let error = AXUIElementSetAttributeValue(self, attr.key as CFString, value)
+        if let metricsGeneration, let started {
+            metrics.record(.axWrite, failed: error != .success,
+                           duration: Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000,
+                           generation: metricsGeneration)
+        }
         AXWindowOperation.current?.record(error, from: ObjectIdentifier(self))
         if let pid { AXReadBudget.current?.record(error, pid: pid) }
         return error == .success

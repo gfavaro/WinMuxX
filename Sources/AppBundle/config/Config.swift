@@ -77,6 +77,8 @@ struct Config: ConvenienceCopyable {
     var onDisplayChanged: [any Command] = []
 
     var autoAddNewWindowsToTabGroup: Bool = false
+    var fullscreenWidth: Double?
+    var displayWindowSettings: [WorkspaceDisplayLayout] = []
     var singleWindowAlignment: SingleWindowAlignment = .center
     var singleWindowAspectRatio: DynamicConfigValue<Double> = .constant(1.5)
     var gaps: Gaps = .zero

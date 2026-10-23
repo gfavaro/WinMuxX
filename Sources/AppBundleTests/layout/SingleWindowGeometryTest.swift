@@ -27,6 +27,7 @@ final class SingleWindowGeometryTest: XCTestCase {
 
     func testEligibilityTransitionsAndSharedGeometry() async throws {
         setUpWorkspacesForTests()
+        config.fullscreenWidth = nil // Exercise legacy aspect-ratio compatibility.
         defer { setUpWorkspacesForTests() }
         let screen = Rect(topLeftX: 0, topLeftY: 0, width: 3440, height: 1440)
         setMonitorsForTests([TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "S34CG50", rect: screen, visibleRect: screen, isMain: true)])
@@ -79,6 +80,7 @@ final class SingleWindowGeometryTest: XCTestCase {
 
     func testManualResizePersistsAcrossRefreshAndSingleWindowTransitions() async throws {
         setUpWorkspacesForTests()
+        config.fullscreenWidth = nil // Exercise legacy aspect-ratio compatibility.
         defer { setUpWorkspacesForTests() }
         let screen = Rect(topLeftX: 0, topLeftY: 0, width: 3440, height: 1440)
         setMonitorsForTests([TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "wide", rect: screen, visibleRect: screen, isMain: true)])
@@ -118,6 +120,7 @@ final class SingleWindowGeometryTest: XCTestCase {
 
     func testHeightResizeFloatsAndPreservesGestureFrame() async throws {
         setUpWorkspacesForTests()
+        config.fullscreenWidth = nil // Exercise legacy aspect-ratio compatibility.
         defer { setUpWorkspacesForTests() }
         let screen = Rect(topLeftX: 0, topLeftY: 0, width: 3440, height: 1440)
         setMonitorsForTests([TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "wide", rect: screen, visibleRect: screen, isMain: true)])
@@ -143,6 +146,7 @@ final class SingleWindowGeometryTest: XCTestCase {
 
     func testHeightResizeDoesNotFloatMultiWindowLayout() async throws {
         setUpWorkspacesForTests()
+        config.fullscreenWidth = nil // Exercise legacy aspect-ratio compatibility.
         defer { setUpWorkspacesForTests() }
         let screen = Rect(topLeftX: 0, topLeftY: 0, width: 3440, height: 1440)
         setMonitorsForTests([TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "wide", rect: screen, visibleRect: screen, isMain: true)])

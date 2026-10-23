@@ -1,6 +1,7 @@
 import Foundation
 
 private struct CachedWindowTitle {
+    let owner: ObjectIdentifier
     let title: String?
     let fetchedAt: Date
 }
@@ -40,17 +41,19 @@ func getCachedWindowTitle(
     maxAge: TimeInterval = cachedWindowTitleMaxAge,
     now: Date = .now,
 ) async -> String? {
-    if let cached = cachedWindowTitles[window.windowId],
+    let owner = ObjectIdentifier(window)
+    if let cached = cachedWindowTitles[window.windowId], cached.owner == owner,
        now.timeIntervalSince(cached.fetchedAt) < maxAge
     {
         return cached.title
     }
 
-    let cachedTitle = cachedWindowTitles[window.windowId]?.title
+    let cachedTitle = cachedWindowTitles[window.windowId].flatMap { $0.owner == owner ? $0.title : nil }
     let rawTitle = try? await window.title
+    guard Window.get(byId: window.windowId) === window else { return cachedTitle }
     let normalized = rawTitle?.trimmingCharacters(in: .whitespacesAndNewlines).takeIf { !$0.isEmpty }
     let refreshedTitle = normalized ?? cachedTitle
-    cachedWindowTitles[window.windowId] = CachedWindowTitle(title: refreshedTitle, fetchedAt: now)
+    cachedWindowTitles[window.windowId] = CachedWindowTitle(owner: owner, title: refreshedTitle, fetchedAt: now)
     return refreshedTitle
 }
 
@@ -66,7 +69,7 @@ func getCachedWindowTitle(
 /// model updates; those are equality-guarded, so an unchanged title costs nothing.
 @MainActor
 func getSessionWindowTitle(_ window: Window, now: Date = .now) async -> String? {
-    if let cached = cachedWindowTitles[window.windowId] {
+    if let cached = cachedWindowTitles[window.windowId], cached.owner == ObjectIdentifier(window) {
         if now.timeIntervalSince(cached.fetchedAt) >= cachedWindowTitleMaxAge {
             scheduleBackgroundWindowTitleRefresh(windowId: window.windowId)
         }

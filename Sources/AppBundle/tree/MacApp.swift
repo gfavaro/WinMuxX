@@ -128,7 +128,7 @@ final class MacApp: AbstractApp {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         _ = withWindowAsync(windowId) { [windows] window, job in
             guard let closeButton = window.get(Ax.closeButtonAttr) else { return }
-            if AXUIElementPerformAction(closeButton.cast, kAXPressAction as CFString) == .success {
+            if measuredAXOperation(.axAction, { AXUIElementPerformAction(closeButton.cast, kAXPressAction as CFString) }) == .success {
                 windows.threadGuarded.removeValue(forKey: windowId)
             }
         }
@@ -139,7 +139,7 @@ final class MacApp: AbstractApp {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         return try await withWindow(windowId) { window, job in
             guard let closeButton = window.get(Ax.closeButtonAttr) else { return false }
-            return AXUIElementPerformAction(closeButton.cast, kAXPressAction as CFString) == .success
+            return measuredAXOperation(.axAction, { AXUIElementPerformAction(closeButton.cast, kAXPressAction as CFString) }) == .success
         } ?? false
     }
 
@@ -224,12 +224,12 @@ final class MacApp: AbstractApp {
         } else {
             MacApp.focusJob = withWindowAsync(windowId) { [nsApp, axApp] window, job in
                 try job.checkCancellation()
-                AXUIElementSetAttributeValue(axApp.threadGuarded, kAXFocusedWindowAttribute as CFString, window)
+                _ = measuredAXOperation(.axWrite, { AXUIElementSetAttributeValue(axApp.threadGuarded, kAXFocusedWindowAttribute as CFString, window) })
                 try job.checkCancellation()
                 // Raise firstly to make sure that by the time we activate the app, the window would be already on top
                 window.set(Ax.isMainAttr, true)
                 try job.checkCancellation()
-                let raiseError = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+                let raiseError = measuredAXOperation(.axAction, { AXUIElementPerformAction(window, kAXRaiseAction as CFString) })
                 AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
                 try job.checkCancellation()
                 nsApp.activate(options: .activateIgnoringOtherApps)

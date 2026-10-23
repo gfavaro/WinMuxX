@@ -16,10 +16,21 @@ func buildDiagnosticsReport() async -> String {
     io.out("  crash recovery: \(WindowRecoveryController.shared.diagnosticSummary)")
     io.out("  workspace restoration: \(pendingRestartWindowCount) saved windows awaiting a unique match")
     let learned = MacWindow.allWindows.filter { !$0.learnedMinimum.isEmpty }
-    io.out("  learned minimum sizes: \(learned.count) windows (persisted observations; layout enforcement pending)")
+    io.out("  learned minimum sizes: \(learned.count) windows (persisted observations used by layout fitting)")
     for window in learned.sorted(by: { $0.windowId < $1.windowId }) {
         let minimum = window.learnedMinimum.size
         io.out("    window \(window.windowId): width=\(minimum.width) height=\(minimum.height)pt (0 = unknown)")
+    }
+    let work = runtime.workMetrics.snapshot()
+    io.out("Runtime work measurements: \(runtime.workMetrics.isRecording ? "recording" : "off")")
+    io.out("  Instrumented AX calls: \(work.operations.values.reduce(0, +)) (reads/writes only; direct AX paths are not all counted)")
+    io.out("  AX failures: \(work.failures); bounded samples dropped: \(work.droppedSamples)")
+    for (kind, samples) in work.durationsMilliseconds.sorted(by: { $0.key < $1.key }) where !samples.isEmpty {
+        let sorted = samples.sorted()
+        let p50 = sorted[(sorted.count - 1) / 2]
+        let p95 = sorted[min(sorted.count - 1, Int(ceil(Double(sorted.count) * 0.95)) - 1)]
+        let max = sorted.last ?? 0
+        io.out(String(format: "  %@: n=%d p50=%.2fms p95=%.2fms max=%.2fms", kind, sorted.count, p50, p95, max))
     }
     if !FileManager.default.fileExists(atPath: configUrl.path) {
         io.out("  file validation: WARNING — file is missing; running config retained")
@@ -42,6 +53,12 @@ func buildDiagnosticsReport() async -> String {
     io.out("  macOS switches to an app's Space on activation: \(dockDiagnosticSetting("workspaces-auto-swoosh"))")
     io.out("  macOS displays have separate Spaces: \(separateSpacesDiagnosticSetting())")
     io.out("  These settings are informational; WinMux does not change them.")
+    io.out("")
+    io.out("Private API paths:")
+    io.out("  WindowServer frame read: \(MacWindow.allWindows.first.map { String(describing: privateWindowFrameDiagnostic($0.windowId)) } ?? "inconclusive (no tracked window)")")
+    io.out("  Borders: \(WindowBorderController.shared.backendDiagnosticSummary)")
+    let touchStatus = RawWorkspaceTouchSource.shared.status
+    io.out("  Raw trackpad input: \(touchStatus) (status reports registration; it does not verify gestures)")
     io.out("")
 
     let touch = RawWorkspaceTouchSource.shared

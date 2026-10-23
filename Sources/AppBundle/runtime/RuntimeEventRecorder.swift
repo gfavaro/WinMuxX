@@ -65,17 +65,19 @@ final class RuntimeEventRecorder {
     /// Export is explicit, private and atomic. Failure leaves the recording intact.
     func export(to url: URL, configURL: URL, topology: [String]) throws {
         struct Envelope: Encodable {
-            let schema = 1
+            let schema = 2
             let build: String
             let session: String
             let configSHA256: String?
             let topology: [String]
             let dropped: Int
             let events: [Event]
+            let workMetrics: RuntimeWorkMetrics.Snapshot
         }
         let fingerprint = (try? Data(contentsOf: configURL)).map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() }
         let envelope = Envelope(build: gitHash, session: session.uuidString, configSHA256: fingerprint,
-                                topology: topology, dropped: dropped, events: events)
+                                topology: topology, dropped: dropped, events: events,
+                                workMetrics: RuntimeWorkMetrics.shared.snapshot())
         try writePrivateData(JSONEncoder().encode(envelope), to: url)
     }
     private(set) var session = UUID()

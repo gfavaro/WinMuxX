@@ -4,95 +4,62 @@ import Common
 extension TilingContainer {
     @MainActor
     func dwindleMinimumExtent(children: ArraySlice<TreeNode>, along axis: Orientation, rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil) -> CGFloat {
-        if isExplicitDwindle {
-            let splitAxis = dwindleAxis(width: rect.width, height: rect.height)
-            let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
-            return splitAxis == axis
-                ? minimums.reduce(0, +) + CGFloat(max(children.count - 1, 0)) * CGFloat(gaps.inner.get(axis).toDouble())
-                : minimums.max() ?? 0
+        let snapshots = children.map(makeLayoutMinimumSnapshot)
+        let ratios = (0..<max(children.count - 1, 0)).map { index in
+            ratioAt?(children.startIndex + index) ?? dwindleSplitRatio(at: children.startIndex + index)
         }
-        guard let child = children.first else { return 0 }
-        guard children.count > 1 else { return child.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
-        let splitAxis = dwindleAxis(width: rect.width, height: rect.height)
-        let gap = CGFloat(gaps.inner.get(splitAxis).toDouble())
-        let ratio = ratioAt?(children.startIndex) ?? dwindleSplitRatio(at: children.startIndex)
-        let childRect = Rect(topLeftX: rect.topLeftX, topLeftY: rect.topLeftY,
-            width: splitAxis == .h ? max(rect.width - gap, 0) * ratio : rect.width,
-            height: splitAxis == .v ? max(rect.height - gap, 0) * ratio : rect.height)
-        let minimum = child.minimumLayoutExtent(along: axis, gaps: gaps, rect: childRect)
-        let tailRect = Rect(topLeftX: rect.topLeftX, topLeftY: rect.topLeftY,
-            width: splitAxis == .h ? max(rect.width - gap, 0) * (1 - ratio) : rect.width,
-            height: splitAxis == .v ? max(rect.height - gap, 0) * (1 - ratio) : rect.height)
-        let tail = dwindleMinimumExtent(children: children.dropFirst(), along: axis, rect: tailRect, gaps: gaps, ratioAt: ratioAt)
-        return splitAxis == axis ? minimum + gap + tail : max(minimum, tail)
+        let settings = DwindleMinimumSettings(orientationHorizontal: dwindleOrientation.map { $0 == .h },
+            explicitShares: isExplicitDwindle ? dwindleShares(count: children.count) : nil, ratios: ratios)
+        let node = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: orientation == .h,
+            children: snapshots, dwindle: settings, tabChrome: .zero, stackedPadding: 0)
+        let extent = node.extent(horizontal: axis == .h,
+            in: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height),
+            gap: CGSize(width: CGFloat(gaps.inner.horizontal.toDouble()), height: CGFloat(gaps.inner.vertical.toDouble())))
+        return extent
     }
 
     @MainActor
     func dwindleChildFrames(in rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil, enforceMinimums: Bool = true) -> [Rect] {
-        if isExplicitDwindle {
-            let axis = dwindleAxis(width: rect.width, height: rect.height)
-            let gap = CGFloat(gaps.inner.get(axis).toDouble())
-            let available = max(rect.getDimension(axis) - CGFloat(max(children.count - 1, 0)) * gap, 0)
-            var shares = dwindleShares(count: children.count)
-            if let ratioAt, shares.count > 1 {
-                for index in 0..<(shares.count - 1) {
-                    let ratio = ratioAt(index)
-                    if ratio != dwindleSplitRatio(at: index) {
-                        let total = shares[index] + shares[index + 1]
-                        shares[index] = total * ratio
-                        shares[index + 1] = total - shares[index]
-                    }
+        var shares = isExplicitDwindle ? dwindleShares(count: children.count) : nil
+        if let ratioAt, var explicit = shares, explicit.count > 1 {
+            for index in 0..<(explicit.count - 1) {
+                let ratio = ratioAt(index)
+                if ratio != dwindleSplitRatio(at: index) {
+                    let total = explicit[index] + explicit[index + 1]
+                    explicit[index] = total * ratio
+                    explicit[index + 1] = total - explicit[index]
                 }
             }
-            let requested = shares.map { $0 * available }
-            let sizes = enforceMinimums ? fitLayoutSizes(requested, minimums: children.map {
-                $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect)
-            }, total: available) : requested
-            var point = rect.topLeftCorner
-            return sizes.map { size in
-                defer { point = point.addingOffset(axis, size + gap) }
-                return Rect(topLeftX: point.x, topLeftY: point.y,
-                    width: axis == .h ? size : rect.width, height: axis == .v ? size : rect.height)
-            }
+            shares = explicit
         }
-        var point = rect.topLeftCorner
-        var width = rect.width
-        var height = rect.height
-        var frames: [Rect] = []
-        for (index, child) in children.enumerated() {
-            let last = index == children.indices.last
-            let axis: Orientation = dwindleAxis(width: width, height: height)
-            let length = axis == .h ? width : height
-            let gap = last ? 0 : CGFloat(gaps.inner.get(axis).toDouble())
-            let ratio = ratioAt?(index) ?? dwindleSplitRatio(at: index)
-            var childLength = last ? length : max(length - gap, 0) * ratio
-            if !last && enforceMinimums {
-                // A nested automatic split can change axis when a minimum adjusts its
-                // rectangle. Re-evaluate using the proposed child and remainder geometry.
-                for _ in 0..<3 {
-                    let childRect = Rect(topLeftX: point.x, topLeftY: point.y,
-                        width: axis == .h ? childLength : width, height: axis == .v ? childLength : height)
-                    let tailLength = max(length - gap - childLength, 0)
-                    let tailRect = Rect(topLeftX: point.x, topLeftY: point.y,
-                        width: axis == .h ? tailLength : width, height: axis == .v ? tailLength : height)
-                    let remainingMinimum = dwindleMinimumExtent(children: children.dropFirst(index + 1),
-                        along: axis, rect: tailRect, gaps: gaps, ratioAt: ratioAt)
-                    let fitted = fittedDwindleSplitLength(total: length, gap: gap, ratio: ratio,
-                        minimum: child.minimumLayoutExtent(along: axis, gaps: gaps, rect: childRect),
-                        remainingMinimum: remainingMinimum)
-                    if abs(fitted - childLength) < 0.001 { break }
-                    childLength = fitted
-                }
-            }
-            let childWidth = axis == .h ? childLength : width
-            let childHeight = axis == .v ? childLength : height
-            frames.append(Rect(topLeftX: point.x, topLeftY: point.y, width: childWidth, height: childHeight))
-            let consumed = childLength + gap
-            point = point.addingOffset(axis, consumed)
-            if axis == .h { width = max(width - consumed, 0) }
-            else { height = max(height - consumed, 0) }
-        }
-        return frames
+        let ratios = (0..<max(children.count - 1, 0)).map { ratioAt?($0) ?? dwindleSplitRatio(at: $0) }
+        let input = DwindleLayoutInput(origin: rect.topLeftCorner, size: rect.size,
+            horizontalGap: CGFloat(gaps.inner.horizontal.toDouble()), verticalGap: CGFloat(gaps.inner.vertical.toDouble()),
+            children: children.map(makeLayoutMinimumSnapshot),
+            orientationHorizontal: dwindleOrientation.map { $0 == .h }, explicitShares: shares,
+            ratios: ratios, enforceMinimums: enforceMinimums)
+        return DwindleLayoutGeometry.calculate(input).map { Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height) }
+    }
+}
+
+@MainActor
+private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapshot {
+    switch node.nodeCases {
+    case .window(let window): return .window(window.minimumLayoutSize)
+    case .tilingContainer(let container):
+        let chrome = container.layout == .tabGroup && container.showsWindowTabs
+            ? CGSize(width: 2 * windowTabGroupShellHorizontalInset(),
+                     height: resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset())
+            : .zero
+        let dwindle = container.layout == .dwindle
+            ? DwindleMinimumSettings(orientationHorizontal: container.dwindleOrientation.map { $0 == .h },
+                explicitShares: container.isExplicitDwindle ? container.dwindleShares(count: container.children.count) : nil,
+                ratios: (0..<max(container.children.count - 1, 0)).map { container.dwindleSplitRatio(at: $0) })
+            : nil
+        return .container(layout: container.layout, horizontal: container.orientation == .h,
+            children: container.children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
+            tabChrome: chrome, stackedPadding: CGFloat(max(config.tabGroupPadding, 0)))
+    default: return .window(.zero)
     }
 }
 

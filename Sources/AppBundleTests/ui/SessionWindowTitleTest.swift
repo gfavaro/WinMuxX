@@ -72,6 +72,21 @@ final class SessionWindowTitleTest: XCTestCase {
         for _ in 0 ..< 50 { await Task.yield() }
         XCTAssertEqual(window.titleGetCount, 1, "fresh entries must not be re-fetched")
     }
+
+    @MainActor
+    func testReusedWindowIdDoesNotReusePriorOwnerTitle() async {
+        setUpWorkspacesForTests()
+        resetCachedWindowTitles()
+        let old = StubSessionTitleWindow(id: 66, title: "Old window")
+        _ = await getCachedWindowTitle(old)
+        old.unbindFromParent()
+        let replacement = StubSessionTitleWindow(id: 66, title: "Replacement")
+
+        let title = await getSessionWindowTitle(replacement)
+
+        XCTAssertEqual(title, "Replacement")
+        XCTAssertEqual(replacement.titleGetCount, 1)
+    }
 }
 
 private final class StubSessionTitleWindow: Window {

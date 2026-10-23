@@ -38,6 +38,18 @@ These example numbers stand for decimal vendor, model and serial values. Missing
 zero or ambiguous hardware identities fail rather than choosing a different
 display. No UUID-to-hardware fallback or reconnect movement is introduced.
 
+## Width and lone-window placement
+
+Settings → Windows edits the global `fullscreen-width` percentage and
+`single-window-alignment` (center, left or right), and displays the current
+workspace's resolved width/alignment and monitor. Width applies to lone tiles and
+WinMuxX fullscreen; fullscreen stays centered. The available width excludes
+sidebar space and outer gaps. These values also support `[display.<selector>]`,
+`[workspace.<internal-name>]` and nested workspace/display tables. Omitted keys
+inherit through workspace/display → workspace → display → global. Changing the
+global controls preserves override tables. See [configuration examples and
+migration](DINKY_022_ADOPTION.md).
+
 ## Window rules
 
 Settings → Automation → Rules provides app selection, app/title regex,

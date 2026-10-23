@@ -16,6 +16,11 @@ final class WindowBorderController {
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
     private(set) var missionControlWindowIds = Set<UInt32>()
+    var backendDiagnosticSummary: String {
+        let native = borders.values.filter(\.usesNativeBackend).count
+        let fallback = borders.count - native
+        return "native=\(native) AppKitFallback=\(fallback) activeBorders=\(borders.count)"
+    }
 
     func setEnabled(_ enabled: Bool) {
         nativeRefresh.cancel()
@@ -252,6 +257,7 @@ final class WindowBorder {
     }
 
     var windowId: UInt32 { windowIds.first ?? 0 }
+    var usesNativeBackend: Bool { nativeID != nil }
 
     init(
         target: UInt32,

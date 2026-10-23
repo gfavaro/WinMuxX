@@ -15,6 +15,7 @@ final class WinMuxRuntime {
     let recovery = WorkspaceRecoveryState()
     let refresh = RefreshCoordinator()
     let events = RuntimeEventRecorder()
+    let workMetrics = RuntimeWorkMetrics.shared
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)

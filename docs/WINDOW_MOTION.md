@@ -23,10 +23,12 @@ Mission Control settles the current tiles before hiding borders. Intermediate
 frames do not participate in minimum-size learning. No motion task remains
 running after arrival.
 
-All moving windows share a display-refresh clock (macOS 14+), with a finite
-60 Hz compatibility clock on macOS 13. Intermediate writes use whole points
-and skip duplicate frames. A stalled refresh advances by at most 1/30 second;
-a finite safety deadline lands windows if a display stops delivering frames.
+Each display with moving windows uses its own display-refresh clock (macOS 14+),
+with a finite 60 Hz compatibility clock on macOS 13. Windows follow their
+monitor's display UUID while the clock is active. Intermediate writes use whole
+points and skip duplicate frames. A stalled refresh advances by at most 1/30
+second. Each window has a finite safety deadline; it lands even if its display
+stops delivering frames, and new motion cannot postpone an older window's deadline.
 
 Display topology changes cancel in-flight motion. Each existing window snaps on
 its first layout after displays settle, including windows on hidden workspaces

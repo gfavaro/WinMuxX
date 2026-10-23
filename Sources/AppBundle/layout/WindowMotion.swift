@@ -25,6 +25,8 @@ final class WindowMotion: NSObject {
         weak var window: MacWindow?
         let motion: WindowMotionFrame
         let duration: Double
+        let displayID: CGDirectDisplayID
+        let deadline: Double
         var elapsed = 0.0
     }
     private var jobs: [UInt32: Playback] = [:]
@@ -32,9 +34,13 @@ final class WindowMotion: NSObject {
     private var targets: [UInt32: CGRect] = [:]
     private var landed = WindowMotionRestingFrames()
     private var displayPolicy = WindowMotionDisplayPolicy()
-    private var displayLink: WindowMotionClock?
-    private var lastTick: Double?
-    private var stallTimeout: Task<Void, Never>?
+    private struct DisplayClockState {
+        let clock: WindowMotionClock
+        var lastTick: Double?
+        var deadlineTask: Task<Void, Never>?
+        var deadlineGeneration: UInt64 = 0
+    }
+    private var displayClocks: [CGDirectDisplayID: DisplayClockState] = [:]
 
     func snapOnNextLayout(_ id: UInt32) {
         cancel(id)
@@ -67,16 +73,11 @@ final class WindowMotion: NSObject {
     }
 
     func cancel(_ id: UInt32) {
+        let oldDisplay = jobs[id]?.displayID
         jobs.removeValue(forKey: id)
         frames.removeValue(forKey: id)
         targets.removeValue(forKey: id)
-        if jobs.isEmpty {
-            displayLink?.invalidate()
-            displayLink = nil
-            lastTick = nil
-            stallTimeout?.cancel()
-            stallTimeout = nil
-        }
+        if let oldDisplay { retireClockIfIdle(oldDisplay) }
     }
 
     func cancelAll() {
@@ -85,9 +86,15 @@ final class WindowMotion: NSObject {
     }
 
     func finishAll() {
-        for (id, target) in targets {
-            MacWindow.allWindowsMap[id]?.setAxFrame(target.origin, target.size)
+        for (id, playback) in jobs {
+            if let window = playback.window, MacWindow.allWindowsMap[id] === window {
+                let target = playback.motion.target
+                window.setAxFrame(target.origin, target.size)
+            }
         }
+        jobs.removeAll(); frames.removeAll(); targets.removeAll()
+        for (_, clock) in displayClocks { clock.deadlineTask?.cancel(); clock.clock.invalidate() }
+        displayClocks.removeAll()
     }
 
     func apply(_ window: Window, target: CGRect) async throws {
@@ -140,31 +147,35 @@ final class WindowMotion: NSObject {
         window.suspendMinimumObservationForMotion()
         let motion = WindowMotionFrame(start: start, target: target)
         let duration = Double(config.animations.durationMs) / 1000
+        let displayID = window.nodeMonitor?.displayUUID.flatMap { uuid in NSScreen.screens.first(where: { $0.displayUUID == uuid })?.displayId }
+            ?? NSScreen.screens.first(where: { $0.frame.intersects(target) })?.displayId
+            ?? NSScreen.screens.first?.displayId ?? CGDirectDisplayID(0)
         targets[id] = target
-        jobs[id] = Playback(window: window, motion: motion, duration: duration)
-        if displayLink == nil {
-            let index = (window.nodeMonitor?.monitorAppKitNsScreenScreensId ?? 1) - 1
-            let screens = NSScreen.screens
-            let screen = screens.indices.contains(index) ? screens[index] : screens.first
-            if let screen {
-                displayLink = WindowMotionClock(screen: screen) { [weak self] timestamp, duration in
-                    self?.tick(timestamp: timestamp, duration: duration)
-                }
-            }
-        }
-        // One finite safety deadline: a disconnected display must not strand tiles.
-        stallTimeout?.cancel()
-        stallTimeout = Task { @MainActor [weak self] in
-            do { try await Task.sleep(for: .seconds(duration + 1)) } catch { return }
-            self?.finishAll()
-        }
-        if displayLink == nil { finishAll() }
+        let deadline = ProcessInfo.processInfo.systemUptime + duration + 1
+        jobs[id] = Playback(window: window, motion: motion, duration: duration,
+                            displayID: displayID, deadline: deadline)
+        startClockIfNeeded(displayID, target: target)
+        scheduleDeadline(for: displayID)
     }
 
-    private func tick(timestamp: Double, duration: Double) {
-        let dt = windowMotionFrameDelta(previous: lastTick, current: timestamp, fallback: duration)
-        lastTick = timestamp
-        for (id, var playback) in jobs {
+    private func startClockIfNeeded(_ displayID: CGDirectDisplayID, target: CGRect) {
+        guard displayClocks[displayID] == nil else { return }
+        let screen = NSScreen.screens.first(where: { $0.displayId == displayID })
+            ?? NSScreen.screens.first(where: { $0.frame.intersects(target) })
+            ?? NSScreen.main
+        guard let screen else { finishAll(); return }
+        let clock = WindowMotionClock(screen: screen) { [weak self] timestamp, duration in
+            self?.tick(displayID: displayID, timestamp: timestamp, duration: duration)
+        }
+        displayClocks[displayID] = DisplayClockState(clock: clock)
+    }
+
+    private func tick(displayID: CGDirectDisplayID, timestamp: Double, duration: Double) {
+        guard var clock = displayClocks[displayID] else { return }
+        let dt = windowMotionFrameDelta(previous: clock.lastTick, current: timestamp, fallback: duration)
+        clock.lastTick = timestamp
+        displayClocks[displayID] = clock
+        for (id, var playback) in Array(jobs) where playback.displayID == displayID {
             guard let window = playback.window, MacWindow.allWindowsMap[id] === window else { cancel(id); continue }
             guard TrayMenuModel.shared.isEnabled, !window.isHiddenInCorner,
                   currentlyManipulatedWithMouseWindowId != id,
@@ -179,6 +190,9 @@ final class WindowMotion: NSObject {
             if progress >= 1 || !config.animations.enabled || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
                 let target = playback.motion.target
                 window.setAxFrame(target.origin, target.size)
+                jobs.removeValue(forKey: id)
+                frames[id] = nil
+                targets[id] = nil
                 continue
             }
             jobs[id] = playback
@@ -190,6 +204,47 @@ final class WindowMotion: NSObject {
             // Intermediate frames bypass minimum-size learning; only the final tile is observed.
             window.macApp.setAnimatedAxFrame(id, frame, session: playback.session)
         }
+        retireClockIfIdle(displayID)
+    }
+
+    private func scheduleDeadline(for displayID: CGDirectDisplayID) {
+        guard var clock = displayClocks[displayID] else { return }
+        clock.deadlineTask?.cancel()
+        clock.deadlineGeneration &+= 1
+        let generation = clock.deadlineGeneration
+        let earliest = jobs.values.filter { $0.displayID == displayID }.map(\.deadline).min()
+        guard let earliest else {
+            displayClocks[displayID] = clock
+            retireClockIfIdle(displayID)
+            return
+        }
+        clock.deadlineTask = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: .seconds(max(0, earliest - ProcessInfo.processInfo.systemUptime))) }
+            catch { return }
+            guard let self, self.displayClocks[displayID]?.deadlineGeneration == generation else { return }
+            self.finishExpired(displayID)
+        }
+        displayClocks[displayID] = clock
+    }
+
+    private func finishExpired(_ displayID: CGDirectDisplayID) {
+        let now = ProcessInfo.processInfo.systemUptime
+        for (id, playback) in Array(jobs) where playback.displayID == displayID && playback.deadline <= now {
+            guard let window = playback.window, MacWindow.allWindowsMap[id] === window else { cancel(id); continue }
+            window.setAxFrame(playback.motion.target.origin, playback.motion.target.size)
+            jobs[id] = nil
+            frames[id] = nil
+            targets[id] = nil
+        }
+        scheduleDeadline(for: displayID)
+        retireClockIfIdle(displayID)
+    }
+
+    private func retireClockIfIdle(_ displayID: CGDirectDisplayID) {
+        guard !jobs.values.contains(where: { $0.displayID == displayID }),
+              let clock = displayClocks.removeValue(forKey: displayID) else { return }
+        clock.deadlineTask?.cancel()
+        clock.clock.invalidate()
     }
 }
 

@@ -9,6 +9,7 @@
 - [Dependencies](DEPENDENCIES.md): package inventory, removal decisions and Swift toolchain.
 - [Reliability](RELIABILITY.md): AX failures, retries, UUID targeting, config backups and IPC limits.
 - [Runtime efficiency](RUNTIME_EFFICIENCY.md): persistence, native notifications, queries, subscribers and capture limits.
+- [Window management internals](WINDOW_MANAGEMENT_INTERNALS.md): opt-in AX measurements, private-path diagnostics and pure tree geometry.
 - [Release validation](RELEASE_VALIDATION.md): completed checks, long observation and remaining native/energy gaps.
 - [Testing](TESTING.md): test design, isolation, asynchronous coordination and CI reports.
 - [Swipe performance](SWIPE_PERFORMANCE.md): stage timings, local surface benchmarks and physical validation requirements.
@@ -16,6 +17,7 @@
 - [Fork maintenance](FORK.md): identity, upstream workflow, configuration ownership and signing.
 - [Roadmap](ROADMAP.md): progress, deferred work and manual validation.
 
+- [Dinky 0.22 width and alignment](DINKY_022_ADOPTION.md): width percentages, display/workspace overrides and legacy configuration migration.
 - [Dinky 0.21 command migration](DINKY_021_ADOPTION.md): workspace/container commands and format output.
 - [Workspace overview](WORKSPACE_OVERVIEW.md): behavior, resource limits and validation.
 

@@ -157,9 +157,7 @@ extension Window {
 
     @MainActor
     fileprivate func layoutFullscreen(_ context: LayoutContext) async throws {
-        let monitorRect = noOuterGapsInFullscreen
-            ? context.workspace.workspaceMonitor.visibleRect
-            : context.workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+        let monitorRect = fullscreenWindowRect(self, in: context.workspace)
         let target = CGRect(origin: monitorRect.topLeftCorner, size: CGSize(width: monitorRect.width, height: monitorRect.height))
         if let window = self as? MacWindow, window.isHiddenInCorner {
             _ = try await window.restoreFromCorner(to: target)
@@ -270,25 +268,7 @@ extension TilingContainer {
 
 @MainActor
 func fitLayoutSizes(_ requested: [CGFloat], minimums: [CGFloat], total: CGFloat) -> [CGFloat] {
-    guard requested.count == minimums.count,
-          !requested.isEmpty,
-          minimums.allSatisfy({ $0.isFinite && $0 >= 0 }),
-          requested.allSatisfy({ $0.isFinite && $0 >= 0 }),
-          minimums.reduce(0, +) <= total else { return requested }
-    var result = requested
-    var pinned = Set<Int>()
-    while let short = result.indices.first(where: { !pinned.contains($0) && result[$0] + 0.5 < minimums[$0] }) {
-        pinned.insert(short)
-        let pinnedTotal = pinned.reduce(CGFloat.zero) { $0 + minimums[$1] }
-        let free = result.indices.filter { !pinned.contains($0) }
-        let freeRequested = free.reduce(CGFloat.zero) { $0 + requested[$1] }
-        for index in pinned { result[index] = minimums[index] }
-        let remaining = max(total - pinnedTotal, 0)
-        for index in free {
-            result[index] = freeRequested > 0 ? remaining * requested[index] / freeRequested : remaining / CGFloat(max(free.count, 1))
-        }
-    }
-    return result
+    TileLayoutGeometry.fit(requested, minimums: minimums, total: total)
 }
 
 @MainActor

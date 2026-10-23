@@ -42,15 +42,25 @@ private final class RunLoopAction: NSObject, Sendable {
     private let autoCheckCancelled: Bool
     private let readBudget: AXReadBudget?
     private let _refreshSessionEvent: RefreshSessionEvent?
+    private let workMetrics = RuntimeWorkMetrics.shared
+    private let workMetricsGeneration: UInt64?
+    private let enqueuedAt: UInt64?
     init(job: RunLoopJob, autoCheckCancelled: Bool, _ action: @escaping @Sendable (RunLoopJob) -> ()) {
         self.job = job
         self.autoCheckCancelled = autoCheckCancelled
         readBudget = AXReadBudget.current
+        workMetricsGeneration = RuntimeWorkMetrics.shared.generationIfRecording()
+        enqueuedAt = workMetricsGeneration.map { _ in DispatchTime.now().uptimeNanoseconds }
         _action = action
         _refreshSessionEvent = refreshSessionEvent
     }
     @objc func action() {
         if autoCheckCancelled && job.isCancelled { return }
+        if let workMetricsGeneration, let enqueuedAt {
+            workMetrics.record(.runLoopQueueWait, failed: false,
+                duration: Double(DispatchTime.now().uptimeNanoseconds - enqueuedAt) / 1_000_000_000,
+                generation: workMetricsGeneration)
+        }
         $refreshSessionEvent.withValue(_refreshSessionEvent) {
             AXReadBudget.$current.withValue(readBudget) {
                 RunLoopJob.$current.withValue(job) { _action(job) }

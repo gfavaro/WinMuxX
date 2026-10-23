@@ -1,0 +1,8 @@
+fullscreen-width = 0.7
+single-window-alignment = 'center'
+[display.'Built-in']
+fullscreen-width = 0.8
+[workspace.3]
+fullscreen-width = 0.9
+[workspace.3.display.main]
+single-window-alignment = 'right'
