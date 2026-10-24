@@ -100,6 +100,7 @@ final class WorkspaceOverviewController {
     let dependencies: WorkspaceOverviewDependencies
     private(set) var models: [WorkspaceOverviewDisplayModel] = []
     private(set) var panels: [any WorkspaceOverviewPresenting] = []
+    private var reusablePanels: [MonitorViewportId: WorkspaceOverviewPanel] = [:]
     private var project: WorkspaceProjectId?
     private var generation = 0
     private var captureSession = UUID()
@@ -123,7 +124,12 @@ final class WorkspaceOverviewController {
         if phase == .closing { finishDismiss() }
         if isOpen { return true }
         guard dependencies.canShow(), selectionTask == nil else { return false }
+        let setupStarted = CACurrentMediaTime()
         let displays = dependencies.displays()
+        let connected = Set(displays.map(\.id))
+        for id in Array(reusablePanels.keys) where !connected.contains(id) {
+            reusablePanels.removeValue(forKey: id)?.dismissOverview()
+        }
         guard !displays.isEmpty else { return false }
         generation += 1; captureSession = UUID(); phase = .opening
         runtime.publicState.overviewVisible = true
@@ -140,7 +146,9 @@ final class WorkspaceOverviewController {
         }
         let cards = dependencies.cards(project!)
         for display in displays {
-            let model = WorkspaceOverviewDisplayModel()
+            let reused = reusablePanels.removeValue(forKey: display.id)
+            reused?.prepareForReuse(name: display.name, frame: display.frame)
+            let model = reused?.model ?? WorkspaceOverviewDisplayModel()
             model.monitor = display.id
             model.cards = cards.filter { $0.monitor == display.id }
             if let current = model.cards.firstIndex(where: { $0.id == display.activeWorkspace }) {
@@ -150,12 +158,13 @@ final class WorkspaceOverviewController {
             model.pageChanged = { [weak self] in self?.pagesChanged() }
             model.dismiss = { [weak self] in self?.dismiss() }
             models.append(model)
-            panels.append(dependencies.makePanel(model, display))
+            panels.append(reused ?? dependencies.makePanel(model, display))
         }
         for (index, panel) in panels.enumerated() {
             let key = dependencies.nativeIntegration ? displays[index].id == MonitorViewportId(focus.workspace.workspaceMonitor) : index == 0
             panel.present(key: key, gestureProgress: gestureProgress)
         }
+        WorkspaceMotionDiagnostics.record("Overview setup to panel submission", milliseconds: (CACurrentMediaTime() - setupStarted) * 1000)
         phase = .open
         if dependencies.nativeIntegration {
             installObservers()
@@ -211,8 +220,23 @@ final class WorkspaceOverviewController {
         phase = .closed
         let retiredPanels = panels, retiredModels = models
         panels.removeAll(); models.removeAll()
-        for panel in retiredPanels { panel.dismissOverview() }
-        for model in retiredModels { model.images.removeAll(); model.cards.removeAll() }
+        for (panel, model) in zip(retiredPanels, retiredModels) {
+            if let native = panel as? WorkspaceOverviewPanel, let id = model.monitor {
+                native.hideForReuse()
+                reusablePanels[id]?.dismissOverview()
+                reusablePanels[id] = native
+            } else { panel.dismissOverview() }
+            model.images.removeAll(); model.cards.removeAll()
+            model.page = 0; model.selection = 0; model.selectedWindow = nil
+            model.activate = nil; model.pageChanged = nil; model.dismiss = nil
+        }
+    }
+
+    /// Runtime and display invalidation release cached native surfaces as well as sessions.
+    func invalidate() {
+        dismiss(animated: false)
+        for panel in reusablePanels.values { panel.dismissOverview() }
+        reusablePanels.removeAll()
     }
 
     /// Called by the established refresh path and application notifications; no polling.

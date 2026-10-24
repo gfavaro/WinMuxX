@@ -90,6 +90,11 @@ func buildDiagnosticsReport() async -> String {
                           sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
         }
     }
+    for (stage, samples) in WorkspaceMotionDiagnostics.samples.sorted(by: { $0.key < $1.key }) where !samples.isEmpty {
+        let sorted = samples.sorted()
+        io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms (submission/layout, not screen presentation)", stage,
+            sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
+    }
     io.out("Permissions:")
     io.out("  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")")
     io.out("  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")")

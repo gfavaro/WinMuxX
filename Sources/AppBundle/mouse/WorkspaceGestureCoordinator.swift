@@ -23,7 +23,7 @@ final class WorkspaceGestureCoordinator {
     private func cancelInteractions() {
         WorkspaceGestureRouter.shared.reset()
         WorkspaceSwipeController.shared.reset()
-        WorkspaceOverviewController.shared.dismiss(animated: false)
+        WorkspaceOverviewController.shared.invalidate()
     }
     func overviewPresentationChanged() {
         if !applyingConfiguration, RawWorkspaceTouchSource.shared.updateDemand() {

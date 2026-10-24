@@ -1,4 +1,5 @@
 import Foundation
+import QuartzCore
 
 struct WorkspaceTouchFrame: Equatable, Sendable {
     let device: UInt64
@@ -7,6 +8,13 @@ struct WorkspaceTouchFrame: Equatable, Sendable {
     let y: Double
     let timestamp: Double
     let contacts: UInt64
+    // Receipt uses our monotonic clock; the private device timestamp is only for deltas.
+    var receivedAt: Double = CACurrentMediaTime()
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.device == rhs.device && lhs.fingers == rhs.fingers && lhs.x == rhs.x &&
+            lhs.y == rhs.y && lhs.timestamp == rhs.timestamp && lhs.contacts == rhs.contacts
+    }
 }
 
 /// A gesture previews one adjacent workspace; only release can commit it.

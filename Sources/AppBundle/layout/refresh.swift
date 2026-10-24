@@ -658,6 +658,7 @@ private func layoutWorkspaces() async throws {
         }
         try await workspace.layoutWorkspace()
         try checkCancellation()
+        if monitor.activeWorkspace === workspace { WorkspaceMotionDiagnostics.layoutReady(workspace) }
     }
 }
 

@@ -598,7 +598,8 @@ The optional three-finger upward gesture opens the overview. A three-finger
 downward gesture closes it whenever it is open, including when opened by command
 with the upward shortcut disabled. The overview follows your fingers while swiping
 up or down; reversing a short swipe returns it to its starting state. Release
-settles with your swipe velocity. Opening and closing share the workspace-swipe
+settles with your swipe velocity. Hidden overview surfaces are reused between openings;
+images and selection state are cleared on dismissal. Opening and closing share the workspace-swipe
 spring and `workspace-swipe.animation-duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
@@ -693,8 +694,8 @@ workspace on the display under the pointer. Left means next, right means previou
 reverse direction is optional. Navigation stays within that display and project,
 stops at either end, and never creates, moves or swaps workspaces.
 
-Previews follow your three fingers with progressive resistance after a small
-horizontal movement. A short quick flick or a longer drag followed by release
+Previews follow your three fingers proportionally after a small horizontal
+movement, without adding an easing animation to each input update. A short quick flick or a longer drag followed by release
 commits the switch. Pulling back before release reduces progress and can cancel it. Each gesture selects at most one adjacent
 workspace. Partial lifts finish the gesture using its last three-finger position;
 extra/replaced contacts and invalid frames cancel it. Window dragging/resizing blocks it.

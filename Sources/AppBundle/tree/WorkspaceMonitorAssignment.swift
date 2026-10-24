@@ -50,6 +50,7 @@ func activateWorkspaceForUser(
     }
 
     guard monitor.setActiveWorkspace(workspace) else { return false }
+    WorkspaceMotionDiagnostics.selected(workspace)
     let focused = workspace.focusWorkspace()
     if focused { recordUserWorkspaceSelectionForRestoration() }
     return focused

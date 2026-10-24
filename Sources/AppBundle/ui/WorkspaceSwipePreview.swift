@@ -3,14 +3,9 @@ import Common
 import QuartzCore
 
 struct WorkspaceSwipePreviewGeometry {
-    /// Keep the preview under the fingers, with increasing resistance as it travels.
-    /// This affects appearance only; the recognizer keeps its short-swipe thresholds.
-    static func resistedProgress(_ progress: Double) -> Double {
-        let progress = min(1, max(0, progress))
-        // Established UIScrollView rubber-band equation, normalized to one display width:
-        // https://holko.pl/2014/07/06/inertia-bouncing-rubber-banding-uikit-dynamics/
-        let coefficient = 0.55
-        return coefficient * progress / (1 + coefficient * progress)
+    /// Navigation progress and visible travel share the same scale.
+    static func trackingProgress(_ progress: Double) -> Double {
+        progress.isFinite ? min(1, max(0, progress)) : 0
     }
 
     static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration: Double) -> CASpringAnimation {
@@ -210,7 +205,7 @@ final class WorkspaceSwipePreview {
         outgoing?.contents = front
         incoming?.contents = back
         CATransaction.commit()
-        applyProgress(animated: false)
+        applyProgress()
         panel.orderFrontRegardless()
         updateTiming {
             $0.panelMs = (CACurrentMediaTime() - panelStarted) * 1000
@@ -218,44 +213,39 @@ final class WorkspaceSwipePreview {
         }
     }
 
-    func update(_ progress: Double) {
+    func update(_ progress: Double, timestamp: Double = CACurrentMediaTime()) {
         guard phase == .tracking || phase == .preparing else { return }
-        let now = CACurrentMediaTime()
-        let next = WorkspaceSwipePreviewGeometry.resistedProgress(progress)
+        let now = timestamp
+        guard now.isFinite else { return }
+        let next = WorkspaceSwipePreviewGeometry.trackingProgress(progress)
         let dt = now - sampleTime
         velocity = dt > 0.001 && dt < 0.1 ? (next - self.progress) / dt : 0
         sampleTime = now
         self.progress = next
-        if phase == .tracking { applyProgress(animated: true) }
+        if phase == .tracking {
+            applyProgress()
+        }
     }
 
-    private func applyProgress(animated: Bool) {
+    private func applyProgress() {
         guard let panel else { return }
         let offset = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: progress, slidesLeft: slidesLeft)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for (layer, to) in [(outgoing, offset.outgoing), (incoming, offset.incoming)] {
             guard let layer else { continue }
-            let from = layer.presentation()?.transform.m41 ?? layer.transform.m41
             layer.transform = CATransform3DMakeTranslation(to, 0, 0)
-            guard animated else { continue }
-            let animation = CABasicAnimation(keyPath: "transform.translation.x")
-            animation.fromValue = from
-            animation.toValue = to
-            animation.duration = 0.045
-            animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            layer.add(animation, forKey: "workspaceSwipe")
         }
         CATransaction.commit()
     }
 
-    func settle(commit: Bool) {
+    func settle(commit: Bool, timestamp: Double = CACurrentMediaTime()) {
         snapshots.cancel()
         if phase == .preparing { cancel(); return }
         guard let panel, phase == .tracking else { return }
         phase.settle(commit: commit)
         let start = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: progress, slidesLeft: slidesLeft)
-        let releaseVelocity = CACurrentMediaTime() - sampleTime < 0.08 ? velocity : 0
+        let releaseVelocity = timestamp >= sampleTime && timestamp - sampleTime < 0.08 ? velocity : 0
         let end = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: commit ? 1 : 0, slidesLeft: slidesLeft)
         let remaining = commit ? 1 - progress : progress
         let duration = max(0.12, Double(config.workspaceSwipe.animationDurationMs) / 1000 * sqrt(remaining))
@@ -264,8 +254,8 @@ final class WorkspaceSwipePreview {
         CATransaction.setDisableActions(true)
         for (layer, from, to) in [(outgoing, start.outgoing, end.outgoing), (incoming, start.incoming, end.incoming)] {
             guard let layer else { continue }
-            layer.transform = CATransform3DMakeTranslation(to, 0, 0)
             let visible = layer.presentation()?.transform.m41 ?? from
+            layer.transform = CATransform3DMakeTranslation(to, 0, 0)
             let speed = releaseVelocity * panel.frame.width * (slidesLeft ? -1 : 1)
             let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: visible, to: to, speed: speed, duration: duration)
             settlingDuration = max(settlingDuration, animation.duration)

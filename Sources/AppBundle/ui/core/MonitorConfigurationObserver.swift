@@ -29,6 +29,7 @@ final class MonitorConfigurationObserver {
 
     private func handleScreenParametersChanged() {
         runtime.displays.displayHookPending = false
+        WorkspaceOverviewController.shared.invalidate()
         WindowMotion.shared.screensChanged()
         // AppKit can emit this notification while the display topology is still changing.
         // Refresh panels immediately, but wait for the settled pass before reconciling
