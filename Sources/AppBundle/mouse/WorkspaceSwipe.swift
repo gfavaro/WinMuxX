@@ -7,8 +7,8 @@ protocol WorkspaceSwipePreviewing: AnyObject {
     var isSettling: Bool { get }
     func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
                isValid: @escaping @MainActor () -> Bool)
-    func update(_ progress: Double)
-    func settle(commit: Bool)
+    func update(_ progress: Double, timestamp: Double)
+    func settle(commit: Bool, timestamp: Double)
     func revealWorkspace()
     func cancel()
     func invalidate()
@@ -103,28 +103,30 @@ final class WorkspaceSwipeController {
                           monitor.activeWorkspace === gesture.source else { return false }
                     return self.gestureIsValid(gesture, on: monitor)
                 }
-                dependencies.preview.update(request.progress)
+                dependencies.preview.update(request.progress, timestamp: frame.timestamp)
             case .changed(let progress):
                 guard let gesture, let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == gesture.displayPoint }),
                       monitor.activeWorkspace === gesture.source else { cancelVisualInteraction(); return }
-                dependencies.preview.update(progress)
+                dependencies.preview.update(progress, timestamp: frame.timestamp)
+                WorkspaceMotionDiagnostics.record("Horizontal callback to preview update", milliseconds: (CACurrentMediaTime() - frame.receivedAt) * 1000)
             case .ended(let commit):
-                finish(commit: commit)
+                finish(commit: commit, timestamp: frame.timestamp)
             case .cancelled:
-                finish(commit: false)
+                finish(commit: false, timestamp: frame.timestamp)
         }
     }
 
-    private func finish(commit: Bool) {
+    private func finish(commit: Bool, timestamp: Double) {
         guard let gesture else { return }
         self.gesture = nil
-        guard commit else { dependencies.preview.settle(commit: false); return }
+        guard commit else { dependencies.preview.settle(commit: false, timestamp: timestamp); return }
         guard let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == gesture.displayPoint }),
               monitor.activeWorkspace === gesture.source, gestureIsValid(gesture, on: monitor) else {
-            dependencies.preview.settle(commit: false)
+            dependencies.preview.settle(commit: false, timestamp: timestamp)
             return
         }
-        dependencies.preview.settle(commit: true)
+        dependencies.preview.settle(commit: true, timestamp: timestamp)
+        let released = CACurrentMediaTime()
         let currentGeneration = generation
         pending = Task { @MainActor in
             defer { if generation == currentGeneration { pending = nil } }
@@ -143,6 +145,7 @@ final class WorkspaceSwipeController {
                 }
                 guard generation == currentGeneration else { return }
                 if activated, monitor.activeWorkspace === gesture.target {
+                    WorkspaceMotionDiagnostics.record("Swipe release to layout ready", milliseconds: (CACurrentMediaTime() - released) * 1000)
                     dependencies.preview.revealWorkspace()
                 } else { dependencies.preview.cancel() }
             } catch {

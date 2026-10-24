@@ -272,7 +272,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(preview.timings.last?.captureMs, 120)
         let panel = try XCTUnwrap(NSApplication.shared.windows.first { !existing.contains(ObjectIdentifier($0)) && $0.isVisible })
         let layer = try XCTUnwrap(panel.contentView?.layer?.sublayers?.first)
-        XCTAssertEqual(layer.transform.m41, -rect.width * WorkspaceSwipePreviewGeometry.resistedProgress(0.6), accuracy: 0.001)
+        XCTAssertEqual(layer.transform.m41, -rect.width * WorkspaceSwipePreviewGeometry.trackingProgress(0.6), accuracy: 0.001)
         preview.cancel()
         XCTAssertFalse(panel.isVisible)
         for layer in panel.contentView?.layer?.sublayers ?? [] {

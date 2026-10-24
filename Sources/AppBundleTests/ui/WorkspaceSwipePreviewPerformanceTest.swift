@@ -7,6 +7,41 @@ import XCTest
 /// AX calls, user configuration writes, or wall-clock pass/fail thresholds.
 @MainActor
 final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
+    func testDirectTrackingAndReleaseUseTouchTime() throws {
+        let rect = Rect(topLeftX: -20000, topLeftY: -20000, width: 200, height: 100)
+        let request = WorkspaceSwipeSnapshotRequest(key: WorkspaceSwipeSnapshotKey(
+            workspace: WorkspaceId("tracking"), display: "synthetic",
+            rect: CGRect(x: -20000, y: -20000, width: 200, height: 100)))
+        let context = try XCTUnwrap(CGContext(data: nil, width: 16, height: 16,
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        let picture = try XCTUnwrap(context.makeImage())
+        let snapshots = WorkspaceSwipeSnapshots(renderer: { _ in .init(image: picture, renderMs: 0) })
+        snapshots.cache.insert(picture, for: request.key)
+        let preview = WorkspaceSwipePreview(snapshots: snapshots)
+        defer { preview.invalidate() }
+        let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
+        for stationary in [false, true] {
+            preview.begin(request: request, front: picture, rect: rect, slidesLeft: true)
+            let panel = try XCTUnwrap(NSApplication.shared.windows.first {
+                !existing.contains(ObjectIdentifier($0)) && $0.isVisible
+            })
+            let layer = try XCTUnwrap(panel.contentView?.layer?.sublayers?.first)
+            preview.update(0.5, timestamp: 10)
+            XCTAssertEqual(layer.transform.m41, -100)
+            preview.update(0.4, timestamp: 10.05)
+            XCTAssertEqual(layer.transform.m41, -80)
+            XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
+            if stationary { preview.update(0.4, timestamp: 10.06) }
+            preview.settle(commit: false, timestamp: 10.07)
+            let spring = try XCTUnwrap(layer.animation(forKey: "workspaceSwipe") as? CASpringAnimation)
+            XCTAssertEqual(spring.toValue as? CGFloat, 0)
+            if stationary { XCTAssertEqual(spring.initialVelocity, 0) }
+            else { XCTAssertGreaterThan(spring.initialVelocity, 0, "Reversal velocity must survive main-thread delivery timing") }
+            preview.cancel()
+        }
+    }
+
     func testRepeatedWarmSurfacePreparation() throws {
         let rect = Rect(topLeftX: -20000, topLeftY: -20000, width: 1710, height: 1080)
         let key = WorkspaceSwipeSnapshotKey(workspace: WorkspaceId("benchmark"), display: "synthetic",

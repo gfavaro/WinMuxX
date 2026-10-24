@@ -388,6 +388,42 @@ final class WorkspaceOverviewTest: XCTestCase {
     }
 
 
+    func testControllerReusesHostingSurfaceAndClearsSessionState() async throws {
+        let picture = try image()
+        var deps = dependencies(cards: [card()], image: picture)
+        var creations = 0
+        deps.makePanel = { model, display in
+            creations += 1
+            return WorkspaceOverviewPanel(model: model, monitorName: display.name,
+                frame: CGRect(x: -20000, y: -20000, width: 800, height: 600))
+        }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        defer { controller.invalidate() }
+        XCTAssertTrue(controller.show())
+        await drain(controller)
+        let panel = try XCTUnwrap(controller.panels.first as? WorkspaceOverviewPanel)
+        let hosting = try XCTUnwrap(panel.contentView)
+        let model = panel.model
+        XCTAssertFalse(model.images.isEmpty)
+        model.selectedWindow = 1
+        controller.dismiss(animated: false)
+        XCTAssertFalse(panel.isVisible)
+        XCTAssertTrue(model.images.isEmpty)
+        XCTAssertTrue(model.cards.isEmpty)
+        XCTAssertNil(model.selectedWindow)
+        XCTAssertNil(model.activate)
+        XCTAssertTrue(controller.show(gestureProgress: 0.3))
+        XCTAssertEqual(creations, 1)
+        XCTAssertTrue(controller.panels.first === panel)
+        XCTAssertTrue(panel.contentView === hosting)
+        XCTAssertNotNil(model.activate)
+        controller.invalidate()
+        XCTAssertNil(panel.contentView)
+        XCTAssertFalse(panel.isVisible)
+        XCTAssertTrue(controller.show())
+        XCTAssertEqual(creations, 2)
+    }
+
     func testSyntheticOverviewRendersAndNativePanelsRelease() throws {
         let picture = try image(640, 360)
         let model = WorkspaceOverviewDisplayModel()

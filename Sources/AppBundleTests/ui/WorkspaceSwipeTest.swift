@@ -115,23 +115,13 @@ final class WorkspaceSwipeTest: XCTestCase {
         XCTAssertNotNil(recognizer.receive(frame(0.2, time: 3.1), displayPoint: main, reversed: false))
     }
 
-    func testPreviewResistanceIncreasesWithoutChangingDirectionOrReachingTheEdge() {
-        XCTAssertEqual(WorkspaceSwipePreviewGeometry.resistedProgress(0), 0)
-        XCTAssertEqual(WorkspaceSwipePreviewGeometry.resistedProgress(1), 0.55 / 1.55, accuracy: 0.0001)
-        var previous = 0.0
-        var previousStep = 1.0
-        for step in 1...100 {
-            let input = Double(step) / 100
-            let output = WorkspaceSwipePreviewGeometry.resistedProgress(input)
-            let delta = output - previous
-            XCTAssertGreaterThan(delta, 0)
-            XCTAssertLessThan(delta, previousStep)
-            XCTAssertLessThan(output, input)
-            previous = output
-            previousStep = delta
+    func testPreviewTracksProgressIncludingReversalAndBounds() {
+        for progress in [0.0, 0.25, 0.5, 1, 0.6, 0.2, 0] {
+            XCTAssertEqual(WorkspaceSwipePreviewGeometry.trackingProgress(progress), progress)
         }
-        XCTAssertEqual(WorkspaceSwipePreviewGeometry.resistedProgress(-1), 0)
-        XCTAssertEqual(WorkspaceSwipePreviewGeometry.resistedProgress(2), 0.55 / 1.55, accuracy: 0.0001)
+        XCTAssertEqual(WorkspaceSwipePreviewGeometry.trackingProgress(-1), 0)
+        XCTAssertEqual(WorkspaceSwipePreviewGeometry.trackingProgress(2), 1)
+        XCTAssertEqual(WorkspaceSwipePreviewGeometry.trackingProgress(.nan), 0)
     }
 
     func testPreviewOffsetsMeetWithoutGapInBothDirections() {

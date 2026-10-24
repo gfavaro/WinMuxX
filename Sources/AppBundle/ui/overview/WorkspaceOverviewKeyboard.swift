@@ -40,6 +40,13 @@ final class WorkspaceOverviewPanel: NSPanelHud {
         setFrame(frame, display: false)
         contentView = NSHostingView(rootView: WorkspaceOverviewView(model: model, monitorName: monitorName))
     }
+    func prepareForReuse(name: String, frame: CGRect) {
+        setFrame(frame, display: false)
+        if let hosting = contentView as? NSHostingView<WorkspaceOverviewView> {
+            hosting.rootView = WorkspaceOverviewView(model: model, monitorName: name)
+        }
+    }
+
     override func mouseDown(with event: NSEvent) { model.dismiss?() }
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown,

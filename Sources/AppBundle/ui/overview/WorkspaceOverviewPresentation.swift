@@ -104,12 +104,17 @@ extension WorkspaceOverviewPanel: WorkspaceOverviewPresenting {
         ignoresMouseEvents = true
         resignKey()
         if animated { presentation.animate(self, opening: false, velocity: velocity, completion: completion) }
-        else { dismissOverview(); completion() }
+        else { hideForReuse(); completion() }
+    }
+
+    func hideForReuse() {
+        presentation.cancel(self)
+        orderOut(nil)
+        model.activate = nil; model.pageChanged = nil; model.dismiss = nil
     }
 
     func dismissOverview() {
-        presentation.cancel(self)
-        orderOut(nil)
+        hideForReuse()
         contentView = nil
         model.activate = nil; model.pageChanged = nil; model.dismiss = nil
     }

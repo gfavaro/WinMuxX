@@ -1,6 +1,26 @@
 # Swipe preview performance
 
-## Scope and acceptance
+## Current motion changes
+
+Horizontal preview travel now follows normalized gesture progress directly: halfway
+progress displays halfway travel. Tracking updates layer transforms without restarting
+an easing animation. Release springs use device sample timestamp deltas and start at
+the visible position. Recognition and commit thresholds are unchanged.
+
+Overview dismissal clears session images, cards, selection and callbacks while retaining
+one native panel and hosting view per display. Reopening refreshes model and geometry;
+runtime invalidation and display topology changes release the retained surfaces.
+Capture remains asynchronous and does not gate overview panel movement.
+
+`doctor` includes bounded (128 per stage) callback-to-update, overview setup-to-submission,
+swipe release-to-layout-ready and ordinary selection-to-layout-ready timings. Callback
+receipt uses the app's monotonic clock; private device timestamps are used only for
+velocity deltas. Horizontal callback-to-update includes updates during capture preparation,
+so it does not imply that a panel was visible. Layout readiness marks successful layout
+completion, not WindowServer presentation. No physical latency improvement is claimed
+without a new installed-build measurement.
+
+## Historical capture optimization scope and acceptance
 
 This pass addresses main-thread capture stalls, repeated native surface allocation,
 and the lack of separate timing for capture and panel preparation. Keep workspace

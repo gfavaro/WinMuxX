@@ -123,7 +123,10 @@ final class WorkspaceGestureRouter {
                     velocity = dt > 0 && dt <= 0.1 ? (progress - verticalProgress) / dt : 0
                     sampleTime = item.timestamp
                     verticalProgress = progress
-                    if interactive { dependencies.updateOverviewGesture?(progress) }
+                    if interactive {
+                        dependencies.updateOverviewGesture?(progress)
+                        WorkspaceMotionDiagnostics.record("Overview callback to layer submission", milliseconds: max(0, (CACurrentMediaTime() - item.receivedAt) * 1000))
+                    }
                 }
             }
         }

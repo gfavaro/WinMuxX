@@ -17,8 +17,8 @@ private final class SwipePreviewSpy: WorkspaceSwipePreviewing {
         validity = isValid
         isActive = capturesAvailable
     }
-    func update(_ progress: Double) {}
-    func settle(commit: Bool) { releases.append(commit) }
+    func update(_ progress: Double, timestamp: Double) {}
+    func settle(commit: Bool, timestamp: Double) { releases.append(commit) }
     func revealWorkspace() { reveals += 1; isActive = false }
     func cancel() { cancels += 1; isActive = false; validity = nil }
     func invalidate() { cancel() }
