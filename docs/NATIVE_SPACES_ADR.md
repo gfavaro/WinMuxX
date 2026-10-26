@@ -1,6 +1,7 @@
 # Native Spaces ownership boundary
 
-Status: accepted for experimental read-only integration; native tiling is not enabled.
+Status: experimental observation plus separately opt-in native tiling implementation;
+physical tiling validation remains pending.
 
 macOS owns native Space identities, visibility, membership and lifecycle. WinMuxX's
 existing Workspace trees own layouts. Those responsibilities must remain separate:
@@ -51,6 +52,14 @@ is unsupported. These either duplicate behavior or conceal ownership failures.
 Backend changes require restart initially. Native observation does not read or write
 virtual recovery. The first native tiling milestone must add separate persistence
 and protect inactive/unknown/fullscreen windows before any automatic frame writes.
+The tiling opt-in reuses shared Dwindle/Master geometry with presentation-only child
+filtering. Concealed native windows keep their tree membership and width/share
+preferences. Native persistence uses its own versioned UUID-keyed file and the shared
+frozen-tree codec, bypassing virtual monitor assignment and recovery. Restoration
+requires a complete unique match within the owning Space; incomplete or unsupported
+records are retained, never replaced by a partial autosave. Private APIs remain
+read-side only; physical positioning uses guarded existing AX operations.
+
 Native creation/deletion, activation, cross-Space moves, whole-Space relocation and
 project mapping remain explicit unsupported capabilities.
 

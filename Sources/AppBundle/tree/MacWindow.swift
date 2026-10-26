@@ -133,7 +133,13 @@ final class MacWindow: Window {
               !macApp.nsApp.isTerminated else { return nil }
         let workspace = registration.workspace
         if let existing = allWindowsMap[windowId], existing.macApp === macApp,
-           existing.nodeWorkspace === workspace { return existing }
+           existing.nodeWorkspace === workspace {
+            let native = try await macApp.readNativeState(windowId)
+            try Task.checkCancellation()
+            guard layouts.accepts(registration) else { return nil }
+            existing.nativeLayoutEligible = native?.fullscreen == false && native?.minimized == false
+            return existing.nativeLayoutEligible ? existing : nil
+        }
         let rect = try await macApp.getAxRect(windowId)
         let type = try await macApp.getAxUiElementWindowType(windowId, getWindowLevel(for: windowId))
         let native = try await macApp.readNativeState(windowId)
@@ -158,6 +164,7 @@ final class MacWindow: Window {
             parent: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
         window.recordAuthoritativeActualRect(rect)
         allWindowsMap[windowId] = window
+        window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
         return window
     }
 
@@ -506,10 +513,10 @@ final class MacWindow: Window {
                 let minimized = try await self.isMacosMinimized
                 guard shouldLearnWindowMinimum(nativeFullscreen: fullscreen, nativeMinimized: minimized,
                                                animating: WindowMotion.shared.isAnimating(self.windowId)),
-                      let first = try await self.macApp.getAxRect(self.windowId) else { return }
+                      let first = try await self.macApp.getAxRectForLayoutConfirmation(self.windowId) else { return }
                 try await Task.sleep(nanoseconds: 150_000_000)
                 guard self.canObserveMinimum(generation),
-                      let confirmed = try await self.macApp.getAxRect(self.windowId),
+                      let confirmed = try await self.macApp.getAxRectForLayoutConfirmation(self.windowId),
                       self.canObserveMinimum(generation),
                       abs(first.topLeftCorner.x - topLeft.x) <= 2,
                       abs(first.topLeftCorner.y - topLeft.y) <= 2,
@@ -521,7 +528,11 @@ final class MacWindow: Window {
                 guard self.canObserveMinimum(generation),
                       shouldLearnWindowMinimum(nativeFullscreen: confirmedFullscreen, nativeMinimized: confirmedMinimized,
                                                animating: WindowMotion.shared.isAnimating(self.windowId)) else { return }
+                let oldMinimum = self.learnedMinimum.size
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
+                if runtime.workspaceBackend.kind == .native, self.learnedMinimum.size != oldMinimum {
+                    runtime.workspaceBackend.observation?.requestRead(event: "nativeMinimumChanged")
+                }
                 if !isUnitTest { PersistedAppMinimums.shared.remember(self.learnedMinimum.size, for: self.macApp.rawAppBundleId) }
                 WindowMotion.shared.noteLanded(self.windowId,
                     asked: CGRect(origin: topLeft, size: size),

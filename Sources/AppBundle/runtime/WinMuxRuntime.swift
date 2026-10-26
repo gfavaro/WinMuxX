@@ -20,7 +20,7 @@ final class WinMuxRuntime {
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)
-        workspaceBackend.selectForStartup(config.workspaceBackend)
+        workspaceBackend.selectForStartup(config.workspaceBackend, nativeTilingEnabled: config.nativeSpaces.tilingEnabled)
     }
 
     private static var process = WinMuxRuntime()

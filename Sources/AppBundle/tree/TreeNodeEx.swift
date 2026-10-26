@@ -134,6 +134,7 @@ extension TreeNode {
 
 extension Window {
     var participatesInWorkspaceFocus: Bool {
+        if !nativeLayoutEligible { return false }
         guard let parent else { return false }
         return switch getChildParentRelation(child: self, parent: parent) {
             case .floatingWindow, .tiling:

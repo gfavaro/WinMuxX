@@ -32,11 +32,24 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     @MainActor var scrollingGestureSessionID: UUID?
     private var savedMasterGroupIndex = 0
     private weak var masterGroup: TreeNode?
+    @MainActor var nativePersistentMasterGroupIndex: Int {
+        masterGroup.flatMap { selected in rootTilingContainer.children.firstIndex { $0 === selected } }
+            ?? min(max(savedMasterGroupIndex, 0), max(rootTilingContainer.children.count - 1, 0))
+    }
+
+    @MainActor func restoreNativeMasterGroupIndex(_ index: Int) {
+        savedMasterGroupIndex = index
+        let groups = rootTilingContainer.children
+        masterGroup = groups.indices.contains(index) ? groups[index] : nil
+    }
+
     @MainActor var masterGroupIndex: Int {
         get {
             let groups = workspaceLayoutUnits
             let index = masterGroup.flatMap { selected in groups.firstIndex { $0 === selected } }
                 ?? min(max(savedMasterGroupIndex, 0), max(groups.count - 1, 0))
+            if runtime.workspaceBackend.kind == .native, let masterGroup,
+               masterGroup.nodeWorkspace === self, !masterGroup.hasNativeLayoutWindow { return index }
             savedMasterGroupIndex = index
             masterGroup = groups.indices.contains(index) ? groups[index] : nil
             return index

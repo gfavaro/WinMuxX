@@ -1,7 +1,8 @@
 # Native Spaces (experimental)
 
-This branch implements read-only native Space observation. It does **not** yet
-tile native Spaces. Virtual workspaces remain the default and retain their layouts,
+This branch implements read-only native Space observation and a separate experimental
+Dwindle/Master tiling opt-in. Physical tiling validation is still a release gate;
+this is not a validated replacement for the installed manager. Virtual workspaces remain the default and retain their layouts,
 projects, gestures, display movement and recovery.
 
 ## Opt in and roll back
@@ -10,7 +11,7 @@ Use an explicit configuration and restart the development app:
 
 ```toml
 [workspace-backend]
-type = "native" # experimental read-only; default is "virtual"
+type = "native" # observation only by default; virtual remains the default backend
 ```
 
 Native observation enumerates desktops and fullscreen Spaces per display, records
@@ -31,7 +32,7 @@ membership counts, query duration, AX classification and whether the observation
 stale. It reports WindowServer event availability and topology-audit work. A local
 read-only ownership preflight checks real process/Space identity without granting
 the runtime any frame-write permits.
-Other CLI commands, including virtual queries and subscriptions, return an explicit
+In observation mode, other CLI commands, including virtual queries and subscriptions, return an explicit
 unsupported error. There is no automatic synthetic-input fallback for navigation.
 The sidebar, palette, overview and project mapping are not integrated yet.
 
@@ -42,6 +43,63 @@ saves `window-state.json`, modifies virtual layout recovery, or migrates workspa
 membership. No personal configuration or installed build is modified by building
 this branch. Keep the installed virtual manager out of any future native **tiling**
 validation; read-only observation itself does not compete for window ownership.
+
+## Experimental tiling opt-in
+
+Use a separate development configuration and run only one window manager:
+
+```toml
+[workspace-backend]
+type = "native"
+
+[native-spaces]
+tiling-enabled = true # false by default; changing this requires restart
+restore-layouts = true
+```
+
+The initial implementation currently suspends tiling below macOS 27 because its
+Mission Control overlay detection has not been validated on older systems. Read-only
+observation remains available there. Accessibility permission must already exist;
+native startup never prompts or changes system settings. Missing lifecycle event
+support, read-only startup, invalid observation, Mission Control and mouse interaction
+suspend native layout application. `doctor` reports the actual status.
+
+`NativeTilingCoordinator` applies the existing geometry to active ordinary desktops.
+Retained minimized/hidden windows and empty nested groups are filtered from frame
+calculation without detaching or rebuilding their trees. Preferred master identity
+and Dwindle shares survive temporary concealment. Floating windows keep their
+physical frames unless an explicit layout command changes them. No native gesture
+recognizer is installed.
+
+Supported commands are `focus` and `move` within workspace boundaries, `resize`,
+`swap`, `balance-sizes`, `split`, `swap-with-master`, `workspace-layout dwindle|master`,
+and `layout` for tiles/orientation/tiling/floating. Dwindle resizing with concealed
+siblings currently returns an unsupported error; restore those siblings first.
+Default command targets require verified native app focus; an unmanaged/fullscreen
+frontmost window cannot redirect commands to a previously focused desktop.
+Configured shortcut modes are
+available; unsupported commands in bindings return errors. Workspace switching,
+cross-display movement, tabs, Accordion, scrolling, fullscreen commands, launch hooks,
+window-detection command hooks, project commands, agent operations, virtual queries
+and subscriptions remain unsupported. Cross-Space movement has no synthetic fallback.
+
+Every queued frame write and retry requires a current generation permit, fresh
+Space/process ownership and non-minimized/non-fullscreen AX state. Minimum-size
+confirmation uses the same validation. Explicit keyboard focus uses a two-second
+ownership lease so its own activation notifications can invalidate frame batches
+without interrupting focus halfway through; newer explicit focus or mouse clicks
+cancel its AX job. Ownership is checked before each focus/raise/activation step.
+AX calls already dispatched cannot be recalled; this is not an atomic transaction.
+
+Native layout state is stored separately in
+`~/Library/Application Support/WinMux-GF/native-space-layouts-v1.json`, keyed by Space
+UUID. Restore only binds uniquely matched windows already in that Space. It neither
+launches apps nor moves windows between Spaces/displays. A missing or ambiguous
+window keeps its complete saved tree pending and protected from autosave; a corrupt
+or newer-version file is preserved and reported. Unsupported saved group layouts
+remain pending. Numeric Space renumbering never causes ordinal matching. Set
+`restore-layouts = false` to disable native loading/saving; existing files are retained.
+The virtual `window-state.json` and recovery journal are untouched.
 
 If startup configuration is invalid, shipped defaults remain available for error
 display but the process stays read-only until restart. This prevents an invalid
@@ -68,9 +126,11 @@ Unknown/native fullscreen Space types and shared/all-Spaces/unknown memberships
 are observable but excluded from the proposed native tiling policy. Missing UUIDs
 cannot be restored by guessing an ordinal. Numeric IDs are not restart identities.
 
-Native tiling, independent layout persistence, tab/accordion integration and native
-navigation are still pending. Do not use successful compilation or mocked tests as
-evidence that those features work.
+Tab/accordion integration and native navigation are pending. The opt-in tiling path
+and native persistence have automated coverage, but physical tiling, focus, Mission
+Control, delayed apps, multi-monitor movement, Stage Manager and restart restoration
+on real apps remain unverified. Do not use compilation or mocked tests as evidence
+that those native behaviors work.
 
 ## Validation
 
@@ -84,8 +144,7 @@ The [Dinky comparison](NATIVE_SPACES_DINKY_COMPARISON.md) traces its current sou
 and identifies targeted reconciliation, missed-event recovery and native stacking
 as implementation priorities. Targeted discovery and a topology audit are now
 implemented; native stacking is pending. Native UUIDs retain layout-tree objects
-across observed switching/renumbering; this is model integration, not window tiling
-or restart persistence. Pending reads revoke membership authority while retaining
+across observed switching/renumbering. Pending reads revoke membership authority while retaining
 last-observed viewport history; failed/stopped observation clears native visibility.
 
 Run the standalone diagnostic without launching a manager:

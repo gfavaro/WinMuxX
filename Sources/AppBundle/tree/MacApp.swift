@@ -207,10 +207,11 @@ final class MacApp: AbstractApp {
     @MainActor func nativeFocus(_ windowId: UInt32, forceRaise: Bool = false) {
         if serverArgs.isReadOnly || !TrayMenuModel.shared.isEnabled || WindowRecoveryController.shared.isTerminating { return }
         MacApp.focusJob?.cancel()
+        let validateNative = nativeFocusValidation(windowId)
         // Performance optimization. If possible avoid doing AX requests
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
         // Beware of the macOS bug: https://github.com/nikitabobko/WinMux/issues/101
-        let useActivationOnly = !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
+        let useActivationOnly = validateNative == nil && !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
             shouldUseActivationOnlyForNativeFocus(
                 targetWindowId: windowId,
                 lastNativeFocusedWindowId: lastNativeFocusedWindowId,
@@ -225,14 +226,18 @@ final class MacApp: AbstractApp {
         } else {
             MacApp.focusJob = withWindowAsync(windowId) { [nsApp, axApp] window, job in
                 try job.checkCancellation()
+                try validateNative?(window)
                 _ = measuredAXOperation(.axWrite, { AXUIElementSetAttributeValue(axApp.threadGuarded, kAXFocusedWindowAttribute as CFString, window) })
                 try job.checkCancellation()
                 // Raise firstly to make sure that by the time we activate the app, the window would be already on top
+                try validateNative?(window)
                 window.set(Ax.isMainAttr, true)
                 try job.checkCancellation()
+                try validateNative?(window)
                 let raiseError = measuredAXOperation(.axAction, { AXUIElementPerformAction(window, kAXRaiseAction as CFString) })
                 AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
                 try job.checkCancellation()
+                try validateNative?(window)
                 nsApp.activate(options: .activateIgnoringOtherApps)
             }
         }
@@ -263,13 +268,36 @@ final class MacApp: AbstractApp {
     }
 
     @MainActor
-    private func nativeFrameValidation(_ windowID: UInt32) -> (@Sendable () throws -> Void)? {
+    private func nativeFocusValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let lease = runtime.workspaceBackend.nativeWriteAuthority.explicitFocusLease(
+                windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { _ in throw NativeSpaceWriteError.revoked }
+        }
+        return { window in
+            try lease.check()
+            guard window.containingWindowId() == windowID,
+                  window.get(Ax.minimizedAttr) == false,
+                  window.get(Ax.isFullscreenAttr) == false else { throw NativeSpaceWriteError.liveOwnershipChanged }
+            try lease.check()
+        }
+    }
+
+    @MainActor
+    private func nativeFrameValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
         guard let launched = nsApp.launchDate,
               let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
-            return { throw NativeSpaceWriteError.revoked }
+            return { _ in throw NativeSpaceWriteError.revoked }
         }
-        return { try permit.check() }
+        return { window in
+            try permit.check()
+            guard window.containingWindowId() == windowID,
+                  window.get(Ax.minimizedAttr) == false,
+                  window.get(Ax.isFullscreenAttr) == false else { throw NativeSpaceWriteError.liveOwnershipChanged }
+            try permit.check()
+        }
     }
 
     @MainActor
@@ -279,7 +307,7 @@ final class MacApp: AbstractApp {
         let validate = nativeFrameValidation(windowId)
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, validateWrite: validate)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, validateWrite: validate.map { check in { try check(window) } })
         }
     }
 
@@ -291,15 +319,15 @@ final class MacApp: AbstractApp {
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             // Intermediate steps need no readback or minimum-size confirmation.
             // Finish both writes of a started step; cancellation drops queued steps.
-            try validate?()
+            try validate?(window)
             try disableAnimations(app: axApp.threadGuarded, job) {
                 if animatedSizes.threadGuarded[windowId]?.session != session || animatedSizes.threadGuarded[windowId]?.size != frame.size {
-                    try validate?()
+                    try validate?(window)
                     let accepted = window.set(Ax.sizeAttr, frame.size)
                     animatedSizes.threadGuarded[windowId] = accepted ? (session, frame.size) : nil
                 }
                 if validate != nil { try job.checkCancellation() }
-                try validate?()
+                try validate?(window)
                 window.set(Ax.topLeftCornerAttr, frame.origin)
             }
         }
@@ -311,7 +339,19 @@ final class MacApp: AbstractApp {
         let validate = nativeFrameValidation(windowId)
         try await withWindow(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate.map { check in { try check(window) } })
+        }
+    }
+
+    @MainActor
+    func getAxRectForLayoutConfirmation(_ windowId: UInt32) async throws -> Rect? {
+        let validate = nativeFrameValidation(windowId)
+        return try await withWindow(windowId) { window, job in
+            try job.checkCancellation()
+            try validate?(window)
+            guard let point = window.get(Ax.topLeftCornerAttr), let size = window.get(Ax.sizeAttr) else { return nil }
+            try validate?(window)
+            return Rect(topLeftX: point.x, topLeftY: point.y, width: size.width, height: size.height)
         }
     }
 

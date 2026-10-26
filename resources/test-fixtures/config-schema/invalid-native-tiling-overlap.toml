@@ -1,0 +1,5 @@
+default-root-container-layout = "tabbed"
+[workspace-backend]
+type = "native"
+[native-spaces]
+tiling-enabled = true

@@ -96,7 +96,7 @@ extension HotKey {
     updateModePresentation()
 }
 
-@MainActor func activateMode(_ targetMode: String?, preservingUnboundKey: Bool = false) async throws {
+@MainActor func activateMode(_ targetMode: String?, preservingUnboundKey: Bool = false, runCallbacks: Bool = true) async throws {
     hotkeyState.pendingUnboundModeExit = false
     if !preservingUnboundKey { hotkeyState.unboundPassthroughKeyCode = nil }
     let owner = runtime
@@ -152,7 +152,7 @@ extension HotKey {
     updateModePresentation()
     if oldMode != targetMode {
         broadcastEvent(.modeChanged(mode: targetMode))
-        if !config.onModeChanged.isEmpty {
+        if runCallbacks && !config.onModeChanged.isEmpty {
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             let context = hookEnvironment(event: "mode-changed", previousMode: previousMode)
             let modeSession = hotkeyState.modeSession

@@ -2,6 +2,7 @@ import AppKit
 import Common
 import PrivateApi
 import QuartzCore
+import NativeSpaces
 
 @MainActor
 final class WindowBorderController {
@@ -368,7 +369,8 @@ private struct Appearance: Equatable {
 }
 
 func isMissionControlVisible(_ windows: [[String: Any]], screenSizes: [CGSize], bundleIdentifierForPID: (pid_t) -> String?) -> Bool {
-    windows.contains { w in guard let p = (w[kCGWindowOwnerPID as String] as? NSNumber).map({ pid_t($0.int32Value) }), bundleIdentifierForPID(p) == "com.apple.WindowManager", let l = (w[kCGWindowLayer as String] as? NSNumber)?.intValue, l == 19, let b = w[kCGWindowBounds as String] as? NSDictionary, let f = CGRect(dictionaryRepresentation: b), f.width > 0, f.height > 0 else { return false }; return screenSizes.contains { abs($0.width - f.width) < 2 && abs($0.height - f.height) < 2 } }
+    NativeSpaceTransitionGuard.isMissionControlVisible(windows, screenSizes: screenSizes,
+        bundleIdentifierForPID: bundleIdentifierForPID)
 }
 
 // Public AppKit fallback when the private WindowServer renderer is unavailable.

@@ -9,7 +9,7 @@ extension TilingContainer {
             ratioAt?(children.startIndex + index) ?? dwindleSplitRatio(at: children.startIndex + index)
         }
         let settings = DwindleMinimumSettings(orientationHorizontal: dwindleOrientation.map { $0 == .h },
-            explicitShares: isExplicitDwindle ? dwindleShares(count: children.count) : nil, ratios: ratios)
+            explicitShares: isExplicitDwindle ? frameDwindleShares : nil, ratios: ratios)
         let node = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: orientation == .h,
             children: snapshots, dwindle: settings, tabChrome: .zero, stackedPadding: 0)
         let extent = node.extent(horizontal: axis == .h,
@@ -20,7 +20,8 @@ extension TilingContainer {
 
     @MainActor
     func dwindleChildFrames(in rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil, enforceMinimums: Bool = true) -> [Rect] {
-        var shares = isExplicitDwindle ? dwindleShares(count: children.count) : nil
+        let children = frameLayoutChildren
+        var shares = frameDwindleShares
         if let ratioAt, var explicit = shares, explicit.count > 1 {
             for index in 0..<(explicit.count - 1) {
                 let ratio = ratioAt(index)
@@ -47,17 +48,18 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
     switch node.nodeCases {
     case .window(let window): return .window(window.minimumLayoutSize)
     case .tilingContainer(let container):
+        let children = container.frameLayoutChildren
         let chrome = container.layout == .tabGroup && container.showsWindowTabs
             ? CGSize(width: 2 * windowTabGroupShellHorizontalInset(),
                      height: resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset())
             : .zero
         let dwindle = container.layout == .dwindle
             ? DwindleMinimumSettings(orientationHorizontal: container.dwindleOrientation.map { $0 == .h },
-                explicitShares: container.isExplicitDwindle ? container.dwindleShares(count: container.children.count) : nil,
-                ratios: (0..<max(container.children.count - 1, 0)).map { container.dwindleSplitRatio(at: $0) })
+                explicitShares: container.frameDwindleShares,
+                ratios: (0..<max(children.count - 1, 0)).map { container.dwindleSplitRatio(at: $0) })
             : nil
         return .container(layout: container.layout, horizontal: container.orientation == .h,
-            children: container.children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
+            children: children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
             tabChrome: chrome, stackedPadding: CGFloat(max(config.tabGroupPadding, 0)))
     default: return .window(.zero)
     }

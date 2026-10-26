@@ -44,6 +44,29 @@ public struct NativeSpaceWritePermit: Sendable {
     }
 }
 
+/// Explicit focus generates its own app-activation notifications. Those invalidate
+/// frame batches, but must not interrupt the focus operation halfway through.
+/// This short-lived lease rechecks actual ownership at each focus step instead.
+/// Callers must also cancel the AX job on a newer explicit focus or mouse click.
+public struct NativeSpaceFocusLease: Sendable {
+    private let identity: NativeWindowWriteIdentity
+    private let validateLive: @Sendable (NativeWindowWriteIdentity) throws -> Bool
+    private let deadline: ContinuousClock.Instant
+
+    init(identity: NativeWindowWriteIdentity, validateLive: @escaping @Sendable (NativeWindowWriteIdentity) throws -> Bool,
+         lifetime: Duration = .seconds(2)) {
+        self.identity = identity
+        self.validateLive = validateLive
+        deadline = .now.advanced(by: lifetime)
+    }
+
+    public func check() throws {
+        guard ContinuousClock.now < deadline else { throw NativeSpaceWriteError.revoked }
+        guard try validateLive(identity) else { throw NativeSpaceWriteError.liveOwnershipChanged }
+        guard ContinuousClock.now < deadline else { throw NativeSpaceWriteError.revoked }
+    }
+}
+
 /// Lock-protected invalidation is synchronous and performs no IPC. A queued AX
 /// job must check its permit before every frame write, retry or animation step.
 /// This is not an atomic WindowServer+AX transaction: already-dispatched AX calls
@@ -98,6 +121,14 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
         }
     }
 
+    public func explicitFocusLease(windowID: UInt32, pid: Int32, processLaunchDate: Date) -> NativeSpaceFocusLease? {
+        lock.withLock {
+            guard let identity = allowed[windowID], identity.pid == pid,
+                  identity.processLaunchDate == processLaunchDate else { return nil }
+            return NativeSpaceFocusLease(identity: identity, validateLive: validateLive)
+        }
+    }
+
     fileprivate func check(generation: UInt64, identity: NativeWindowWriteIdentity) throws {
         func current() -> Bool { lock.withLock { self.generation == generation && allowed[identity.windowID] == identity } }
         guard current() else { throw NativeSpaceWriteError.revoked }
@@ -118,7 +149,8 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
               id == identity.spaceID, uuid == identity.spaceUUID,
               let running = NSRunningApplication(processIdentifier: identity.pid),
               !running.isHidden, !running.isTerminated, running.launchDate == identity.processLaunchDate,
-              let rows = CGWindowListCopyWindowInfo(.optionIncludingWindow, identity.windowID) as? [[String: Any]],
+              let rows = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]],
+              NativeSpaceTransitionGuard.allowsFrameOperations(windows: rows),
               let row = rows.first(where: { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value == identity.windowID }),
               (row[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true,
               (row[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value == identity.pid else { return false }

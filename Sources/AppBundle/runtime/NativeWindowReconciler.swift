@@ -36,6 +36,8 @@ final class NativeWindowReconciler {
                 let pids = await Task.detached { nativeWindowOwnerPIDs(eligible) }.value
                 try Task.checkCancellation()
                 guard self.generation == version else { return }
+                Self.updateEligibility(snapshot, windows: MacWindow.allWindows, ownerPIDs: pids,
+                    layouts: owner.workspaceBackend.nativeLayouts)
                 for app in Array(MacApp.allAppsMap.values) where app.nsApp.isTerminated {
                     try Task.checkCancellation()
                     await app.destroy()
@@ -52,7 +54,8 @@ final class NativeWindowReconciler {
                                 for id in ids.sorted() {
                                     try Task.checkCancellation()
                                     guard self.generation == version else { throw CancellationError() }
-                                    _ = try? await MacWindow.getOrRegister(windowId: id, macApp: app)
+                                    let window = try? await MacWindow.getOrRegister(windowId: id, macApp: app)
+                                    window?.nativeLayoutEligible = window != nil
                                 }
                             }
                             // Match the existing app refresh's cooperative budget.
@@ -83,7 +86,7 @@ final class NativeWindowReconciler {
                 }
                 self.pendingWindowCount = eligible.filter { MacWindow.allWindowsMap[$0] == nil }.count
                 let identities = MacWindow.allWindows.compactMap { window -> NativeWindowWriteIdentity? in
-                    guard eligible.contains(window.windowId), let launched = window.macApp.nsApp.launchDate,
+                    guard window.nativeLayoutEligible, eligible.contains(window.windowId), let launched = window.macApp.nsApp.launchDate,
                           owner.workspaceBackend.nativeLayouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace else { return nil }
                     for display in snapshot.displays {
                         if case .desktop(let spaceID, let uuid?) = snapshot.eligibility(windowID: window.windowId, on: display.identifier) {
@@ -98,18 +101,19 @@ final class NativeWindowReconciler {
                 let preflight = Task.detached {
                     let authority = NativeSpaceWriteAuthority()
                     authority.replace(snapshot: snapshot, identities: identities)
-                    var passed = 0
+                    var passed: [UInt32] = []
                     for identity in identities {
                         if Task.isCancelled { break }
                         if let permit = authority.permit(windowID: identity.windowID, pid: identity.pid,
-                            processLaunchDate: identity.processLaunchDate), (try? permit.check()) != nil { passed += 1 }
+                            processLaunchDate: identity.processLaunchDate), (try? permit.check()) != nil { passed.append(identity.windowID) }
                     }
-                    return (passed, identities.count - passed)
+                    return (passed, identities.count - passed.count)
                 }
                 let result = await withTaskCancellationHandler { await preflight.value } onCancel: { preflight.cancel() }
                 guard self.generation == version else { return }
-                self.writePreflight = result
+                self.writePreflight = (result.0.count, result.1)
                 owner.workspaceBackend.observation?.watchManagedWindows(Set(MacWindow.allWindowsMap.keys))
+                await owner.workspaceBackend.nativeTiling.accept(snapshot, identities: identities.filter { result.0.contains($0.windowID) })
                 self.lastError = nil
             } catch is CancellationError { return }
             catch { if self.generation == version { self.lastError = String(describing: error) } }
@@ -117,6 +121,23 @@ final class NativeWindowReconciler {
             let duration = started.duration(to: .now).components
             self.lastDurationMilliseconds = Double(duration.seconds) * 1000 + Double(duration.attoseconds) / 1e15
             self.task = nil
+        }
+    }
+
+    static func updateEligibility(_ snapshot: NativeSpacesSnapshot, windows: [Window],
+                                  ownerPIDs: [UInt32: Int32], layouts: NativeSpaceLayouts) {
+        let queried = Set(snapshot.reconciliationSpaceIDs ?? snapshot.displays.map(\.activeSpaceID))
+        for window in windows {
+            let owners = snapshot.displays.filter {
+                layouts.activeWorkspace(on: $0.identifier) === window.nodeWorkspace
+            }
+            guard !owners.isEmpty else { window.nativeLayoutEligible = false; continue }
+            // Incoming-Space reads deliberately omit the unchanged displays'
+            // memberships. Retain their presentation, but never fabricate fresh
+            // write authority from that retained state.
+            guard owners.contains(where: { queried.contains($0.activeSpaceID) }) else { continue }
+            window.nativeLayoutEligible = ownerPIDs[window.windowId] == window.app.pid &&
+                layouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace
         }
     }
 }

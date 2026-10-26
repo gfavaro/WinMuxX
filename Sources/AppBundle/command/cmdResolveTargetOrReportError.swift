@@ -3,6 +3,20 @@ import Common
 extension CmdArgs {
     @MainActor
     func resolveTargetOrReportError(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
+        guard let target = resolveUncheckedTarget(env, io) else { return nil }
+        if runtime.workspaceBackend.kind == .native {
+            let layouts = runtime.workspaceBackend.nativeLayouts
+            guard let snapshot = layouts.snapshot,
+                  snapshot.displays.contains(where: { layouts.activeWorkspace(on: $0.identifier) === target.workspace }),
+                  target.windowOrNil?.nativeLayoutEligible != false else {
+                io.err("Native target is not an eligible window or active desktop")
+                return nil
+            }
+        }
+        return target
+    }
+
+    @MainActor private func resolveUncheckedTarget(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
         // Flags
         if let windowId {
             if let wi = Window.get(byId: windowId) {

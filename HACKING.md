@@ -1,10 +1,12 @@
 # Developing WinMuxX
 
-The `feat/native-spaces` branch has an experimental read-only native backend.
+The `feat/native-spaces` branch has an experimental native backend: observation is
+the default, with a separate Dwindle/Master tiling opt-in awaiting physical validation.
 `WorkspaceBackendState` belongs to `WinMuxRuntime`; capabilities gate virtual
 lifecycle, parking and recovery. `NativeSpaces` isolates dynamic read-side SkyLight
 access and generation-checked event reconciliation. Layout trees/algorithms remain
-shared and unchanged. See [native mode and rollback](docs/NATIVE_SPACES.md), the
+shared, with native visibility filtering and separate UUID-keyed persistence.
+See [native mode and rollback](docs/NATIVE_SPACES.md), the
 [assessment](docs/NATIVE_SPACES_ASSESSMENT.md) and [decision record](docs/NATIVE_SPACES_ADR.md).
 
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for

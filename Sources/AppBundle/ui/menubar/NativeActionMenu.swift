@@ -85,9 +85,9 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if runtime.workspaceBackend.kind == .native {
             statusItem?.length = NSStatusItem.squareLength
             statusItem?.button?.attributedTitle = NSAttributedString(string: "")
-            statusItem?.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Native Spaces, read-only")
+            statusItem?.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Native Spaces")
             statusItem?.button?.toolTip = TrayMenuModel.shared.menuBarWorkspaceName
-            statusItem?.button?.setAccessibilityLabel("WinMuxX, Native Spaces, read-only")
+            statusItem?.button?.setAccessibilityLabel("WinMuxX, \(TrayMenuModel.shared.menuBarWorkspaceName)")
             return
         }
         let model = TrayMenuModel.shared
@@ -134,7 +134,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.autoenablesItems = false
         if runtime.workspaceBackend.kind == .native {
-            menu.addItem(NSMenuItem(title: "Native Spaces · Experimental read-only", action: nil, keyEquivalent: ""))
+            let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "read-only"
+            menu.addItem(NSMenuItem(title: "Native Spaces · \(state)", action: nil, keyEquivalent: ""))
             if let inventory = runtime.workspaceBackend.observation?.inventory {
                 menu.addItem(NSMenuItem(title: "Observation: \(inventory.status)", action: nil, keyEquivalent: ""))
                 for record in inventory.records {

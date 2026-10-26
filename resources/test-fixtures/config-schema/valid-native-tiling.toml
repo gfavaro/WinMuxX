@@ -1,0 +1,5 @@
+[workspace-backend]
+type = "native"
+[native-spaces]
+tiling-enabled = true
+restore-layouts = true

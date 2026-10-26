@@ -99,6 +99,10 @@ final class WindowMotion: NSObject {
 
     func apply(_ window: Window, target: CGRect) async throws {
         let target = windowMotionNativeTarget(target)
+        if runtime.workspaceBackend.kind == .native {
+            window.setAxFrame(target.origin, target.size)
+            return
+        }
         let snap = displayPolicy.shouldSnap(window.windowId)
         guard let window = window as? MacWindow else {
             window.setAxFrame(target.origin, target.size)

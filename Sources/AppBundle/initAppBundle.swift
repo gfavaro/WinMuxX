@@ -40,7 +40,7 @@ import Foundation
         if runtime.workspaceBackend.kind == .native {
             // Defense in depth: low-level AX setters and recovery also enforce
             // this immutable startup flag. No permission prompts or virtual hooks.
-            _serverArgs.isReadOnly = true
+            _serverArgs.isReadOnly = _serverArgs.isReadOnly || !config.nativeSpaces.tilingEnabled
             let owner = runtime
             owner.workspaceBackend.startObservation { [weak owner] _, _ in
                 owner?.withValue { updateTrayText() }

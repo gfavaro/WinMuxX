@@ -7,6 +7,13 @@ struct ResizeCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        if runtime.workspaceBackend.kind == .native,
+           target.windowOrNil?.parentsWithSelf.contains(where: { node in
+               guard let container = node as? TilingContainer, container.layout == .dwindle else { return false }
+               return container.frameLayoutChildren.count != container.children.count
+           }) == true {
+            return io.err("Native Dwindle resize with concealed siblings is not supported yet; restore those windows first")
+        }
 
         if target.workspace.arrangement == .scrolling, let window = target.windowOrNil {
             switch args.dimension.val {

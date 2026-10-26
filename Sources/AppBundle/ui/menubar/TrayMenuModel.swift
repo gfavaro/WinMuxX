@@ -65,7 +65,8 @@ extension ObservableObject {
     if runtime.workspaceBackend.kind == .native {
         let available = runtime.workspaceBackend.observation?.inventory.currentSnapshot != nil
         TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, "Spaces")
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, available ? "Native Spaces (read-only)" : "Native Spaces (observation unavailable)")
+        let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "read-only"
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, available ? "Native Spaces (\(state))" : "Native Spaces (observation unavailable)")
         return
     }
     let focus = focus

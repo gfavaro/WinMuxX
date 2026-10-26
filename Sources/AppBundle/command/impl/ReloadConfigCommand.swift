@@ -100,8 +100,9 @@ struct ReloadConfigCommand: Command {
     switch readConfig(forceConfigUrl: forceConfigUrl ?? (isWinMuxRuntimeReady ? preferredEditableConfigUrl() : nil)) {
         case .success(let (parsedConfig, url)):
             if !args.dryRun, (isWinMuxRuntimeReady || runtime.workspaceBackend.selectionLocked),
-               parsedConfig.workspaceBackend != runtime.workspaceBackend.kind {
-                let message = "Changing workspace-backend.type requires restarting WinMuxX; the running backend and configuration were retained."
+               (parsedConfig.workspaceBackend != runtime.workspaceBackend.kind ||
+                parsedConfig.nativeSpaces.tilingEnabled != runtime.workspaceBackend.nativeTilingEnabled) {
+                let message = "Changing workspace-backend.type or native-spaces.tiling-enabled requires restarting WinMuxX; the running backend and configuration were retained."
                 lastConfigReloadError = message
                 stdout.append(message)
                 return false
@@ -114,9 +115,13 @@ struct ReloadConfigCommand: Command {
                 resetHotKeys()
                 runtime.configuration.publish(parsedConfig, from: url)
                 if !isWinMuxRuntimeReady && !runtime.workspaceBackend.selectionLocked {
-                    runtime.workspaceBackend.selectForStartup(parsedConfig.workspaceBackend)
+                    runtime.workspaceBackend.selectForStartup(parsedConfig.workspaceBackend, nativeTilingEnabled: parsedConfig.nativeSpaces.tilingEnabled)
                 }
                 if runtime.workspaceBackend.kind == .native {
+                    if runtime.workspaceBackend.nativeTilingEnabled {
+                        try await activateMode(activeMode ?? mainModeId, runCallbacks: false)
+                        runtime.workspaceBackend.observation?.requestRead(event: "nativeConfigReload")
+                    }
                     TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, parsedConfig.menuBar)
                     updateTrayText()
                     MessageModel.shared.message = nil

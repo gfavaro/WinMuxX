@@ -1,4 +1,7 @@
 {
+  "valid-native-tiling.toml": {"parser": true, "schema": true},
+  "invalid-native-tiling-type.toml": {"parser": false, "schema": false},
+  "invalid-native-tiling-overlap.toml": {"parser": false, "schema": true},
   "valid-native-backend.toml": {"parser": true, "schema": true},
   "invalid-backend-type.toml": {"parser": false, "schema": false},
   "invalid-backend-key.toml": {"parser": false, "schema": false},

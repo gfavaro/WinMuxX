@@ -25,20 +25,26 @@ struct WorkspaceBackendCapabilities: Equatable, Sendable {
 @MainActor
 final class WorkspaceBackendState {
     private(set) var kind: WorkspaceBackendKind = .virtual
+    private(set) var nativeTilingEnabled = false
     private(set) var selectionLocked = false
     private(set) var observation: NativeSpacesObservation?
     let nativeLayouts = NativeSpaceLayouts()
     let nativeWriteAuthority = NativeSpaceWriteAuthority()
     let nativeWindows = NativeWindowReconciler()
+    let nativeTiling = NativeTilingCoordinator()
+    let nativePersistence = NativeLayoutPersistence()
     var capabilities: WorkspaceBackendCapabilities {
-        kind == .virtual ? .virtual : .nativeObservation
+        if kind == .virtual { return .virtual }
+        return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
+            relocatesWorkspaces: false, tilesWindows: nativeTilingEnabled, parksInactiveWindows: false, usesVirtualRecovery: false)
     }
 
     /// Live switching is intentionally unavailable until all motion/recovery
     /// owners can be handed over transactionally. Configuration enforces restart.
-    func selectForStartup(_ kind: WorkspaceBackendKind) {
+    func selectForStartup(_ kind: WorkspaceBackendKind, nativeTilingEnabled: Bool = false) {
         precondition(observation == nil && !selectionLocked)
         self.kind = kind
+        self.nativeTilingEnabled = nativeTilingEnabled
     }
 
     func lockSelection() { selectionLocked = true }
@@ -49,10 +55,18 @@ final class WorkspaceBackendState {
         let observer = NativeSpacesObservation()
         let owner = runtime
         observation = observer
+        observer.onWindowsChanged = { [weak owner] in
+            guard let owner else { return }
+            owner.withValue {
+                owner.workspaceBackend.nativeWriteAuthority.invalidate()
+                owner.workspaceBackend.nativeTiling.invalidate()
+            }
+        }
         observer.onWindowClosed = { [weak owner] id in
             guard let owner else { return }
             owner.withValue {
                 owner.workspaceBackend.nativeWriteAuthority.invalidate()
+                owner.workspaceBackend.nativeTiling.invalidate()
                 owner.workspaceBackend.nativeWindows.invalidate()
                 guard let window = MacWindow.allWindowsMap[id] else { return }
                 window.garbageCollect(skipClosedWindowsCache: true)
@@ -63,6 +77,7 @@ final class WorkspaceBackendState {
             guard let self, let owner else { return }
             owner.withValue {
                 self.nativeWriteAuthority.invalidate()
+                self.nativeTiling.invalidate()
                 self.nativeWindows.invalidate()
                 for window in MacWindow.allWindows { window.suspendMinimumObservationForMotion() }
                 self.nativeLayouts.reconcile(inventory, displays: owner.displays.all())
@@ -76,9 +91,11 @@ final class WorkspaceBackendState {
     func stop() {
         nativeWriteAuthority.invalidate()
         nativeWindows.invalidate()
+        nativeTiling.stop()
         observation?.stop()
         observation?.onChange = nil
         observation?.onWindowClosed = nil
+        observation?.onWindowsChanged = nil
         observation = nil
     }
 }

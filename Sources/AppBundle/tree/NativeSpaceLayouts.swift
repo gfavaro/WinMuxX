@@ -39,8 +39,13 @@ final class NativeSpaceLayouts {
             let matches = displays.filter { $0.displayUUID == record.displayIdentifier }
             // Never use ordinal or nearest-display fallback for native ownership.
             guard matches.count == 1, let display = matches.first else { continue }
+            let isNew = retainedByUUID[uuid] == nil
             let workspace = retainedByUUID[uuid] ?? Workspace.get(byName: "__native_space_\(uuid)")
             retainedByUUID[uuid] = workspace
+            if isNew, runtime.workspaceBackend.nativeTilingEnabled, config.defaultRootContainerLayout == .master {
+                workspace.rootTilingContainer.layout = .tiles
+                workspace.transitionArrangement(to: .master)
+            }
             workspace.preferredMonitorPoint = display.rect.topLeftCorner
             currentBySpaceID[record.space.id] = workspace
             if record.isActive {

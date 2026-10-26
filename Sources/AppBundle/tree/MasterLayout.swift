@@ -29,7 +29,8 @@ extension Workspace {
 
     @MainActor
     var usesSpatialFocus: Bool {
-        arrangement != .dwindle || rootTilingContainer.layout == .dwindle || rootTilingContainer.layout == .master
+        if runtime.workspaceBackend.kind == .native { return true }
+        return arrangement != .dwindle || rootTilingContainer.layout == .dwindle || rootTilingContainer.layout == .master
     }
 
     @MainActor
@@ -43,6 +44,7 @@ extension Workspace {
     @MainActor
     func normalizeMasterLayout() {
         guard arrangement == .master else { return }
+        if runtime.workspaceBackend.kind == .native { return }
         masterGroupIndex = min(max(masterGroupIndex, 0), max(workspaceLayoutUnits.count - 1, 0))
     }
 
@@ -116,6 +118,7 @@ extension Workspace {
     @MainActor
     var workspaceLayoutUnits: [TreeNode] {
         let root = rootTilingContainer
-        return root.layout == .tabGroup || root.layout == .stacked ? [root] : root.children
+        let units = root.layout == .tabGroup || root.layout == .stacked ? [root] : root.children
+        return runtime.workspaceBackend.kind == .native ? units.filter(\.hasNativeLayoutWindow) : units
     }
 }

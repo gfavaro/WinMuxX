@@ -182,6 +182,7 @@ private struct LayoutContext {
 extension Window {
     @MainActor
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
+        if runtime.workspaceBackend.kind == .native { return }
         // A failed corner restoration must retry from its saved position, rather
         // than treating the still-parked native frame as a cross-display move.
         guard !isHiddenInCorner else { return }
@@ -238,10 +239,18 @@ extension TilingContainer {
     fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = tileChildFrames(in: rect, gaps: context.resolvedGaps)
+        let selected = frameLayoutChildren
+        if runtime.workspaceBackend.kind == .native {
+            let total = selected.reduce(CGFloat.zero) { $0 + $1.getWeight(orientation) }
+            let factor = total > 0 ? frames.reduce(CGFloat.zero) { $0 + $1.weight } / total : 1
+            for child in children where !selected.contains(child) {
+                child.setWeight(orientation, child.getWeight(orientation) * factor)
+            }
+        }
         if layout == .master, frames.count == 2, width > 0, height > 0 {
             masterRatio = frames[0].weight / rect.getDimension(orientation)
         }
-        for (child, frame) in zip(children, frames) {
+        for (child, frame) in zip(selected, frames) {
             child.setWeight(orientation, frame.weight)
             let childVirtual = Rect(
                 topLeftX: frame.virtual.topLeftX + virtual.topLeftX - point.x,
@@ -256,7 +265,7 @@ extension TilingContainer {
     fileprivate func layoutDwindle(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = dwindleChildFrames(in: rect, gaps: context.resolvedGaps)
-        for (child, frame) in zip(children, frames) {
+        for (child, frame) in zip(frameLayoutChildren, frames) {
             let childVirtual = Rect(
                 topLeftX: virtual.topLeftX + frame.topLeftX - point.x,
                 topLeftY: virtual.topLeftY + frame.topLeftY - point.y,
@@ -346,11 +355,12 @@ extension TreeNode {
                 let minimum = window.minimumLayoutSize
                 return axis == .h ? minimum.width : minimum.height
             case .tilingContainer(let container):
+                let children = container.frameLayoutChildren
                 let rect = rect ?? container.lastAppliedLayoutPhysicalRect ?? container.nodeMonitor?.visibleRectPaddedByOuterGaps
                 if container.layout == .dwindle, let rect {
-                    return container.dwindleMinimumExtent(children: container.children[...], along: axis, rect: rect, gaps: gaps)
+                    return container.dwindleMinimumExtent(children: children[...], along: axis, rect: rect, gaps: gaps)
                 }
-                let minimums = container.children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
+                let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
                 guard !minimums.isEmpty else { return 0 }
                 if container.layout == .tabGroup || container.layout == .stacked {
                     if container.layout == .stacked {

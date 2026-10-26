@@ -209,3 +209,72 @@ claimed from that check. Private ABI compatibility remains host-specific.
 **Next milestone:** explicit native Dwindle/Master/floating opt-in, shared-engine
 frame application with native focus/command policy, separate native persistence,
 then exclusive development-manager positioning validation. Read-only remains default.
+
+## Phase 3 implementation checkpoint: optional shared-engine tiling
+
+**Findings:** native visibility is a rendering projection, not a membership change.
+Filtering children only in layout application was insufficient: navigation geometry
+also paired frames with retained child indices, and Dwindle structural conversion
+and resize assumed a frame for every retained child. Incoming-Space reads also omit
+unchanged displays' memberships. Those omissions must retain presentation without
+granting fresh write authority. A concealed preferred master needs its full-tree
+index persisted rather than its temporary visible fallback.
+
+**Changes:** `NativeTilingCoordinator` adds a separate, restart-only
+`native-spaces.tiling-enabled` opt-in. `NativeLayoutProjection` reuses shared geometry
+while preserving concealed leaves, group identity, shares and floating frames.
+Structural conversion explicitly measures the complete retained tree. Unsupported
+concealed-sibling Dwindle resize returns an error before indexing frames. Native
+commands are restricted to implemented workspace-local operations, require fresh
+observation, and reject unknown default focus and cross-display movement.
+
+`MacApp` validates live ownership and AX fullscreen/minimized state before writes,
+retries and minimum confirmations. Explicit focus has a bounded ownership lease
+independent of frame-batch invalidation, with cancellation on newer focus/clicks.
+WindowServer events revoke queued frame authority before coalescing. The existing
+Mission Control overlay heuristic is shared with the read-side compatibility layer
+and checked again at live native operations. Tiling is conservatively suspended
+below macOS 27 pending validation of that heuristic on older versions.
+
+`NativeLayoutPersistence` stores versioned UUID-keyed records separately from virtual
+recovery and reuses only the frozen-tree codec/restorer. Complete unique matching
+within the owning Space is required; incomplete/unsupported trees remain pending,
+and unreadable files are never overwritten. Concurrent reconciliations share initial
+loading; disk writes reject superseded revisions. The virtual journal is gated off.
+
+**Validation:** `swift build` passed. Focused command/layout regression suites ran
+52 tests successfully before the final master-identity addition; subsequent focused
+native coverage passed 13 AppBundle tests plus the native authority/transition
+tests. Final `make check` passed 1,448 AppBundle plus 40 NativeSpaces tests
+(1,488 Swift tests), 19 shared schema fixtures covering 52 parser keys, and all
+script/lockfile checks. `git diff --check` passed. These establish automated
+regression coverage, not physical native tiling correctness.
+
+A real development process launched with `tiling-enabled = true` **and
+`--read-only`** on the same SIP-enabled macOS 27.2 host. Diagnostics reported tiling
+suppressed by read-only startup, 10 AX-classified windows, nine successful live
+ownership preflights, lifecycle events available, and active desktop 4 on the
+external display. One reconciliation sampled 55.39 ms; a topology audit sampled
+3.57 ms. These are individual diagnostic samples, not performance certification.
+`resize width +20` returned a not-ready/read-only error; `workspace 2` returned
+unsupported. No native persistence file was created. The process was stopped;
+installed manager PID 70487 remained running. No physical native frame writes,
+focus activation or Space mutations were performed.
+
+**Limitations:** this is an implementation checkpoint, not completed native tiling
+validation. Tabs/Accordion/scrolling, native navigation, sidebar/palette/overview,
+project mapping, launch/detection hooks, empty-desktop default command targeting
+and Dwindle resize with concealed siblings remain unavailable. macOS 15/26 tiling,
+actual Mission Control transitions, fullscreen/sheets, Stage Manager, delayed AX
+responses, real-app restart recovery, display relocation/hotplug/sleep/wake, rcmd
+and sustained performance relative to virtual mode remain unverified.
+
+**Risks:** private ABI and the Mission Control signature are host/version-specific.
+Per-write live checks add bounded native query work whose interactive cost has not
+been measured. An already-dispatched AX call is not recallable. Incomplete native
+snapshots intentionally remain protected instead of guessing or deleting state.
+
+**Next milestone:** exclusive development-manager physical positioning/focus and
+Space-transition validation before enabling the feature in personal configuration
+or integrating overlap-dependent groups and additional UI. No installation or
+personal configuration changes were made.

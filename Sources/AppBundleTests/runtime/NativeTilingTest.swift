@@ -1,0 +1,317 @@
+import AppKit
+import Common
+import XCTest
+@testable import AppBundle
+@testable import NativeSpaces
+
+@MainActor
+final class NativeTilingTest: WorkspaceTestCase {
+    private func nativeWorkspace() -> Workspace {
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let rect = Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080)
+        let display = TestMonitor(displayUUID: "display-a", monitorAppKitNsScreenScreensId: 1,
+            name: "fixture", rect: rect, visibleRect: rect, isMain: true)
+        setMonitorsForTests([display])
+        let snapshot = NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a",
+            activeSpaceID: "1", spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0)])],
+            windows: (1...6).map { NativeWindowMembership(windowID: UInt32($0), spaceIDs: ["1"]) },
+            readMilliseconds: 0, capturedAt: .now)
+        var inventory = NativeWorkspaceInventory()
+        XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
+        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [display])
+        return runtime.workspaceBackend.nativeLayouts.activeWorkspace(on: "display-a")!
+    }
+
+    func testNativeTilingNeverAcquiresVirtualLifecycleOrRecovery() {
+        _ = nativeWorkspace()
+        let capabilities = runtime.workspaceBackend.capabilities
+        XCTAssertTrue(capabilities.tilesWindows)
+        XCTAssertFalse(capabilities.ownsWorkspaceLifecycle)
+        XCTAssertFalse(capabilities.activatesWorkspaces)
+        XCTAssertFalse(capabilities.relocatesWorkspaces)
+        XCTAssertFalse(capabilities.parksInactiveWindows)
+        XCTAssertFalse(capabilities.usesVirtualRecovery)
+    }
+
+    func testIncomingSpaceReadPreservesUnqueriedDisplaysAndRetiresOutgoingPresentation() throws {
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let displays = (0..<3).map { index -> TestMonitor in
+            let rect = Rect(topLeftX: CGFloat(index * 1920), topLeftY: 0, width: 1920, height: 1080)
+            return TestMonitor(displayUUID: "display-\(index)", monitorAppKitNsScreenScreensId: index + 1,
+                name: "fixture", rect: rect, visibleRect: rect, isMain: index == 0)
+        }
+        setMonitorsForTests(displays)
+        func snapshot(active: String, partial: Bool) -> NativeSpacesSnapshot {
+            NativeSpacesSnapshot(displays: (0..<3).map { index in
+                NativeSpaceDisplay(identifier: "display-\(index)", activeSpaceID: index == 0 ? active : "\(index + 1)",
+                    spaces: (index == 0 ? ["1", "4"] : ["\(index + 1)"]).map { NativeSpace(id: $0, uuid: "desktop-\($0)", type: 0) })
+            }, windows: (partial ? [4] : [1, 2, 3, 4]).map {
+                NativeWindowMembership(windowID: UInt32($0), spaceIDs: ["\($0)"])
+            }, readMilliseconds: 0, capturedAt: .now, reconciliationSpaceIDs: partial ? ["4"] : nil)
+        }
+        func publish(_ snapshot: NativeSpacesSnapshot) {
+            var inventory = NativeWorkspaceInventory()
+            XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
+            runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: displays)
+        }
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        publish(snapshot(active: "1", partial: false))
+        let windows = try (1...4).map { id in
+            TestWindow.new(id: UInt32(id), parent: try XCTUnwrap(layouts.currentBySpaceID["\(id)"]).rootTilingContainer)
+        }
+        let roots = windows.map(\.parent)
+        publish(snapshot(active: "4", partial: true))
+        NativeWindowReconciler.updateEligibility(snapshot(active: "4", partial: true), windows: windows,
+            ownerPIDs: [4: TestApp.shared.pid], layouts: layouts)
+        XCTAssertFalse(windows[0].nativeLayoutEligible)
+        XCTAssertTrue(windows[1].nativeLayoutEligible)
+        XCTAssertTrue(windows[2].nativeLayoutEligible)
+        XCTAssertTrue(windows[3].nativeLayoutEligible)
+        for index in windows.indices { XCTAssertTrue(windows[index].parent === roots[index]) }
+        // Retained presentation is not fresh membership or frame authority.
+        XCTAssertNil(layouts.registration(for: 2))
+        XCTAssertNil(layouts.registration(for: 3))
+        XCTAssertNotNil(layouts.registration(for: 4))
+    }
+
+    func testHiddenWindowLeavesGeometryButRetainsTreeAndDwindleShares() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        let first = TestWindow.new(id: 1, parent: root)
+        let hidden = TestWindow.new(id: 2, parent: root)
+        let last = TestWindow.new(id: 3, parent: root)
+        root.dwindleChildRatios = [0.2, 0.3, 0.5]
+        hidden.nativeLayoutEligible = false
+        XCTAssertEqual(root.frameLayoutChildren, [first, last])
+        let rect = Rect(topLeftX: 0, topLeftY: 0, width: 1400, height: 800)
+        let frames = root.dwindleChildFrames(in: rect, gaps: ResolvedGaps(gaps: .zero, monitor: mainMonitor))
+        XCTAssertEqual(frames.count, 2)
+        XCTAssertEqual(frames[0].width, 400, accuracy: 0.001)
+        XCTAssertEqual(frames[1].width, 1000, accuracy: 0.001)
+        XCTAssertEqual(root.children, [first, hidden, last])
+        XCTAssertEqual(root.dwindleChildRatios, [0.2, 0.3, 0.5])
+        hidden.nativeLayoutEligible = true
+        XCTAssertEqual(root.frameLayoutChildren, [first, hidden, last])
+        XCTAssertEqual(root.frameDwindleShares, [0.2, 0.3, 0.5])
+    }
+
+    func testNavigationGeometryMapsVisibleFramesToTheirActualWindows() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        let first = TestWindow.new(id: 1, parent: root)
+        let hidden = TestWindow.new(id: 2, parent: root)
+        let last = TestWindow.new(id: 3, parent: root)
+        hidden.nativeLayoutEligible = false
+        let frames = dwindleGeometry(in: workspace)
+        XCTAssertNotNil(frames[ObjectIdentifier(first)])
+        XCTAssertNil(frames[ObjectIdentifier(hidden)])
+        XCTAssertNotNil(frames[ObjectIdentifier(last)])
+        XCTAssertTrue(dwindleDirectionalFocusTarget(from: first, direction: .right) === last)
+        root.layout = .tiles
+        XCTAssertTrue(workspace.usesSpatialFocus)
+        _ = first.focusWindow()
+        let result = try await NativeTilingCommandScope.$active.withValue(true) {
+            try await parseCommand("focus right").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        }
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(focus.windowOrNil === last)
+    }
+
+    func testStructuralDwindleConversionKeepsConcealedLeavesAndResizeRejectsSafely() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        let windows = (1...4).map { TestWindow.new(id: UInt32($0), parent: root) }
+        for hidden in windows.dropFirst() { hidden.nativeLayoutEligible = false }
+        workspace.materializeDwindleTree()
+        XCTAssertEqual(Set(workspace.rootTilingContainer.allLeafWindowsRecursive.map(\.windowId)), Set([1, 2, 3, 4]))
+        XCTAssertTrue(windows.allSatisfy { $0.nodeWorkspace === workspace })
+        _ = windows[0].focusWindow()
+        let result = try await NativeTilingCommandScope.$active.withValue(true) {
+            try await parseCommand("resize width +20").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        }
+        XCTAssertNotEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stderr.joined().contains("concealed siblings"))
+        XCTAssertTrue(windows.dropFirst().allSatisfy { !$0.nativeLayoutEligible })
+    }
+
+    func testEmptyNestedGroupDoesNotConsumePaneOrLoseMasterIdentity() {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        let group = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 1, parent: group)
+        let b = TestWindow.new(id: 2, parent: group)
+        let other = TestWindow.new(id: 3, parent: root)
+        workspace.arrangement = .master
+        workspace.masterGroupIndex = 0
+        a.nativeLayoutEligible = false
+        b.nativeLayoutEligible = false
+        XCTAssertEqual(workspace.workspaceLayoutUnits, [other])
+        workspace.normalizeMasterLayout()
+        _ = workspace.masterGroupIndex
+        a.nativeLayoutEligible = true
+        XCTAssertEqual(workspace.workspaceLayoutUnits, [group, other])
+        XCTAssertTrue(workspace.workspaceLayoutUnits[workspace.masterGroupIndex] === group)
+        XCTAssertEqual(group.children, [a, b])
+    }
+
+    func testPersistenceKeepsConcealedMasterIdentityInsteadOfTemporaryVisibleFallback() {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let windows = (1...3).map { TestWindow.new(id: UInt32($0), parent: root) }
+        for window in windows {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+                launchDate: Date(timeIntervalSince1970: 1), title: "\(window.windowId)")
+        }
+        workspace.arrangement = .master
+        workspace.masterGroupIndex = 2
+        windows[2].nativeLayoutEligible = false
+        XCTAssertEqual(workspace.masterGroupIndex, 1) // Temporary visible fallback.
+        let record = NativePersistedLayout(workspace)
+        XCTAssertEqual(record.masterIndex, 2)
+        let store = NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        XCTAssertTrue(store.restore(record, to: workspace))
+        XCTAssertEqual(workspace.nativePersistentMasterGroupIndex, 2)
+        windows[2].nativeLayoutEligible = true
+        XCTAssertEqual(workspace.masterGroupIndex, 2)
+        XCTAssertTrue(workspace.workspaceLayoutUnits[2] === windows[2])
+    }
+
+    func testSharedLayoutDoesNotWriteIneligibleWindowAndPreservesFloatingFrame() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let visible = TestWindow.new(id: 1, parent: root)
+        let hidden = TestWindow.new(id: 2, parent: root)
+        hidden.nativeLayoutEligible = false
+        let original = Rect(topLeftX: 20, topLeftY: 50, width: 300, height: 400)
+        let floating = TestWindow.new(id: 3, parent: workspace, rect: original)
+        try await workspace.layoutWorkspace()
+        XCTAssertNotNil(visible.lastAppliedLayoutPhysicalRect)
+        XCTAssertNil(hidden.lastAppliedLayoutPhysicalRect)
+        let floatingRect = try await floating.getAxRect()
+        XCTAssertEqual(floatingRect, original)
+        XCTAssertTrue(hidden.parent === root)
+        XCTAssertTrue(floating.parent === workspace)
+    }
+
+    func testCommandPolicyRejectsCrossSpaceAndOverlappingLayoutsBeforeReadiness() throws {
+        for text in ["focus left", "move right", "resize width +20", "workspace-layout master", "layout floating"] {
+            let command = try XCTUnwrap(parseCommand(text).unwrap().0)
+            XCTAssertTrue(NativeTilingCoordinator.supports(command), text)
+        }
+        for text in ["workspace 2", "move-node-to-workspace 2", "layout tabbed", "workspace-layout scrolling",
+                     "move --boundaries all-monitors-outer-frame left",
+                     "focus --boundaries all-monitors-outer-frame left"] {
+            let command = try XCTUnwrap(parseCommand(text).unwrap().0)
+            XCTAssertFalse(NativeTilingCoordinator.supports(command), text)
+        }
+    }
+
+    func testRestoreDoesNotBorrowWindowFromAnotherSpaceOrFlattenIncompleteTree() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let group = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 1, parent: group)
+        let b = TestWindow.new(id: 2, parent: group)
+        for window in [a, b] {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+                launchDate: Date(timeIntervalSince1970: 1), title: "\(window.windowId)")
+        }
+        workspace.arrangement = .master
+        let record = NativePersistedLayout(workspace)
+        let otherSpace = Workspace.get(byName: "other-space")
+        b.bind(to: otherSpace.rootTilingContainer, adaptiveWeight: 1, index: 0)
+        let store = NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        XCTAssertFalse(store.restore(record, to: workspace))
+        XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertTrue(root.children.first === group)
+        XCTAssertTrue(b.nodeWorkspace === otherSpace)
+        b.bind(to: group, adaptiveWeight: 1, index: 1)
+        XCTAssertTrue(store.restore(record, to: workspace))
+        let restored = workspace.rootTilingContainer
+        XCTAssertFalse(restored === root)
+        XCTAssertEqual(restored.layout, record.root.layout)
+        let restoredGroup = try XCTUnwrap(restored.children.first as? TilingContainer)
+        XCTAssertEqual(restoredGroup.layout, .tiles)
+        XCTAssertEqual(restoredGroup.children, [a, b])
+        XCTAssertEqual(workspace.arrangement, .master)
+    }
+
+    func testNativePersistenceRoundTripProtectsIncompleteSavedTreeFromAutosave() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let group = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 1, parent: group)
+        let b = TestWindow.new(id: 2, parent: group)
+        for window in [a, b] {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+                launchDate: Date(timeIntervalSince1970: 1), title: "\(window.windowId)")
+        }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("native.json")
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let first = NativeLayoutPersistence(url: url)
+        await first.reconcile(layouts)
+        await first.save(layouts)
+        XCTAssertNil(first.lastError)
+        let original = try Data(contentsOf: url)
+        let elsewhere = Workspace.get(byName: "elsewhere")
+        b.bind(to: elsewhere.rootTilingContainer, adaptiveWeight: 1, index: 0)
+        let second = NativeLayoutPersistence(url: url)
+        await second.reconcile(layouts)
+        XCTAssertEqual(second.pendingCount, 1)
+        await second.save(layouts)
+        XCTAssertEqual(try Data(contentsOf: url), original)
+        XCTAssertTrue(b.nodeWorkspace === elsewhere)
+        b.bind(to: group, adaptiveWeight: 1, index: 1)
+        await second.reconcile(layouts)
+        XCTAssertEqual(second.pendingCount, 0)
+        let restoredGroup = try XCTUnwrap(workspace.rootTilingContainer.children.first as? TilingContainer)
+        XCTAssertEqual(restoredGroup.children, [a, b])
+        XCTAssertEqual(restoredGroup.layout, .tiles)
+    }
+
+    func testUnreadableNativePersistenceIsNeverOverwritten() async throws {
+        _ = nativeWorkspace()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent("native.json")
+        let original = Data("{invalid".utf8)
+        try original.write(to: url)
+        let store = NativeLayoutPersistence(url: url)
+        await store.reconcile(runtime.workspaceBackend.nativeLayouts)
+        await store.save(runtime.workspaceBackend.nativeLayouts)
+        XCTAssertNotNil(store.lastError)
+        XCTAssertEqual(try Data(contentsOf: url), original)
+    }
+
+    func testNativeCommandsRetainNestedGroupsAndRejectHiddenWindowTarget() async throws {
+        let workspace = nativeWorkspace()
+        let group = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 1, parent: group)
+        let b = TestWindow.new(id: 2, parent: group)
+        _ = a.focusWindow()
+        let result = try await NativeTilingCommandScope.$active.withValue(true) {
+            try await parseCommand("workspace-layout master").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        }
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(workspace.arrangement, .master)
+        XCTAssertTrue(workspace.rootTilingContainer.children.first === group)
+        XCTAssertEqual(group.children, [a, b])
+        b.nativeLayoutEligible = false
+        let rejected = try await NativeTilingCommandScope.$active.withValue(true) {
+            try await parseCommand("resize --window-id 2 width +20").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        }
+        XCTAssertNotEqual(rejected.exitCode, 0)
+        XCTAssertTrue(rejected.stderr.joined().contains("eligible"))
+        XCTAssertEqual(group.children, [a, b])
+    }
+}

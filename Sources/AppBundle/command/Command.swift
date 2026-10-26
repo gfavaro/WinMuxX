@@ -100,11 +100,16 @@ extension [Command] {
 
     @MainActor
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
+        if runtime.workspaceBackend.kind == .native, runtime.workspaceBackend.nativeTilingEnabled,
+           !NativeTilingCommandScope.active, contains(where: { !($0 is DoctorCommand || $0 is ReloadConfigCommand) }) {
+            return try await runtime.workspaceBackend.nativeTiling.run(self, env: env, io: io)
+        }
         var isSucc = true
         for command in self {
             if runtime.workspaceBackend.kind == .native,
-               !(command is DoctorCommand || command is ReloadConfigCommand) {
-                io.err("Command '\(command.args)' is unsupported by the experimental native read-only backend. Use doctor for native Space diagnostics; native gestures remain owned by macOS.")
+               !(command is DoctorCommand || command is ReloadConfigCommand ||
+                 (runtime.workspaceBackend.nativeTilingEnabled && NativeTilingCoordinator.supports(command))) {
+                io.err("Command '\(command.args)' is unsupported by the experimental native backend. Use doctor for native Space diagnostics; native gestures remain owned by macOS.")
                 return false
             }
             try WindowDetectionOperations.current?.check()

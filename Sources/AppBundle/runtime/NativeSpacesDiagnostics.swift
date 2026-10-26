@@ -4,9 +4,14 @@ import ApplicationServices
 
 @MainActor
 func nativeSpacesDiagnosticReport() -> String {
-    var lines = ["WinMuxX — Native Spaces (experimental read-only)",
-        "Automatic tiling, activation, relocation, projects and virtual recovery: unsupported.",
-        "No window positions, application focus or macOS settings are changed."]
+    let tiling = runtime.workspaceBackend.nativeTilingEnabled
+    var lines = ["WinMuxX — Native Spaces (experimental\(tiling ? " tiling" : " read-only"))",
+        "Space activation, relocation, projects and virtual recovery: unsupported.",
+        tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
+            "No window positions, application focus or macOS settings are changed."]
+    lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
+    lines.append("Native saved layouts pending complete matching: \(runtime.workspaceBackend.nativePersistence.pendingCount)")
+    if let error = runtime.workspaceBackend.nativePersistence.lastError { lines.append(error) }
     lines.append("Accessibility permission for this development process: \(AXIsProcessTrusted() ? "available" : "not granted"). Observation does not request it.")
     if let error = lastConfigReloadError { lines.append("Configuration error: \(error)") }
     guard let inventory = runtime.workspaceBackend.observation?.inventory else {
@@ -19,7 +24,7 @@ func nativeSpacesDiagnosticReport() -> String {
     }
     if let error = runtime.workspaceBackend.nativeWindows.lastError { lines.append("AX reconciliation error: \(error)") }
     if let preflight = runtime.workspaceBackend.nativeWindows.writePreflight {
-        lines.append("Live ownership preflight (read-only): \(preflight.passed) passed, \(preflight.blocked) blocked; runtime frame writes remain disabled")
+        lines.append("Live ownership preflight: \(preflight.passed) passed, \(preflight.blocked) blocked; frame writes \(tiling && !serverArgs.isReadOnly ? "require per-write validation" : "remain disabled")")
     }
     lines.append("WindowServer lifecycle events: \(runtime.workspaceBackend.observation?.windowEventsAvailable == true ? "available" : "unavailable; topology/public-event fallback only")")
     if let observer = runtime.workspaceBackend.observation {

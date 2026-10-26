@@ -8,6 +8,7 @@ public final class NativeSpacesObservation {
     public private(set) var inventory = NativeWorkspaceInventory()
     public var onChange: (@MainActor (NativeWorkspaceInventory, String) -> Void)?
     public var onWindowClosed: (@MainActor (UInt32) -> Void)?
+    public var onWindowsChanged: (@MainActor () -> Void)?
     private let read: @Sendable (NativeSpacesSnapshot?, Bool) async throws -> NativeSpacesSnapshot
     private let topology: (@Sendable () async throws -> [NativeSpaceDisplay])?
     private var registrations: [(NotificationCenter, NSObjectProtocol)] = []
@@ -69,6 +70,7 @@ public final class NativeSpacesObservation {
         windowEventsSubscription = NativeSpacesWindowEvents.shared.subscribe { [weak self] event in
             guard let self else { return }
             self.windowEventCount += 1
+            self.onWindowsChanged?()
             if event.confirmsClosure, let id = event.windowID { self.onWindowClosed?(id) }
             if event.changesTopology { self.requestRead(event: "windowServerSpaceChange") }
             else { self.scheduleWindowRead() }

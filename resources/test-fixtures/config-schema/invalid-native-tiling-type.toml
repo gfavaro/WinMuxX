@@ -1,0 +1,4 @@
+[workspace-backend]
+type = "native"
+[native-spaces]
+tiling-enabled = "yes"

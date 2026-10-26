@@ -4,6 +4,16 @@ import Common
 
 @MainActor
 final class WorkspaceBackendConfigTest: WorkspaceTestCase {
+    func testNativeTilingIsSeparateExplicitOptInWithStrictConfiguration() {
+        XCTAssertFalse(parseConfig("[workspace-backend]\ntype = 'native'").config.nativeSpaces.tilingEnabled)
+        let enabled = parseConfig("[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true\nrestore-layouts = false")
+        XCTAssertTrue(enabled.errors.isEmpty, "\(enabled.errors)")
+        XCTAssertTrue(enabled.config.nativeSpaces.tilingEnabled)
+        XCTAssertFalse(enabled.config.nativeSpaces.restoreLayouts)
+        XCTAssertFalse(parseConfig("[native-spaces]\ntiling-enabled = 'yes'").errors.isEmpty)
+        XCTAssertFalse(parseConfig("[native-spaces]\nunknown = true").errors.isEmpty)
+        XCTAssertFalse(parseConfig("default-root-container-layout = 'tabbed'\n[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true").errors.isEmpty)
+    }
     func testOmittedBackendRemainsVirtualAndNativeRequiresExplicitOptIn() {
         XCTAssertEqual(parseConfig("").config.workspaceBackend, .virtual)
         let native = parseConfig("[workspace-backend]\ntype = 'native'")
@@ -29,6 +39,21 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         XCTAssertEqual(runtime.workspaceBackend.kind, .virtual)
         XCTAssertEqual(configUrl, originalURL)
         XCTAssertTrue(Workspace.existing(byName: "retained") === workspace)
+    }
+
+    func testReloadCannotTurnReadOnlyNativeStartupIntoTiling() async throws {
+        runtime.workspaceBackend.selectForStartup(.native)
+        runtime.workspaceBackend.lockSelection()
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true"
+            .write(to: file, atomically: true, encoding: .utf8)
+        var output = ""
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertFalse(result)
+        XCTAssertTrue(output.contains("requires restarting"))
+        XCTAssertFalse(runtime.workspaceBackend.nativeTilingEnabled)
+        XCTAssertFalse(runtime.workspaceBackend.capabilities.tilesWindows)
     }
 
     func testDryRunCanValidateFutureBackendWithoutSelectingIt() async throws {

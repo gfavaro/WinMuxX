@@ -47,6 +47,7 @@ private let persistentWorkspacesKey = "persistent-workspaces"
 // 2. Prefer commands and commands flags over toml options if possible
 private let configParser: [String: any ParserProtocol<Config>] = [
     "workspace-backend": Parser(\.workspaceBackend, parseWorkspaceBackend),
+    "native-spaces": Parser(\.nativeSpaces, parseNativeSpaces),
     "appearance": Parser(\.appearance) { raw, backtrace in
         parseString(raw, backtrace).flatMap {
             AppAppearance(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: system, light, dark"))
@@ -227,6 +228,14 @@ func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]
                 My recommendation: keep the normalizations enabled, and prefer 'join-with' over 'split'.
                 """,
             )]
+        }
+    }
+    if config.workspaceBackend == .native && config.nativeSpaces.tilingEnabled {
+        if config.defaultRootContainerLayout != .dwindle && config.defaultRootContainerLayout != .tiles && config.defaultRootContainerLayout != .master {
+            errors.append(.semantic(.rootKey("native-spaces"), "Native tiling currently supports Dwindle, Master and tiles; overlapping layouts are not enabled"))
+        }
+        if config.master.stackLayout != .tiles {
+            errors.append(.semantic(.rootKey("native-spaces"), "Native Master currently requires a tiles stack"))
         }
     }
     return (config, errors)

@@ -5,6 +5,7 @@
   "description": "Editor assistance for WinMuxX TOML. The app's Swift parser remains authoritative; command strings and monitor selectors need runtime validation.",
   "type": "object",
   "properties": {
+    "native-spaces": {"type": "object", "properties": {"tiling-enabled": {"type": "boolean", "default": false}, "restore-layouts": {"type": "boolean", "default": true}}, "additionalProperties": false},
     "workspace-backend": {"type": "object", "properties": {"type": {"enum": ["virtual", "native"], "default": "virtual", "description": "native is experimental read-only observation; changing backend requires restart."}}, "additionalProperties": false},
     "config-version": {"type": "integer", "minimum": 1, "maximum": 2},
     "appearance": {"enum": ["system", "light", "dark"]},
