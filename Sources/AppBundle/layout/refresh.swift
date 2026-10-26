@@ -201,6 +201,10 @@ func scheduleRefreshSession(
 @MainActor
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
                                optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
+    guard runtime.workspaceBackend.kind == .virtual else {
+        runtime.workspaceBackend.observation?.requestRead(event: "refresh")
+        return
+    }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -228,6 +232,7 @@ func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard
 func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
                        shouldSchedulePostRefresh: Bool = true,
                        body: @MainActor () async throws -> T) async throws -> T {
+    guard runtime.workspaceBackend.kind == .virtual else { return try await body() }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -488,6 +493,7 @@ struct RunSessionGuard: Sendable {
 
 @MainActor
 func refreshModel() {
+    guard runtime.workspaceBackend.capabilities.ownsWorkspaceLifecycle else { return }
     // Focus-only sessions skip AX enumeration, but must still free layout slots
     // for closed native windows. Hidden/minimized windows remain valid here.
     if !isUnitTest {
@@ -609,6 +615,7 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return }
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
     let monitors = monitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]

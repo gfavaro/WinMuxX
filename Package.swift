@@ -49,6 +49,7 @@ let package = Package(
         .target(
             name: "AppBundle",
             dependencies: [
+                .target(name: "NativeSpaces"),
                 .product(name: "Collections", package: "swift-collections"),
                 .product(name: "HotKey", package: "HotKey"),
                 .product(name: "MASShortcut", package: "MASShortcut"),
