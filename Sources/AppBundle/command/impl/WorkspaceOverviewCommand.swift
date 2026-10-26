@@ -7,11 +7,16 @@ struct WorkspaceOverviewCommand: Command {
     @MainActor func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         let controller = WorkspaceOverviewController.shared
         switch args.action {
-        case .hide: controller.dismiss()
-        case .show: return controller.show() || io.err("Workspace overview is unavailable during this interaction.")
+        case .hide: WorkspaceControlsPanelController.shared.dismiss(); controller.dismiss()
+        case .show:
+            WorkspaceControlsPanelController.shared.dismiss()
+            return controller.show() || io.err("Workspace overview is unavailable during this interaction.")
         case .toggle:
             if controller.isOpen { controller.dismiss() }
-            else { return controller.show() || io.err("Workspace overview is unavailable during this interaction.") }
+            else {
+                WorkspaceControlsPanelController.shared.dismiss()
+                return controller.show() || io.err("Workspace overview is unavailable during this interaction.")
+            }
         }
         return true
     }

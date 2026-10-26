@@ -283,6 +283,9 @@ extension Workspace {
         windowId: focus.windowOrNil?.windowId,
         workspace: focus.workspace.name,
     ))
+    var controlsUserInfo: [String: Any] = ["workspaceId": focus.workspace.id]
+    if let windowId = focus.windowOrNil?.windowId { controlsUserInfo["windowId"] = windowId }
+    NotificationCenter.default.post(name: workspaceControlsFocusChanged, object: nil, userInfo: controlsUserInfo)
     if config.onFocusChanged.isEmpty { return }
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession

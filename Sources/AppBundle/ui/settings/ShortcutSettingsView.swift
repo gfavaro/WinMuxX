@@ -33,6 +33,7 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
 
 @MainActor
 public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
+    WorkspaceControlsPanelController.shared.dismiss()
     ShortcutSettingsModel.shared.reload()
     if let existingWindow = shortcutSettingsWindow() {
         presentShortcutSettingsWindow(existingWindow)

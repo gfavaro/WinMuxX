@@ -78,6 +78,7 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
     }
     guard targetMonitor.setActiveWorkspace(workspace) else { return false }
     reconcileSecondaryWorkspaceAssignments()
+    NotificationCenter.default.post(name: workspaceControlsOwnershipChanged, object: nil)
     return true
 }
 

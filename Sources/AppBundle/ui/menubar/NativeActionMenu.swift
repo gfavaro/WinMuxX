@@ -22,6 +22,7 @@ public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
 final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
+    private var nativeMenu: NSMenu?
     private var observation: AnyCancellable?
     private var accessibilityObservation: NSObjectProtocol?
     private var appearanceObservation: NSKeyValueObservation?
@@ -38,9 +39,12 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.delegate = self
-        item.menu = menu
+        nativeMenu = menu
         statusItem = item
         if let button = item.button {
+            button.target = self
+            button.action = #selector(statusItemClicked(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
                 Task { @MainActor in
                     let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) ?? .aqua
@@ -66,6 +70,26 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         observation = TrayMenuModel.shared.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateIcon() }
         }
+    }
+
+    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
+        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.buttonNumber == 1 {
+            WorkspaceControlsPanelController.shared.dismiss()
+            openMenu()
+        } else {
+            WorkspaceControlsPanelController.shared.toggle()
+        }
+    }
+
+    func openMenu() {
+        guard let button = statusItem?.button, let nativeMenu else { return }
+        nativeMenu.update()
+        nativeMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button)
+    }
+
+    func containsStatusItem(point: NSPoint) -> Bool {
+        guard let button = statusItem?.button, let window = button.window else { return false }
+        return window.convertToScreen(button.convert(button.bounds, to: nil)).contains(point)
     }
 
     private func updateIcon() {
@@ -308,9 +332,20 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func openSettings() { ShortcutSettingsModel.shared.requestWindowOpen() }
+    @objc private func openSettings() {
+        WorkspaceControlsPanelController.shared.dismiss()
+        ShortcutSettingsModel.shared.requestWindowOpen()
+    }
     @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
     @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }
+
+    func createQuickFloatingRule(for focus: LiveFocus, match: QuickFloatingRuleMatch?) {
+        guard let window = focus.windowOrNil as? MacWindow,
+              let bundleId = window.macApp.rawAppBundleId else { return }
+        capturedRuleTarget = QuickFloatingRuleTarget(window: window, focus: focus, bundleId: bundleId,
+            pid: window.macApp.pid, launchDate: window.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
+        createQuickFloatingRule(match: match)
+    }
 
     private func createQuickFloatingRule(match requestedMatch: QuickFloatingRuleMatch?) {
         guard let target = capturedRuleTarget else { return }
@@ -405,6 +440,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     }
     @objc private func copyVersion() { "\(winMuxAppName) v\(winMuxAppVersion) \(gitHash)".copyToClipboard() }
     @objc private func openConfig() {
+        WorkspaceControlsPanelController.shared.dismiss()
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }

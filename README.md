@@ -177,8 +177,9 @@ reduce the mandatory system reservation.
 
 Settings → Appearance → Menu bar offers Icon or Workspace. Workspace follows the
 focused monitor and shows the label initial, or the workspace number when there
-is no label. Icon supports color or monochrome appearance. Both open the same
-native action menu. Settings saves these choices to TOML:
+is no label. Icon supports color or monochrome appearance. Left-click the status
+item to toggle the workspace controls panel; right-click opens the full action menu.
+Settings saves these choices to TOML:
 
 ```toml
 [menu-bar]
@@ -205,6 +206,11 @@ Reload Config, Enabled and Quit remain directly accessible. Projects, tab contro
 extra container operations, utilities and maintenance tools stay in Settings or the CLI.
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
+
+The left-click panel shows the current workspace, project, display, applied group
+frames, and controls for arrangement, floating, fullscreen, scrolling width, and
+fit issues. It uses the displayed workspace's current frames, so opening it does not
+change scrolling position. Choose **More Actions…** or right-click for the full menu.
 
 Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,

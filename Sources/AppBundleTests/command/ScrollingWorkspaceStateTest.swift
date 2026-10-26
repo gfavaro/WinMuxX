@@ -30,6 +30,18 @@ final class ScrollingWorkspaceStateTest: WorkspaceTestCase {
         XCTAssertEqual(try XCTUnwrap(workspace.scrollingMetrics.columns.first).width, before + 80, accuracy: 1)
     }
 
+    func testWorkspaceControlsPreviewReadsFramesWithoutChangingScrollingOffset() {
+        let workspace = focus.workspace
+        let first = TestWindow.new(id: 98109, parent: workspace.rootTilingContainer)
+        TestWindow.new(id: 98110, parent: workspace.rootTilingContainer)
+        workspace.transitionArrangement(to: .scrolling)
+        _ = first.focusWindow()
+        workspace.scrollingOffset = 123
+        let snapshot = WorkspaceControlsPanelController.shared.makeSnapshot()
+        XCTAssertEqual(snapshot?.workspaceId, workspace.id)
+        XCTAssertEqual(workspace.scrollingOffset, 123)
+    }
+
     func testTabAndAccordionRootTransitionsAndNewInsertionPreserveAtomicGroup() async throws {
         for layout in [Layout.tabGroup, .stacked] {
             let workspace = Workspace.get(byName: "atomic-\(layout.rawValue)")
