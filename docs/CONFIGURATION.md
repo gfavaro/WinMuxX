@@ -4,8 +4,9 @@
 accepts `"native"` for experimental read-only Space observation. An additional
 `[native-spaces] tiling-enabled = true` opts into the development Dwindle/Master
 implementation; both selections require restart. `restore-layouts = true` is the
-default and uses a separate native file when tiling is enabled. Physical tiling
-validation remains pending. See [Native Spaces](NATIVE_SPACES.md)
+default and uses a separate native file when tiling is enabled. Initial single-host
+positioning/focus/fullscreen checks passed; the broader native validation matrix
+remains pending. See [Native Spaces](NATIVE_SPACES.md)
 for opt-in, rollback, unsupported commands and failure handling.
 
 For TOML editor completion, use the checked-in

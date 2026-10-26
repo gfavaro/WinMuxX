@@ -52,7 +52,11 @@ Our executed evidence remains narrower: read-side queries with SIP enabled on
 macOS 27.2, two connected displays, one observed user Space-change notification,
 and inactive-window membership preservation. Native frame writes, overlapping
 window ordering, fullscreen/Mission Control cycles and third-party posted swipes
-have not been validated.
+were not validated during that comparison. Subsequent host validation exercised
+basic Dwindle/Master positioning, explicit focus, minimize/restore and native
+fullscreen; see the [current assessment](NATIVE_SPACES_ASSESSMENT.md). Native
+overlapping-group ordering, Mission Control and third-party posted swipes remain
+unverified.
 
 ## Implementation order revised by this comparison
 

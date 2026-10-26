@@ -10,9 +10,13 @@ struct FocusCommand: Command {
         WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
         target.workspace.lastScrollingFocusWindowId = nil
         // todo bug: floating windows break mru
-        let floatingWindows = args.floatingAsTiling ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
+        // Native floating windows retain their ownership and physical geometry.
+        // Do not temporarily rebind them across asynchronous AX reads. Explicit
+        // --window-id focus still supports them without a tree mutation.
+        let includeFloating = args.floatingAsTiling && runtime.workspaceBackend.kind == .virtual
+        let floatingWindows = includeFloating ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
         defer {
-            if args.floatingAsTiling {
+            if includeFloating {
                 restoreFloatingWindows(floatingWindows: floatingWindows, workspace: target.workspace)
             }
         }

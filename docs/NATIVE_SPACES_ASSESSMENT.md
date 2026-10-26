@@ -278,3 +278,45 @@ snapshots intentionally remain protected instead of guessing or deleting state.
 Space-transition validation before enabling the feature in personal configuration
 or integrating overlap-dependent groups and additional UI. No installation or
 personal configuration changes were made.
+
+## Phase 3 native validation checkpoint
+
+**Findings:** physical AX positioning works with SIP enabled on the current host.
+Dwindle, resized Master, explicit same-app focus, minimization/restoration and a
+native fullscreen round trip were executed. Fifteen inactive-desktop windows kept
+identical frames during the first native session. Mission Control's production
+overlay signature detected user-assisted opening and clearing in a separate
+read-only probe. The [native validation record](NATIVE_SPACES_NATIVE_VALIDATION.md)
+lists exact scope, evidence and unperformed checks.
+
+**Changes:** `doctor` now exposes per-window JSON rows for identity, eligibility,
+floating state and the last layout target, without treating targets as actual AX
+measurements. A disposable AppKit fixture provides repeatable window interactions.
+`NativeCommandTargetFence` prevents commands waiting on reconciliation from
+following focus or ownership into another Space/display. The execution scope
+rechecks ownership before subsequent commands and before focus completion.
+Floating-to-tiling rechecks its registration after asynchronous size reads;
+native directional focus avoids temporarily rebinding floating windows across AX
+awaits. Floating windows remain explicitly focusable by window ID.
+Runtime layout validation also rejects unsupported arrangements and nested
+overlapping groups before frame application, preserving their live trees rather
+than allowing configuration to bypass the native command capability policy.
+
+**Validation:** build and focused tests passed. Final `make check` passed 1,454
+AppBundle plus 40 NativeSpaces tests (1,494 Swift tests), 19 schema fixtures covering
+52 parser keys, script checks and dependency resolution. Native frame comparisons used settled CG snapshots,
+not CLI exit status alone. Test managers and fixtures were stopped, the installed
+manager was restored, and native persistence was disabled throughout the sessions.
+The Space-switch regression failed when target revocation was temporarily bypassed;
+the production guard was restored before the final full gate.
+
+**Limitations/risks:** the current host's basic results do not certify other macOS
+versions, multi-display movement, delayed apps, native restart persistence,
+cross-app ordering or a complete Mission Control/trackpad integration cycle.
+Already-dispatched AX calls remain non-atomic with WindowServer transitions.
+The queued-command fence's new cancellation paths have model/regression coverage,
+not an interactive queued-command/Space-switch reproduction.
+
+**Next milestone:** backend-aware native UI/queries and focused follow-up validation;
+overlapping groups remain behind native ordering validation. No installation,
+personal configuration change, push or merge was performed.

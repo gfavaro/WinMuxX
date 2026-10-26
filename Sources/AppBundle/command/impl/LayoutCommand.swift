@@ -66,7 +66,15 @@ struct LayoutCommand: Command {
                     case .tilingContainer:
                         return true // Nothing to do
                     case .workspace(let workspace):
-                        window.lastFloatingSize = try await window.getAxSize() ?? window.lastFloatingSize
+                        let registration = runtime.workspaceBackend.kind == .native
+                            ? runtime.workspaceBackend.nativeLayouts.registration(for: window.windowId) : nil
+                        let size = try await window.getAxSize()
+                        if runtime.workspaceBackend.kind == .native {
+                            guard let registration, runtime.workspaceBackend.nativeLayouts.accepts(registration) else {
+                                return io.err("Native layout target changed while reading its size")
+                            }
+                        }
+                        window.lastFloatingSize = size ?? window.lastFloatingSize
                         try await window.relayoutWindow(on: workspace, forceTile: true)
                         return true
                 }

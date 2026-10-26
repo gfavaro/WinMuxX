@@ -1,7 +1,8 @@
 # Developing WinMuxX
 
 The `feat/native-spaces` branch has an experimental native backend: observation is
-the default, with a separate Dwindle/Master tiling opt-in awaiting physical validation.
+the default, with a separate Dwindle/Master tiling opt-in. Initial single-display
+positioning/focus/fullscreen checks passed; broader native validation remains pending.
 `WorkspaceBackendState` belongs to `WinMuxRuntime`; capabilities gate virtual
 lifecycle, parking and recovery. `NativeSpaces` isolates dynamic read-side SkyLight
 access and generation-checked event reconciliation. Layout trees/algorithms remain

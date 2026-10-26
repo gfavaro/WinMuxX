@@ -113,7 +113,13 @@ extension [Command] {
                 return false
             }
             try WindowDetectionOperations.current?.check()
+            if NativeTilingCommandScope.validateTarget?() == false {
+                return io.err("Native command target changed during execution")
+            }
             await WorkspacePresentationController.shared.cancelForCommand(command)
+            if NativeTilingCommandScope.validateTarget?() == false {
+                return io.err("Native command target changed during execution")
+            }
             let commandSucc = try await command.run(env, io)
             isSucc = commandSucc && isSucc
             if !command.isQuery && !command.isPresentation {

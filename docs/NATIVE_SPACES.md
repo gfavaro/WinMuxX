@@ -1,8 +1,9 @@
 # Native Spaces (experimental)
 
 This branch implements read-only native Space observation and a separate experimental
-Dwindle/Master tiling opt-in. Physical tiling validation is still a release gate;
-this is not a validated replacement for the installed manager. Virtual workspaces remain the default and retain their layouts,
+Dwindle/Master tiling opt-in. Basic positioning, explicit focus, minimize/restore
+and native fullscreen have been exercised on one SIP-enabled macOS 27.2 host.
+Broader native validation remains a release gate. Virtual workspaces remain the default and retain their layouts,
 projects, gestures, display movement and recovery.
 
 ## Opt in and roll back
@@ -29,7 +30,11 @@ Leaving a Space or disappearing from AX does not imply closure.
 The menu bar lists the latest native Space observations and provides refresh and
 diagnostics. `winmuxx doctor` reports native IDs, UUIDs, per-display active Spaces,
 membership counts, query duration, AX classification and whether the observation is
-stale. It reports WindowServer event availability and topology-audit work. A local
+stale. It reports WindowServer event availability, topology-audit work and per-window
+JSON diagnostic rows (`Window frame:`) identifying PID, Space UUID, eligibility,
+floating state and the last calculated layout target. Targets are cached model
+state, may be stale for concealed windows, and are not actual AX measurements or
+write permits. A local
 read-only ownership preflight checks real process/Space identity without granting
 the runtime any frame-write permits.
 In observation mode, other CLI commands, including virtual queries and subscriptions, return an explicit
@@ -127,9 +132,12 @@ are observable but excluded from the proposed native tiling policy. Missing UUID
 cannot be restored by guessing an ordinal. Numeric IDs are not restart identities.
 
 Tab/accordion integration and native navigation are pending. The opt-in tiling path
-and native persistence have automated coverage, but physical tiling, focus, Mission
-Control, delayed apps, multi-monitor movement, Stage Manager and restart restoration
-on real apps remain unverified. Do not use compilation or mocked tests as evidence
+and native persistence have automated coverage. Initial physical Dwindle/Master,
+resize, focus, minimize/restore and fullscreen checks passed on one display;
+Mission Control's detection signature also passed a user-assisted read-only check.
+End-to-end Mission Control tiling pause/resume, physical trackpad switching, delayed apps, multi-monitor movement,
+Stage Manager and restart restoration on real apps remain unverified.
+Do not use compilation or mocked tests as evidence
 that those native behaviors work.
 
 ## Validation
@@ -139,6 +147,16 @@ Apple Silicon/macOS 27.2, two connected displays, a real public Space-change eve
 and inactive-window membership preservation. It lists untested hardware/OS and
 lifecycle scenarios separately. The [decision record](NATIVE_SPACES_ADR.md) explains
 the ownership boundary and rejected alternatives.
+
+The [interactive validation record](NATIVE_SPACES_NATIVE_VALIDATION.md) separates
+executed physical checks from unverified behavior. Commands retain their original
+Space/display across a reconciliation wait; default targets also retain their
+focused window. Explicit window-ID commands remain bound to that same window
+object if application focus changes. Changed ownership, focus or reused IDs cancel
+the affected command. Subsequent commands in a batch may follow focus changes authored by that
+batch within the same Space; they cannot inherit another Space's focus. Directional
+native focus currently excludes floating windows; explicit window-ID focus includes
+them while preserving their tree membership.
 
 The [Dinky comparison](NATIVE_SPACES_DINKY_COMPARISON.md) traces its current source
 and identifies targeted reconciliation, missed-event recovery and native stacking
@@ -159,3 +177,13 @@ make check
 Interactive macOS checks require an unlocked desktop and an actual AppKit event
 loop. CI fixtures verify parsing, ownership, eligibility, cancellation, configuration
 and command rejection; they cannot verify private API compatibility or native UI.
+
+`script/native-spaces-fixture.swift` supplies a disposable AppKit application with
+two resizable windows, a Window menu, minimization and native fullscreen. Compile
+it with `xcrun swiftc` into a temporary `.app` whose Info.plist declares the binary
+as `CFBundleExecutable`, a unique `CFBundleIdentifier`, `CFBundlePackageType = APPL`
+and `NSPrincipalClass = NSApplication`. Use a separately selected test desktop,
+check for existing windows before enabling tiling, disable native persistence in
+the test configuration, and pause the installed manager with a bounded restoration
+watchdog. Stop the development manager before returning to a working desktop.
+Never interpret fixture success as validation of restrictive third-party apps.

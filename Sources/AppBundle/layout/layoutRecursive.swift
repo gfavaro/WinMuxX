@@ -7,6 +7,9 @@ extension Workspace {
         await WorkspacePresentationController.shared.restorePendingFloatingFrames(in: self)
         if WorkspacePresentationController.shared.preservesLayout(for: self) { return }
         applyConfiguredLayout()
+        if runtime.workspaceBackend.kind == .native, !supportsNativeTiling {
+            throw NativeTilingUnsupportedLayout()
+        }
         normalizeMasterLayout()
         if isEffectivelyEmpty { return }
         let rect = workspaceTilingRect(self)
@@ -56,6 +59,22 @@ extension Workspace {
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
         // But I also faced this problem in monitors horizontal configuration. ¯\_(ツ)_/¯
         try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, context)
+    }
+}
+
+struct NativeTilingUnsupportedLayout: Error, CustomStringConvertible {
+    var description: String { "Native tiling currently supports Dwindle/Master and non-overlapping tile groups; retained unsupported groups were not modified" }
+}
+
+extension Workspace {
+    @MainActor var supportsNativeTiling: Bool {
+        func supported(_ container: TilingContainer) -> Bool {
+            [.tiles, .dwindle].contains(container.layout) && container.children.allSatisfy {
+                guard let nested = $0 as? TilingContainer else { return true }
+                return supported(nested)
+            }
+        }
+        return [.dwindle, .master].contains(arrangement) && masterStackLayout == .tiles && supported(rootTilingContainer)
     }
 }
 

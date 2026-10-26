@@ -2,6 +2,27 @@ import Foundation
 import NativeSpaces
 import ApplicationServices
 
+struct NativeWindowFrameDiagnostic: Codable, Equatable {
+    let windowID: UInt32
+    let pid: Int32
+    let spaceUUID: String
+    let eligible: Bool
+    let floating: Bool
+    let desiredFrame: [CGFloat]?
+}
+
+@MainActor
+func nativeWindowFrameDiagnostics(_ layouts: NativeSpaceLayouts) -> [NativeWindowFrameDiagnostic] {
+    layouts.retainedByUUID.flatMap { uuid, workspace in
+        workspace.allLeafWindowsRecursive.map { window in
+            let frame = window.lastAppliedLayoutPhysicalRect
+            return NativeWindowFrameDiagnostic(windowID: window.windowId, pid: window.app.pid,
+                spaceUUID: uuid, eligible: window.nativeLayoutEligible, floating: window.parent is Workspace,
+                desiredFrame: frame.map { [$0.minX, $0.minY, $0.width, $0.height] })
+        }
+    }.sorted { $0.windowID < $1.windowID }
+}
+
 @MainActor
 func nativeSpacesDiagnosticReport() -> String {
     let tiling = runtime.workspaceBackend.nativeTilingEnabled
@@ -43,5 +64,12 @@ func nativeSpacesDiagnosticReport() -> String {
     }
     let known = snapshot.windows.filter { $0.unambiguousSpaceID != nil }.count
     lines.append("Window inventory: \(snapshot.windows.count); single-Space memberships: \(known). Inventory entries are not necessarily manageable AX windows.")
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    for row in nativeWindowFrameDiagnostics(runtime.workspaceBackend.nativeLayouts) {
+        if let data = try? encoder.encode(row), let json = String(data: data, encoding: .utf8) {
+            lines.append("Window frame: \(json)")
+        }
+    }
     return lines.joined(separator: "\n")
 }

@@ -4,6 +4,7 @@ import NativeSpaces
 
 enum NativeTilingCommandScope {
     @TaskLocal static var active = false
+    @TaskLocal static var validateTarget: (@MainActor @Sendable () -> Bool)?
 }
 
 /// Applies the shared engine to observed active desktop trees. It neither owns
@@ -138,6 +139,10 @@ final class NativeTilingCoordinator {
 
     func run(_ commands: [any Command], env: CmdEnv, io: CmdIo) async throws -> Bool {
         guard commands.allSatisfy(Self.supports) else { return io.err("Operation unsupported by the native tiling MVP") }
+        guard let target = NativeCommandTargetFence(commands, env: env,
+            defaultFocus: runtime.focus.requested.liveOrNil, layouts: runtime.workspaceBackend.nativeLayouts) else {
+            return io.err("Native command target is not an observed active desktop")
+        }
         runtime.workspaceBackend.observation?.requestRead(event: "nativeCommand")
         // Bounded readiness wait, with no additional native queries. Reconciliation
         // is owned by the event pipeline; newer events can supersede it safely.
@@ -147,14 +152,24 @@ final class NativeTilingCoordinator {
             if case .unavailable = runtime.workspaceBackend.observation?.inventory.status { break }
         }
         guard ready else { return io.err("Native tiling is not ready: \(status)") }
+        guard target.matches(runtime.workspaceBackend.nativeLayouts, defaultFocus: runtime.focus.requested.liveOrNil) else {
+            return io.err("Native command cancelled because its target changed during reconciliation")
+        }
         guard hasManagedNativeFocus || commands.allSatisfy({
             $0 is DoctorCommand || $0 is ReloadConfigCommand || $0 is ModeCommand ||
                 $0.args.windowId != nil || env.windowId != nil
         }) else { return io.err("The frontmost window is not managed by native tiling; use an eligible explicit --window-id") }
-        let result = try await NativeTilingCommandScope.$active.withValue(true) {
-            try await commands.runCmdSeq(env, io)
+        let validate: @MainActor @Sendable () -> Bool = {
+            target.matches(runtime.workspaceBackend.nativeLayouts,
+                defaultFocus: runtime.focus.requested.liveOrNil, allowDefaultFocusChanges: true)
+        }
+        let result = try await NativeTilingCommandScope.$validateTarget.withValue(validate) {
+            try await NativeTilingCommandScope.$active.withValue(true) {
+                try await commands.runCmdSeq(env, io)
+            }
         }
         if result {
+            guard validate() else { return io.err("Native command target changed before completion") }
             if commands.contains(where: { $0 is FocusCommand }) {
                 focus.windowOrNil?.nativeFocus()
             } else {

@@ -33,6 +33,131 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertFalse(capabilities.usesVirtualRecovery)
     }
 
+    func testFrameDiagnosticsIdentifyRetainedWindowsWithoutClaimingActualAXFrames() async throws {
+        let workspace = nativeWorkspace()
+        let visible = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let concealed = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        concealed.nativeLayoutEligible = false
+        TestWindow.new(id: 3, parent: workspace)
+        try await workspace.layoutWorkspace()
+        let rows = nativeWindowFrameDiagnostics(runtime.workspaceBackend.nativeLayouts)
+        XCTAssertEqual(rows.map(\.windowID), [1, 2, 3])
+        XCTAssertEqual(rows.map(\.spaceUUID), ["desktop-a", "desktop-a", "desktop-a"])
+        XCTAssertEqual(rows.map(\.eligible), [true, false, true])
+        XCTAssertNotNil(rows[0].desiredFrame)
+        XCTAssertNil(rows[1].desiredFrame)
+        XCTAssertTrue(rows[2].floating)
+        XCTAssertNil(rows[2].desiredFrame)
+        XCTAssertTrue(visible.nodeWorkspace === workspace)
+    }
+
+    func testQueuedCommandCannotFollowFocusToAnotherWorkspaceOrWindow() throws {
+        let workspace = nativeWorkspace()
+        let first = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        let second = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        _ = first.focusWindow()
+        let command = try XCTUnwrap(parseCommand("resize width +20").unwrap().0)
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let initial = focus
+        let target = try XCTUnwrap(NativeCommandTargetFence([command], env: .defaultEnv, defaultFocus: initial, layouts: layouts))
+        XCTAssertTrue(target.matches(layouts, defaultFocus: initial))
+        _ = second.focusWindow()
+        XCTAssertFalse(target.matches(layouts, defaultFocus: focus))
+        XCTAssertTrue(target.matches(layouts, defaultFocus: focus, allowDefaultFocusChanges: true))
+        let other = Workspace.get(byName: "other-desktop")
+        XCTAssertFalse(target.matches(layouts, defaultFocus: LiveFocus(windowOrNil: nil, workspace: other)))
+        let explicitCommand = try XCTUnwrap(parseCommand("resize --window-id 1 width +20").unwrap().0)
+        let explicit = try XCTUnwrap(NativeCommandTargetFence([explicitCommand], env: .defaultEnv,
+            defaultFocus: initial, layouts: layouts))
+        XCTAssertTrue(explicit.matches(layouts, defaultFocus: focus)) // Explicit target is independent of app focus.
+        first.bind(to: other.rootTilingContainer, adaptiveWeight: 1, index: 0)
+        XCTAssertFalse(explicit.matches(layouts, defaultFocus: focus))
+        first.unbindFromParent()
+        TestApp.shared._windows.removeAll { $0 === first }
+        TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        XCTAssertFalse(explicit.matches(layouts, defaultFocus: focus)) // Reused IDs cannot inherit a queued command.
+        XCTAssertTrue(second.nodeWorkspace === workspace)
+    }
+
+    func testFloatingToTilingCannotBindAfterItsNativeReadWasInvalidated() async throws {
+        let workspace = nativeWorkspace()
+        let window = TestWindow.new(id: 1, parent: workspace)
+        _ = window.focusWindow()
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        defer { window.sizeReader = nil }
+        window.sizeReader = {
+            await Task.yield()
+            var stopped = NativeWorkspaceInventory()
+            stopped.stop()
+            layouts.reconcile(stopped, displays: [mainMonitor])
+            return CGSize(width: 500, height: 400)
+        }
+        let result = try await NativeTilingCommandScope.$active.withValue(true) {
+            try await parseCommand("layout tiling").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        }
+        XCTAssertNotEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stderr.joined().contains("changed"))
+        XCTAssertTrue(window.parent === workspace)
+    }
+
+    func testQueuedCommandIsRevokedByObservedNativeSpaceSwitch() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        let window = TestWindow.new(id: 1, parent: root)
+        _ = window.focusWindow()
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let command = try XCTUnwrap(parseCommand("resize width +20").unwrap().0)
+        let target = try XCTUnwrap(NativeCommandTargetFence([command], env: .defaultEnv,
+            defaultFocus: focus, layouts: layouts))
+        let next = NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "2",
+            spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0), NativeSpace(id: "2", uuid: "desktop-b", type: 0)])],
+            windows: [NativeWindowMembership(windowID: 1, spaceIDs: ["1"])], readMilliseconds: 0, capturedAt: .now)
+        var inventory = NativeWorkspaceInventory()
+        XCTAssertTrue(inventory.publish(next, for: inventory.invalidate()))
+        layouts.reconcile(inventory, displays: [mainMonitor])
+        let incoming = try XCTUnwrap(layouts.activeWorkspace(on: "display-a"))
+        XCTAssertFalse(target.matches(layouts, defaultFocus: incoming.toLiveFocus(), allowDefaultFocusChanges: true))
+        XCTAssertTrue(layouts.retainedByUUID["desktop-a"] === workspace)
+        XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertTrue(window.parent === root)
+        XCTAssertNil(window.lastAppliedLayoutPhysicalRect)
+    }
+
+    func testCommandSequenceRejectsRevokedNativeTargetBeforeMutation() async throws {
+        let workspace = nativeWorkspace()
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        _ = window.focusWindow()
+        let root = workspace.rootTilingContainer
+        let result = try await NativeTilingCommandScope.$validateTarget.withValue({ false }) {
+            try await NativeTilingCommandScope.$active.withValue(true) {
+                try await parseCommand("workspace-layout master").cmdOrDie.run(.defaultEnv, .emptyStdin)
+            }
+        }
+        XCTAssertNotEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stderr.joined().contains("target changed"))
+        XCTAssertEqual(workspace.arrangement, .dwindle)
+        XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertTrue(root.children.first === window)
+    }
+
+    func testNativeLayoutRejectsUnsupportedRetainedGroupsBeforeAnyFrameWrite() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tabGroup, index: 0)
+        let a = TestWindow.new(id: 1, parent: tabs)
+        let b = TestWindow.new(id: 2, parent: tabs)
+        do {
+            try await workspace.layoutWorkspace()
+            XCTFail("Native overlapping groups must remain suspended")
+        } catch { XCTAssertTrue(error is NativeTilingUnsupportedLayout) }
+        XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertTrue(root.children.first === tabs)
+        XCTAssertEqual(tabs.layout, .tabGroup)
+        XCTAssertEqual(tabs.children, [a, b])
+        XCTAssertNil(a.lastAppliedLayoutPhysicalRect)
+        XCTAssertNil(b.lastAppliedLayoutPhysicalRect)
+    }
+
     func testIncomingSpaceReadPreservesUnqueriedDisplaysAndRetiresOutgoingPresentation() throws {
         runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
         let displays = (0..<3).map { index -> TestMonitor in
