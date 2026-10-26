@@ -22,6 +22,7 @@ final class NativeSpacesReaderTests: XCTestCase {
             default: ["1", "2"]
             }
         }
+        func windowIDs(inSpace id: UInt64) -> [UInt32]? { id == 1 ? [1, 1, 4] : [4] }
     }
 
     func testMissingPrivateAPIFailsExplicitlyWithoutFallbackInventory() async {
@@ -64,5 +65,25 @@ final class NativeSpacesReaderTests: XCTestCase {
                 XCTAssertEqual(error as? NativeSpacesError, .invalidSnapshot("window IDs must be nonzero, at most 1024 per read"))
             }
         }
+    }
+
+    func testScopedDiscoveryDeduplicatesCandidatesAndKeepsMembershipAmbiguity() async throws {
+        let reader = NativeSpacesReader(makeBridge: { FakeQuery() })
+        let result = try await reader.snapshot(spaceIDs: ["1"])
+        XCTAssertEqual(result.windows.map(\.windowID), [1, 4])
+        XCTAssertEqual(result.windows[1].spaceIDs, ["1", "2"])
+        do {
+            _ = try await reader.snapshot(spaceIDs: ["99"])
+            XCTFail("removed Space must not fall back to the focused desktop")
+        } catch { XCTAssertEqual(error as? NativeSpacesError, .invalidSnapshot("requested Space no longer exists")) }
+    }
+
+    func testTopologyAuditMakesNoMembershipQueriesAndScopedObservationHasTargets() async throws {
+        let reader = NativeSpacesReader(makeBridge: { FakeQuery() })
+        let topology = try await reader.topology()
+        XCTAssertEqual(topology.first?.activeSpaceID, "1")
+        let observed = try await reader.observationSnapshot(previous: topology)
+        XCTAssertEqual(observed.reconciliationSpaceIDs, ["1"])
+        XCTAssertEqual(observed.windows.map(\.windowID), [1, 4])
     }
 }

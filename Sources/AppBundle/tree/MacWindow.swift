@@ -64,6 +64,9 @@ final class MacWindow: Window {
     @MainActor
     @discardableResult
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
+        if runtime.workspaceBackend.kind == .native {
+            return try await getOrRegisterNative(windowId: windowId, macApp: macApp)
+        }
         // Focus/main-window AX attributes can continue reporting a closed id.
         // Never let the fast focus path recreate its layout node.
         if !isUnitTest && !winmux_window_exists(windowId) {
@@ -123,6 +126,41 @@ final class MacWindow: Window {
         return window
     }
 
+    @MainActor
+    private static func getOrRegisterNative(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        guard let registration = layouts.registration(for: windowId),
+              !macApp.nsApp.isTerminated else { return nil }
+        let workspace = registration.workspace
+        if let existing = allWindowsMap[windowId], existing.macApp === macApp,
+           existing.nodeWorkspace === workspace { return existing }
+        let rect = try await macApp.getAxRect(windowId)
+        let type = try await macApp.getAxUiElementWindowType(windowId, getWindowLevel(for: windowId))
+        let native = try await macApp.readNativeState(windowId)
+        try Task.checkCancellation()
+        guard layouts.accepts(registration),
+              !macApp.nsApp.isTerminated, native?.fullscreen == false, native?.minimized == false else { return nil }
+        if case .popup = type { return nil }
+        if let existing = allWindowsMap[windowId] {
+            if existing.macApp !== macApp {
+                existing.garbageCollect(skipClosedWindowsCache: true)
+            } else {
+                let floated = existing.parent is Workspace
+                let binding = floated ? BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+                    : bindingDataForNewWindow(type: type, workspace: workspace, window: existing)
+                existing.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+                existing.recordAuthoritativeActualRect(rect)
+                return existing
+            }
+        }
+        let binding = bindingDataForNewWindow(type: type, workspace: workspace, window: nil)
+        let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size,
+            parent: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+        window.recordAuthoritativeActualRect(rect)
+        allWindowsMap[windowId] = window
+        return window
+    }
+
     // var description: String {
     //     let description = [
     //         ("title", title),
@@ -169,6 +207,13 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
+        if runtime.workspaceBackend.kind == .native {
+            guard MacWindow.allWindowsMap.removeValue(forKey: windowId) != nil else { return }
+            WindowMotion.shared.forget(windowId)
+            resetLearnedMinimum()
+            if parent != nil { _ = unbindFromParent() }
+            return
+        }
         NotificationCenter.default.post(name: workspaceControlsWindowClosed, object: nil, userInfo: ["windowId": windowId])
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
@@ -256,6 +301,7 @@ final class MacWindow: Window {
     // todo it's part of the window layout and should be moved to layoutRecursive.swift
     @MainActor
     func hideInCorner(_ corner: OptimalHideCorner, force: Bool = false) async throws {
+        guard runtime.workspaceBackend.kind == .virtual else { return }
         guard let nodeMonitor else { return }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent `hideInCorner` calls
         if !isHiddenInCorner {

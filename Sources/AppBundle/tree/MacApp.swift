@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import PrivateApi
+import NativeSpaces
 
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
@@ -262,12 +263,23 @@ final class MacApp: AbstractApp {
     }
 
     @MainActor
+    private func nativeFrameValidation(_ windowID: UInt32) -> (@Sendable () throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { throw NativeSpaceWriteError.revoked }
+        }
+        return { try permit.check() }
+    }
+
+    @MainActor
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        let validate = nativeFrameValidation(windowId)
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, validateWrite: validate)
         }
     }
 
@@ -275,24 +287,31 @@ final class MacApp: AbstractApp {
     func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect, session: UUID) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        let validate = nativeFrameValidation(windowId)
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             // Intermediate steps need no readback or minimum-size confirmation.
             // Finish both writes of a started step; cancellation drops queued steps.
+            try validate?()
             try disableAnimations(app: axApp.threadGuarded, job) {
                 if animatedSizes.threadGuarded[windowId]?.session != session || animatedSizes.threadGuarded[windowId]?.size != frame.size {
+                    try validate?()
                     let accepted = window.set(Ax.sizeAttr, frame.size)
                     animatedSizes.threadGuarded[windowId] = accepted ? (session, frame.size) : nil
                 }
+                if validate != nil { try job.checkCancellation() }
+                try validate?()
                 window.set(Ax.topLeftCornerAttr, frame.origin)
             }
         }
     }
 
+    @MainActor
     func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        let validate = nativeFrameValidation(windowId)
         try await withWindow(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate)
         }
     }
 
@@ -578,7 +597,7 @@ final class MacApp: AbstractApp {
         return alive
     }
 
-    private func destroy() async {
+    func destroy() async {
         _ = await Task { @MainActor [pid] in _ = MacApp.allAppsMap.removeValue(forKey: pid) }.result
         for (_, job) in setFrameJobs {
             job.cancel()

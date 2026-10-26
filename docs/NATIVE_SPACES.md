@@ -14,17 +14,23 @@ type = "native" # experimental read-only; default is "virtual"
 ```
 
 Native observation enumerates desktops and fullscreen Spaces per display, records
-window memberships, and follows public Space/display/session/application events.
+window memberships, and follows public Space/display/session/application events
+plus dynamically resolved WindowServer lifecycle notifications.
 It does not request Accessibility or Screen Recording permission, activate Spaces,
 create/delete Spaces, move windows, park windows, run virtual startup hooks or
 register WinMuxX trackpad gestures/hotkeys. Mission Control and native gestures
-remain under macOS control. An ordinary app window opening within the same active
-application may need a manual refresh; per-window AX lifecycle integration is a
-later native tiling milestone.
+remain under macOS control. When Accessibility permission already exists, active
+desktop windows are AX-classified into the existing layout trees without applying
+frames or running detection-command hooks. Missing AX responses retain nodes;
+explicit WindowServer closure and confirmed process termination remove them.
+Leaving a Space or disappearing from AX does not imply closure.
 
 The menu bar lists the latest native Space observations and provides refresh and
 diagnostics. `winmuxx doctor` reports native IDs, UUIDs, per-display active Spaces,
-membership counts, query duration, and whether the retained observation is stale.
+membership counts, query duration, AX classification and whether the observation is
+stale. It reports WindowServer event availability and topology-audit work. A local
+read-only ownership preflight checks real process/Space identity without granting
+the runtime any frame-write permits.
 Other CLI commands, including virtual queries and subscriptions, return an explicit
 unsupported error. There is no automatic synthetic-input fallback for navigation.
 The sidebar, palette, overview and project mapping are not integrated yet.
@@ -50,7 +56,11 @@ Unavailable symbols, invalid topology or a topology change during a read suspend
 observation. A Space-change event immediately revokes the current observation;
 superseded reads cannot publish older membership. Last successful observations may
 remain visible as **stale diagnostics**, never as permission to write frames.
-There is no continuous polling.
+An app-backend topology-only audit runs every 500 ms to recover missed Space
+notifications. Unchanged topology does not enumerate windows or query AX. Three
+consecutive audit failures suspend automatic retry until a real event/manual
+refresh. Audits and subscriptions stop with the backend. The standalone probe's
+bounded watch remains event-driven without an idle audit.
 
 These private APIs are unstable across macOS versions even with SIP enabled. No
 SIP change, root helper, Dock injection or non-exported symbol scanning is used.
@@ -72,7 +82,8 @@ the ownership boundary and rejected alternatives.
 
 The [Dinky comparison](NATIVE_SPACES_DINKY_COMPARISON.md) traces its current source
 and identifies targeted reconciliation, missed-event recovery and native stacking
-as the next implementation priorities. Native UUIDs now retain layout-tree objects
+as implementation priorities. Targeted discovery and a topology audit are now
+implemented; native stacking is pending. Native UUIDs retain layout-tree objects
 across observed switching/renumbering; this is model integration, not window tiling
 or restart persistence. Pending reads revoke membership authority while retaining
 last-observed viewport history; failed/stopped observation clears native visibility.

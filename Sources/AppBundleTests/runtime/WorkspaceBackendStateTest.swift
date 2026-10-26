@@ -31,4 +31,14 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
         XCTAssertEqual(first.workspaceBackend.kind, .native)
         XCTAssertEqual(second.workspaceBackend.kind, .virtual)
     }
+
+    func testNativeWindowChangesCannotPopulateVirtualClosedWindowRecovery() {
+        let saved = runtime.recovery.closedWindows.windowIds
+        let workspace = Workspace.get(byName: "native-test")
+        TestWindow.new(id: 999, parent: workspace.rootTilingContainer)
+        runtime.workspaceBackend.selectForStartup(.native)
+        cacheClosedWindowIfNeeded()
+        syncClosedWindowsCacheToCurrentWorld()
+        XCTAssertEqual(runtime.recovery.closedWindows.windowIds, saved)
+    }
 }

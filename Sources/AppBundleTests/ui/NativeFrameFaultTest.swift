@@ -27,6 +27,44 @@ private final class FrameAX: AxUiElementMock {
 }
 
 final class NativeFrameFaultTest: XCTestCase {
+    func testRevokedPermitPreventsAnyFrameOrAnimationSettingWrite() {
+        let window = FrameAX(), app = FrameAX()
+        window.seed(Ax.topLeftCornerAttr, .zero)
+        window.seed(Ax.sizeAttr, CGSize(width: 400, height: 300))
+        XCTAssertThrowsError(try setFrame(window, app: app, CGPoint(x: 100, y: 100),
+            CGSize(width: 800, height: 600), RunLoopJob(), validateWrite: { throw CancellationError() }))
+        XCTAssertTrue(window.writes.isEmpty)
+        XCTAssertTrue(app.writes.isEmpty)
+    }
+
+    func testPermitIsRecheckedBetweenSizeAndPositionWrites() {
+        let window = FrameAX(), app = FrameAX()
+        window.seed(Ax.topLeftCornerAttr, .zero)
+        window.seed(Ax.sizeAttr, CGSize(width: 400, height: 300))
+        var checks = 0
+        XCTAssertThrowsError(try setFrame(window, app: app, CGPoint(x: 100, y: 100),
+            CGSize(width: 800, height: 600), RunLoopJob(), validateWrite: {
+                checks += 1
+                if checks == 3 { throw CancellationError() }
+            }))
+        XCTAssertEqual(window.writes, [Ax.sizeAttr.key])
+        XCTAssertEqual(window.get(Ax.topLeftCornerAttr), .zero)
+    }
+
+    func testPermitIsRecheckedBeforeParkingStylePositionReassertion() {
+        let window = FrameAX(), app = FrameAX()
+        window.positionWrites = .ignore
+        window.seed(Ax.topLeftCornerAttr, .zero)
+        window.seed(Ax.sizeAttr, CGSize(width: 400, height: 300))
+        var checks = 0
+        XCTAssertThrowsError(try setFrame(window, app: app, CGPoint(x: 100, y: 100),
+            CGSize(width: 800, height: 600), RunLoopJob(), positionFirst: true, validateWrite: {
+                checks += 1
+                if checks == 4 { throw CancellationError() }
+            }))
+        XCTAssertEqual(window.writes, [Ax.topLeftCornerAttr.key, Ax.sizeAttr.key])
+    }
+
     func testSatisfiedFrameAvoidsAllWritesAndAnimationReads() throws {
         let window = FrameAX(), app = FrameAX()
         let origin = CGPoint(x: 10, y: 20), size = CGSize(width: 800, height: 600)

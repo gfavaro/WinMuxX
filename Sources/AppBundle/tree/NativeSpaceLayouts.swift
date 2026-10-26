@@ -1,6 +1,12 @@
 import Foundation
 import NativeSpaces
 
+struct NativeWindowRegistration {
+    let windowID: UInt32
+    let workspace: Workspace
+    fileprivate let generation: UInt64
+}
+
 /// macOS supplies identity/membership; existing Workspace objects retain layout
 /// organization. Observing a switch never rebuilds or flattens a layout tree.
 @MainActor
@@ -8,9 +14,11 @@ final class NativeSpaceLayouts {
     private(set) var retainedByUUID: [String: Workspace] = [:]
     private(set) var currentBySpaceID: [String: Workspace] = [:]
     private(set) var snapshot: NativeSpacesSnapshot?
+    private var generation: UInt64 = 0
 
     func reconcile(_ inventory: NativeWorkspaceInventory, displays: [Monitor]) {
         precondition(runtime.workspaceBackend.kind == .native)
+        generation &+= 1
         // Revoke the current membership view before considering a replacement.
         snapshot = nil
         currentBySpaceID = [:]
@@ -61,5 +69,23 @@ final class NativeSpaceLayouts {
         guard let snapshot,
               case .desktop(let spaceID, _) = snapshot.eligibility(windowID: windowID, on: displayIdentifier) else { return nil }
         return currentBySpaceID[spaceID]
+    }
+
+    func registrationWorkspace(for windowID: UInt32) -> Workspace? {
+        guard let snapshot else { return nil }
+        for display in snapshot.displays {
+            if let workspace = workspace(for: windowID, on: display.identifier) { return workspace }
+        }
+        return nil
+    }
+
+    func registration(for windowID: UInt32) -> NativeWindowRegistration? {
+        registrationWorkspace(for: windowID).map {
+            NativeWindowRegistration(windowID: windowID, workspace: $0, generation: generation)
+        }
+    }
+
+    func accepts(_ registration: NativeWindowRegistration) -> Bool {
+        registration.generation == generation && registrationWorkspace(for: registration.windowID) === registration.workspace
     }
 }

@@ -28,6 +28,8 @@ final class WorkspaceBackendState {
     private(set) var selectionLocked = false
     private(set) var observation: NativeSpacesObservation?
     let nativeLayouts = NativeSpaceLayouts()
+    let nativeWriteAuthority = NativeSpaceWriteAuthority()
+    let nativeWindows = NativeWindowReconciler()
     var capabilities: WorkspaceBackendCapabilities {
         kind == .virtual ? .virtual : .nativeObservation
     }
@@ -47,10 +49,24 @@ final class WorkspaceBackendState {
         let observer = NativeSpacesObservation()
         let owner = runtime
         observation = observer
+        observer.onWindowClosed = { [weak owner] id in
+            guard let owner else { return }
+            owner.withValue {
+                owner.workspaceBackend.nativeWriteAuthority.invalidate()
+                owner.workspaceBackend.nativeWindows.invalidate()
+                guard let window = MacWindow.allWindowsMap[id] else { return }
+                window.garbageCollect(skipClosedWindowsCache: true)
+                owner.task { try? await window.macApp.unregisterDestroyedWindow(id) }
+            }
+        }
         observer.onChange = { [weak self, weak owner] inventory, event in
             guard let self, let owner else { return }
             owner.withValue {
+                self.nativeWriteAuthority.invalidate()
+                self.nativeWindows.invalidate()
+                for window in MacWindow.allWindows { window.suspendMinimumObservationForMotion() }
                 self.nativeLayouts.reconcile(inventory, displays: owner.displays.all())
+                if let snapshot = inventory.currentSnapshot { self.nativeWindows.reconcile(snapshot) }
                 onChange(inventory, event)
             }
         }
@@ -58,8 +74,11 @@ final class WorkspaceBackendState {
     }
 
     func stop() {
+        nativeWriteAuthority.invalidate()
+        nativeWindows.invalidate()
         observation?.stop()
         observation?.onChange = nil
+        observation?.onWindowClosed = nil
         observation = nil
     }
 }

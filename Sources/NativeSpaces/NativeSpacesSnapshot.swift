@@ -41,6 +41,9 @@ public struct NativeSpacesSnapshot: Codable, Equatable, Sendable {
     public let windows: [NativeWindowMembership]
     public let readMilliseconds: Double
     public let capturedAt: Date
+    /// Spaces needing reconciliation, not a second membership model. Nil is a
+    /// full diagnostic read. Unlisted Space trees remain retained and untouched.
+    public var reconciliationSpaceIDs: [String]? = nil
 
     /// Parse only an intact topology. A missing row must not become a new empty desktop.
     public static func parseDisplays(_ raw: [[String: Any]]) throws -> [NativeSpaceDisplay] {

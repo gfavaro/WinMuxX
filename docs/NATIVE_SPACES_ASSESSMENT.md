@@ -151,3 +151,61 @@ Validation of this preparation: focused native-layout/config suites executed 11
 tests successfully. The final `make check` executed 1,428 AppBundle plus 22
 NativeSpaces tests (1,450 total), the 16 shared schema fixtures and script checks,
 all passing. No native frame writes or physical three-display test was performed.
+
+## Phase 3 progress: targeted discovery and native write authority
+
+**Findings:** Dinky's targeted reconciliation is directly useful here. A Space-only
+switch should query incoming Spaces; a coalesced window/app event must retain its
+broader current-Space scope, including when its original read was superseded.
+WindowServer departure (1326) is not closure (804). Native callbacks also need to
+bypass virtual mouse/focus/closed-window recovery paths before AX discovery starts.
+
+**Changes:** `NativeSpacesReader` now supports optional Space-scoped candidate
+queries and topology-only reads. `NativeSpacesObservation` adds one native lifecycle
+event hub, bounded/coalesced reads, managed-window notification subscriptions and a
+500 ms topology audit that never enumerates windows when topology is unchanged.
+Audit failure retries are bounded. AX classification populates the existing live
+Workspace trees through `NativeWindowReconciler`; stale registration leases cannot
+attach nodes after a newer observation. AX work runs concurrently by app with the
+existing one-second messaging timeout and a cooperative 1.5-second app read budget.
+Unsupported or inaccessible candidates remain unclassified, never inferred closed.
+Explicit native closure and confirmed process termination remove nodes; absence
+from AX or a failed bounds read does not. Virtual closed-window recovery is gated.
+
+`NativeSpaceWriteAuthority` issues revocable per-job permits, checking live topology,
+membership, UUID, PID/launch identity, app visibility and on-screen state. Existing
+standard and animated AX paths recheck before individual writes and retries.
+Native corner parking is disabled. Observation never installs runtime write permits;
+its separate local preflight performs reads only. Already-dispatched AX calls are
+not recallable, so the guard is not an atomic WindowServer/AX transaction.
+
+**Validation:** final `make check` passed 1,433 AppBundle and 38 NativeSpaces tests
+(1,471 total), 16 shared schema fixtures covering 51 parser keys, and script checks.
+Focused coverage includes missed-event recovery, bounded audit retry, malformed
+event payloads, incoming-Space targets, coalesced cross-display work, stale AX
+registration, PID/launch mismatches, revocation during live validation, revocation
+between size/position/reassertion and virtual recovery isolation.
+
+Actual read-only development processes ran on the same SIP-enabled macOS 27.2
+host, without installation. A paired sample with one reported display took 25.87 ms
+for 128 public-inventory candidates versus 2.78 ms for a Space-scoped read;
+topology-only audits sampled about 0.3–0.6 ms. These are samples, not a benchmark
+distribution. AX classification retained 11 windows; a local live-ownership
+preflight passed 10 eligible identities, while runtime frame writes stayed disabled.
+Cold AX/preflight reconciliation sampled 46–96 ms. Native window event registration,
+managed-window watch requests and delivery were available. A later snapshot showed
+the built-in display present again, with numeric Space ID 5137 and its prior UUID;
+this establishes read-side observation, not completed display hot-plug validation.
+All temporary development processes were stopped, leaving the installed manager.
+
+**Limitations/risks:** native positioning is still disabled. Frame mutation, delayed
+AX responses during an actual Space transition, focus/ordering, sheets/fullscreen,
+native layout persistence, sidebar/palette/overview, native command navigation,
+rcmd, sleep/wake and OS/hardware combinations remain unverified. The Finder check
+opened a temporary window; the user navigated it, so it was left open rather than
+closing a window they might be using. No individual-window close validation is
+claimed from that check. Private ABI compatibility remains host-specific.
+
+**Next milestone:** explicit native Dwindle/Master/floating opt-in, shared-engine
+frame application with native focus/command policy, separate native persistence,
+then exclusive development-manager positioning validation. Read-only remains default.

@@ -14,6 +14,10 @@ func movedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutableR
 
 @MainActor
 private func handleMovedEvent(windowId: UInt32?, notif: String) async {
+    if runtime.workspaceBackend.kind == .native {
+        if let windowId { Window.get(byId: windowId)?.invalidateLastKnownNativeState() }
+        return
+    }
     if let windowId, WindowMotion.shared.isAnimating(windowId), NSEvent.pressedMouseButtons & 1 == 0 {
         Window.get(byId: windowId)?.invalidateLastKnownNativeState()
         return

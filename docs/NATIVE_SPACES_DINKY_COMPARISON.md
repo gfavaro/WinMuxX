@@ -11,6 +11,12 @@ retaining WinMuxX's layout engine and optional virtual backend. Our branch curre
 has verified native **observation**, not a native tiling MVP. Its stricter identity
 checks do not substitute for Dinky's implemented window lifecycle and native writes.
 
+Follow-up implementation now adds scoped discovery, incoming-Space targeting,
+WindowServer lifecycle events, a measured topology-only audit, AX classification
+into retained trees and per-write ownership checks. Physical native tiling remains
+disabled. The table below records the original comparison that led to these changes;
+the [assessment](NATIVE_SPACES_ASSESSMENT.md) records current implementation evidence.
+
 | Area | Dinky implementation | WinMuxX branch and decision |
 |---|---|---|
 | Space discovery | `DinkyPrivate/query.m`: `dinky_displays`, `dinky_current_space_id`; SkyLight display inventory, current ID, type | `NativeSpaces/SkyLightReadOnlyBridge.swift` resolves read symbols dynamically and validates the complete returned topology. Same API family. Keep the narrow bridge and missing-symbol handling. |

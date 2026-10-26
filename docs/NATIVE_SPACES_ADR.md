@@ -18,6 +18,24 @@ An event revokes the current snapshot immediately. Owner-scoped generation token
 reject superseded results, failures and completions after stopping. Read failure
 suspends native observation; it never enables virtual management as a fallback.
 
+Following the Dinky comparison, native observation also subscribes to WindowServer
+lifecycle events and audits topology every 500 ms. Unchanged audits perform no
+window discovery. Reads target incoming Spaces for a Space-only switch; coalesced
+window/application work retains its broader current-Space scope. Optional scoped
+query failure falls back to the existing read-only inventory, never virtual parking.
+
+AX classification may populate existing trees in observation mode. Its asynchronous
+registration leases are revoked by every new observation, independent of timestamps.
+Individual removal needs an explicit close notification, not a Space departure or
+an unavailable AX/bounds read. Virtual recovery, focus/drag callbacks and detection
+commands are bypassed. No runtime frame permits are installed in observation mode.
+
+`NativeSpaceWriteAuthority` supplies revocable per-job permits; queued frame writes
+check generation, live display/Space identity, PID/launch identity and on-screen
+state. Standard and animated AX paths recheck before each write. Already-dispatched
+AX calls cannot be recalled, so this is not an atomic WindowServer/AX transaction.
+Actual native positioning and delayed-app races remain separate validation gates.
+
 `NativeWorkspaceInventory` retains stale data for diagnostics separately from the
 current observation. Numeric IDs are session data. UUIDs supply namespaced recovery
 keys when available; missing or duplicate UUIDs cannot justify guessed restoration.

@@ -580,6 +580,11 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     let invalidateNativeStateAppPid: pid_t? =
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
+        if runtime.workspaceBackend.kind == .native {
+            runtime.workspaceBackend.nativeWriteAuthority.invalidate()
+            runtime.workspaceBackend.observation?.requestRead(event: "axWindowChange")
+            return
+        }
         if let emittingAppPid,
            notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
             notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {
