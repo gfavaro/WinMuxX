@@ -70,6 +70,9 @@ struct FrozenWindow: Codable, Equatable, Sendable {
     let layoutReason: LayoutReason
     let learnedMinimumSize: CGSize?
     let minimumEvidenceVersion: Int
+    let minimumEvidenceBundleId: String?
+    let minimumEvidenceGlobalGeneration: UInt64
+    let minimumEvidenceAppGeneration: UInt64
     let lastFloatingSize: CGSize?
     let singleWindowManualWidth: CGFloat?
     let workspacePreviewFrame: CGRect?
@@ -95,8 +98,13 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         } else {
             workspacePreviewFrame = window.workspacePreviewFrame
         }
-        minimumEvidenceVersion = 2
-        learnedMinimumSize = (window as? MacWindow)?.learnedMinimum.size == .zero ? nil : (window as? MacWindow)?.learnedMinimum.size
+        minimumEvidenceVersion = 3
+        let minimum = window as? MacWindow
+        learnedMinimumSize = minimum?.learnedMinimum.size == .zero ? nil : minimum?.learnedMinimum.size
+        minimumEvidenceBundleId = minimum?.macApp.rawAppBundleId
+        let generation = PersistedAppMinimums.shared.evidenceGeneration(for: minimum?.macApp.rawAppBundleId)
+        minimumEvidenceGlobalGeneration = generation.global
+        minimumEvidenceAppGeneration = generation.app
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -108,6 +116,9 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         case layoutReason
         case learnedMinimumSize
         case minimumEvidenceVersion
+        case minimumEvidenceBundleId
+        case minimumEvidenceGlobalGeneration
+        case minimumEvidenceAppGeneration
         case lastFloatingSize
         case singleWindowManualWidth
         case workspacePreviewFrame
@@ -124,7 +135,11 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         layoutReason = try container.decodeIfPresent(LayoutReason.self, forKey: .layoutReason) ?? .standard
         minimumEvidenceVersion = try container.decodeIfPresent(Int.self, forKey: .minimumEvidenceVersion) ?? 1
         learnedMinimumSize = minimumEvidenceVersion == 2
+            || minimumEvidenceVersion == 3
             ? try container.decodeIfPresent(CGSize.self, forKey: .learnedMinimumSize) : nil
+        minimumEvidenceBundleId = try container.decodeIfPresent(String.self, forKey: .minimumEvidenceBundleId)
+        minimumEvidenceGlobalGeneration = try container.decodeIfPresent(UInt64.self, forKey: .minimumEvidenceGlobalGeneration) ?? 0
+        minimumEvidenceAppGeneration = try container.decodeIfPresent(UInt64.self, forKey: .minimumEvidenceAppGeneration) ?? 0
         lastFloatingSize = try container.decodeIfPresent(CGSize.self, forKey: .lastFloatingSize)
         singleWindowManualWidth = try container.decodeIfPresent(CGFloat.self, forKey: .singleWindowManualWidth)
         workspacePreviewFrame = try container.decodeIfPresent(CGRect.self, forKey: .workspacePreviewFrame)

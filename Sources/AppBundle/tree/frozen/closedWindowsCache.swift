@@ -295,7 +295,12 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
         window.workspacePreviewFrame = valid
         window.preserveRestoredWorkspacePreview = true
     }
-    (window as? MacWindow)?.restoreLearnedMinimum(frozenWindow.learnedMinimumSize)
+    (window as? MacWindow)?.restoreLearnedMinimum(
+        frozenWindow.learnedMinimumSize,
+        savedBundleId: frozenWindow.minimumEvidenceBundleId,
+        generation: MinimumEvidenceGeneration(global: frozenWindow.minimumEvidenceGlobalGeneration,
+                                              app: frozenWindow.minimumEvidenceAppGeneration)
+    )
     if let size = frozenWindow.lastFloatingSize, validRestoredWindowSize(size) {
         window.lastFloatingSize = size
     }

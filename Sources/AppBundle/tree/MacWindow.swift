@@ -34,9 +34,11 @@ final class MacWindow: Window {
     }
 
     @MainActor
-    func restoreLearnedMinimum(_ size: CGSize?) {
+    func restoreLearnedMinimum(_ size: CGSize?, savedBundleId: String?, generation: MinimumEvidenceGeneration) {
         guard let size, size.width.isFinite, size.height.isFinite,
-              size.width >= 0, size.height >= 0, size != .zero else { return }
+              size.width >= 0, size.height >= 0, size != .zero,
+              PersistedAppMinimums.shared.acceptsEvidence(generation, for: macApp.rawAppBundleId,
+                                                           savedBundleId: savedBundleId) else { return }
         learnedMinimum = LearnedWindowMinimum(size: size)
     }
     private var prevUnhiddenProportionalPositionInsideWorkspaceRect: CGPoint?

@@ -1,8 +1,10 @@
+import AppKit
 import SwiftUI
 import Common
 
 struct ShortcutBehaviorSettingsView: View {
     @ObservedObject private var workspaceTouch = RawWorkspaceTouchSource.shared
+    @ObservedObject private var minimums = PersistedAppMinimums.shared
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
@@ -27,6 +29,8 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("enable-normalization-opposite-orientation-for-nested-containers", load: { config.enableNormalizationOppositeOrientationForNestedContainers }) private var normalizeNestedContainers: Bool
     @SettingsDraft("focus-follows-mouse", load: { config.focusFollowsMouse }) private var focusFollowsMouse: Bool
     @SettingsDraft("focus-follows-mouse-dwell", load: { config.focusFollowsMouseDwell }) private var focusFollowsMouseDwell: Int
+    @State private var confirmsForgetAllMinimums = false
+    @State private var fitIssues: [WorkspaceFitIssue] = []
 
     @SettingsDraft("single-window-alignment", load: { config.singleWindowAlignment }) private var singleWindowAlignment: SingleWindowAlignment
     @SettingsDraft("fullscreen-width", load: { config.fullscreenWidth ?? 1.0 }) private var fullscreenWidth: Double
@@ -38,6 +42,8 @@ struct ShortcutBehaviorSettingsView: View {
                 SettingsToggle("Add new windows to the current tab group", id: "auto-add-new-windows-to-tab-group", isOn: $autoAddNewWindowsToTabGroup, help: "Keep new windows in the selected stack instead of creating a new tile.") { persistRootBool("auto-add-new-windows-to-tab-group", autoAddNewWindowsToTabGroup) }
                 SettingsToggle("Unhide macOS-hidden apps", id: "automatically-unhide-macos-hidden-apps", isOn: $automaticallyUnhideMacosHiddenApps, help: "Restore apps macOS has hidden when they receive focus.") { persistRootBool("automatically-unhide-macos-hidden-apps", automaticallyUnhideMacosHiddenApps) }
             }
+            learnedMinimumsSection
+            fitDiagnosticsSection
             SettingsSection("Default layout") {
                 SettingsPicker("Default drag stack", id: "drag-stack-layout", selection: $dragStackLayout, help: "Layout for a new group created by dropping a window onto another. Existing groups keep their layout; edge drops still split.") {
                     Text("Accordion").tag(Layout.stacked)
@@ -154,7 +160,74 @@ struct ShortcutBehaviorSettingsView: View {
 
         }
         .navigationTitle("Windows")
+        .onAppear { refreshFitDiagnostics() }
+        .onChange(of: minimums.revision) { _ in refreshFitDiagnostics() }
+        .confirmationDialog("Forget all learned minimum sizes?", isPresented: $confirmsForgetAllMinimums, titleVisibility: .visible) {
+            Button("Forget All", role: .destructive) { minimums.forgetAll() }
+        } message: {
+            Text("WinMuxX will relearn app minimums from future resize attempts.")
+        }
 
+    }
+
+    private var learnedMinimumsSection: some View {
+        SettingsSection("Learned minimum sizes") {
+            if minimums.snapshot.isEmpty {
+                Text("No confirmed app minimum sizes have been saved.")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                ForEach(minimums.snapshot) { evidence in
+                    HStack(spacing: 12) {
+                        Image(nsImage: minimumAppIcon(evidence.bundleId))
+                            .resizable().frame(width: 24, height: 24)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(minimumAppName(evidence.bundleId)).font(.body)
+                            Text(evidence.bundleId).font(.caption.monospaced()).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        VStack(alignment: .trailing, spacing: 3) {
+                            Text(minimumSizeDescription(evidence.size)).font(.callout.monospacedDigit())
+                            if !evidence.unknownAxes.isEmpty {
+                                Text("Unknown \(evidence.unknownAxes.joined(separator: ", "))")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        Button("Forget") { minimums.forget(evidence.bundleId) }
+                            .buttonStyle(.borderless)
+                    }
+                    .padding(.vertical, 4)
+                }
+                Button("Forget All…", role: .destructive) { confirmsForgetAllMinimums = true }
+                    .padding(.top, 4)
+            }
+            Text("Only stable, confirmed resize refusals are saved. Forgetting an app also clears its current evidence and prevents an older saved snapshot from restoring it.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private var fitDiagnosticsSection: some View {
+        SettingsSection("Layout fit diagnostics") {
+            if fitIssues.isEmpty {
+                Text("No tiled group or visible scrolling column exceeds its available layout area.")
+                    .font(.callout).foregroundStyle(.secondary)
+            } else {
+                ForEach(fitIssues) { issue in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(issue.kind == .tiledGroup ? "Tiled group minimum exceeds its layout area" : "Scrolling column minimum exceeds the viewport")
+                            .font(.body)
+                        Text("Workspace \(workspaceDisplayName(runtime.workspaces.workspaceById[issue.workspaceId]?.name ?? issue.workspaceId.rawValue)) · minimum \(minimumSizeDescription(issue.minimumSize)) · available \(minimumSizeDescription(issue.availableSize))")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            Text("Offscreen scrolling columns are intentionally reachable by scrolling and are not reported as fit failures.")
+                .font(.callout).foregroundStyle(.secondary)
+        }
+    }
+
+    private func refreshFitDiagnostics() {
+        fitIssues = workspaceFitIssues(in: orderedWorkspacesForPresentation())
     }
 
     private var scrollingSettingsSection: some View {
@@ -195,6 +268,25 @@ struct ShortcutBehaviorSettingsView: View {
     private func persistConfig(section: String?, key: String, value: String) {
         persistSettingsConfig(section: section, key: key, renderedValue: value, model: model)
     }
+}
+
+private func minimumAppName(_ bundleId: String) -> String {
+    NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first?.localizedName
+        ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId).flatMap { Bundle(url: $0)?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String }
+        ?? bundleId
+}
+
+private func minimumAppIcon(_ bundleId: String) -> NSImage {
+    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
+        return NSWorkspace.shared.icon(forFile: url.path)
+    }
+    return NSImage(systemSymbolName: "app.dashed", accessibilityDescription: "Application") ?? NSImage(size: NSSize(width: 24, height: 24))
+}
+
+private func minimumSizeDescription(_ size: CGSize) -> String {
+    let width = size.width == 0 ? "?" : String(Int(size.width.rounded()))
+    let height = size.height == 0 ? "?" : String(Int(size.height.rounded()))
+    return "\(width) × \(height)"
 }
 
 private func scrollingPresetValues(_ text: String) -> [Double]? {

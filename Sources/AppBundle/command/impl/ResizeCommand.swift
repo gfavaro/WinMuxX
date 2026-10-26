@@ -75,6 +75,16 @@ struct ResizeCommand: Command {
             adjustments: [TiledResizeAdjustment(weight: node.getWeight(orientation), multiplier: 1)] +
                 siblings.map { TiledResizeAdjustment(weight: $0.getWeight(orientation), multiplier: siblingMultiplier) },
         )
+        if abs(diff - requestedDiff) > 0.01 {
+            let blockedAxis = orientation == .h ? "width" : "height"
+            let blocked = parent.allLeafWindowsRecursive.compactMap { $0 as? MacWindow }.first {
+                orientation == .h ? $0.minimumLayoutSize.width > 0 : $0.minimumLayoutSize.height > 0
+            }
+            if let blocked {
+                MinimumSizeNoticePanel.shared.show(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
+                                                   dimension: blockedAxis, minimum: blocked.minimumLayoutSize)
+            }
+        }
         let childDiff = diff.div(siblings.count).orDie()
         siblings
             .forEach { $0.setWeight(parent.orientation, $0.getWeight(parent.orientation) - childDiff) }
@@ -97,6 +107,10 @@ private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units,
     }
     let maximum = max(metrics.areaWidth - column.frameStartInset - column.frameEndInset, lower)
     let actual = min(max(requested, lower), maximum)
+    if requested + 1 < lower, let blocked = group.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }).first(where: { $0.minimumLayoutSize.width > 0 }) {
+        MinimumSizeNoticePanel.shared.show(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
+                                           dimension: "width", minimum: blocked.minimumLayoutSize)
+    }
     if abs(actual - column.width) < 0.5 {
         io.out("resize: nothing to do")
         return true

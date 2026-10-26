@@ -416,7 +416,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         alert.addButton(withTitle: "Reset")
         guard alert.runModal() == .alertSecondButtonReturn else { return }
         PersistedAppMinimums.shared.reset()
-        for window in MacWindow.allWindows { window.resetLearnedMinimum() }
     }
     @objc private func recoverWindows() {
         let alert = NSAlert()

@@ -546,8 +546,11 @@ Left Option then runs Option shortcuts; right Option remains available for typin
 Pressing both sides of a restricted modifier passes through too. Modifier-only tap
 bindings keep their explicitly configured sides. Accessibility access is required.
 
-Confirmed application minimum sizes persist across restarts. Use **Clear Saved
-Minimum Sizes…** in the menu to clear saved and current observations.
+Confirmed application minimum sizes persist across restarts. Settings → Windows
+lists each app and its known width and height; unknown axes are shown explicitly.
+Forget an app or all evidence there, or use **Clear Saved Minimum Sizes…** in the
+menu to clear saved and current observations. When an explicit resize reaches a
+confirmed app minimum, WinMuxX shows a brief nonactivating notice.
 
 ### Window search palette
 
