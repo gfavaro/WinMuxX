@@ -64,6 +64,10 @@ Sources were inspected at pinned revisions on 2026-10-26; these are evidence of 
 
 ## Architectural alternatives and recommendation
 
+The follow-up [Dinky implementation comparison](NATIVE_SPACES_DINKY_COMPARISON.md)
+traces its actual coordinator, event, scheduling and stacking paths and revises the
+next native tiling milestone around targeted reconciliation.
+
 1. **Replace Workspace with a fully generic asynchronous backend graph:** too large; all geometry and synchronous focus/registry consumers would be rewritten unnecessarily.
 2. **Treat native Spaces as virtual slots and merely stop parking:** unsafe. Existing creation/pruning, focused-window binding, monitor reassignment and recovery would still mutate macOS-owned membership indirectly.
 3. **Retain layout trees; introduce an ownership/reconciliation policy boundary:** preferred. A native snapshot maps macOS identities to layout workspaces. It supplies visibility and membership, gates frame writes, and reports unsupported navigation/movement. Virtual paths retain current behavior. Native read failure suspends native management instead of falling back to virtual parking.
@@ -118,3 +122,32 @@ Unverified: macOS 15 and 26, native fullscreen transitions, sleep/wake, restart/
 - **Limitations:** native menu appearance was not inspected through the UI tool; the unbundled development process was not in its app inventory. Native app-event observation is not complete AX window-lifecycle tracking. No native tiling, independent native tree recovery, sidebar/palette/overview integration, navigation or project mapping is claimed.
 - **Risks:** read-side private API compatibility remains host-specific. Missing notifications or a rejected transitional read can leave observation unavailable until the next event/manual refresh. Stale observations are labelled and cannot grant native management authority.
 - **Next milestone:** native membership reconciliation and guarded native frame operations, followed by an exclusive development-manager validation session. Automatic native tiling remains disabled until that boundary is implemented and verified.
+
+## Phase 3 preparation: retained native layout identity
+
+`NativeSpaceLayouts` now associates observed ordinary desktop UUIDs with existing
+Workspace objects and exact display UUIDs. It retains roots across numeric-ID
+changes and removal, and rejects unknown display/Space identity without a guessed
+fallback. The backend observer binds callbacks to their owning runtime. Switching
+one display publishes only changed viewport assignments, retaining other displays'
+history. A pending read revokes native membership authority while retaining the last
+observed presentation; failed/stopped observation clears active assignments. This
+does not register/manage AX windows or enable native tiling.
+
+Five focused model tests cover independent layout state, live nested tab/floating
+tree retention, numeric-ID changes, removed Spaces, invalidation, fullscreen and
+missing identity, plus unaffected second/third-display history. An additional config
+test verifies that a startup hook cannot change backends after selection locks but
+before runtime readiness. The development process reported existing Accessibility
+permission available without requesting or changing it. Both temporary development
+processes were stopped; the installed manager remained running.
+
+The [Dinky source comparison](NATIVE_SPACES_DINKY_COMPARISON.md) now defines the next
+runtime work: targeted incoming-Space reconciliation, incremental window lifecycle,
+missed-event recovery and frame-job membership authority, then native group stacking.
+These remain necessary before claiming a native tiling MVP.
+
+Validation of this preparation: focused native-layout/config suites executed 11
+tests successfully. The final `make check` executed 1,428 AppBundle plus 22
+NativeSpaces tests (1,450 total), the 16 shared schema fixtures and script checks,
+all passing. No native frame writes or physical three-display test was performed.

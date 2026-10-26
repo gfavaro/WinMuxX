@@ -1,11 +1,13 @@
 import Foundation
 import NativeSpaces
+import ApplicationServices
 
 @MainActor
 func nativeSpacesDiagnosticReport() -> String {
     var lines = ["WinMuxX — Native Spaces (experimental read-only)",
         "Automatic tiling, activation, relocation, projects and virtual recovery: unsupported.",
         "No window positions, application focus or macOS settings are changed."]
+    lines.append("Accessibility permission for this development process: \(AXIsProcessTrusted() ? "available" : "not granted"). Observation does not request it.")
     if let error = lastConfigReloadError { lines.append("Configuration error: \(error)") }
     guard let inventory = runtime.workspaceBackend.observation?.inventory else {
         return (lines + ["Observation has not started."]).joined(separator: "\n")

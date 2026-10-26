@@ -99,7 +99,7 @@ struct ReloadConfigCommand: Command {
     let result: Bool
     switch readConfig(forceConfigUrl: forceConfigUrl ?? (isWinMuxRuntimeReady ? preferredEditableConfigUrl() : nil)) {
         case .success(let (parsedConfig, url)):
-            if !args.dryRun, isWinMuxRuntimeReady,
+            if !args.dryRun, (isWinMuxRuntimeReady || runtime.workspaceBackend.selectionLocked),
                parsedConfig.workspaceBackend != runtime.workspaceBackend.kind {
                 let message = "Changing workspace-backend.type requires restarting WinMuxX; the running backend and configuration were retained."
                 lastConfigReloadError = message
@@ -113,7 +113,9 @@ struct ReloadConfigCommand: Command {
                 let previousRootOrientation = config.defaultRootContainerOrientation
                 resetHotKeys()
                 runtime.configuration.publish(parsedConfig, from: url)
-                if !isWinMuxRuntimeReady { runtime.workspaceBackend.selectForStartup(parsedConfig.workspaceBackend) }
+                if !isWinMuxRuntimeReady && !runtime.workspaceBackend.selectionLocked {
+                    runtime.workspaceBackend.selectForStartup(parsedConfig.workspaceBackend)
+                }
                 if runtime.workspaceBackend.kind == .native {
                     TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, parsedConfig.menuBar)
                     updateTrayText()

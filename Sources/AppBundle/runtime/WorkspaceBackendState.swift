@@ -25,7 +25,9 @@ struct WorkspaceBackendCapabilities: Equatable, Sendable {
 @MainActor
 final class WorkspaceBackendState {
     private(set) var kind: WorkspaceBackendKind = .virtual
+    private(set) var selectionLocked = false
     private(set) var observation: NativeSpacesObservation?
+    let nativeLayouts = NativeSpaceLayouts()
     var capabilities: WorkspaceBackendCapabilities {
         kind == .virtual ? .virtual : .nativeObservation
     }
@@ -33,16 +35,25 @@ final class WorkspaceBackendState {
     /// Live switching is intentionally unavailable until all motion/recovery
     /// owners can be handed over transactionally. Configuration enforces restart.
     func selectForStartup(_ kind: WorkspaceBackendKind) {
-        precondition(observation == nil)
+        precondition(observation == nil && !selectionLocked)
         self.kind = kind
     }
+
+    func lockSelection() { selectionLocked = true }
 
     func startObservation(onChange: @escaping @MainActor (NativeWorkspaceInventory, String) -> Void) {
         precondition(kind == .native)
         guard observation == nil else { return }
         let observer = NativeSpacesObservation()
+        let owner = runtime
         observation = observer
-        observer.onChange = onChange
+        observer.onChange = { [weak self, weak owner] inventory, event in
+            guard let self, let owner else { return }
+            owner.withValue {
+                self.nativeLayouts.reconcile(inventory, displays: owner.displays.all())
+                onChange(inventory, event)
+            }
+        }
         observer.start()
     }
 

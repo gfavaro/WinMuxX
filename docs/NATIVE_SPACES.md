@@ -70,6 +70,13 @@ and inactive-window membership preservation. It lists untested hardware/OS and
 lifecycle scenarios separately. The [decision record](NATIVE_SPACES_ADR.md) explains
 the ownership boundary and rejected alternatives.
 
+The [Dinky comparison](NATIVE_SPACES_DINKY_COMPARISON.md) traces its current source
+and identifies targeted reconciliation, missed-event recovery and native stacking
+as the next implementation priorities. Native UUIDs now retain layout-tree objects
+across observed switching/renumbering; this is model integration, not window tiling
+or restart persistence. Pending reads revoke membership authority while retaining
+last-observed viewport history; failed/stopped observation clears native visibility.
+
 Run the standalone diagnostic without launching a manager:
 
 ```sh

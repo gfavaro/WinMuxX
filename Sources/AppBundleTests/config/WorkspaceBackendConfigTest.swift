@@ -61,6 +61,19 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         XCTAssertNil(runtime.workspaceBackend.observation)
     }
 
+    func testStartupHookCannotChangeBackendBeforeRuntimeIsReady() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'".write(to: file, atomically: true, encoding: .utf8)
+        runtime.workspaceBackend.lockSelection()
+        XCTAssertFalse(isWinMuxRuntimeReady)
+        var output = ""
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertFalse(result)
+        XCTAssertEqual(runtime.workspaceBackend.kind, .virtual)
+        XCTAssertTrue(output.contains("requires restarting"))
+    }
+
     func testNativeReadOnlyCommandsRejectVirtualQueriesAndMutation() async throws {
         runtime.workspaceBackend.selectForStartup(.native)
         let original = Workspace.all.count

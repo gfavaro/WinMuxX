@@ -36,6 +36,7 @@ import Foundation
                 """,
             )
         }
+        runtime.workspaceBackend.lockSelection()
         if runtime.workspaceBackend.kind == .native {
             // Defense in depth: low-level AX setters and recovery also enforce
             // this immutable startup flag. No permission prompts or virtual hooks.
