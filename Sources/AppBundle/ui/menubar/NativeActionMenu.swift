@@ -30,6 +30,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
     private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
+    private var capturedRuleTarget: QuickFloatingRuleTarget?
 
     func install(checkForUpdates: (() -> Void)?) {
         guard statusItem == nil else { return }
@@ -108,6 +109,11 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.removeAllItems()
         menu.autoenablesItems = false
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
+        capturedRuleTarget = focus.windowOrNil.flatMap { window -> QuickFloatingRuleTarget? in
+            guard let app = window as? MacWindow, let bundleId = app.macApp.rawAppBundleId else { return nil }
+            return QuickFloatingRuleTarget(window: app, focus: focus, bundleId: bundleId,
+                pid: app.macApp.pid, launchDate: app.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
+        }
         menu.addItem(NSMenuItem(title: "WinMuxX · Workspace \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         if activeMode != mainModeId {
             menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
@@ -180,6 +186,10 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
+        if capturedRuleTarget != nil {
+            menu.addItem(callbackItem("Always Float This App…", #selector(alwaysFloatApp)))
+            menu.addItem(callbackItem("Create Floating Rule for This Window…", #selector(floatThisWindow)))
+        }
         addCommand("Balance Sizes", script: "balance-sizes", to: menu)
         if sortedMonitors.count > 1 {
             addSubmenu("Display", to: menu) { submenu in
@@ -299,6 +309,100 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     }
 
     @objc private func openSettings() { ShortcutSettingsModel.shared.requestWindowOpen() }
+    @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
+    @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }
+
+    private func createQuickFloatingRule(match requestedMatch: QuickFloatingRuleMatch?) {
+        guard let target = capturedRuleTarget else { return }
+        Task { @MainActor in
+            let title = (try? await target.window.title) ?? ""
+            let selectedMatch: QuickFloatingRuleMatch
+            if let requestedMatch { selectedMatch = requestedMatch }
+            else {
+                guard !title.isEmpty else {
+                    showQuickRuleMessage("This window has no title", details: "A title rule needs a nonempty window title.")
+                    return
+                }
+                let alert = NSAlert()
+                alert.messageText = "Create a floating rule for this window?"
+                alert.informativeText = "\(target.window.macApp.name ?? target.bundleId) · \(title)"
+                let matchPicker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 220, height: 26), pullsDown: false)
+                matchPicker.addItems(withTitles: ["Exact title", "Title starts with"])
+                alert.accessoryView = matchPicker
+                alert.addButton(withTitle: "Cancel")
+                alert.addButton(withTitle: "Create Rule")
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+                selectedMatch = matchPicker.indexOfSelectedItem == 1 ? .titlePrefix(title) : .exactTitle(title)
+            }
+
+            let configText: String
+            do { configText = try ConfigFileStore.read(preferredEditableConfigUrl()) ?? "" }
+            catch { showQuickRuleMessage("Could not read window rules", details: error.localizedDescription); return }
+            if let conflict = QuickFloatingRuleDocument.conflict(in: configText, bundleId: target.bundleId,
+                                                                  appName: target.window.macApp.name, title: title) {
+                let details = conflict.actions.isEmpty ? "The earlier matching rule has no readable actions." : conflict.actions.joined(separator: " → ")
+                let alert = NSAlert()
+                alert.messageText = "An earlier window rule may match"
+                alert.informativeText = "Rule \(conflict.ruleIndex + 1) runs first and stops further callbacks. Existing actions: \(details)"
+                alert.addButton(withTitle: "Cancel")
+                alert.addButton(withTitle: "Open Configuration")
+                if alert.runModal() == .alertSecondButtonReturn { openConfig() }
+                return
+            }
+
+            let matchingWindows = MacWindow.allWindows.filter { $0.macApp.rawAppBundleId == target.bundleId }
+            var matchingTitles: [String] = []
+            for window in matchingWindows {
+                let currentTitle = (try? await window.title) ?? ""
+                guard !currentTitle.isEmpty else { continue }
+                if QuickFloatingRuleDocument.matchesTitle(currentTitle, with: selectedMatch) { matchingTitles.append(currentTitle) }
+            }
+            let matchDescription: String
+            switch selectedMatch {
+                case .application: matchDescription = "all windows from this app"
+                case .exactTitle(let value): matchDescription = "the exact title ‘\(value)’"
+                case .titlePrefix(let value): matchDescription = "titles starting with ‘\(value)’"
+            }
+            let review = NSAlert()
+            review.messageText = "Save floating rule?"
+            review.informativeText = "App: \(target.window.macApp.name ?? target.bundleId) (\(target.bundleId))\nRule: \(matchDescription)\nCurrently matching windows: \(matchingTitles.isEmpty ? "none" : matchingTitles.joined(separator: ", "))"
+            review.addButton(withTitle: "Cancel")
+            review.addButton(withTitle: "Save Rule")
+            guard review.runModal() == .alertSecondButtonReturn else { return }
+
+            let rule = QuickFloatingRuleDocument.rule(bundleId: target.bundleId, match: selectedMatch)
+            persistSettingsDocumentEdit(model: ShortcutSettingsModel.shared, settingIDs: ["on-window-detected"], onSaved: {
+                guard target.isStillCurrent else {
+                    self.showQuickRuleMessage("Rule saved", details: "The captured window changed before it could be floated. The rule will apply to future matching windows.")
+                    return
+                }
+                guard case .cmd(let command) = parseCommand("layout floating") else { return }
+                let environment = CmdEnv.defaultEnv.withFocus(target.focus)
+                Task {
+                    do {
+                        try await runLightSession(.menuBarButton, .forceRun, shouldSchedulePostRefresh: true) {
+                            _ = try await [command].runCmdSeq(environment, .emptyStdin)
+                        }
+                    } catch { self.showQuickRuleMessage("Rule saved, but the window could not be floated", details: error.localizedDescription) }
+                }
+            }, onFailure: { error in
+                self.showQuickRuleMessage("Could not save floating rule", details: error.localizedDescription)
+            }) { current in
+                guard QuickFloatingRuleDocument.conflict(in: current, bundleId: target.bundleId,
+                                                         appName: target.window.macApp.name, title: title) == nil else {
+                    throw SettingsDisplayError("An earlier stopping window rule now matches. Review the rules before saving.")
+                }
+                return try QuickFloatingRuleDocument.adding(rule, to: current)
+            }
+        }
+    }
+
+    private func showQuickRuleMessage(_ title: String, details: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = details
+        alert.runModal()
+    }
     @objc private func copyVersion() { "\(winMuxAppName) v\(winMuxAppVersion) \(gitHash)".copyToClipboard() }
     @objc private func openConfig() {
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
@@ -331,6 +435,30 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     @objc private func openIssue() { NSWorkspace.shared.open(URL(string: forkRepositoryURL + "/issues/new")!) }
     @objc private func quit() { terminateApp() }
 
+}
+
+@MainActor
+private struct QuickFloatingRuleTarget {
+    let window: MacWindow
+    let focus: LiveFocus
+    let bundleId: String
+    let pid: Int32
+    let launchDate: Date?
+    let workspaceId: WorkspaceId
+
+    var isStillCurrent: Bool {
+        var node: TreeNode? = window
+        var currentWorkspace: Workspace?
+        while let current = node {
+            if let workspace = current as? Workspace { currentWorkspace = workspace; break }
+            node = current.parent
+        }
+        guard MacWindow.allWindowsMap[window.windowId] === window,
+              window.macApp.pid == pid, window.macApp.nsApp.launchDate == launchDate,
+              window.macApp.rawAppBundleId == bundleId, currentWorkspace?.id == workspaceId,
+              !window.macApp.nsApp.isTerminated else { return false }
+        return true
+    }
 }
 
 final class MenuCommandPayload {

@@ -452,6 +452,8 @@ automatically-tile-new-windows = false
 
 This applies to windows discovered when WinMux starts and windows opened later. You can still tile an individual floating window with `winmux layout tiling` or the configured `layout floating tiling` shortcut.
 
+The WinMuxX menu bar actions **Always Float This App…** and **Create Floating Rule for This Window…** save an ordered `on-window-detected` rule in your configuration. Window rules run in file order; if an earlier stopping rule may match, WinMuxX opens the configuration for review instead of silently changing its behavior. Restored windows keep their saved placement.
+
 While dragging a window by its title bar, shake it horizontally to toggle between floating and tiling. The gesture requires several deliberate direction changes in quick succession, and does not activate during resize, sidebar, tab-strip, or tab-group drags. Disable it with:
 
 ```toml
