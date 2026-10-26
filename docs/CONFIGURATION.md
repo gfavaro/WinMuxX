@@ -1,5 +1,10 @@
 # Configuration
 
+`[workspace-backend] type = "virtual"` is the default. This feature branch also
+accepts `"native"` for experimental **read-only** Space observation. Backend changes
+require restart; native tiling is not enabled. See [Native Spaces](NATIVE_SPACES.md)
+for opt-in, rollback, unsupported commands and failure handling.
+
 For TOML editor completion, use the checked-in
 [WinMuxX JSON Schema](schemas/winmuxx.schema.json) with a TOML editor that
 supports JSON Schema. Keep the schema beside your local documentation or use its

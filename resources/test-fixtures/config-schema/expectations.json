@@ -1,4 +1,7 @@
 {
+  "valid-native-backend.toml": {"parser": true, "schema": true},
+  "invalid-backend-type.toml": {"parser": false, "schema": false},
+  "invalid-backend-key.toml": {"parser": false, "schema": false},
   "valid-defaults.toml": {"parser": true, "schema": true},
   "valid-quoted-names.toml": {"parser": true, "schema": true},
   "valid-regex-rules.toml": {"parser": true, "schema": true},

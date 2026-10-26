@@ -48,6 +48,10 @@ func initTerminationHandler() {
 
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
+        if runtime.workspaceBackend.kind == .native {
+            runtime.workspaceBackend.stop()
+            return
+        }
         await terminationCoordinator.run {
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()

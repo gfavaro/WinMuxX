@@ -65,6 +65,10 @@ private func newConnection(_ connection: NWConnection) async { // todo add exit 
         }
         // Handle subscribe before parseCommand (subscribe doesn't have a Command impl)
         if request.args.first == "subscribe" {
+            if await runtime.workspaceBackend.kind == .native {
+                await answerToClient(exitCode: 1, stderr: "subscribe is unsupported by the experimental native read-only backend; use doctor for native Space diagnostics.")
+                continue
+            }
             switch parseSubscribeCmdArgs(request.args.slice(1...).orDie()) {
                 case .cmd(let subscribeArgs): await handleSubscribeAndWaitTillError(connection, subscribeArgs)
                 case .help(let help): await answerToClient(exitCode: 0, stdout: help)

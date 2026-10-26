@@ -46,6 +46,7 @@ private let persistentWorkspacesKey = "persistent-workspaces"
 // 1. Does it make sense to have different value
 // 2. Prefer commands and commands flags over toml options if possible
 private let configParser: [String: any ParserProtocol<Config>] = [
+    "workspace-backend": Parser(\.workspaceBackend, parseWorkspaceBackend),
     "appearance": Parser(\.appearance) { raw, backtrace in
         parseString(raw, backtrace).flatMap {
             AppAppearance(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: system, light, dark"))

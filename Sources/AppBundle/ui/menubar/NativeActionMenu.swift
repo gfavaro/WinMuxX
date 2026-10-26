@@ -82,6 +82,14 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     }
 
     private func updateIcon() {
+        if runtime.workspaceBackend.kind == .native {
+            statusItem?.length = NSStatusItem.squareLength
+            statusItem?.button?.attributedTitle = NSAttributedString(string: "")
+            statusItem?.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Native Spaces, read-only")
+            statusItem?.button?.toolTip = TrayMenuModel.shared.menuBarWorkspaceName
+            statusItem?.button?.setAccessibilityLabel("WinMuxX, Native Spaces, read-only")
+            return
+        }
         let model = TrayMenuModel.shared
         let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
         if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
@@ -125,6 +133,22 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.autoenablesItems = false
+        if runtime.workspaceBackend.kind == .native {
+            menu.addItem(NSMenuItem(title: "Native Spaces · Experimental read-only", action: nil, keyEquivalent: ""))
+            if let inventory = runtime.workspaceBackend.observation?.inventory {
+                menu.addItem(NSMenuItem(title: "Observation: \(inventory.status)", action: nil, keyEquivalent: ""))
+                for record in inventory.records {
+                    let title = "\(record.isActive ? "●" : "○") Space \(record.space.id) · \(record.space.isDesktop ? "Desktop" : "Unmanaged")"
+                    menu.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
+                }
+            }
+            menu.addItem(.separator())
+            menu.addItem(callbackItem("Refresh native observations", #selector(refreshNativeSpaces)))
+            menu.addItem(callbackItem("Native diagnostics…", #selector(openDiagnostics)))
+            menu.addItem(callbackItem("Open config…", #selector(openConfig)))
+            menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+            return
+        }
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
         capturedRuleTarget = focus.windowOrNil.flatMap { window -> QuickFloatingRuleTarget? in
             guard let app = window as? MacWindow, let bundleId = app.macApp.rawAppBundleId else { return nil }
@@ -441,6 +465,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }
+    @objc private func refreshNativeSpaces() { runtime.workspaceBackend.observation?.requestRead() }
     @objc private func resetMinimumSizes() {
         let alert = NSAlert()
         alert.messageText = "Reset learned minimum window sizes?"

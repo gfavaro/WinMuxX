@@ -30,6 +30,9 @@ public final class NativeSpacesObservation {
             (workspace, NSWorkspace.activeSpaceDidChangeNotification, "activeSpaceDidChange"),
             (workspace, NSWorkspace.screensDidWakeNotification, "screensDidWake"),
             (workspace, NSWorkspace.sessionDidBecomeActiveNotification, "sessionDidBecomeActive"),
+            (workspace, NSWorkspace.didLaunchApplicationNotification, "applicationLaunched"),
+            (workspace, NSWorkspace.didTerminateApplicationNotification, "applicationTerminated"),
+            (workspace, NSWorkspace.didActivateApplicationNotification, "applicationActivated"),
             (NotificationCenter.default, NSApplication.didChangeScreenParametersNotification, "displayTopologyChanged"),
         ] {
             let token = source.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in

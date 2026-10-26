@@ -1,5 +1,9 @@
 # Command guide
 
+With the experimental native read-only backend, `doctor` reports native Space
+observations and `reload-config` validates configuration. Other commands return an
+unsupported error. See [Native Spaces](NATIVE_SPACES.md); virtual remains the default.
+
 Run `winmuxx --help` for the command list and `winmuxx <command> --help` for
 arguments. This guide groups commands by what they affect.
 

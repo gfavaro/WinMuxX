@@ -20,6 +20,7 @@ final class WinMuxRuntime {
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)
+        workspaceBackend.selectForStartup(config.workspaceBackend)
     }
 
     private static var process = WinMuxRuntime()

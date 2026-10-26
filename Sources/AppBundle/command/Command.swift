@@ -102,6 +102,11 @@ extension [Command] {
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
         var isSucc = true
         for command in self {
+            if runtime.workspaceBackend.kind == .native,
+               !(command is DoctorCommand || command is ReloadConfigCommand) {
+                io.err("Command '\(command.args)' is unsupported by the experimental native read-only backend. Use doctor for native Space diagnostics; native gestures remain owned by macOS.")
+                return false
+            }
             try WindowDetectionOperations.current?.check()
             await WorkspacePresentationController.shared.cancelForCommand(command)
             let commandSucc = try await command.run(env, io)

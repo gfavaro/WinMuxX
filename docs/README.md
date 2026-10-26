@@ -23,6 +23,8 @@
 
 ## Reviews and investigations
 
+- [Native Spaces](NATIVE_SPACES.md): experimental read-only backend, opt-in and rollback; [technical assessment](NATIVE_SPACES_ASSESSMENT.md) and [decision record](NATIVE_SPACES_ADR.md).
+
 - [Dinky fit and implementation plan](DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
 - [Dinky execution checklist](DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
 

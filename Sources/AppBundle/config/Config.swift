@@ -40,6 +40,7 @@ var defaultConfigUrl: URL {
 }
 
 struct Config: ConvenienceCopyable {
+    var workspaceBackend: WorkspaceBackendKind = .virtual
     var appearance: AppAppearance = .system
     var configVersion: Int = 1
     var afterLoginCommand: [any Command] = []

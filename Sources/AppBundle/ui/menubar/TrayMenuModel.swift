@@ -62,6 +62,12 @@ extension ObservableObject {
 }
 
 @MainActor func updateTrayText() {
+    if runtime.workspaceBackend.kind == .native {
+        let available = runtime.workspaceBackend.observation?.inventory.currentSnapshot != nil
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, "Spaces")
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, available ? "Native Spaces (read-only)" : "Native Spaces (observation unavailable)")
+        return
+    }
     let focus = focus
     let workspace = focus.workspace
     let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)

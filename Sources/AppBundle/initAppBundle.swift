@@ -8,9 +8,6 @@ import Foundation
         isCli = false
         initServerArgs()
         var bootstrappedConfigUrl: URL? = nil
-        if isDebug {
-            await toggleReleaseServerIfDebug(.off)
-        }
         do {
             bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
             let editable = bootstrappedConfigUrl ?? preferredEditableConfigUrl()
@@ -24,6 +21,10 @@ import Foundation
             )
         }
         if try await !reloadConfig(forceConfigUrl: bootstrappedConfigUrl) {
+            // An invalid native configuration must never fall back to a virtual
+            // manager that starts parking windows. Defaults remain available for
+            // diagnostics/UI, but startup stays physically read-only until restart.
+            _serverArgs.isReadOnly = true
             var out = ""
             check(
                 try await reloadConfig(forceConfigUrl: defaultConfigUrl, stdout: &out),
@@ -35,6 +36,20 @@ import Foundation
                 """,
             )
         }
+        if runtime.workspaceBackend.kind == .native {
+            // Defense in depth: low-level AX setters and recovery also enforce
+            // this immutable startup flag. No permission prompts or virtual hooks.
+            _serverArgs.isReadOnly = true
+            let owner = runtime
+            owner.workspaceBackend.startObservation { [weak owner] _, _ in
+                owner?.withValue { updateTrayText() }
+            }
+            isWinMuxRuntimeReady = true
+            startUnixSocketServer()
+            syncConfigFileWatcher()
+            return
+        }
+        if isDebug { await toggleReleaseServerIfDebug(.off) }
         MonitorConfigurationObserver.shared.prepareForStartup()
 
         checkAccessibilityPermissions()
