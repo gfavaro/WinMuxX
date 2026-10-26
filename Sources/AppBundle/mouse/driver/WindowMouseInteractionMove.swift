@@ -129,6 +129,7 @@ extension WindowMouseInteractionDriver {
         detachOrigin: TabDetachOrigin,
         startedInSidebar: Bool,
     ) {
+        WorkspacePresentationController.shared.cancelForMouseManipulation(windowId: windowId)
         WorkspaceScrollingGestureController.shared.cancelForInteractiveDrag()
         forgetPendingRestartWindow(windowId)
         let session = MoveSession(

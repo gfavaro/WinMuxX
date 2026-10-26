@@ -590,6 +590,13 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         }
         if let invalidateNativeStateWindowId {
             Window.get(byId: invalidateNativeStateWindowId)?.invalidateLastKnownNativeState()
+            if notif == kAXWindowMiniaturizedNotification as String {
+                NotificationCenter.default.post(name: workspaceControlsWindowInvalidated, object: nil,
+                    userInfo: ["windowId": invalidateNativeStateWindowId])
+            } else if notif == kAXWindowDeminiaturizedNotification as String {
+                NotificationCenter.default.post(name: workspaceControlsWindowRestored, object: nil,
+                    userInfo: ["windowId": invalidateNativeStateWindowId])
+            }
         } else if let invalidateNativeStateAppPid {
             for window in MacWindow.allWindows where window.macApp.pid == invalidateNativeStateAppPid {
                 window.invalidateLastKnownNativeState()

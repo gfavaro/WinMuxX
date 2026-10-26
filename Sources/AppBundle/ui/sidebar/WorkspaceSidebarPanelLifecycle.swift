@@ -10,6 +10,10 @@ extension WorkspaceSidebarPanel {
 
     func refresh(on monitor: Monitor) {
         guard !isRetired else { return }
+        if WorkspacePresentationController.shared.suppressesChrome(on: monitor) {
+            orderOut(nil)
+            return
+        }
         defer { requestPublicStateUpdate() }
         if appliedHoverOpenDelayMs != config.workspaceSidebar.hoverOpenDelayMs {
             appliedHoverOpenDelayMs = config.workspaceSidebar.hoverOpenDelayMs

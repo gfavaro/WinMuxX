@@ -135,6 +135,7 @@ func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
 enum FocusChangeOrigin: Equatable { case explicit, native }
 
 @MainActor func setFocus(to newFocus: LiveFocus, origin: FocusChangeOrigin = .explicit) -> Bool {
+    WorkspacePresentationController.shared.cancelForFocusChange(to: newFocus)
     if origin == .explicit {
         ScrollingWindowOrdering.shared.cancel()
         let interruptedMotion = WorkspaceScrollingGestureController.shared.isMotionActive

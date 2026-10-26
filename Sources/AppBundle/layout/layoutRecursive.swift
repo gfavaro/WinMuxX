@@ -4,6 +4,8 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
+        await WorkspacePresentationController.shared.restorePendingFloatingFrames(in: self)
+        if WorkspacePresentationController.shared.preservesLayout(for: self) { return }
         applyConfiguredLayout()
         normalizeMasterLayout()
         if isEffectivelyEmpty { return }

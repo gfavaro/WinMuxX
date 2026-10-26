@@ -23,6 +23,7 @@ struct EnableCommand: Command {
             }
             return !args.failIfNoop
         }
+        if !newState { await WorkspacePresentationController.shared.end(reason: .invalidated) }
         if !newState { persistFrozenWorldForRestartIfPossible() }
         TrayMenuModel.shared.isEnabled = newState
         WindowBorderController.shared.setEnabled(newState)

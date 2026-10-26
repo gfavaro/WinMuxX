@@ -41,6 +41,7 @@ extension CmdArgs {
             case let args as WorkspaceOverviewCmdArgs: WorkspaceOverviewCommand(args: args)
             case let args as OpenSidebarCmdArgs: OpenSidebarCommand(args: args)
             case let args as PaletteCmdArgs: PaletteCommand(args: args)
+            case let args as PresentationCmdArgs: PresentationCommand(args: args)
             case let args as ProjectCmdArgs: ProjectCommand(args: args)
             case let args as ReloadConfigCmdArgs: ReloadConfigCommand(args: args)
             case let args as ResizeCmdArgs: ResizeCommand(args: args)

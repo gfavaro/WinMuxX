@@ -188,6 +188,7 @@ extension WindowMouseInteractionDriver {
 
 extension WindowMouseInteractionDriver {
     func startResize(windowId: UInt32) {
+        WorkspacePresentationController.shared.cancelForMouseManipulation(windowId: windowId)
         WorkspaceScrollingGestureController.shared.cancelForInteractiveDrag()
         forgetPendingRestartWindow(windowId)
         let session = ResizeSession(windowId: windowId)

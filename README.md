@@ -212,6 +212,13 @@ frames, and controls for arrangement, floating, fullscreen, scrolling width, and
 fit issues. It uses the displayed workspace's current frames, so opening it does not
 change scrolling position. Choose **More Actions…** or right-click for the full menu.
 
+Use `presentation [on|off|toggle] [--window-id <id>]` to enlarge one visible,
+managed window over a dark backdrop. The command has no default key binding.
+The target stays above the opaque nonactivating backdrop, and WinMuxX keeps the
+workspace's groups, tabs, and scrolling position intact. Escape, clicking the
+backdrop, switching focus on the same display, or changing the layout ends the
+session and restores the window's prior tiled or floating placement.
+
 Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,
 and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).

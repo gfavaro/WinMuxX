@@ -103,6 +103,7 @@ extension [Command] {
         var isSucc = true
         for command in self {
             try WindowDetectionOperations.current?.check()
+            await WorkspacePresentationController.shared.cancelForCommand(command)
             let commandSucc = try await command.run(env, io)
             isSucc = commandSucc && isSucc
             if !command.isQuery && !command.isPresentation {

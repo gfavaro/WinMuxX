@@ -5,6 +5,7 @@ struct WorkspaceOverviewCommand: Command {
     let shouldResetClosedWindowsCache = false
     let isPresentation = true
     @MainActor func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        await WorkspacePresentationController.shared.end(reason: .invalidated)
         let controller = WorkspaceOverviewController.shared
         switch args.action {
         case .hide: WorkspaceControlsPanelController.shared.dismiss(); controller.dismiss()

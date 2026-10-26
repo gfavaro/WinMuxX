@@ -155,11 +155,13 @@ final class MacWindow: Window {
 
     func setNativeFullscreen(_ value: Bool) {
         if value { NotificationCenter.default.post(name: workspaceControlsWindowInvalidated, object: nil, userInfo: ["windowId": windowId]) }
+        else { NotificationCenter.default.post(name: workspaceControlsWindowRestored, object: nil, userInfo: ["windowId": windowId]) }
         macApp.setNativeFullscreen(windowId, value)
     }
 
     func setNativeMinimized(_ value: Bool) {
         if value { NotificationCenter.default.post(name: workspaceControlsWindowInvalidated, object: nil, userInfo: ["windowId": windowId]) }
+        else { NotificationCenter.default.post(name: workspaceControlsWindowRestored, object: nil, userInfo: ["windowId": windowId]) }
         macApp.setNativeMinimized(windowId, value)
     }
 

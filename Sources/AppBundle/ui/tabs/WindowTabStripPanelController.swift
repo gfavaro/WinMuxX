@@ -71,6 +71,7 @@ extension WindowTabStripPanelController {
         }
 
         let strips = windowTabStripsWithTransientResizeApplied(TrayMenuModel.shared.windowTabStrips)
+            .filter { !WorkspacePresentationController.shared.suppressesChrome(workspaceName: $0.workspaceName) }
         let activeIds = Set(strips.map(\.id))
         if let mouseInteractionChromeMode {
             refreshSuppressedChrome(mode: mouseInteractionChromeMode, strips: strips, activeIds: activeIds)

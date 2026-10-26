@@ -447,6 +447,7 @@ struct WorkspaceControlsPanelView: View {
                 button("Float", "layout floating").disabled(model.snapshot.targetWindowId == nil)
                 button("Tile", "layout tiling").disabled(model.snapshot.targetWindowId == nil)
                 button("Fullscreen", "fullscreen").disabled(model.snapshot.targetWindowId == nil)
+                button("Present", "presentation toggle").disabled(model.snapshot.targetWindowId == nil)
             }
         }
     }
@@ -494,3 +495,4 @@ let workspaceControlsWindowClosed = Notification.Name("WinMuxWorkspaceControlsWi
 let workspaceControlsWindowInvalidated = Notification.Name("WinMuxWorkspaceControlsWindowInvalidated")
 let workspaceControlsWindowDetected = Notification.Name("WinMuxWorkspaceControlsWindowDetected")
 let workspaceControlsOwnershipChanged = Notification.Name("WinMuxWorkspaceControlsOwnershipChanged")
+let workspaceControlsWindowRestored = Notification.Name("WinMuxWorkspaceControlsWindowRestored")
