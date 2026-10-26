@@ -83,6 +83,8 @@ struct SettingsDisplaysView: View {
     @State private var isSavingAssignment = false
     @State private var attemptedAssignment: SettingsAssignmentDraft?
     @State private var workspace = ""
+    @State private var layoutWorkspace = ""
+    @State private var workspaceLayoutChoice = "inherit"
     @State private var selectedDisplay: String?
     @State private var pendingMove: (workspace: String, selector: String, visibleWorkspace: String?, displayName: String)?
     @State private var confirmsMove = false
@@ -113,6 +115,21 @@ struct SettingsDisplaysView: View {
                         }
                     }.padding(.vertical, 6)
                 }
+            }
+            SettingsSection("Workspace layout mode") {
+                Picker("Workspace", selection: $layoutWorkspace) {
+                    Text("Choose workspace").tag("")
+                    ForEach(tray.workspaces, id: \.name) { row in Text(row.displayName).tag(row.name) }
+                }
+                Picker("Default mode", selection: $workspaceLayoutChoice) {
+                    Text("Inherit global default").tag("inherit")
+                    Text("Dwindle").tag("dwindle")
+                    Text("Master").tag("master")
+                    Text("Scrolling").tag("scrolling")
+                }
+                Button("Save workspace mode") { saveWorkspaceLayout() }
+                    .disabled(layoutWorkspace.isEmpty || workspaceLayoutChoice == currentWorkspaceLayoutChoice)
+                SettingsDescription("Sets the workspace-wide arrangement. Each existing top-level group keeps its nested splits and tabs. A matching display override may take precedence.")
             }
             SettingsSection("Move a workspace") {
                 Picker("Workspace", selection: $workspace) {
@@ -153,7 +170,8 @@ struct SettingsDisplaysView: View {
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
         }
-        .onAppear { displays.refresh() }
+        .onAppear { displays.refresh(); loadWorkspaceLayoutChoice() }
+        .onChange(of: layoutWorkspace) { _ in loadWorkspaceLayoutChoice() }
         .onReceive(tray.$workspaceSidebarWorkspaces) { _ in displays.refresh() }
         .onReceive(tray.$workspaceSidebarMonitorScopes) { _ in displays.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).receive(on: RunLoop.main)) { _ in displays.refresh() }
@@ -177,6 +195,37 @@ struct SettingsDisplaysView: View {
     private func copy(_ value: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(value, forType: .string)
+    }
+
+    private var currentWorkspaceLayoutChoice: String {
+        guard !layoutWorkspace.isEmpty else { return "inherit" }
+        return config.workspaceLayouts[layoutWorkspace]?.defaults.layout?.rawValue ?? "inherit"
+    }
+
+    private func loadWorkspaceLayoutChoice() { workspaceLayoutChoice = currentWorkspaceLayoutChoice }
+
+    private func saveWorkspaceLayout() {
+        guard !layoutWorkspace.isEmpty, workspaceLayoutChoice != currentWorkspaceLayoutChoice else { return }
+        let name = layoutWorkspace
+        let selected = workspaceLayoutChoice
+        let previous = currentWorkspaceLayoutChoice
+        let settingId = "workspace.\(name).layout"
+        model.activeSettingTitle = "Workspace layout: \(workspaceDisplayName(name))"
+        persistSettingsDocumentEdit(model: model, settingIDs: [settingId], onSaved: {
+            error = nil
+        }, onFailure: { failure in
+            error = failure.localizedDescription
+        }) { current in
+            let parsed = parseConfig(current)
+            guard parsed.errors.isEmpty,
+                  (parsed.config.workspaceLayouts[name]?.defaults.layout?.rawValue ?? "inherit") == previous else {
+                throw ConfigFileStore.Conflict()
+            }
+            let rendered = selected == "inherit" ? nil : settingsQuotedString(selected)
+            return applyingSettingsConfigEdits([
+                .init(section: "workspace.\(settingsQuotedString(name))", key: "layout", renderedValue: rendered),
+            ], to: current)
+        }
     }
 
     private var assignmentEditor: some View {

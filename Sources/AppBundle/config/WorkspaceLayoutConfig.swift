@@ -3,7 +3,7 @@ import Common
 import TOMLKit
 
 struct WorkspaceLayoutSettings: ConvenienceCopyable, Equatable {
-    var layout: Layout?
+    var layout: WorkspaceLayoutName?
     var orientation: DefaultContainerOrientation?
     var fullscreenWidth: Double?
     var singleWindowAlignment: SingleWindowAlignment?
@@ -50,9 +50,10 @@ private let workspaceParsers: [String: any ParserProtocol<WorkspaceLayoutConfig>
     "display": Parser(\.displays, parseWorkspaceDisplayLayouts),
 ]
 
-private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<Layout?> {
+private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<WorkspaceLayoutName?> {
     parseString(raw, trace).flatMap {
-        $0.parseLayout().map { Optional($0) }.orFailure(.semantic(trace, "Expected dwindle, master, tiles, accordion or tab-group"))
+        WorkspaceLayoutName(rawValue: $0).map { Optional($0) }
+            .orFailure(.semantic(trace, "Expected dwindle, master or scrolling"))
     }
 }
 
@@ -114,28 +115,31 @@ extension Workspace {
         // Width/alignment policies must not reset a manually selected layout.
         let settings = resolved.flatMap { value -> WorkspaceLayoutSettings? in
             guard value.layout != nil || value.orientation != nil else { return nil }
-            return WorkspaceLayoutSettings(layout: value.layout ?? config.defaultRootContainerLayout,
+            return WorkspaceLayoutSettings(layout: value.layout,
                                            orientation: value.orientation ?? config.defaultRootContainerOrientation)
         }
         guard settings != lastConfiguredLayout else { return }
         let previous = lastConfiguredLayout
         lastConfiguredLayout = settings
         guard settings != nil || previous != nil else { return }
+        if previous?.layout != nil, settings?.layout == nil { transitionArrangement(to: .dwindle) }
         let root = rootTilingContainer
-        let layout = settings?.layout ?? config.defaultRootContainerLayout
         let orientation = settings?.orientation ?? config.defaultRootContainerOrientation
-        root.layout = layout
-        root.dwindleOrientation = switch orientation {
-            case .horizontal: .h
-            case .vertical: .v
-            case .auto: nil
+        if let layout = settings?.layout { transitionArrangement(to: layout) }
+        if arrangement == .dwindle {
+            root.dwindleOrientation = switch orientation {
+                case .horizontal: .h
+                case .vertical: .v
+                case .auto: nil
+            }
+            let axis: Orientation = switch orientation {
+                case .horizontal: .h
+                case .vertical: .v
+                case .auto: workspaceMonitor.visibleRectPaddedByOuterGaps.width >= workspaceMonitor.visibleRectPaddedByOuterGaps.height ? .h : .v
+            }
+            root.changeOrientation(axis)
         }
-        let axis: Orientation = switch orientation {
-            case .horizontal: .h
-            case .vertical: .v
-            case .auto: workspaceMonitor.visibleRectPaddedByOuterGaps.width >= workspaceMonitor.visibleRectPaddedByOuterGaps.height ? .h : .v
-        }
-        root.changeOrientation(axis)
         for window in allLeafWindowsRecursive { window.lastAppliedLayoutPhysicalRect = nil }
+        WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
     }
 }

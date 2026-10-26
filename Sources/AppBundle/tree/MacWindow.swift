@@ -10,6 +10,19 @@ final class MacWindow: Window {
     @MainActor private var minimumObservation: Task<Void, Never>?
     @MainActor private var frameRequestGeneration: UInt64 = 0
     @MainActor private var minimumRequest: (point: CGPoint?, size: CGSize?)?
+    @MainActor private var scrollingSheetCache: (generation: UInt64, offsets: [CGRect])?
+
+    @MainActor func invalidateScrollingSheetCache() { scrollingSheetCache = nil }
+
+    @MainActor
+    func scrollingSheetOffsets() async throws -> [CGRect] {
+        let generation = nativeStateObservationToken()
+        if let cache = scrollingSheetCache, cache.generation == generation { return cache.offsets }
+        let offsets = try await macApp.attachedSheetOffsets(windowId)
+        guard nativeStateObservationToken() == generation else { return [] }
+        scrollingSheetCache = (generation, offsets)
+        return offsets
+    }
 
     @MainActor
     func resetLearnedMinimum() {
@@ -409,6 +422,11 @@ final class MacWindow: Window {
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
         WindowMotion.shared.cancel(windowId)
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        if nodeWorkspace?.scrollingGestureMotionActive == true, let session = nodeWorkspace?.scrollingGestureSessionID,
+           let topLeft, let size {
+            setScrollingGestureFrame(CGRect(origin: topLeft, size: size), session: session)
+            return
+        }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
         macApp.setAxFrame(windowId, topLeft, size)
         // Reasserting an unchanged layout must neither flood AX with observations nor
@@ -418,6 +436,7 @@ final class MacWindow: Window {
         frameRequestGeneration &+= 1
         minimumObservation?.cancel()
         guard let topLeft, let size, parent is TilingContainer, !isFullscreen,
+              !isConcealedByScrolling,
               TrayMenuModel.shared.isEnabled, lastKnownActualRect?.size != size else { return }
         let generation = frameRequestGeneration
         minimumObservation = Task { @MainActor [weak self] in
@@ -455,10 +474,21 @@ final class MacWindow: Window {
     }
 
     @MainActor
+    func setScrollingGestureFrame(_ frame: CGRect, session: UUID? = nil) {
+        guard let workspace = nodeWorkspace, workspace.scrollingGestureMotionActive,
+              let session = session ?? workspace.scrollingGestureSessionID else { return }
+        suspendMinimumObservationForMotion()
+        guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
+        macApp.setAnimatedAxFrame(windowId, frame, session: session)
+    }
+
+    @MainActor
     private func canObserveMinimum(_ generation: UInt64) -> Bool {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
             !isFullscreen && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
+            !isConcealedByScrolling && nodeWorkspace?.scrollingGestureMotionActive != true &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites
     }

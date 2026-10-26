@@ -12,15 +12,11 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
-        if target.workspace.rootTilingContainer.layout == .master {
-            if let neighbor = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction, excludingMoveNode: currentNode) {
-                swapWindows(currentWindow, neighbor)
-                return true
-            }
-            // Master slots stay fixed; crossing a pane edge must not wrap the
-            // master root in an implicit split and silently abandon its policy.
-            if args.boundaries == .workspace { return args.boundariesAction == .stop }
-            return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
+        if target.workspace.arrangement == .scrolling {
+            return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
+        }
+        if target.workspace.arrangement == .master {
+            return moveWorkspaceGroup(currentWindow, direction: direction, workspace: target.workspace)
         }
         if currentWindow.nodeWorkspace?.rootTilingContainer.layout == .dwindle,
            let neighbor = dwindleDirectionalFocusTarget(
@@ -61,6 +57,86 @@ struct MoveCommand: Command {
                 return false // Impossible
         }
     }
+}
+
+@MainActor
+private func moveScrollingNode(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
+    let groups = workspace.workspaceLayoutUnits
+    let column = window.topLevelWorkspaceGroup
+    guard let index = groups.firstIndex(where: { $0 === column }) else { return false }
+    if direction.orientation == .v {
+        var node = window.moveNode
+        while let parent = node.parent as? TilingContainer, parent !== column {
+            if parent.navigationOrientation == direction.orientation,
+               let ownIndex = node.ownIndex {
+                let target = ownIndex + direction.focusOffset
+                if parent.children.indices.contains(target) {
+                    let sibling = parent.children[target]
+                    if node is TilingContainer || (sibling as? TilingContainer)?.layout == .tabGroup {
+                        let binding = node.unbindFromParent()
+                        node.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: target)
+                    } else if let siblingContainer = sibling as? TilingContainer {
+                        return deepMoveIn(node: node, into: siblingContainer, moveDirection: direction)
+                    } else {
+                        swapNodes(node, sibling)
+                    }
+                    scheduleRefreshSession(.globalObserver("moveWithinScrollingColumn"))
+                    return true
+                }
+            }
+            node = parent
+        }
+        return false
+    }
+    if column.allLeafWindowsRecursive.count <= 1 {
+        guard groups.count > 1, let root = column.parent as? TilingContainer, root === workspace.rootTilingContainer else { return false }
+        let targetIndex = index + direction.focusOffset
+        guard root.children.indices.contains(targetIndex) else { return false }
+        let binding = column.unbindFromParent()
+        column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: targetIndex)
+    } else {
+        let width = column.scrollingColumnWidth
+        window.unbindFromParent()
+        let parent = ensureScrollingRootSupportsColumns(workspace)
+        let insertion = min(max(index + (direction.isPositive ? 1 : 0), 0), parent.children.count)
+        window.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: insertion)
+        window.scrollingColumnWidth = width
+        workspace.normalizeContainers()
+    }
+    scheduleRefreshSession(.globalObserver("moveScrollingColumn"))
+    return true
+}
+
+@MainActor
+@discardableResult
+func ensureScrollingRootSupportsColumns(_ workspace: Workspace) -> TilingContainer {
+    let previousRoot = workspace.rootTilingContainer
+    guard previousRoot.layout == .tabGroup || previousRoot.layout == .stacked else { return previousRoot }
+    let orientation = previousRoot.orientation
+    previousRoot.unbindFromParent()
+    let root = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)
+    previousRoot.bind(to: root, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    return root
+}
+
+@MainActor
+private func moveWorkspaceGroup(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
+    guard direction.orientation == .h else { return false }
+    let root = workspace.rootTilingContainer
+    let group = window.topLevelWorkspaceGroup
+    guard group.parent === root, let index = root.children.firstIndex(of: group) else { return false }
+    let target = index + direction.focusOffset
+    guard root.children.indices.contains(target) else { return false }
+    let masterGroup = workspace.workspaceLayoutUnits.indices.contains(workspace.masterGroupIndex)
+        ? workspace.workspaceLayoutUnits[workspace.masterGroupIndex] : nil
+    let binding = group.unbindFromParent()
+    group.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: target)
+    if workspace.arrangement == .master, let masterGroup,
+       let newIndex = workspace.workspaceLayoutUnits.firstIndex(where: { $0 === masterGroup }) {
+        workspace.masterGroupIndex = newIndex
+    }
+    scheduleRefreshSession(.globalObserver("moveWorkspaceGroup"))
+    return true
 }
 
 @MainActor

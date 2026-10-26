@@ -17,7 +17,7 @@ struct SwapCommand: Command {
         let targetWindow: Window?
         switch args.target.val {
             case .direction(let direction):
-                if target.workspace.rootTilingContainer.layout == .master {
+                if target.workspace.arrangement == .master {
                     targetWindow = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction,
                         excludingMoveNode: currentWindow.moveNode) ?? (args.wrapAround
                             ? spatialWrapFocusTarget(in: target.workspace, from: currentWindow, direction: direction,

@@ -8,6 +8,15 @@ struct ResizeCommand: Command {
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
 
+        if target.workspace.arrangement == .scrolling, let window = target.windowOrNil {
+            switch args.dimension.val {
+                case .width, .smart:
+                    return resizeScrollingColumn(window, units: args.units.val, workspace: target.workspace, io: io)
+                case .height, .smartOpposite:
+                    break
+            }
+        }
+
         if let window = target.windowOrNil, let workspace = window.nodeWorkspace,
            singleWindowWidthTarget(in: workspace) === window,
            args.dimension.val == .width || args.dimension.val == .smart {
@@ -22,6 +31,7 @@ struct ResizeCommand: Command {
 
         let candidates: [WindowResizeCommandTarget] = target.windowOrNil?.parentsWithSelf.flatMap { node -> [WindowResizeCommandTarget] in
             guard let parent = node.parent as? TilingContainer else { return [] }
+            if target.workspace.arrangement != .dwindle, parent === target.workspace.rootTilingContainer { return [] }
             switch parent.layout {
                 case .tiles, .master: return [.tiles(node, parent)]
                 case .dwindle: return node.dwindleResizeTargets().map(WindowResizeCommandTarget.dwindle)
@@ -38,6 +48,7 @@ struct ResizeCommand: Command {
         }
         guard let selected else {
             guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
+            if target.workspace.resizeMasterPane(window, dimension: args.dimension.val, units: args.units.val) { return true }
             if window.parent is TilingContainer {
                 io.out("resize: nothing to do")
                 return true
@@ -71,4 +82,26 @@ struct ResizeCommand: Command {
         node.setWeight(orientation, node.getWeight(orientation) + diff)
         return true
     }
+}
+
+@MainActor
+private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units, workspace: Workspace, io: CmdIo) -> Bool {
+    let group = window.topLevelWorkspaceGroup
+    guard let column = workspace.scrollingMetrics.columns.first(where: { $0.node === group }) else { return io.err("The focused window has no scrolling column") }
+    let metrics = workspace.scrollingMetrics
+    let lower = column.node.minimumLayoutExtent(along: .h, rect: workspaceTilingRect(workspace))
+    let requested: CGFloat = switch units {
+        case .set(let value): CGFloat(value)
+        case .add(let value): column.width + CGFloat(value)
+        case .subtract(let value): column.width - CGFloat(value)
+    }
+    let maximum = max(metrics.areaWidth - column.frameStartInset - column.frameEndInset, lower)
+    let actual = min(max(requested, lower), maximum)
+    if abs(actual - column.width) < 0.5 {
+        io.out("resize: nothing to do")
+        return true
+    }
+    group.scrollingColumnWidth = min(max((actual + column.frameStartInset + column.frameEndInset) / max(metrics.areaWidth, 1), 0.1), 1)
+    scheduleRefreshSession(.globalObserver("resizeScrollingColumn"))
+    return true
 }

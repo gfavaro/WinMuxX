@@ -3,6 +3,12 @@ import AppKit
 import XCTest
 
 final class WorkspaceGestureRouterTest: XCTestCase {
+    func testOptionGestureIsReservedForScrollingOnlyInScrollingWorkspaces() {
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: false, scrollingEnabledAtStart: true), .workspaceSwipe)
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: true, scrollingEnabledAtStart: true), .scrolling)
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: true, scrollingEnabledAtStart: false), .ignore)
+    }
+
     private func frame(_ x: Double = 0.5, _ y: Double = 0.5, fingers: Int = 3, device: UInt64 = 1, contacts: UInt64 = 123, time: Double = 1) -> WorkspaceTouchFrame {
         .init(device: device, fingers: fingers, x: x, y: y, timestamp: time, contacts: contacts)
     }
@@ -38,6 +44,16 @@ final class WorkspaceGestureRouterTest: XCTestCase {
         var router = WorkspaceGestureAxisRouter()
         XCTAssertNil(router.route(frame(fingers: 4)))
         XCTAssertNil(router.route(frame(0.5, 0.8, time: 1.2)))
+    }
+    func testInterruptedScrollingContactCannotRestartUntilFullLift() {
+        var gate = ScrollingGestureContactGate()
+        XCTAssertTrue(gate.allows(frame()))
+        gate.interrupt() // Explicit click/focus supersedes the captured offset.
+        XCTAssertFalse(gate.allows(frame(0.2, time: 1.1)))
+        XCTAssertFalse(gate.allows(frame(0.1, time: 1.2)))
+        XCTAssertFalse(gate.allows(frame(fingers: 2, time: 1.3)))
+        XCTAssertFalse(gate.allows(frame(fingers: 0, time: 1.4)))
+        XCTAssertTrue(gate.allows(frame(time: 2)))
     }
     func testAmbiguousMovementDoesNotChooseAnAxis() {
         var router = WorkspaceGestureAxisRouter()

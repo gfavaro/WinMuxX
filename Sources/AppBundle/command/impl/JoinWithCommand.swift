@@ -14,6 +14,9 @@ struct JoinWithCommand: Command {
         guard currentWindow.parent is TilingContainer else {
             return io.err("join-with does not support non-tiling windows")
         }
+        if target.workspace.arrangement == .scrolling {
+            return joinScrolling(currentWindow, direction: direction, workspace: target.workspace)
+        }
         guard let (parent, ownIndex) = currentWindow.closestParent(hasChildrenInDirection: direction, withLayout: nil) else {
             io.out("join-with: nothing to do")
             return true
@@ -33,4 +36,53 @@ struct JoinWithCommand: Command {
         currentWindow.bind(to: newParent, adaptiveWeight: WEIGHT_AUTO, index: direction.isPositive ? 0 : INDEX_BIND_LAST)
         return true
     }
+}
+
+@MainActor
+private func joinScrolling(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
+    if direction.orientation == .v {
+        let group = window.topLevelWorkspaceGroup
+        guard let (parent, ownIndex) = window.closestParent(hasChildrenInDirection: direction, withLayout: nil),
+              parent !== workspace.rootTilingContainer,
+              parent === group || parent.parents.contains(where: { $0 === group }) else { return false }
+        let targetIndex = ownIndex + direction.focusOffset
+        guard parent.children.indices.contains(targetIndex) else { return false }
+        return joinScrollingNodes(window.moveNode, with: parent.children[targetIndex], in: parent,
+                                  direction: direction, width: nil)
+    }
+    let sourceColumn = window.topLevelWorkspaceGroup
+    guard let initialRoot = sourceColumn.parent as? TilingContainer,
+          initialRoot === workspace.rootTilingContainer,
+          let sourceIndex = initialRoot.children.firstIndex(where: { $0 === sourceColumn }) else { return false }
+    let neighborIndex = sourceIndex + direction.focusOffset
+    guard initialRoot.children.indices.contains(neighborIndex) else { return false }
+    let neighbor = initialRoot.children[neighborIndex]
+    return joinScrollingNodes(window.moveNode, with: neighbor, in: initialRoot, direction: direction,
+                              width: neighbor.scrollingColumnWidth, workspace: workspace,
+                              sourceIndex: sourceIndex, neighborIndex: neighborIndex)
+}
+
+@MainActor
+private func joinScrollingNodes(_ source: TreeNode, with target: TreeNode, in parent: TilingContainer,
+                                direction: CardinalDirection, width: CGFloat?, workspace: Workspace? = nil,
+                                sourceIndex: Int? = nil, neighborIndex: Int? = nil) -> Bool {
+    let adoptedWidth = width
+    let sourceIndex = sourceIndex ?? source.ownIndex ?? 0
+    let targetIndex = neighborIndex ?? target.ownIndex ?? 0
+    source.unbindFromParent()
+    // An atomic tab/accordion root becomes an ordinary column if a second
+    // column is explicitly added; the old container remains nested intact.
+    let host = workspace.map { ensureScrollingRootSupportsColumns($0) } ?? parent
+    guard let currentTargetIndex = host.children.firstIndex(where: { $0 === target }) else { return false }
+    let targetBinding = target.unbindFromParent()
+    let insertion = min(sourceIndex, currentTargetIndex)
+    let joined = TilingContainer(parent: host, adaptiveWeight: targetBinding.adaptiveWeight,
+                                 parent.orientation.opposite, .tiles, index: insertion)
+    joined.scrollingColumnWidth = adoptedWidth
+    let sourceFirst = direction.isPositive
+    (sourceFirst ? source : target).bind(to: joined, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    (sourceFirst ? target : source).bind(to: joined, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    workspace?.normalizeContainers()
+    scheduleRefreshSession(.globalObserver("joinScrolling"))
+    return true
 }

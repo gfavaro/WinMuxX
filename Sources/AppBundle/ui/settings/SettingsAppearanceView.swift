@@ -61,7 +61,8 @@ struct ShortcutAppearanceSettingsView: View {
                     persist("menu-bar", "indicator", "'\(menuBarIndicator.rawValue)'")
                 }
                 if menuBarIndicator == .icon {
-                    SettingsPicker("Icon appearance", id: "menu-bar.icon-appearance", selection: $menuBarIconAppearance, help: "Choose a color or monochrome tray icon.") {
+                    SettingsPicker("Icon appearance", id: "menu-bar.icon-appearance", selection: $menuBarIconAppearance,
+                                   help: "The icon shows the focused workspace layout. Color uses the system accent; monochrome follows the menu bar. Keyboard modes tint either icon.") {
                         ForEach(MenuBarIconAppearance.allCases) { appearance in
                             Text(appearance.title).tag(appearance)
                         }

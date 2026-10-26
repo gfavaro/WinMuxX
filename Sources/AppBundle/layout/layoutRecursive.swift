@@ -10,6 +10,9 @@ extension Workspace {
         let rect = workspaceTilingRect(self)
         let context = LayoutContext(self)
         if let tabGroup = rootTilingContainer.allTabbedContainersRecursive.first(where: \.hasFullscreenTab) {
+            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -21,6 +24,9 @@ extension Workspace {
             return
         }
         if let fullscreenWindow = rootTilingContainer.mostRecentWindowRecursive, fullscreenWindow.isFullscreen {
+            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -31,10 +37,68 @@ extension Workspace {
             try await fullscreenWindow.layoutFullscreen(context)
             return
         }
+        if arrangement == .master || arrangement == .scrolling {
+            lastAppliedLayoutPhysicalRect = rect
+            lastAppliedLayoutVirtualRect = rect
+            rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
+            rootTilingContainer.lastAppliedLayoutVirtualRect = rect
+            try await layoutWorkspaceGroups(in: rect, context)
+            for window in children.filterIsInstance(of: Window.self) {
+                window.lastAppliedLayoutPhysicalRect = nil
+                window.lastAppliedLayoutVirtualRect = nil
+                try await window.layoutFloatingWindow(context)
+            }
+            return
+        }
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
         // But I also faced this problem in monitors horizontal configuration. ¯\_(ツ)_/¯
         try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, context)
+    }
+}
+
+@MainActor
+private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) async throws {
+    let workspace = context.workspace
+    if workspace.arrangement == .scrolling {
+        workspace.rebaseScrollingViewportIfNeeded(using: workspace.scrollingMetrics)
+        let metrics = workspace.scrollingMetrics
+        if !workspace.scrollingGestureMotionActive, let focused = focus.windowOrNil,
+           workspace.lastScrollingFocusWindowId != focused.windowId,
+           let column = metrics.columns.first(where: { $0.node === focused.topLevelWorkspaceGroup })
+        {
+            workspace.scrollingOffset = metrics.revealedOffset(for: column, current: workspace.scrollingOffset)
+            workspace.lastScrollingFocusWindowId = focused.windowId
+        }
+        workspace.scrollingOffset = metrics.clampedOffset(workspace.scrollingOffset)
+        if !workspace.scrollingGestureMotionActive, let window = focus.windowOrNil as? MacWindow,
+           window.nodeWorkspace === workspace,
+           let column = metrics.columns.first(where: { $0.node === window.topLevelWorkspaceGroup }) {
+            let epoch = workspace.scrollingSessionEpoch
+            let offsets = (try? await window.scrollingSheetOffsets()) ?? []
+            try checkCancellation()
+            if workspace.scrollingSessionEpoch == epoch, focus.windowOrNil === window,
+               let left = offsets.map(\.minX).min(), let right = offsets.map(\.maxX).max() {
+                let leafInset = (window.lastAppliedLayoutVirtualRect?.minX ?? 0) -
+                    (column.node.lastAppliedLayoutVirtualRect?.minX ?? 0)
+                workspace.scrollingOffset = metrics.revealedOffset(start: column.start + leafInset + left,
+                    end: column.start + leafInset + right, current: workspace.scrollingOffset)
+            }
+        }
+    }
+    let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
+    for frame in frames {
+        for window in frame.node.allLeafWindowsRecursive {
+            window.isConcealedByScrolling = workspace.arrangement == .scrolling &&
+                !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size)
+                    .intersects(workspace.scrollingMetrics.geometry.area)
+        }
+        try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
+                                             height: frame.physical.height, virtual: frame.virtual, context)
+    }
+    if workspace.arrangement == .scrolling {
+        workspace.captureScrollingViewportAnchor()
+        ScrollingWindowOrdering.shared.update(workspace: workspace, frames: frames)
     }
 }
 

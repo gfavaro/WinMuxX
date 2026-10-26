@@ -8,9 +8,47 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     private(set) var namingStyle: WorkspaceNamingStyle = .explicit
     var projectId: WorkspaceProjectId = workspaceProjectDefaultId
     var restoredDisplayIndex: Int?
-    var preferredMonitorPoint: CGPoint?
+    var preferredMonitorPoint: CGPoint? {
+        didSet { if oldValue != preferredMonitorPoint { scrollingSessionEpoch &+= 1 } }
+    }
     var lifecycle: WorkspaceLifecycle = .durable
     var lastConfiguredLayout: WorkspaceLayoutSettings?
+    // Once workspace arrangements are used, returning to Dwindle must retain
+    // the same group boundaries rather than rerun the legacy tree migration.
+    var preservesTopLevelGroups = false
+    var arrangement: WorkspaceLayoutName = .dwindle {
+        didSet {
+            if arrangement != .dwindle { preservesTopLevelGroups = true }
+            if oldValue != arrangement { scrollingSessionEpoch &+= 1 }
+        }
+    }
+    var scrollingSessionEpoch: UInt64 = 0
+    var scrollingOffset: CGFloat = 0
+    var lastScrollingFocusWindowId: UInt32?
+    var scrollingAnchorWindowId: UInt32?
+    var scrollingAnchorViewportPosition: CGFloat?
+    var scrollingAnchorAreaWidth: CGFloat?
+    @MainActor var scrollingGestureMotionActive = false
+    @MainActor var scrollingGestureSessionID: UUID?
+    private var savedMasterGroupIndex = 0
+    private weak var masterGroup: TreeNode?
+    @MainActor var masterGroupIndex: Int {
+        get {
+            let groups = workspaceLayoutUnits
+            let index = masterGroup.flatMap { selected in groups.firstIndex { $0 === selected } }
+                ?? min(max(savedMasterGroupIndex, 0), max(groups.count - 1, 0))
+            savedMasterGroupIndex = index
+            masterGroup = groups.indices.contains(index) ? groups[index] : nil
+            return index
+        }
+        set {
+            savedMasterGroupIndex = newValue
+            let groups = workspaceLayoutUnits
+            masterGroup = groups.indices.contains(newValue) ? groups[newValue] : nil
+        }
+    }
+    var masterRatio: CGFloat?
+    var masterStackLayout: Layout = .tiles
 
     @MainActor
     private init(_ name: String) {
@@ -87,6 +125,24 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
 
     nonisolated func hash(into hasher: inout Hasher) { hasher.combine(ObjectIdentifier(self)) }
 
+}
+
+extension Workspace {
+    @MainActor
+    var scrollingTopologySignature: String {
+        let bounds = workspaceTilingRect(self)
+        var values: [String] = [arrangement.rawValue, id.rawValue,
+            "\(bounds.minX),\(bounds.minY),\(bounds.width),\(bounds.height)"]
+        func visit(_ node: TreeNode) {
+            values.append("\(ObjectIdentifier(node).hashValue):\(node.bindingGeneration):\(node.children.count):\(node.scrollingColumnWidth ?? config.scrolling.columnWidth)")
+            if let window = node as? Window {
+                values.append("\(window.minimumLayoutSize.width),\(window.minimumLayoutSize.height)")
+            }
+            node.children.forEach(visit)
+        }
+        visit(rootTilingContainer)
+        return values.joined(separator: ",")
+    }
 }
 
 extension Workspace {

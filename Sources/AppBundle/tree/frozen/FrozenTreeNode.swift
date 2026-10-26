@@ -17,6 +17,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
+    let scrollingColumnWidth: CGFloat?
 
     @MainActor init(_ container: TilingContainer) {
         children = container.children.map {
@@ -40,6 +41,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         dwindleSplitRatios = container.dwindleSplitRatios.isEmpty ? nil : container.dwindleSplitRatios
         dwindleOrientation = container.dwindleOrientation
         dwindleChildRatios = container.dwindleChildRatios
+        scrollingColumnWidth = container.scrollingColumnWidth
     }
 
     /// A terminated process can recover assignments, but cannot finish its old
@@ -55,6 +57,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         dwindleSplitRatios = nil
         dwindleOrientation = nil
         dwindleChildRatios = nil
+        scrollingColumnWidth = container.scrollingColumnWidth
     }
 }
 
@@ -70,6 +73,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
     let lastFloatingSize: CGSize?
     let singleWindowManualWidth: CGFloat?
     let workspacePreviewFrame: CGRect?
+    let scrollingColumnWidth: CGFloat?
 
     @MainActor init(_ window: Window) {
         id = window.windowId
@@ -81,6 +85,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         lastFloatingSize = window.parent is Workspace && !window.isFullscreen
             ? window.lastKnownActualRect?.size ?? window.lastFloatingSize : window.lastFloatingSize
         singleWindowManualWidth = window.singleWindowManualWidth
+        scrollingColumnWidth = window.scrollingColumnWidth
         if window.nodeWorkspace?.isVisible == true, !window.isHiddenInCorner,
            let rect = window.lastKnownActualRect ?? window.lastAppliedLayoutPhysicalRect,
            let monitor = window.nodeMonitor
@@ -106,6 +111,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         case lastFloatingSize
         case singleWindowManualWidth
         case workspacePreviewFrame
+        case scrollingColumnWidth
     }
 
     init(from decoder: any Decoder) throws {
@@ -122,6 +128,7 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         lastFloatingSize = try container.decodeIfPresent(CGSize.self, forKey: .lastFloatingSize)
         singleWindowManualWidth = try container.decodeIfPresent(CGFloat.self, forKey: .singleWindowManualWidth)
         workspacePreviewFrame = try container.decodeIfPresent(CGRect.self, forKey: .workspacePreviewFrame)
+        scrollingColumnWidth = try container.decodeIfPresent(CGFloat.self, forKey: .scrollingColumnWidth)
     }
 }
 

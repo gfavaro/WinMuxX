@@ -17,9 +17,11 @@ final class RawWorkspaceTouchSource: ObservableObject {
     var onFrame: ((WorkspaceTouchFrame) -> Void)?
 
     private var wantsTouch: Bool {
-        workspaceGesturesNeedRawTouch(horizontal: config.workspaceSwipe.enabled,
+        let scrollingWorkspaceVisible = config.scrolling.gestureEnabled &&
+            sortedMonitors.contains { runtime.workspaces.visibleWorkspace(for: $0)?.arrangement == .scrolling }
+        return workspaceGesturesNeedRawTouch(horizontal: config.workspaceSwipe.enabled,
             overview: config.workspaceOverview.threeFingerUp,
-            overviewOpen: WorkspaceOverviewController.shared.isOpen,
+            overviewOpen: WorkspaceOverviewController.shared.isOpen || scrollingWorkspaceVisible,
             runtimeEnabled: TrayMenuModel.shared.isEnabled)
     }
 

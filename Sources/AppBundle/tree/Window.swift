@@ -5,6 +5,12 @@ open class Window: TreeNode, Hashable {
     let windowId: UInt32
     let app: any AbstractApp
     var restartIdentity: RestartWindowIdentity?
+    /// Scrolling concealment is independent of inactive-workspace corner parking.
+    @MainActor private var scrollingColumnConcealed = false
+    @MainActor var isConcealedByScrolling: Bool {
+        get { scrollingColumnConcealed && nodeWorkspace?.arrangement == .scrolling && parent is TilingContainer }
+        set { scrollingColumnConcealed = newValue }
+    }
     /// Last trustworthy pre-parking frame in desktop unit coordinates; survives restart.
     var workspacePreviewFrame: CGRect?
     var preserveRestoredWorkspacePreview = false

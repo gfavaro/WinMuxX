@@ -76,6 +76,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "enable-shake-to-toggle-tiling": Parser(\.enableShakeToToggleTiling, parseBool),
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
     "master": Parser(\.master, parseMaster),
+    "scrolling": Parser(\.scrolling, parseScrolling),
     "follow-app-activation": Parser(\.followAppActivation, parseFollowAppActivation),
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),

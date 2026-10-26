@@ -20,6 +20,7 @@ open class TreeNode: Equatable, WinMuxAny {
     // - drag window with mouse
     // - move-mouse command
     var lastAppliedLayoutPhysicalRect: Rect? = nil // with real inner gaps
+    var scrollingColumnWidth: CGFloat? = nil
     final var unboundStacktrace: String? = nil
     var isBound: Bool { parent != nil } // todo drop, once https://github.com/nikitabobko/WinMux/issues/1215 is fixed
 

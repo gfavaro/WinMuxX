@@ -212,15 +212,16 @@ and window recovery/performance fixes. See [configuration and comparison notes](
 
 Dinky 0.20 adaptations add optional master layout / `swap-with-master`,
 app-activation exclusions, browser overlay filtering, and original-frame restoration
-on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md). In master
-mode, `layout tiles accordion` toggles only the stack from any tiled window;
-`workspace-layout dwindle` returns the workspace to its splitting tree.
+on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md) for the
+historical adoption notes. Current Master and Scrolling modes arrange each existing
+top-level group as a whole, preserving its nested splits and tabs. Group layout
+commands continue to affect their own group; `workspace-layout dwindle` restores
+the workspace's default arrangement mode.
 
-Dinky 0.21 command separation uses `workspace-layout dwindle master` to toggle
-workspace modes; `layout` only changes containers or floating/tiling. Existing
-`layout dwindle` and `layout master` bindings must be migrated. Three-option
-container cycles now visit every option, and `%{workspace-layout}` reports the
-workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
+Dinky 0.21 command separation uses `workspace-layout dwindle master scrolling`
+to select workspace modes; `layout` changes container layouts or floating/tiling.
+Three-option container cycles visit every option, and `%{workspace-layout}` reports
+the workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
 
 Run `winmuxx doctor` to inspect the loaded config path, file validation, effective default layout,
 permissions, monitors, potentially conflicting window managers and per-app accessibility latency.

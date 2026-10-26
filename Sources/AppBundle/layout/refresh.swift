@@ -502,6 +502,7 @@ func refreshModel() {
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
+    if !isUnitTest { WorkspaceScrollingMinimap.shared.modelDidChange() }
     if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 
@@ -573,6 +574,13 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     let invalidateNativeStateAppPid: pid_t? =
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
+        if let emittingAppPid,
+           notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
+            notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {
+            for window in MacWindow.allWindows where window.macApp.pid == emittingAppPid {
+                window.invalidateScrollingSheetCache()
+            }
+        }
         if let destroyedWindowId {
             WindowBorderController.shared.remove(windowId: destroyedWindowId)
             (Window.get(byId: destroyedWindowId) as? MacWindow)?.garbageCollect(skipClosedWindowsCache: false)

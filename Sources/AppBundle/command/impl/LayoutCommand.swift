@@ -18,12 +18,19 @@ struct LayoutCommand: Command {
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)
         }
-        if window.parent is TilingContainer, target.workspace.rootTilingContainer.layout == .master,
-           args.toggleBetween.val.allSatisfy({ $0 == .tiles || $0 == .stacked }) {
-            return target.workspace.changeMasterStackLayout(between: args.toggleBetween.val.map { $0 == .tiles ? .tiles : .stacked })
-        }
         let targetDescription = nextLayout(in: args.toggleBetween.val, matching: { window.matchesDescription($0) })
         if window.matchesDescription(targetDescription) { return false }
+        if target.workspace.arrangement == .scrolling,
+           window.parent === target.workspace.rootTilingContainer,
+           targetDescription != .floating, targetDescription != .tiling {
+            let parent = window.parent as! TilingContainer
+            let binding = window.unbindFromParent()
+            let wrapper = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight,
+                                          parent.orientation, .tiles, index: binding.index)
+            wrapper.scrollingColumnWidth = window.scrollingColumnWidth
+            window.scrollingColumnWidth = nil
+            window.bind(to: wrapper, adaptiveWeight: WEIGHT_AUTO, index: 0)
+        }
         switch targetDescription {
             case .hTabGroup:
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: .h, window: window)
@@ -78,13 +85,6 @@ struct LayoutCommand: Command {
     guard let parent = window.parent else { return false }
     switch parent.cases {
         case .tilingContainer(let immediateParent):
-            let root = window.nodeWorkspace?.rootTilingContainer
-            if root?.layout == .master, targetLayout == nil {
-                return io.err("Configure [master].side to change the master orientation")
-            }
-            if root?.layout == .master {
-                return io.err("In master layout, use tiles or accordion to change the stack; configure [master].side to change its orientation")
-            }
             let parent = immediateParent
             let requestedOrientation = targetOrientation
             let targetOrientation = targetOrientation ?? parent.orientation
@@ -103,8 +103,7 @@ struct LayoutCommand: Command {
 
 extension Window {
     @MainActor fileprivate func matchesDescription(_ layout: LayoutCmdArgs.LayoutDescription) -> Bool {
-        let layoutParent = nodeWorkspace?.rootTilingContainer.layout == .master
-            ? nodeWorkspace?.rootTilingContainer : parent as? TilingContainer
+        let layoutParent = parent as? TilingContainer
         return switch layout {
             case .stacked: layoutParent?.layout == .stacked
             case .tabGroup:   layoutParent?.layout == .tabGroup

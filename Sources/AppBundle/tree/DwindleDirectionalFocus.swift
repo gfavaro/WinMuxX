@@ -6,12 +6,13 @@ func dwindleDirectionalFocusTarget(
     from current: Window,
     direction: CardinalDirection,
     excludingMoveNode: TreeNode? = nil,
+    candidates sourceWindows: [Window]? = nil,
 ) -> Window? {
     guard let workspace = current.nodeWorkspace
     else { return nil }
     let frames = dwindleFocusFrames(in: workspace)
     guard let currentRect = frames[current.windowId] else { return nil }
-    let candidates = workspace.rootTilingContainer.allLeafWindowsRecursive.compactMap { window -> (Window, [CGFloat])? in
+    let candidates = (sourceWindows ?? workspace.rootTilingContainer.allLeafWindowsRecursive).compactMap { window -> (Window, [CGFloat])? in
         guard window != current,
               window.moveNode != excludingMoveNode,
               window.participatesInWorkspaceFocus,
@@ -59,10 +60,10 @@ func dwindleFocusFrames(in workspace: Workspace) -> [UInt32: Rect] {
 
 @MainActor
 func spatialWrapFocusTarget(in workspace: Workspace, from currentWindow: Window?, direction: CardinalDirection,
-                            excludingMoveNode: TreeNode? = nil) -> Window? {
+                            excludingMoveNode: TreeNode? = nil, candidates sourceWindows: [Window]? = nil) -> Window? {
         let frames = dwindleFocusFrames(in: workspace)
         let current = currentWindow.flatMap { frames[$0.windowId] }
-        let candidates = workspace.rootTilingContainer.allLeafWindowsRecursive.compactMap { window -> (Window, [CGFloat])? in
+        let candidates = (sourceWindows ?? workspace.rootTilingContainer.allLeafWindowsRecursive).compactMap { window -> (Window, [CGFloat])? in
             guard window.moveNode != excludingMoveNode, let rect = frames[window.windowId], window.participatesInWorkspaceFocus else { return nil }
             let edge = direction.orientation == .h
                 ? (direction.isPositive ? rect.minX : -rect.maxX)

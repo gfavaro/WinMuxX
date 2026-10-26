@@ -13,6 +13,8 @@ help documents an explicit target.
 `layout` changes the selected window's container. These scopes differ; see
 [layouts](LAYOUTS.md).
 
+**Scrolling workspaces:** `scrolling-width next|previous|full` changes the focused group's width; `scrolling-center` centers it. `scrolling-minimap toggle` opens or closes the clickable workspace map; explicit opening keeps it visible and supports Left/Right, Return and Escape, also available from Layout → Show Scrolling Minimap and Control–Option–M in fresh configurations.
+
 **Workspace and project:** `workspace` selects a workspace;
 `workspace-back-and-forth` returns to the previous one; `project` selects a
 project. `move-node-to-workspace`, `move-node-to-project` and

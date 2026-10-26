@@ -29,7 +29,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
 
     func install(checkForUpdates: (() -> Void)?) {
         guard statusItem == nil else { return }
@@ -69,14 +69,16 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, lastModePresentation == model.modePresentation { return }
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
         lastIconState = state
         lastModePresentation = model.modePresentation
         let mode = model.isEnabled ? model.modePresentation : nil
         let dark = statusItem?.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let color = mode?.color(dark: dark, increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
         let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
+        let arrangementName = state.arrangement.rawValue.capitalized
+        let arrangementDescription = " · \(arrangementName) layout"
         if model.isEnabled && state.indicator == .workspace {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
@@ -84,36 +86,22 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
             statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + modeDescription
-            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display" + modeDescription)
+            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + arrangementDescription + modeDescription
+            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display, \(arrangementName) layout" + modeDescription)
             return
         }
         statusItem?.length = NSStatusItem.squareLength
         statusItem?.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" + modeDescription : "WinMux disabled")
-        let image: NSImage?
-        if model.isEnabled {
-            let monochrome = model.menuBarConfiguration.iconAppearance != .color
-            image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
-            image?.isTemplate = monochrome
-        } else {
-            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuxX disabled")
-        }
+        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux, \(arrangementName) layout" + modeDescription : "WinMux disabled")
+        let image = menuBarIconImage(
+            enabled: model.isEnabled,
+            arrangement: state.arrangement,
+            appearance: model.menuBarConfiguration.iconAppearance,
+            keyboardTint: color,
+        )
         image?.size = NSSize(width: 18, height: 18)
-        if let color, let source = NSImage(named: "MenuBarIconMonochrome") {
-            let tinted = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-                source.draw(in: rect)
-                color.setFill()
-                rect.fill(using: .sourceIn)
-                return true
-            }
-            tinted.isTemplate = false
-            statusItem?.button?.image = tinted
-            statusItem?.button?.toolTip = "WinMuxX" + modeDescription
-            return
-        }
         statusItem?.button?.image = image
-        statusItem?.button?.toolTip = "WinMuxX" + modeDescription
+        statusItem?.button?.toolTip = "WinMuxX" + arrangementDescription + modeDescription
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -180,11 +168,15 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             submenu.addItem(.separator())
             addCommand("Dwindle", script: "workspace-layout dwindle", to: submenu)
             addCommand("Master", script: "workspace-layout master", to: submenu)
+            addCommand("Scrolling", script: "workspace-layout scrolling", to: submenu)
             submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
             addCommand("Swap with Master", script: "swap-with-master", to: submenu)
+            addCommand("Center Scrolling Column", script: "scrolling-center", to: submenu)
+            addCommand("Show Scrolling Minimap", script: "scrolling-minimap", to: submenu)
+            addCommand("Cycle Scrolling Width", script: "scrolling-width next", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)

@@ -83,6 +83,14 @@ strips and exactly two window children. Larger groups keep their tabs. Rotation
 uses Screen Recording permission and respects Reduce Motion. These preferences
 have no runtime fallback to UserDefaults.
 
+The icon represents the focused workspace arrangement: Dwindle uses four
+progressive panes, Master uses a large left pane with two stacked panes on the
+right, and Scrolling shows a centered column with neighboring columns. The
+symbols stay fixed as windows, nested layouts, or master orientation change.
+Color uses the macOS system accent; monochrome is a template icon that follows
+the menu bar. An active keyboard mode tints either icon. The workspace text
+indicator remains the workspace label or number.
+
 ## Migration and backups
 
 At startup, an editable config is migrated before loading. Legacy
@@ -162,3 +170,34 @@ the draft and provide Retry. Opening or reloading a page does not save its value
 Existing rule and display-assignment edits also autosave; creating or deleting
 entries remains an explicit action. The complete TOML editor in Configuration
 keeps Validate and Save and apply, including stale-file conflict protection.
+
+## Workspace-wide arrangement
+
+Set `layout` in a workspace section to `dwindle`, `master` or `scrolling`. This chooses how the workspace's existing top-level groups are arranged; it does not flatten nested splits or tab groups. Master arranges one selected group beside a stack of the others. Scrolling arranges groups in horizontal columns.
+
+After using Master or Scrolling, switching back to Dwindle retains those group boundaries, including across restarts. Master selection follows the group when other groups are inserted or removed. Keyboard resizing adjusts nested splits first; when there is no matching split inside the focused group, resizing along the Master axis adjusts the workspace divider. Its proportion is saved with the workspace.
+
+```toml
+[scrolling]
+column-width = 0.49
+width-presets = [0.25, 0.3333, 0.5, 0.6667, 0.75, 1.0]
+gesture-enabled = true
+gesture-sensitivity = 1.0
+minimap-enabled = true
+
+[workspace.'Code']
+layout = 'scrolling'
+```
+
+Option plus a three-finger horizontal swipe pans a scrolling workspace. Plain three-finger swipes continue to switch workspaces. `scrolling-width next|previous|full` changes the focused column width, and `scrolling-center` centres it. The clickable minimap appears while navigating. Scrolled-out columns leave a 25-point edge preview; previews at display walls stay within their owning display.
+
+A fitting strip is centered. An overflowing strip clamps at both ends; explicit centering respects those bounds. Focus and minimap selection reveal the selected column with the smallest necessary movement. The minimap appears on the workspace's display. Its tiles preserve the column proportions with one scale for both width and height, and show app icons, window titles and tab/split markers. Short strips are centered rather than stretched across the panel. The preview height can grow for narrow columns to retain 32-point click targets without distorting their shapes. A dashed outline tracks the visible area; the accent border marks the focused group. Click a group to focus and reveal it. The map stays visible during panning or while hovered, then fades after 1.5 seconds of inactivity.
+
+Run `scrolling-minimap toggle` (the argument is optional) or choose **Layout → Show Scrolling Minimap** to keep it open without a gesture. Use Left/Right to select, Return to activate, and Escape to dismiss. Narrow columns retain at least 32-point targets; the map scrolls horizontally when needed. Fresh configurations bind Control–Option–M; existing configurations can assign it in Settings → Shortcuts or add a binding:
+
+```toml
+[mode.main.binding]
+alt-ctrl-m = 'scrolling-minimap'
+```
+
+WinMuxX adapts the scrolling-strip geometry described by [Dinky](https://github.com/mikker/Dinky); see [Dinky's MIT license](licenses/Dinky-MIT.txt).

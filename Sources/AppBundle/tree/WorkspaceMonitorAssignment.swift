@@ -109,8 +109,14 @@ extension CGPoint {
         guard !runtime.workspaces.isWorkspaceActive(workspace.id, outside: viewportId) else {
             return false
         }
+        if let monitor = sortedMonitors.first(where: { $0.rect.topLeftCorner == self }),
+           runtime.workspaces.visibleWorkspace(for: monitor) !== workspace {
+            WorkspaceScrollingGestureController.shared.cancelForMonitorOwnershipChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+        }
         _ = runtime.workspaces.setActiveWorkspace(workspace, on: viewportId)
         checkWorkspaceHierarchyInvariants()
+        if isWinMuxRuntimeReady { WorkspaceGestureCoordinator.shared.overviewPresentationChanged() }
         return true
     }
 }

@@ -9,6 +9,7 @@ public final class TrayMenuModel: ObservableObject {
     @Published var modePresentation: ModePresentation?
     @Published var menuBarWorkspaceIndicator: String = "1"
     @Published var menuBarWorkspaceName: String = ""
+    @Published var menuBarWorkspaceArrangement: WorkspaceLayoutName = .dwindle
     /// Is "layouting" enabled
     @Published var isEnabled: Bool = true
     @Published var shortcutHealth: ShortcutHealth = .available
@@ -71,6 +72,7 @@ extension ObservableObject {
     let persistentLabel = workspace.isConfiguredPersistent && parsePositiveWorkspaceDisplayIndex(workspace.name) == nil ? workspace.name : nil
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name] ?? persistentLabel, number: number))
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, workspaceDisplayName(workspace.name))
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, workspace.arrangement)
     let workspaces = userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace).filter {
         $0.projectId == activeWorkspaceProjectId(for: $0.workspaceMonitor)
     }.map {

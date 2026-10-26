@@ -66,6 +66,7 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 ),
                 shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "workspace-layout dwindle"),
                 shortcutAction(id: "layout-master", title: "Master", command: "workspace-layout master"),
+                shortcutAction(id: "scrolling-minimap", title: "Show Scrolling Minimap", command: "scrolling-minimap"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
                 shortcutAction(id: "layout-tabs", title: "Stacked: Tabbed", command: "layout tab-group"),

@@ -4,4 +4,4 @@ config-version = 2
 layout = 'master'
 
 [workspace.'A quoted workspace'.display.'Built-in']
-layout = 'accordion'
+layout = 'scrolling'

@@ -39,6 +39,9 @@ let subcommandDescriptions = [
     ["  project", "Focus the specified project"],
     ["  reload-config", "Reload currently active config"],
     ["  resize", "Resize the focused window"],
+    ["  scrolling-center", "Center the focused scrolling column"],
+    ["  scrolling-minimap", "Toggle the scrolling workspace map"],
+    ["  scrolling-width", "Change the focused scrolling column width"],
     ["  split", "Split focused window"],
     ["  stack-with", "Put the focused window into the same tab group as the nearest window in the specified direction."],
     ["  state", "Read a versioned snapshot of managed state without refreshing native windows"],
@@ -49,6 +52,6 @@ let subcommandDescriptions = [
     ["  trigger-binding", "Trigger WinMuxX binding as if it was pressed by user"],
     ["  workspace-back-and-forth", "Switch between the focused workspace and previously focused workspace back and forth"],
     ["  workspace", "Focus the specified workspace"],
-    ["  workspace-layout", "Switch the workspace between dwindle and master layouts"],
+    ["  workspace-layout", "Arrange workspace groups using dwindle, master, or scrolling"],
     ["  workspace-overview", "Show, hide, or toggle the spatial workspace overview"],
 ]

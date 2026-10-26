@@ -68,7 +68,7 @@ let layout_help_generated = """
     Change the focused window's container, or float/tile the window.
     In master layout, tiles/accordion choices change only the stack.
     Multiple choices cycle after the last matching state, wrapping to the first.
-    Use 'workspace-layout dwindle master' to switch workspace modes.
+    Use 'workspace-layout dwindle master scrolling' to switch workspace modes.
     """
 let list_apps_help_generated = """
     USAGE: list-apps [-h|--help] [--macos-native-hidden [no]] [--format <output-format>] [--count] [--json]

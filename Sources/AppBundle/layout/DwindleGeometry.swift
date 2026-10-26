@@ -58,6 +58,13 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
         }
     }
     let rect = workspaceTilingRect(workspace)
-    visit(workspace.rootTilingContainer, physical ? rect.copy(\.height, max(rect.height - 1, 0)) : rect)
+    if workspace.arrangement == .dwindle {
+        visit(workspace.rootTilingContainer, physical ? rect.copy(\.height, max(rect.height - 1, 0)) : rect)
+    } else {
+        result[ObjectIdentifier(workspace.rootTilingContainer)] = rect
+        for frame in workspace.arrangementGroupFrames(in: rect, gaps: gaps) {
+            visit(frame.node, physical ? frame.physical : frame.virtual)
+        }
+    }
     return result
 }

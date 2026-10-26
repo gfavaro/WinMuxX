@@ -25,10 +25,10 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
 
     func testWorkspaceAndContainerCommandsHaveSeparateParsers() {
         for command in ["layout master", "layout dwindle", "layout tiles master", "layout scrolling",
-                        "workspace-layout tiles", "workspace-layout accordion", "workspace-layout scrolling", "workspace-layout"] {
+                        "workspace-layout tiles", "workspace-layout accordion", "workspace-layout"] {
             XCTAssertNotNil(parseCommand(command).errorOrNil, command)
         }
-        for command in ["workspace-layout master", "workspace-layout dwindle master", "layout tiles accordion"] {
+        for command in ["workspace-layout master", "workspace-layout scrolling", "workspace-layout dwindle master", "layout tiles accordion"] {
             XCTAssertNil(parseCommand(command).errorOrNil, command)
         }
         let old = parseConfig("[mode.main.binding]\nalt-space = 'layout dwindle'")
@@ -64,8 +64,8 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         _ = unrelated.focusWindow()
         let result = try await run("workspace-layout --window-id \(tab.windowId) master")
         XCTAssertEqual(result.exitCode, 0)
-        XCTAssertEqual(workspace.rootTilingContainer.layout, .master)
-        XCTAssertTrue(workspace.rootTilingContainer.children.first === tabs)
+        XCTAssertEqual(workspace.arrangement, .master)
+        XCTAssertTrue(workspace.rootTilingContainer.children.contains(where: { $0 === tabs }))
         XCTAssertEqual(tabs.children, [tab, otherTab])
         XCTAssertEqual(other.rootTilingContainer.layout, .stacked)
         XCTAssertEqual(other.rootTilingContainer.children, [unrelated])
@@ -86,15 +86,14 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         XCTAssertEqual(enter.exitCode, 0)
         let change = try await run("layout accordion")
         XCTAssertEqual(change.exitCode, 0)
-        let stack = try XCTUnwrap(focus.workspace.rootTilingContainer.children.compactMap { $0 as? TilingContainer }.first)
-        XCTAssertEqual(stack.layout, .stacked)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.children, windows)
         config.master.stackLayout = .tiles
         let exit = try await run("workspace-layout dwindle master")
         XCTAssertEqual(exit.exitCode, 0)
         XCTAssertEqual(focus.workspace.layoutName, "dwindle")
-        XCTAssertEqual(stack.layout, .stacked)
-        XCTAssertEqual(stack.children, Array(windows.dropFirst()))
-        XCTAssertFalse(stack.isMasterStack)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.children, windows)
         XCTAssertTrue(focus.windowOrNil === windows[0])
     }
 
@@ -108,15 +107,17 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertEqual(focus.workspace.layoutName, "dwindle")
         XCTAssertEqual(root.layout, .tabGroup)
+        XCTAssertEqual(focus.workspace.arrangement, .dwindle)
         XCTAssertEqual(root.children, [first, second])
         XCTAssertTrue(focus.windowOrNil === first)
     }
 
-    func testEmptyFloatingAndInvalidTargetsDoNotChangeWorkspaceLayout() async throws {
+    func testEmptyWorkspaceAllowsModeSelectionAndInvalidTargetsRemainRejected() async throws {
         let root = focus.workspace.rootTilingContainer
         root.layout = .tiles
         let empty = try await run("workspace-layout master")
-        XCTAssertNotEqual(empty.exitCode, 0)
+        XCTAssertEqual(empty.exitCode, 0)
+        XCTAssertEqual(focus.workspace.arrangement, .master)
         let floating = TestWindow.new(id: 28400, parent: focus.workspace)
         let floatResult = try await run("workspace-layout --window-id \(floating.windowId) master")
         XCTAssertNotEqual(floatResult.exitCode, 0)
@@ -131,9 +132,9 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         let root = workspace.rootTilingContainer
         let window = TestWindow.new(id: 28500, parent: root)
         _ = window.focusWindow()
-        for (layout, expected): (Layout, String) in [(.tiles, "fixed"), (.stacked, "fixed"),
-                                                    (.tabGroup, "fixed"), (.dwindle, "dwindle"), (.master, "master")] {
-            root.layout = layout
+        for (mode, expected): (WorkspaceLayoutName, String) in [(.dwindle, "dwindle"), (.master, "master"), (.scrolling, "scrolling")] {
+            workspace.arrangement = mode
+            root.layout = .tiles
             let values = [FormatObject.workspace(workspace)].format([.interVar("workspace-layout")])
             XCTAssertEqual(try values.get(), [expected])
             let output = try await run("list-windows --all --format %{workspace-layout} --json")

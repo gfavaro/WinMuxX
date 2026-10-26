@@ -6,30 +6,17 @@ struct WorkspaceLayoutCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
-        guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
-        guard window.parent is TilingContainer else { return io.err("The window is non-tiling") }
         let workspace = target.workspace
-        let current: WorkspaceLayoutName = workspace.rootTilingContainer.layout == .master ? .master : .dwindle
-        let layout = nextLayout(in: args.layouts.val, matching: { $0 == current })
-        switch layout {
-            case .master:
-                workspace.configureMasterLayout(focused: window)
-            case .dwindle:
-                let root = workspace.rootTilingContainer
-                guard root.layout != .dwindle else { return false }
-                if root.layout == .tabGroup {
-                    // A workspace switch preserves a tab group as one atomic pane.
-                    root.unbindFromParent()
-                    let replacement = TilingContainer(parent: workspace, adaptiveWeight: 1,
-                        root.orientation, .dwindle, index: 0)
-                    root.bind(to: replacement, adaptiveWeight: 1, index: 0)
-                } else {
-                    // Keep existing containers, including the master's chosen stack
-                    // mode. Configuration defaults must not rebuild them on exit.
-                    for child in root.children { (child as? TilingContainer)?.isMasterStack = false }
-                    root.layout = .dwindle
-                }
+        let window = target.windowOrNil
+        if let window, !(window.parent is TilingContainer) {
+            return io.err("The window is non-tiling")
         }
+        let current = workspace.arrangement
+        let layout = nextLayout(in: args.layouts.val, matching: { $0 == current })
+        // Arrangement transitions retain the live nested tree. In particular, an
+        // empty workspace can opt in before its first window is detected.
+        workspace.transitionArrangement(to: layout, focused: window)
+        WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
         return true
     }
 }
@@ -37,10 +24,6 @@ struct WorkspaceLayoutCommand: Command {
 extension Workspace {
     @MainActor
     var layoutName: String {
-        switch rootTilingContainer.layout {
-            case .dwindle: "dwindle"
-            case .master: "master"
-            case .tiles, .stacked, .tabGroup: "fixed"
-        }
+        arrangement.rawValue
     }
 }

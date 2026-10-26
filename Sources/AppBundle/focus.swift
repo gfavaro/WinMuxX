@@ -132,11 +132,22 @@ func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
 /// Unlike derived live focus, this changes only when focus is explicitly assigned.
 @MainActor func captureRequestedFocus() -> FrozenFocus { runtime.focus.requested }
 
-@MainActor func setFocus(to newFocus: LiveFocus) -> Bool {
+enum FocusChangeOrigin: Equatable { case explicit, native }
+
+@MainActor func setFocus(to newFocus: LiveFocus, origin: FocusChangeOrigin = .explicit) -> Bool {
+    if origin == .explicit {
+        ScrollingWindowOrdering.shared.cancel()
+        let interruptedMotion = WorkspaceScrollingGestureController.shared.isMotionActive
+        WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
+        if interruptedMotion { newFocus.workspace.lastScrollingFocusWindowId = nil }
+    } else if WorkspaceScrollingGestureController.shared.isMotionActive {
+        return false
+    }
     if runtime.focus.requested == newFocus.frozen {
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
     let oldFocus = focus
+    if oldFocus.workspace !== newFocus.workspace { WorkspaceScrollingMinimap.shared.dismiss() }
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     guard status else { return false }
 

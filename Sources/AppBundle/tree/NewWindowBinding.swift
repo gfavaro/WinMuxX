@@ -37,11 +37,11 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> B
     if let tabGroupBinding = autoAddNewWindowToFocusedTabGroupBinding(workspace) {
         return tabGroupBinding
     }
-    if workspace.rootTilingContainer.layout == .master {
-        workspace.normalizeMasterLayout()
-        let root = workspace.rootTilingContainer
-        let parent = root.children.isEmpty ? root : workspace.masterStackForInsertion()
-        return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    if workspace.arrangement == .scrolling || workspace.arrangement == .master {
+        let root = ensureScrollingRootSupportsColumns(workspace)
+        let focused = focus.windowOrNil?.topLevelWorkspaceGroup
+        let index = focused.flatMap { root.children.firstIndex(of: $0) }.map { $0 + 1 } ?? root.children.count
+        return BindingData(parent: root, adaptiveWeight: WEIGHT_AUTO, index: index)
     }
     guard let mruWindow = workspace.mostRecentWindowRecursive,
           let tilingParent = mruWindow.parent as? TilingContainer
