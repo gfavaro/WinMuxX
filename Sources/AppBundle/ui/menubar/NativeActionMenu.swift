@@ -40,11 +40,9 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         nativeMenu = menu
+        item.menu = menu
         statusItem = item
         if let button = item.button {
-            button.target = self
-            button.action = #selector(statusItemClicked(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             appearanceObservation = button.observe(\.effectiveAppearance, options: [.initial, .new]) { button, _ in
                 Task { @MainActor in
                     let match = button.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) ?? .aqua
@@ -69,15 +67,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         updateIcon()
         observation = TrayMenuModel.shared.objectWillChange.sink { [weak self] _ in
             Task { @MainActor in self?.updateIcon() }
-        }
-    }
-
-    @objc private func statusItemClicked(_ sender: NSStatusBarButton) {
-        if NSApp.currentEvent?.type == .rightMouseUp || NSApp.currentEvent?.buttonNumber == 1 {
-            WorkspaceControlsPanelController.shared.dismiss()
-            openMenu()
-        } else {
-            WorkspaceControlsPanelController.shared.toggle()
         }
     }
 
@@ -127,6 +116,10 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         image?.size = NSSize(width: 18, height: 18)
         statusItem?.button?.image = image
         statusItem?.button?.toolTip = "WinMuxX" + arrangementDescription + modeDescription
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        WorkspaceControlsPanelController.shared.dismiss()
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
@@ -234,6 +227,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
+        menu.addItem(callbackItem("Workspace Controls…", #selector(openWorkspaceControls)))
         addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
         if !PersistedAppMinimums.shared.isEmpty || MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
             menu.addItem(callbackItem("Clear Saved Minimum Sizes…", #selector(resetMinimumSizes)))
@@ -335,6 +329,9 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     @objc private func openSettings() {
         WorkspaceControlsPanelController.shared.dismiss()
         ShortcutSettingsModel.shared.requestWindowOpen()
+    }
+    @objc private func openWorkspaceControls() {
+        Task { @MainActor in WorkspaceControlsPanelController.shared.show() }
     }
     @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
     @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }

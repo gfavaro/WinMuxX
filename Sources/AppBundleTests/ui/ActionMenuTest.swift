@@ -79,7 +79,7 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
-        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Reload Config", "Enabled", "Settings…", "Quit WinMuxX"] {
+        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Workspace Controls…", "Reload Config", "Enabled", "Settings…", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
         XCTAssertFalse(titles.contains("Mode: main"))
