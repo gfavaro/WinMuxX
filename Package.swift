@@ -13,6 +13,7 @@ let package = Package(
         .executable(name: "winmuxx", targets: ["Cli"]),
         .executable(name: "winmux-marketing-renderer", targets: ["MarketingRenderer"]),
         .executable(name: "winmux-window-capture", targets: ["WindowCapture"]),
+        .executable(name: "winmuxx-native-spaces-probe", targets: ["NativeSpacesProbe"]),
         // Don't use this build for release, use xcode instead
         .executable(name: "WinMuxApp", targets: ["WinMuxApp"]),
         // We only need to expose this as a product for xcode
@@ -29,6 +30,9 @@ let package = Package(
     // Targets are the basic building blocks of a package, defining a module or a test suite.
     // Targets can depend on other targets in this package and products from dependencies.
     targets: [
+        .target(name: "NativeSpaces"),
+        .executableTarget(name: "NativeSpacesProbe", dependencies: ["NativeSpaces"]),
+        .testTarget(name: "NativeSpacesTests", dependencies: ["NativeSpaces"]),
         // Exposes the private _AXUIElementGetWindow function to swift
         .target(
             name: "PrivateApi",
