@@ -7,6 +7,7 @@ struct ShortcutGeneralSettingsView: View {
 
     @SettingsDraft("start-workspaces-on-main-monitor", load: { config.startWorkspacesOnMainMonitor }) private var startWorkspacesOnMain: Bool
     @SettingsDraft("native-spaces.restore-layouts", load: { config.nativeSpaces.restoreLayouts }) private var restoreNativeLayouts: Bool
+    @SettingsDraft("native-spaces.restore-frames-on-quit", load: { config.nativeSpaces.restoreFramesOnQuit }) private var restoreFramesOnQuit: Bool
     private let runsNative = runtime.workspaceBackend.kind == .native
     /// Applied only by restarting: a running WinMuxX keeps its backend (see `reload-config`).
     @State private var backendChoice = WorkspaceBackendChoice.running
@@ -34,6 +35,9 @@ struct ShortcutGeneralSettingsView: View {
                 if runsNative {
                     SettingsToggle("Restore desktop layouts", id: "native-spaces.restore-layouts", isOn: $restoreNativeLayouts, help: "Remember each desktop's layout and put it back after WinMuxX or the Mac restarts.") {
                         persistSettingsConfig(section: "native-spaces", key: "restore-layouts", renderedValue: restoreNativeLayouts ? "true" : "false", model: model)
+                    }
+                    SettingsToggle("Put windows back on quit", id: "native-spaces.restore-frames-on-quit", isOn: $restoreFramesOnQuit, help: "Quitting WinMuxX or turning it off returns tiled windows on the desktops showing to where they were before tiling.") {
+                        persistSettingsConfig(section: "native-spaces", key: "restore-frames-on-quit", renderedValue: restoreFramesOnQuit ? "true" : "false", model: model)
                     }
                 }
                 if backendChoice != .running {

@@ -211,7 +211,7 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
             clearPendingWindowDragIntent()
             cancelManipulatedWithMouseState()
             model.isWorkspaceSidebarExpanded = false
-            state.nativeTiling.invalidate("disabled")
+            await stopNativeTilingAndRestoreFrames()
             try await activateMode(nil)
         }
         WorkspaceSidebarPanel.refreshAll()
@@ -223,12 +223,21 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
     func diagnosticsReport() async -> String? { nativeSpacesDiagnosticReport() }
     func updateTray() -> Bool { updateNativeTrayText(); return true }
 
-    /// Native mode has no live drag driver: geometry is re-read on demand, and a moving
-    /// tiled window shows the drop overlays.
+    /// Native mode has no live drag driver: geometry is re-read on demand, a moving tiled
+    /// window shows the drop overlays, and one its app moved by itself is put back.
     func windowGeometryChanged(_ windowId: UInt32?, moved: Bool) -> Bool {
         guard let windowId, let window = Window.get(byId: windowId) else { return true }
         window.invalidateLastKnownNativeState()
         if moved { updateNativeDragOverlay(window) }
+        if NSEvent.pressedMouseButtons == 0 { NativeFrameRecovery.shared.windowChanged(window) }
         return true
     }
+}
+
+/// Stops tiling first, so no layout moves a window back while it is being restored.
+@MainActor
+func stopNativeTilingAndRestoreFrames() async {
+    TrayMenuModel.shared.isEnabled = false
+    runtime.workspaceBackend.nativeTiling.invalidate("disabled")
+    await NativeOriginalFrames.shared.restore()
 }

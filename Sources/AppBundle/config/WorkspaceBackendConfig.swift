@@ -8,6 +8,7 @@ private struct WorkspaceBackendConfig: ConvenienceCopyable {
 struct NativeSpacesConfig: ConvenienceCopyable, Equatable {
     var tilingEnabled = false
     var restoreLayouts = true
+    var restoreFramesOnQuit = true
 }
 
 func parseNativeSpaces(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace,
@@ -15,6 +16,7 @@ func parseNativeSpaces(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace,
     parseTable(raw, NativeSpacesConfig(), [
         "tiling-enabled": Parser(\.tilingEnabled, parseBool),
         "restore-layouts": Parser(\.restoreLayouts, parseBool),
+        "restore-frames-on-quit": Parser(\.restoreFramesOnQuit, parseBool),
     ], trace, &errors)
 }
 

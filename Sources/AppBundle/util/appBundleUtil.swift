@@ -48,8 +48,9 @@ func initTerminationHandler() {
 
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
-        // Native windows were never parked, so there is nothing to restore on quit.
+        // Native windows were never parked; tiled ones go back to where they started.
         if !runtime.workspaceBackend.capabilities.usesVirtualRecovery {
+            await stopNativeTilingAndRestoreFrames()
             runtime.workspaceBackend.stop()
             return
         }

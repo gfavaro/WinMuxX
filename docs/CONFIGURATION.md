@@ -4,7 +4,8 @@
 accepts `"native"` for experimental read-only Space observation. An additional
 `[native-spaces] tiling-enabled = true` opts into the development Dwindle/Master
 implementation; both selections require restart. `restore-layouts = true` is the
-default and uses a separate native file when tiling is enabled. Initial single-host
+default and uses a separate native file when tiling is enabled; `restore-frames-on-quit = true`
+puts tiled windows back where they started on quit or `enable off`. Initial single-host
 positioning/focus/fullscreen checks passed; the broader native validation matrix
 remains pending. See [Native Spaces](NATIVE_SPACES.md)
 for opt-in, rollback, unsupported commands and failure handling.

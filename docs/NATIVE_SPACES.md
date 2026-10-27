@@ -71,6 +71,7 @@ type = "native"
 [native-spaces]
 tiling-enabled = true # false by default; changing this requires restart
 restore-layouts = true
+restore-frames-on-quit = true
 ```
 
 The initial implementation currently suspends tiling below macOS 27 because its
@@ -129,6 +130,14 @@ meanwhile, and the desktop is saved again as it is. A corrupt or
 newer-version file is preserved and reported. Numeric Space renumbering never causes ordinal matching. Set
 `restore-layouts = false` to disable native loading/saving; existing files are retained.
 The virtual `window-state.json` and recovery journal are untouched.
+
+Quitting WinMuxX or `enable off` puts each tiled window back where it was before native
+tiling first moved it, if it is still on that desktop and the desktop is showing; a
+window on a hidden desktop stays where it is, since reaching it would take a desktop
+switch. The original frames are kept in memory only. Set `restore-frames-on-quit = false`
+to leave windows where tiling put them. A tiled window its app moves or resizes on its
+own is put back on its tile once it has been still for 150 ms, up to three times per
+tile, so an app that keeps fighting is left alone.
 
 If startup configuration is invalid, shipped defaults remain available for error
 display but the process stays read-only until restart. This prevents an invalid

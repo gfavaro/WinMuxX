@@ -495,6 +495,7 @@ final class MacWindow: Window {
             return
         }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
+        NativeOriginalFrames.shared.recordBeforeWrite(self)
         macApp.setAxFrame(windowId, topLeft, size)
         // Reasserting an unchanged layout must neither flood AX with observations nor
         // continually cancel the confirmation already waiting for that same request.
@@ -551,6 +552,7 @@ final class MacWindow: Window {
         suspendMinimumObservationForMotion()
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
+        NativeOriginalFrames.shared.recordBeforeWrite(self)
         macApp.setAnimatedAxFrame(windowId, frame, session: session)
     }
 
@@ -579,6 +581,7 @@ final class MacWindow: Window {
         minimumObservation?.cancel()
         minimumRequest = nil
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
+        NativeOriginalFrames.shared.recordBeforeWrite(self)
         try await macApp.setAxFrameBlocking(windowId, topLeft, size, positionFirst: positionFirst)
     }
 

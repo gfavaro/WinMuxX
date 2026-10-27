@@ -10,6 +10,8 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         XCTAssertTrue(enabled.errors.isEmpty, "\(enabled.errors)")
         XCTAssertTrue(enabled.config.nativeSpaces.tilingEnabled)
         XCTAssertFalse(enabled.config.nativeSpaces.restoreLayouts)
+        XCTAssertTrue(enabled.config.nativeSpaces.restoreFramesOnQuit, "On by default")
+        XCTAssertFalse(parseConfig("[native-spaces]\nrestore-frames-on-quit = false").config.nativeSpaces.restoreFramesOnQuit)
         XCTAssertFalse(parseConfig("[native-spaces]\ntiling-enabled = 'yes'").errors.isEmpty)
         XCTAssertFalse(parseConfig("[native-spaces]\nunknown = true").errors.isEmpty)
         XCTAssertFalse(parseConfig("default-root-container-layout = 'tabbed'\n[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true").errors.isEmpty)
