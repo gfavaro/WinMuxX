@@ -2,12 +2,19 @@ import Common
 import NativeSpaces
 
 /// Explicit native Space navigation for `workspace`. macOS still owns Spaces; this
-/// only asks the Dock to swipe. Landing is confirmed from fresh topology reads, a
-/// swipe that has not landed is posted once more from wherever the display is, and
-/// a newer request supersedes an older one rather than replaying obsolete swipes.
+/// only asks the Dock to swipe. Landing is confirmed from fresh topology reads, and a
+/// swipe that has not landed is posted once more from wherever the display is.
+/// One switch is in flight per display: a request meanwhile only changes its target,
+/// and the next swipe leaves once the posted one lands, so a burst of shortcuts never
+/// swipes from a Space the display is about to leave. After Dinky's SpaceSwitcher.
 @MainActor
 final class NativeSpaceNavigator {
-    private var generation = 0
+    private struct Flight {
+        var target: String
+        var waiters: [CheckedContinuation<Bool, Never>] = []
+    }
+    /// By display identifier.
+    private var flights: [String: Flight] = [:]
     var topology: () async throws -> [NativeSpaceDisplay]
     var post: (NativeSpaceSwitchPlan) async -> Bool = { plan in
         await NativeDockSwipe.post(steps: abs(plan.toIndex - plan.fromIndex),
@@ -33,7 +40,10 @@ final class NativeSpaceNavigator {
     }
 
     func run(_ args: WorkspaceCmdArgs, io: CmdIo) async -> Bool {
-        guard let displays = await readyTopology(io), var plan = resolve(args, displays, io) else { return false }
+        guard let observed = await readyTopology(io) else { return false }
+        // Next and previous count from where a switch in flight is going.
+        let displays = observed.map { display in flights[display.identifier].map { display.showing($0.target) } ?? display }
+        guard var plan = resolve(args, displays, io) else { return false }
         // Already showing on another display: focus it there, as virtual workspaces do.
         if plan.isNoop, let shown = runtime.workspaceBackend.nativeLayouts.currentBySpaceID[plan.targetSpaceID],
            shown.isVisible, shown !== focus.workspace {
@@ -71,31 +81,54 @@ final class NativeSpaceNavigator {
     }
 
     private func perform(_ initial: NativeSpaceSwitchPlan, failIfNoop: Bool, io: CmdIo) async -> Bool {
-        var plan = initial
-        if plan.isNoop {
+        let display = initial.displayIdentifier
+        if flights[display] != nil {
+            flights[display]!.target = initial.targetSpaceID
+            let landed = await withCheckedContinuation { flights[display]!.waiters.append($0) }
+            return landed || io.err("Native Space switch did not land on Space \(initial.targetSpaceID)")
+        }
+        if initial.isNoop {
             if failIfNoop { return false }
             io.err("Already on that Space. Tip: use --fail-if-noop to exit with non-zero code")
             return true
         }
-        generation += 1
-        let request = generation
-        for attempt in 0..<2 {
-            guard await post(plan) else { return io.err("Posting the native Space switch failed") }
+        flights[display] = Flight(target: initial.targetSpaceID)
+        let result = await fly(initial)
+        let waiters = flights.removeValue(forKey: display)?.waiters ?? []
+        waiters.forEach { $0.resume(returning: result == nil) }
+        if result == nil { runtime.workspaceBackend.observation?.requestRead(event: "nativeSpaceSwitch") }
+        return result.map { io.err($0) } ?? true
+    }
+
+    /// Swipes until the display shows the flight's newest target. Nil when it does, else why not.
+    private func fly(_ initial: NativeSpaceSwitchPlan) async -> String? {
+        let display = initial.displayIdentifier
+        var plan = initial
+        var retried = false
+        while true {
+            guard await post(plan) else { return "Posting the native Space switch failed" }
+            let posted = plan.targetSpaceID
             let deadline = ContinuousClock.now + landingTimeout
             var latest: NativeSpaceDisplay?
             while ContinuousClock.now < deadline {
                 try? await Task.sleep(for: pollInterval)
-                guard request == generation else { return true } // A newer request owns the display.
-                latest = (try? await topology())?.first { $0.identifier == plan.displayIdentifier }
-                if latest?.activeSpaceID == plan.targetSpaceID {
-                    runtime.workspaceBackend.observation?.requestRead(event: "nativeSpaceSwitch")
-                    return true
-                }
+                latest = (try? await topology())?.first { $0.identifier == display }
+                if latest?.activeSpaceID == posted { break }
             }
-            guard attempt == 0, let latest, let retry = NativeSpaceNavigation.toward(spaceID: plan.targetSpaceID, on: latest) else { break }
-            plan = retry
+            let target = flights[display]?.target ?? posted
+            if latest?.activeSpaceID == target { return nil }
+            if latest?.activeSpaceID == posted {
+                retried = false // Landed on an older request; go on to the newest.
+            } else if retried {
+                return "Native Space switch did not land on Space \(target)"
+            } else {
+                retried = true
+            }
+            guard let latest, let next = NativeSpaceNavigation.toward(spaceID: target, on: latest) else {
+                return "Native Space switch did not land on Space \(target)"
+            }
+            plan = next
         }
-        return io.err("Native Space switch did not land on Space \(plan.targetSpaceID)")
     }
 
     private func resolve(_ args: WorkspaceCmdArgs, _ displays: [NativeSpaceDisplay], _ io: CmdIo) -> NativeSpaceSwitchPlan? {

@@ -58,6 +58,37 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
         XCTAssertTrue(result.stderr.joined().contains("did not land"))
     }
 
+    /// Starts `command` and returns once it has posted or joined the switch in flight.
+    private func start(_ nav: NativeSpaceNavigator, _ command: String) async -> Task<CmdResult, Error> {
+        let task = Task { try await run(nav, command) }
+        for _ in 0..<20 { await Task.yield() }
+        return task
+    }
+
+    func testABurstRetargetsTheSwitchInFlightInsteadOfSwipingFromAStaleSpace() async throws {
+        // Swipes land only when the test says so, to hold the first one in flight.
+        let nav = navigator { $0.targetSpaceID == "3" ? "3" : nil }
+        nav.landingTimeout = .seconds(2)
+        let first = await start(nav, "workspace 2")
+        let second = await start(nav, "workspace 3")
+        XCTAssertEqual(posts.count, 1, "The second request waits for the first swipe")
+        active = "2"
+        let results = try await [first.value.exitCode, second.value.exitCode]
+        XCTAssertEqual(results, [0, 0])
+        XCTAssertEqual(posts.map { [$0.fromIndex, $0.toIndex] }, [[0, 1], [1, 2]], "From where the first one landed")
+        XCTAssertEqual(active, "3")
+    }
+
+    func testNextCountsFromTheSwitchInFlight() async throws {
+        let nav = navigator { $0.targetSpaceID == "3" ? "3" : nil }
+        nav.landingTimeout = .seconds(2)
+        let first = await start(nav, "workspace next")
+        let second = await start(nav, "workspace next")
+        active = "2"
+        _ = try await (first.value, second.value)
+        XCTAssertEqual(active, "3", "Two quick nexts go two desktops along")
+    }
+
     func testNoopUnknownDesktopAndEndOfDisplayPostNothing() async throws {
         let nav = navigator { $0.targetSpaceID }
         var codes: [Int32] = []

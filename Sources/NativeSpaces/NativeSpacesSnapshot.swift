@@ -24,6 +24,11 @@ public struct NativeSpaceDisplay: Codable, Equatable, Sendable {
     public let identifier: String
     public let activeSpaceID: String
     public let spaces: [NativeSpace]
+
+    /// The display as it will be once a switch in flight lands on `spaceID`.
+    public func showing(_ spaceID: String) -> Self {
+        Self(identifier: identifier, activeSpaceID: spaceID, spaces: spaces)
+    }
 }
 
 public struct NativeWindowMembership: Codable, Equatable, Sendable {
