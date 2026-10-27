@@ -46,17 +46,33 @@ final class WorkspaceBackendState {
     /// Control-arrow for its own Space switching instead of WinMuxX swallowing them.
     func accepts(_ command: any Command) -> Bool {
         // Moving windows writes; observation-only mode stays physically read-only.
-        kind == .virtual || command is DoctorCommand || command is ReloadConfigCommand ||
+        kind == .virtual || Self.isNativeDiagnosticOrQuery(command) ||
             (Self.isNativeNavigation(command) && (nativeTilingEnabled || !(command is MoveNodeToWorkspaceCommand))) ||
             (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
     }
 
-    /// Navigation runs outside the native tiling command fence, so a sequence may
-    /// pair it only with diagnostics, never with window commands.
+    /// Navigation and queries run outside the native tiling command fence, so a
+    /// sequence with window commands may add only diagnostics and config reloads.
     func accepts(_ commands: [any Command]) -> Bool {
         guard commands.allSatisfy(accepts) else { return false }
-        return kind == .virtual || !commands.contains(where: Self.isNativeNavigation) ||
-            commands.allSatisfy { Self.isNativeNavigation($0) || $0 is DoctorCommand || $0 is ReloadConfigCommand }
+        return kind == .virtual || commands.allSatisfy(Self.runsOutsideNativeTilingFence) || commands.allSatisfy {
+            !Self.runsOutsideNativeTilingFence($0) || $0 is DoctorCommand || $0 is ReloadConfigCommand
+        }
+    }
+
+    static func runsOutsideNativeTilingFence(_ command: any Command) -> Bool {
+        isNativeNavigation(command) || isNativeDiagnosticOrQuery(command)
+    }
+
+    /// Read-only commands that answer from config or native snapshots, and the
+    /// palette and sidebar, whose selections run their own native commands.
+    static func isNativeDiagnosticOrQuery(_ command: any Command) -> Bool {
+        switch command {
+            case is DoctorCommand, is ReloadConfigCommand, is ListWorkspacesCommand, is ListWindowsCommand,
+                 is ListAppsCommand, is ListModesCommand, is ListExecEnvVarsCommand, is ConfigCommand,
+                 is PaletteCommand, is OpenSidebarCommand: true
+            default: false
+        }
     }
 
     /// Space navigation and cross-Space window moves: Space-level operations that run

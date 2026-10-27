@@ -194,6 +194,12 @@ final class SwitcherPalettePanel: NSPanelHud {
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.menuBarButton, token) {
+                if runtime.workspaceBackend.kind == .native {
+                    if let error = try await runNativeCommands(nativeFocusWindowCommands(windowId)) {
+                        MessageModel.shared.message = Message(description: "Palette", body: error)
+                    }
+                    return
+                }
                 guard let window = Window.get(byId: windowId), let liveFocus = window.toLiveFocusOrNil() else { return }
                 window.markAsMostRecentChild()
                 _ = setFocus(to: liveFocus)
@@ -240,7 +246,10 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
     let focusedWindowId = focus.windowOrNil?.windowId
     let focusedWorkspace = focus.workspace
     // Focused workspace first, then the rest — so an empty query shows nearby windows on top.
-    let workspaces = [focusedWorkspace] + Workspace.all.filter { $0 != focusedWorkspace }
+    let candidates = runtime.workspaceBackend.kind == .native ? nativeDesktopWorkspaces().map(\.workspace) : Workspace.all
+    let workspaces = candidates.contains(focusedWorkspace)
+        ? [focusedWorkspace] + candidates.filter { $0 != focusedWorkspace }
+        : runtime.workspaceBackend.kind == .native ? candidates : [focusedWorkspace] + candidates
     let indexedWindows = workspaces.flatMap { workspace in
         workspace.allLeafWindowsRecursive.filter(\.isBound).map { (window: $0, workspaceName: workspace.name) }
     }
@@ -269,8 +278,9 @@ func makeSwitcherPaletteItem(
     focusedWindowId: UInt32?,
 ) async -> SwitcherPaletteItem {
     let appName = window.app.name ?? window.app.rawAppBundleId ?? "Unknown"
-    let workspaceTitle = workspaceDisplayName(workspaceName)
-    let projectName = Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) }
+    let nativeNumber = runtime.workspaceBackend.kind == .native ? nativeDesktopNumber(forSidebarWorkspace: workspaceName) : nil
+    let workspaceTitle = nativeNumber.map { nativeDesktopDisplayName($0) } ?? workspaceDisplayName(workspaceName)
+    let projectName = nativeNumber != nil ? nil : Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) }
     // A cold cache previously indexed every Finder window as only "Finder" until some other
     // UI happened to fetch its title. Fetch first-sight titles before showing the palette so
     // folder names are searchable immediately; known stale titles still return instantly and

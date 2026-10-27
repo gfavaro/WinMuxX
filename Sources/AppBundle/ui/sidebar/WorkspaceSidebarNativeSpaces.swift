@@ -42,39 +42,6 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
     return result
 }
 
-/// A `workspace-labels` entry keyed by desktop number names that desktop.
-func nativeDesktopLabel(_ number: Int, labels: [String: String]) -> String {
-    labels[String(number)]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-}
-
-@MainActor
-func nativeDesktopDisplayName(_ number: Int, labels: [String: String]? = nil) -> String {
-    let label = nativeDesktopLabel(number, labels: labels ?? config.workspaceSidebar.workspaceLabels)
-    return label.isEmpty ? "Desktop \(number)" : label
-}
-
-/// The last observation stays listed during a read, so rows don't flicker away.
-@MainActor
-func nativeObservedDisplays() -> [NativeSpaceDisplay]? {
-    let backend = runtime.workspaceBackend
-    return (backend.observation?.inventory.lastSnapshot ?? backend.nativeLayouts.snapshot)?.displays
-}
-
-/// The Control-N number of the desktop a native sidebar row stands for.
-@MainActor
-func nativeDesktopNumber(forSidebarWorkspace name: String) -> Int? {
-    let layouts = runtime.workspaceBackend.nativeLayouts
-    guard let displays = nativeObservedDisplays() else { return nil }
-    var number = 0
-    for display in displays {
-        for space in display.spaces where space.isDesktop {
-            number += 1
-            if let uuid = space.uuid, layouts.retainedByUUID[uuid]?.name == name { return number }
-        }
-    }
-    return nil
-}
-
 /// Handles a sidebar action in native mode. Actions that only make sense for
 /// virtual workspaces explain why they are unavailable instead of acting.
 @MainActor
@@ -84,14 +51,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
             runNativeSidebarCommands(["workspace \(number)"])
         case .selectWindow(let windowId):
-            var commands: [String] = []
-            if let name = workspaceSidebarFallbackWorkspaceName(for: windowId),
-               let row = viewModel.workspaceSidebarWorkspaces.first(where: { $0.name == name }), !row.isVisible,
-               let number = nativeDesktopNumber(forSidebarWorkspace: name) {
-                commands.append("workspace \(number)")
-            }
-            if runtime.workspaceBackend.nativeTilingEnabled { commands.append("focus --window-id \(windowId)") }
-            runNativeSidebarCommands(commands)
+            runNativeSidebarCommands(nativeFocusWindowCommands(windowId))
         case .selectMonitorScope(let scopeId):
             selectWorkspaceSidebarMonitorScope(scopeId, viewModel: viewModel)
         case .clearDropPreview:
@@ -113,14 +73,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
 private func runNativeSidebarCommands(_ commands: [String]) {
     WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
     runWorkspaceSidebarSession {
-        for text in commands {
-            guard case .cmd(let command) = parseCommand(text) else { continue }
-            let io = CmdIo(stdin: .emptyStdin)
-            guard try await [command].runCmdSeq(.defaultEnv, io) else {
-                if let error = io.stderr.last { showWorkspaceSidebarError(error) }
-                return
-            }
-        }
+        if let error = try await runNativeCommands(commands) { return showWorkspaceSidebarError(error) }
         await updateWorkspaceSidebarModel()
     }
 }

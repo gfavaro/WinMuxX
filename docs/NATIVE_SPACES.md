@@ -39,9 +39,14 @@ state, may be stale for concealed windows, and are not actual AX measurements or
 write permits. A local
 read-only ownership preflight checks real process/Space identity without granting
 the runtime any frame-write permits.
-In observation mode, other CLI commands, including virtual queries and subscriptions, return an explicit
+In every native mode, `list-workspaces`, `list-windows`, `list-apps`, `list-modes`,
+`list-exec-env-vars` and `config` answer from config and native snapshots. Workspaces
+are named by desktop number (`%{workspace}` prints `2`), and `--workspace 2` selects
+Desktop 2; internal `__native_space_*` names never appear. `palette` lists windows by
+desktop, and choosing one on another desktop switches there before focusing it. Other
+CLI commands, including `list-monitors`, `state` and subscriptions, return an explicit
 unsupported error. The sidebar lists native desktops (see [sidebar](#sidebar)); the
-palette and workspace overview are not integrated yet. Projects are disabled in
+workspace overview is left to Mission Control. Projects are disabled in
 native mode by design: virtual projects stay untouched for a later rollback.
 
 Change `type` back to `"virtual"` (or remove the table) and restart to roll back.

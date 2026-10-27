@@ -17,14 +17,17 @@ struct ListWindowsCommand: Command {
                 return io.err(noWindowIsFocused)
             }
         } else {
+            let allWorkspaces = runtime.workspaceBackend.kind == .native
+                ? nativeDesktopWorkspaces().map(\.workspace)
+                : userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace)
             var workspaces: Set<Workspace> = args.filteringOptions.workspaces.isEmpty
-                ? userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace).toSet()
+                ? allWorkspaces.toSet()
                 : args.filteringOptions.workspaces
                     .flatMap { filter in
                         switch filter {
                             case .focused: [focus.workspace]
                             case .visible: Workspace.all.filter(\.isVisible)
-                            case .name(let name): Workspace.existing(byName: name.raw).map { [$0] } ?? []
+                            case .name(let name): userWorkspace(named: name.raw).map { [$0] } ?? []
                         }
                     }
                     .toSet()

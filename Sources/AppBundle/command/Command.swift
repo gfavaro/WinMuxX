@@ -102,7 +102,7 @@ extension [Command] {
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
         if runtime.workspaceBackend.kind == .native, runtime.workspaceBackend.nativeTilingEnabled,
            !NativeTilingCommandScope.active, contains(where: {
-               !($0 is DoctorCommand || $0 is ReloadConfigCommand || WorkspaceBackendState.isNativeNavigation($0))
+               !WorkspaceBackendState.runsOutsideNativeTilingFence($0)
            }) {
             return try await runtime.workspaceBackend.nativeTiling.run(self, env: env, io: io)
         }
