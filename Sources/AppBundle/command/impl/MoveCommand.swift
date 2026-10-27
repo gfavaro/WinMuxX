@@ -97,17 +97,24 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
         }
         return false
     }
+    // `groups` can omit columns native mode is not laying out (a lone minimized window),
+    // so positions are taken from the tree, next to the neighbouring visible column.
     if column.allLeafWindowsRecursive.count <= 1 {
-        guard groups.count > 1, let root = column.parent as? TilingContainer, root === workspace.rootTilingContainer else { return false }
-        let targetIndex = index + direction.focusOffset
-        guard root.children.indices.contains(targetIndex) else { return false }
+        guard let root = column.parent as? TilingContainer, root === workspace.rootTilingContainer,
+              groups.indices.contains(index + direction.focusOffset) else { return false }
+        let neighbor = groups[index + direction.focusOffset]
         let binding = column.unbindFromParent()
-        column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: targetIndex)
+        guard let neighborIndex = root.children.firstIndex(where: { $0 === neighbor }) else {
+            column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return false
+        }
+        column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: neighborIndex + (direction.isPositive ? 1 : 0))
     } else {
         let width = column.scrollingColumnWidth
         window.unbindFromParent()
         let parent = ensureScrollingRootSupportsColumns(workspace)
-        let insertion = min(max(index + (direction.isPositive ? 1 : 0), 0), parent.children.count)
+        let at = parent.children.firstIndex(where: { $0 === column }) ?? index
+        let insertion = min(max(at + (direction.isPositive ? 1 : 0), 0), parent.children.count)
         window.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: insertion)
         window.scrollingColumnWidth = width
         workspace.normalizeContainers()

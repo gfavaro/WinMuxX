@@ -34,6 +34,15 @@ final class NativeSpaceNavigator {
 
     func run(_ args: WorkspaceCmdArgs, io: CmdIo) async -> Bool {
         guard let displays = await readyTopology(io), var plan = resolve(args, displays, io) else { return false }
+        // Already showing on another display: focus it there, as virtual workspaces do.
+        if plan.isNoop, let shown = runtime.workspaceBackend.nativeLayouts.currentBySpaceID[plan.targetSpaceID],
+           shown.isVisible, shown !== focus.workspace {
+            guard let window = shown.mostRecentWindowRecursive, window.focusWindow() else {
+                return io.err("That desktop is showing on another display and has no window to focus")
+            }
+            window.nativeFocus()
+            return true
+        }
         if plan.isNoop, args.autoBackAndForth,
            let display = displays.first(where: { $0.identifier == plan.displayIdentifier }),
            let previous = runtime.workspaceBackend.nativeActivity.previousDesktop(on: display),

@@ -164,9 +164,16 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
         window?.nativeFocus()
     }
 
+    /// Switches to the window's desktop, waits for it to show and for tiling to be ready,
+    /// then focuses the window directly. Never re-dispatches `focus`, so it cannot recurse.
     private func focusWindowOnHiddenDesktop(_ id: UInt32?, _ io: CmdIo) async throws -> Bool {
-        guard let id else { return false }
-        if let error = try await focusNativeWindow(id) { return io.err(error) }
+        guard let id, let window = Window.get(byId: id), let desktop = window.nodeWorkspace,
+              let number = nativeDesktopNumber(of: desktop) else { return io.err("Window \(id ?? 0) is not on a native desktop") }
+        guard case .cmd(let command) = parseCommand("workspace \(number)"), let switchTo = command as? WorkspaceCommand,
+              await state.nativeNavigation.run(switchTo.args, io: io) else { return false }
+        for _ in 0..<80 where !(desktop.isVisible && state.nativeTiling.ready) { try await Task.sleep(for: .milliseconds(25)) }
+        guard desktop.isVisible, window.focusWindow() else { return io.err("Desktop \(number) did not show in time; try again") }
+        window.nativeFocus()
         return true
     }
 

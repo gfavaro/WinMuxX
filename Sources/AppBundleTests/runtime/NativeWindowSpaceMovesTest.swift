@@ -264,6 +264,25 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         XCTAssertFalse(WorkspaceBackendState.isNativeNavigation(here), "A showing desktop's window stays a fenced tiling command")
     }
 
+    func testWorkspaceNShowingOnTheOtherDisplayFocusesItThere() async throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let here = TestWindow.new(id: 77, parent: try XCTUnwrap(layouts.retainedByUUID["desktop-a"]).rootTilingContainer)
+        let there = TestWindow.new(id: 78, parent: try XCTUnwrap(layouts.retainedByUUID["desktop-c"]).rootTilingContainer)
+        _ = here.focusWindow()
+        let navigator = NativeSpaceNavigator()
+        navigator.isSupported = { true }
+        navigator.canPostEvents = { true }
+        navigator.topology = { [unowned self] in snapshot().displays }
+        var posted = 0
+        navigator.post = { _ in posted += 1; return true }
+        let args = try XCTUnwrap(parseCommand("workspace --auto-back-and-forth 3").cmdOrDie as? WorkspaceCommand).args
+        let io = CmdIo(stdin: .emptyStdin)
+        let ok = await navigator.run(args, io: io)
+        XCTAssertTrue(ok, io.stderr.joined())
+        XCTAssertEqual(posted, 0, "Nothing switches: desktop 3 is already showing")
+        XCTAssertEqual(focus.windowOrNil?.windowId, there.windowId, "Focus moves to it on the other display")
+    }
+
     func testTheTilingFenceAcceptsADesktopNumber() throws {
         let layouts = runtime.workspaceBackend.nativeLayouts
         _ = Workspace.get(byName: "1") // A leftover virtual workspace named like desktop 1 must not shadow it.

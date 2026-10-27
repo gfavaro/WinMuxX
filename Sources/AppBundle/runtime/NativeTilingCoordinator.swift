@@ -71,7 +71,11 @@ final class NativeTilingCoordinator {
         }
         let backend = runtime.workspaceBackend
         guard snapshot.displays.contains(where: { backend.nativeLayouts.activeWorkspace(on: $0.identifier) != nil }) else {
-            status = "Tiling paused: no active ordinary desktop"
+            // One shared set of desktops across displays is reported as "Main"; native
+            // tiling lays out per display, so it says why instead of doing nothing.
+            status = snapshot.displays.contains(where: { $0.identifier == "Main" })
+                ? "Tiling unavailable: turn on Displays have separate Spaces (System Settings › Desktop & Dock)"
+                : "Tiling paused: no active ordinary desktop"
             return
         }
         await backend.nativePersistence.reconcile(backend.nativeLayouts)
@@ -298,7 +302,9 @@ final class NativeTilingCoordinator {
         }
         let monitorMove = sink.pending
         if result {
-            guard validate() else { return io.err("Native command target changed before completion") }
+            // Closing removes the target on purpose; its absence is success, not a race.
+            let closesTarget = commands.allSatisfy { $0 is CloseCommand || $0 is CloseAllWindowsButCurrentCommand }
+            guard closesTarget || validate() else { return io.err("Native command target changed before completion") }
             if let monitorMove {
                 return await runtime.workspaceBackend.nativeWindowMoves.run(monitorMove, env: env, io: io)
             }

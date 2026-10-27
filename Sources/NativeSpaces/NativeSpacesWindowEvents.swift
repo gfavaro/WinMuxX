@@ -64,7 +64,9 @@ final class NativeSpacesWindowEvents {
         if registered.isEmpty {
             for kind in NativeSpacesWindowEvent.kinds {
                 guard register(Self.callback, kind, nil) == 0 else {
-                    for previous in registered + [kind] {
+                    // Undo only what did register; the failed kind never did, and removing it
+                    // would mark the bridge unhealthy for good after one transient failure.
+                    for previous in registered {
                         if remove(Self.callback, previous, nil) != 0 { healthy = false }
                     }
                     registered = []
