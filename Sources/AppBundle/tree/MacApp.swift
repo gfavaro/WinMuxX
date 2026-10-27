@@ -272,6 +272,17 @@ final class MacApp: AbstractApp {
         setFrameJobs.removeAll()
     }
 
+    /// Whether native tiling currently grants writes to the window.
+    @MainActor
+    func hasNativeWriteGrant(_ windowID: UInt32) -> Bool {
+        guard let launched = nsApp.launchDate else { return false }
+        return runtime.workspaceBackend.nativeWriteAuthority.explicitFocusLease(windowID: windowID, pid: pid, processLaunchDate: launched) != nil
+    }
+
+    /// A short lease that keeps checking live ownership after tiling stops granting writes.
+    @MainActor
+    func nativeLeaseValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? { nativeFocusValidation(windowID) }
+
     @MainActor
     private func nativeFocusValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
@@ -358,9 +369,11 @@ final class MacApp: AbstractApp {
     }
 
     @MainActor
-    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
+    /// `validation` replaces the native frame permit, as for a restore that outlives tiling.
+    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false,
+                            validation: (@Sendable (AXUIElement) throws -> Void)? = nil) async throws {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        let validate = nativeFrameValidation(windowId)
+        let validate = validation ?? nativeFrameValidation(windowId)
         try await withWindow(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
             try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate.map { check in { try check(window) } })

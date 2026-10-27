@@ -13,6 +13,9 @@ final class NativeOriginalFrames {
         let workspaceName: String?
     }
     private var entries: [UInt32: Entry] = [:]
+    /// For `doctor`: what the last restore did.
+    private(set) var lastRestore = "none yet"
+    var count: Int { entries.count }
     private let answerTimeout: Duration = .seconds(2)
 
     func recordBeforeWrite(_ window: MacWindow) {
@@ -21,26 +24,48 @@ final class NativeOriginalFrames {
         entries[window.windowId] = Entry(pid: window.macApp.pid, frame: frame, workspaceName: window.nodeWorkspace?.name)
     }
 
-    /// Puts back tiled windows still on the desktop they started on while it shows. A
-    /// window on a hidden desktop keeps its entry for a later restore: reaching it would
-    /// take a desktop switch. Returns how many went back and how many were left.
-    @discardableResult
-    func restore() async -> (restored: Int, left: Int) {
-        guard config.nativeSpaces.restoreFramesOnQuit else { return (0, entries.count) }
+    /// Stops tiling with `stopTiling`, then puts back tiled windows still on the desktop
+    /// they started on while it shows. Each write runs under a lease taken while tiling
+    /// still granted it, which keeps checking that the window is where it was. A window on
+    /// a hidden desktop keeps its entry for a later restore: reaching it would take a
+    /// desktop switch.
+    func restore(stoppingTiling stopTiling: () -> Void) async {
+        guard config.nativeSpaces.restoreFramesOnQuit else {
+            stopTiling()
+            lastRestore = "off (restore-frames-on-quit = false)"
+            return
+        }
         let candidates = entries.compactMap { id, entry -> (id: UInt32, frame: CGRect)? in
             guard let window = MacWindow.allWindowsMap[id] else { entries[id] = nil; return nil }
-            guard window.macApp.pid == entry.pid, window.parent is TilingContainer,
+            guard window.macApp.pid == entry.pid, window.parent is TilingContainer, // Floating ones were placed by the user.
                   let workspace = window.nodeWorkspace, workspace.name == entry.workspaceName, workspace.isVisible else { return nil }
             return (id, entry.frame)
         }
+        // Any AX event revokes grants until the next read; wait briefly for one.
+        func granted(_ id: UInt32) -> Bool { MacWindow.allWindowsMap[id]?.macApp.hasNativeWriteGrant(id) == true }
+        if !candidates.allSatisfy({ granted($0.id) }) {
+            runtime.workspaceBackend.observation?.requestRead(event: "nativeRestoreFrames")
+            let deadline = ContinuousClock.now + .milliseconds(1500)
+            while ContinuousClock.now < deadline, !candidates.allSatisfy({ granted($0.id) }) {
+                try? await Task.sleep(for: .milliseconds(20))
+            }
+        }
+        let leased = candidates.compactMap { candidate -> (id: UInt32, frame: CGRect, validate: @Sendable (AXUIElement) throws -> Void)? in
+            guard granted(candidate.id), let validate = MacWindow.allWindowsMap[candidate.id]?.macApp.nativeLeaseValidation(candidate.id) else { return nil }
+            return (candidate.id, candidate.frame, validate)
+        }
+        stopTiling()
         // All at once, each app on its own thread, so one slow app cannot hold up the rest.
-        let writes = candidates.map { candidate in
+        let writes = leased.map { item in
             Task { @MainActor () -> UInt32? in
-                guard let window = MacWindow.allWindowsMap[candidate.id] else { return nil }
+                guard let app = MacWindow.allWindowsMap[item.id]?.macApp else { return nil }
                 do {
-                    try await window.setAxFrameBlocking(candidate.frame.origin, candidate.frame.size, positionFirst: true)
-                    return candidate.id
-                } catch { return nil }
+                    try await app.setAxFrameBlocking(item.id, item.frame.origin, item.frame.size, positionFirst: true, validation: item.validate)
+                    return item.id
+                } catch {
+                    NSLog("WinMuxX native restore of window %u: %@", item.id, String(describing: error))
+                    return nil
+                }
             }
         }
         let timeout = answerTimeout
@@ -49,6 +74,6 @@ final class NativeOriginalFrames {
         for write in writes { if let id = await write.value { restored.append(id) } }
         deadline.cancel()
         for id in restored { entries[id] = nil }
-        return (restored.count, entries.count)
+        lastRestore = "\(restored.count) of \(candidates.count) on showing desktops put back (\(leased.count) granted), \(entries.count) kept"
     }
 }

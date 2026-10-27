@@ -201,7 +201,8 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
             }
             return !args.failIfNoop
         }
-        model.isEnabled = newState
+        // Turning off keeps tiling's grants until the restore has taken its leases.
+        if newState { model.isEnabled = true }
         WindowBorderController.shared.setEnabled(newState)
         if newState {
             try await activateMode(mainModeId)
@@ -234,10 +235,11 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
     }
 }
 
-/// Stops tiling first, so no layout moves a window back while it is being restored.
+/// Stops tiling before the writes, so no layout moves a window back while it is being restored.
 @MainActor
 func stopNativeTilingAndRestoreFrames() async {
-    TrayMenuModel.shared.isEnabled = false
-    runtime.workspaceBackend.nativeTiling.invalidate("disabled")
-    await NativeOriginalFrames.shared.restore()
+    await NativeOriginalFrames.shared.restore {
+        TrayMenuModel.shared.isEnabled = false
+        runtime.workspaceBackend.nativeTiling.invalidate("disabled")
+    }
 }

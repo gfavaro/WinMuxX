@@ -35,6 +35,7 @@ func nativeSpacesDiagnosticReport() -> String {
         tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
+    lines.append("Original frames: \(NativeOriginalFrames.shared.count) kept; last restore: \(NativeOriginalFrames.shared.lastRestore)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
     lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")
     let model = TrayMenuModel.shared
