@@ -16,10 +16,10 @@ struct MoveCommand: Command {
             return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
         }
         if target.workspace.arrangement == .master {
-            if moveWorkspaceGroup(currentWindow, direction: direction, workspace: target.workspace) { return true }
-            // Within a group, or vertically, swap with the spatial neighbour as master always did.
+            // Swap with the window on that side, as master always did. Master is tracked by its
+            // group, so a move between master and stack also hands the master role across.
             if let neighbor = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction, excludingMoveNode: currentNode) {
-                swapWindows(currentWindow, neighbor)
+                swapMasterAware(currentWindow, neighbor, in: target.workspace)
                 return true
             }
             // Master slots stay fixed; crossing a pane edge must not wrap the master root
@@ -129,23 +129,17 @@ func ensureScrollingRootSupportsColumns(_ workspace: Workspace) -> TilingContain
 }
 
 @MainActor
-private func moveWorkspaceGroup(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
-    guard direction.orientation == .h else { return false }
-    let root = workspace.rootTilingContainer
-    let group = window.topLevelWorkspaceGroup
-    guard group.parent === root, let index = root.children.firstIndex(of: group) else { return false }
-    let target = index + direction.focusOffset
-    guard root.children.indices.contains(target) else { return false }
-    let masterGroup = workspace.workspaceLayoutUnits.indices.contains(workspace.masterGroupIndex)
+private func swapMasterAware(_ window: Window, _ neighbor: Window, in workspace: Workspace) {
+    let mine = window.topLevelWorkspaceGroup
+    let theirs = neighbor.topLevelWorkspaceGroup
+    let master = workspace.workspaceLayoutUnits.indices.contains(workspace.masterGroupIndex)
         ? workspace.workspaceLayoutUnits[workspace.masterGroupIndex] : nil
-    let binding = group.unbindFromParent()
-    group.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: target)
-    if workspace.arrangement == .master, let masterGroup,
-       let newIndex = workspace.workspaceLayoutUnits.firstIndex(where: { $0 === masterGroup }) {
-        workspace.masterGroupIndex = newIndex
-    }
-    scheduleRefreshSession(.globalObserver("moveWorkspaceGroup"))
-    return true
+    guard mine !== theirs, master === mine || master === theirs else { return swapWindows(window, neighbor) }
+    swapNodes(mine, theirs)
+    // The group now in the master's place takes the role.
+    let incoming = master === mine ? theirs : mine
+    if let index = workspace.workspaceLayoutUnits.firstIndex(where: { $0 === incoming }) { workspace.masterGroupIndex = index }
+    scheduleRefreshSession(.globalObserver("moveMaster"))
 }
 
 @MainActor

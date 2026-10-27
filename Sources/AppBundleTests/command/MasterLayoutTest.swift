@@ -178,4 +178,16 @@ final class MasterLayoutTest: WorkspaceTestCase {
         let center = try await run("scrolling-center")
         XCTAssertEqual(center.exitCode, 0)
     }
+
+    func testDefaultRootLayoutMasterStillGivesAMasterWorkspace() async throws {
+        config.defaultRootContainerLayout = .master
+        let workspace = Workspace.get(byName: "fresh-master")
+        let windows = (0..<3).map { TestWindow.new(id: UInt32(8400 + $0), parent: workspace.rootTilingContainer) }
+        XCTAssertTrue(windows[0].focusWindow())
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(workspace.arrangement, .master)
+        XCTAssertEqual(workspace.rootTilingContainer.layout, .tiles)
+        let swap = try await XCTUnwrap(parseCommand("swap-with-master").unwrap().0).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(swap.exitCode, 0, swap.stderr.joined())
+    }
 }

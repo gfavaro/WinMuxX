@@ -43,6 +43,12 @@ extension Workspace {
 
     @MainActor
     func normalizeMasterLayout() {
+        // `default-root-container-layout = 'master'` still creates a master root, as it did
+        // before arrangements: turn it into the Master arrangement once.
+        if arrangement == .dwindle, rootTilingContainer.layout == .master {
+            rootTilingContainer.layout = .tiles
+            transitionArrangement(to: .master)
+        }
         guard arrangement == .master else { return }
         if runtime.workspaceBackend.kind == .native { return }
         masterGroupIndex = min(max(masterGroupIndex, 0), max(workspaceLayoutUnits.count - 1, 0))
