@@ -39,6 +39,16 @@ final class WorkspaceBackendState {
             relocatesWorkspaces: false, tilesWindows: nativeTilingEnabled, parksInactiveWindows: false, usesVirtualRecovery: false)
     }
 
+    /// Whether this backend implements a command. Native shortcuts whose commands
+    /// fail this check are left unregistered, so macOS keeps keys such as
+    /// Control-arrow for its own Space switching instead of WinMuxX swallowing them.
+    func accepts(_ command: any Command) -> Bool {
+        kind == .virtual || command is DoctorCommand || command is ReloadConfigCommand ||
+            (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
+    }
+
+    func accepts(_ commands: [any Command]) -> Bool { commands.allSatisfy(accepts) }
+
     /// Live switching is intentionally unavailable until all motion/recovery
     /// owners can be handed over transactionally. Configuration enforces restart.
     func selectForStartup(_ kind: WorkspaceBackendKind, nativeTilingEnabled: Bool = false) {

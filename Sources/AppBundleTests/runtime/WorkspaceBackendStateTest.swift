@@ -1,3 +1,4 @@
+import Common
 import XCTest
 @testable import AppBundle
 
@@ -30,6 +31,33 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
         first.workspaceBackend.selectForStartup(.native)
         XCTAssertEqual(first.workspaceBackend.kind, .native)
         XCTAssertEqual(second.workspaceBackend.kind, .virtual)
+    }
+
+    func testNativeLeavesUnimplementedShortcutsToMacOS() async throws {
+        let bindings = parseConfig("""
+        [mode.main.binding]
+        ctrl-left = 'workspace prev'
+        alt-h = 'focus left'
+        alt-b = ['balance-sizes', 'workspace 2']
+        [mode.main.binding-tap]
+        left-alt = 'focus-monitor next'
+        """).config
+        config = bindings
+        defer { resetHotKeys() }
+        try await activateMode(mainModeId)
+        XCTAssertEqual(runtime.hotkeys.hotkeys.count, 3)
+        XCTAssertEqual(runtime.hotkeys.activeTapBindings.count, 1)
+        resetHotKeys()
+
+        let native = WinMuxRuntime()
+        native.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        try await native.withValue {
+            config = bindings
+            defer { resetHotKeys() }
+            try await activateMode(mainModeId)
+            XCTAssertEqual(runtime.hotkeys.hotkeys.values.map(\.keyCombo.key), [.h], "Control-arrow must reach macOS")
+            XCTAssertTrue(runtime.hotkeys.activeTapBindings.isEmpty)
+        }
     }
 
     func testNativeWindowChangesCannotPopulateVirtualClosedWindowRecovery() {

@@ -102,12 +102,13 @@ extension HotKey {
     let owner = runtime
     let previousMode = activeMode
     let mode = targetMode.flatMap { config.modes[$0] }
-    let targetBindings = mode?.bindings ?? [:]
+    let targetBindings = backendBindings(mode)
     hotkeyState.sideFilteredBindings = Dictionary(grouping: targetBindings.values.filter { config.modifierSides.restricts($0.modifiers) },
         by: { Int64($0.keyCode.carbonKeyCode) })
     hotkeyState.activeTapBindings = mode?
         .tapBindings
         .values
+        .filter { runtime.workspaceBackend.accepts($0.commands) }
         .reduce(into: [:]) { $0[$1.trigger] = $1 } ?? [:]
     hotkeyState.pendingTapBindings = [:]
     hotkeyState.pressedTapModifiers = []
@@ -300,8 +301,13 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
     hotkeyState.pendingTapTriggerTokens = [:]
 }
 
+/// Bindings the current backend can run; the rest stay with macOS and the focused app.
+@MainActor private func backendBindings(_ mode: Mode?) -> [String: HotkeyBinding] {
+    (mode?.bindings ?? [:]).filter { runtime.workspaceBackend.accepts($0.value.commands) }
+}
+
 @MainActor private func applyHotkeyEnabledState() {
-    let targetBindings = activeMode.flatMap { config.modes[$0] }?.bindings ?? [:]
+    let targetBindings = backendBindings(activeMode.flatMap { config.modes[$0] })
     for (binding, key) in hotkeyState.hotkeys {
         key.isEnabled = !hotkeyState.hotkeysSuspended && !hotkeyState.pendingUnboundModeExit && hotkeyState.unboundPassthroughKeyCode == nil && targetBindings[binding].map { !config.modifierSides.restricts($0.modifiers) } == true
     }
@@ -329,7 +335,7 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     guard !hotkeyState.hotkeysSuspended, !hotkeyState.pendingUnboundModeExit,
           TrayMenuModel.shared.isEnabled, let name = activeMode, name != mainModeId,
           let mode = config.modes[name], mode.exitOnUnboundKey else { return false }
-    if mode.bindings.values.contains(where: {
+    if backendBindings(mode).values.contains(where: {
         Int64($0.keyCode.carbonKeyCode) == keyCode && config.modifierSides.matches($0.modifiers, flags: flags)
     }) { return false }
     // Preserve sequence prefixes and a valid pending continuation.

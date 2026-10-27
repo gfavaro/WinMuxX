@@ -106,9 +106,7 @@ extension [Command] {
         }
         var isSucc = true
         for command in self {
-            if runtime.workspaceBackend.kind == .native,
-               !(command is DoctorCommand || command is ReloadConfigCommand ||
-                 (runtime.workspaceBackend.nativeTilingEnabled && NativeTilingCoordinator.supports(command))) {
+            if !runtime.workspaceBackend.accepts(command) {
                 io.err("Command '\(command.args)' is unsupported by the experimental native backend. Use doctor for native Space diagnostics; native gestures remain owned by macOS.")
                 return false
             }
