@@ -27,7 +27,7 @@ final class NativeWindowSpaceMoves {
     }
 
     func run(_ args: MoveNodeToWorkspaceCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
-        guard let window = args.resolveTargetOrReportError(env, io)?.windowOrNil else { return io.err(noWindowIsFocused) }
+        guard let window = movableWindow(args, env, io) else { return false }
         return await move(window, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop, io: io) {
             self.resolve(args, from: $0, on: $1, in: $2, io)
         }
@@ -35,7 +35,7 @@ final class NativeWindowSpaceMoves {
 
     /// `move-node-to-monitor`: the window joins the desktop that display shows.
     func run(_ args: MoveNodeToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
-        guard let window = args.resolveTargetOrReportError(env, io)?.windowOrNil else { return io.err(noWindowIsFocused) }
+        guard let window = movableWindow(args, env, io) else { return false }
         guard let current = window.nodeMonitor else { return io.err(windowIsntPartOfTree(window)) }
         let monitor: Monitor
         switch args.target.val.resolve(current, wrapAround: args.wrapAround) {
@@ -131,6 +131,15 @@ final class NativeWindowSpaceMoves {
             root.bind(to: destination.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         }
         for window in floating { window.bindAsFloatingWindow(to: destination) }
+    }
+
+    /// The window to move, on any desktop: moves go by window ID and each arrival is
+    /// confirmed, so the active-desktop fence of tiling commands is not needed. An
+    /// explicit window must still be one native tiling manages.
+    private func movableWindow(_ args: some CmdArgs, _ env: CmdEnv, _ io: CmdIo) -> Window? {
+        guard let window = args.resolveUncheckedTarget(env, io)?.windowOrNil else { _ = io.err(noWindowIsFocused); return nil }
+        guard window.nativeLayoutEligible else { _ = io.err("Window \(window.windowId) is not managed by native tiling"); return nil }
+        return window
     }
 
     private func move(_ window: Window, focusFollowsWindow: Bool, failIfNoop: Bool, io: CmdIo,
