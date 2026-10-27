@@ -584,6 +584,9 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
         if runtime.workspaceBackend.kind == .native {
+            // A pan's own window moves must not revoke the permits it is streaming
+            // with; the pan reads once when it settles.
+            if NativeScrollingPan.shared.isPanning, nativePanIgnoresNotification(notif) { return }
             runtime.workspaceBackend.nativeWriteAuthority.invalidate()
             runtime.workspaceBackend.observation?.requestRead(event: "axWindowChange")
             return

@@ -12,6 +12,7 @@ final class NativeScrollingPan {
     private var tap: CFMachPort?
     private var source: CFRunLoopSource?
     private weak var workspace: Workspace?
+    var isPanning: Bool { workspace != nil }
     private var lastDirection: CGFloat = 0
     private var idleTask: Task<Void, Never>?
     /// Why the last Option scroll did or did not pan, for doctor.
@@ -110,6 +111,8 @@ final class NativeScrollingPan {
         idleTask = nil
         guard let workspace else { return }
         self.workspace = nil
+        // Move notifications were ignored while panning; observe the result once.
+        defer { runtime.workspaceBackend.observation?.requestRead(event: "nativeScrollingSettled") }
         workspace.scrollingGestureMotionActive = false
         WorkspaceScrollingMinimap.shared.endGesture()
         let metrics = workspace.scrollingMetrics
@@ -124,6 +127,12 @@ final class NativeScrollingPan {
         runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
         _ = WorkspaceScrollingMinimap.shared.show(workspace)
     }
+}
+
+/// Geometry notifications a pan's own window moves produce.
+func nativePanIgnoresNotification(_ notif: String) -> Bool {
+    notif == kAXMovedNotification as String || notif == kAXResizedNotification as String ||
+        notif == kAXWindowMovedNotification as String || notif == kAXWindowResizedNotification as String
 }
 
 /// The column whose centre is nearest the viewport's centre; ties follow the last

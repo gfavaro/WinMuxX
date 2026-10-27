@@ -41,6 +41,9 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
         XCTAssertTrue(pan.handle(scroll(0, option: false, phase: 0, momentum: 3, at: point)))
         XCTAssertFalse(workspace.scrollingGestureMotionActive)
         XCTAssertEqual(pan.lastDecision, "panning")
+        XCTAssertFalse(pan.isPanning)
+        XCTAssertTrue(nativePanIgnoresNotification(kAXWindowMovedNotification as String), "Its own moves keep the permits")
+        XCTAssertFalse(nativePanIgnoresNotification(kAXWindowMiniaturizedNotification as String), "Ownership changes still revoke")
         let metrics = workspace.scrollingMetrics
         XCTAssertTrue(metrics.columns.contains { metrics.revealedOffset(for: $0, current: workspace.scrollingOffset) == workspace.scrollingOffset },
             "The pan ends with a whole column revealed")
