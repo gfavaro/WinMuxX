@@ -103,3 +103,14 @@ final class WorkspaceBackendInterfaceTest: XCTestCase {
         XCTAssertFalse(native.workspaceBackend.current.hasProjects)
     }
 }
+
+final class TestWriteGuardTest: XCTestCase {
+    func testOnlyTemporaryPathsAreWritableFromTests() {
+        XCTAssertTrue(isTemporaryPath(FileManager.default.temporaryDirectory.appendingPathComponent("native.json")))
+        XCTAssertTrue(isTemporaryPath(URL(filePath: "/tmp/x/config.toml")))
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        XCTAssertFalse(isTemporaryPath(home.appendingPathComponent(".config/winmuxx/winmux.toml")), "The user's config")
+        XCTAssertFalse(isTemporaryPath(home.appendingPathComponent("Library/Application Support/WinMux-GF/window-state.json")))
+        XCTAssertFalse(isTemporaryPath(URL(filePath: "/tmpfoo/x")), "A prefix of a temporary name is not temporary")
+    }
+}

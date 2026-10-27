@@ -63,6 +63,7 @@ private actor NativeLayoutStorage {
     }
     func save(_ spaces: [String: NativePersistedLayout], revision: UInt64) throws {
         guard revision > savedRevision else { return }
+        assertTestWriteIsTemporary(url)
         let data = try JSONEncoder().encode(NativeLayoutFile(spaces: spaces))
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: url, options: .atomic)
