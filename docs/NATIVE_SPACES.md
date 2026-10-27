@@ -220,12 +220,14 @@ command support as shortcuts.
 ## Sidebar
 
 With `[workspace-sidebar] enabled`, native mode lists desktops as "Desktop N"; a
-`workspace-labels` entry keyed by the desktop number (`"2" = "Mail"`) renames it.
-Rows show the windows each native layout retains, so a desktop not yet visited shows
-none. Selecting a desktop switches to it; selecting a window on another desktop
-switches first, then focuses it when tiling is enabled. Creating, renaming, deleting
-or rearranging desktops, dragging windows between them and projects explain that
-Mission Control owns desktops instead of acting.
+`workspace-labels` entry keyed by the desktop number (`"2" = "Mail"`) renames it, and
+renaming a row in the sidebar writes that entry to the running config. Labels follow
+the desktop's position, as Control-N does, so reordering desktops in Mission Control
+moves the name with the number. Rows show the windows each native layout retains, so
+a desktop not yet visited shows none. Selecting a desktop switches to it; selecting a
+window on another desktop switches first, then focuses it when tiling is enabled;
+dropping a window on a desktop moves it there. Creating, deleting or rearranging
+desktops and projects explain that Mission Control owns desktops instead of acting.
 
 ## Failure handling and limits
 

@@ -42,8 +42,20 @@ final class WorkspaceSidebarNativeSpacesTest: WorkspaceTestCase {
         _ = observe(active: "1")
         let before = Workspace.all.map(\.name)
         MessageModel.shared.message = nil
-        handleWorkspaceSidebarAction(.renameWorkspace("__native_space_desktop-a", displayName: "x"))
+        handleWorkspaceSidebarAction(.deleteWorkspace("__native_space_desktop-a"))
         XCTAssertTrue(try XCTUnwrap(MessageModel.shared.message).body.contains("Mission Control"))
         XCTAssertEqual(Workspace.all.map(\.name), before)
+    }
+
+    func testRenamingADesktopLabelsItsNumber() async throws {
+        let monitor = observe(active: "1")
+        let rows = await buildNativeWorkspaceSidebarWorkspaceViewModels(
+            currentFocus: focus, workspaceLabels: [:], availableMonitors: [monitor])
+        renameNativeDesktop(try XCTUnwrap(nativeDesktopNumber(forSidebarWorkspace: rows[0].name)), to: "  Mail ")
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(nativeDesktopDisplayName(1), "Mail")
+        renameNativeDesktop(1, to: "")
+        try await Task.sleep(for: .milliseconds(50))
+        XCTAssertEqual(nativeDesktopDisplayName(1), "Desktop 1", "An empty name restores the default")
     }
 }

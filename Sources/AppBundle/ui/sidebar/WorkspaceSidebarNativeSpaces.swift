@@ -3,8 +3,9 @@ import NativeSpaces
 
 // With native Spaces the sidebar lists macOS desktops instead of virtual workspaces.
 // Rows reuse the virtual view models; selection routes through native navigation,
-// dragging a window onto a desktop moves it there, and virtual-only edits (create,
-// rename, delete, tab-group drags, projects) are unavailable.
+// dragging a window onto a desktop moves it there, and renaming saves a
+// `workspace-labels` entry keyed by desktop number. Virtual-only edits (create,
+// delete, tab-group drags, projects) are unavailable.
 
 /// Desktops in macOS Control-N order, with the windows each native layout retains.
 /// Desktops not yet visited show no windows until their layout is first observed.
@@ -61,10 +62,26 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
         case .moveWindow(let windowId, let name):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
             runNativeSidebarCommands(["move-node-to-workspace --window-id \(windowId) \(number)"])
-        case .createWorkspace, .renameWorkspace, .deleteWorkspace, .moveTabGroup,
+        case .renameWorkspace(let name, let displayName):
+            guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
+            renameNativeDesktop(number, to: displayName)
+        case .createWorkspace, .deleteWorkspace, .moveTabGroup,
              .moveWindowToNewWorkspace, .moveTabGroupToNewWorkspace,
              .selectProject, .createProject, .renameProject, .setProjectColor, .deleteProject:
             showWorkspaceSidebarError("macOS owns native Spaces: add, remove and rearrange desktops in Mission Control. Projects are available with virtual workspaces.")
+    }
+}
+
+/// An empty name returns the desktop to "Desktop N". Labels follow the desktop's
+/// position, as Control-N does.
+@MainActor
+func renameNativeDesktop(_ number: Int, to displayName: String) {
+    let label = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+    runWorkspaceSidebarSession {
+        if !isUnitTest { try persistWorkspaceSidebarLabel(workspaceName: String(number), label: label.isEmpty ? nil : label) }
+        config.workspaceSidebar.workspaceLabels[String(number)] = label.isEmpty ? nil : label
+        updateTrayText()
+        await updateWorkspaceSidebarModel()
     }
 }
 
