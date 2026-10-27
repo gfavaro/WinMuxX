@@ -118,8 +118,11 @@ launches apps nor moves windows between Spaces/displays. A missing or ambiguous
 window keeps its complete saved tree pending and protected from autosave, but the
 desktop's arrangement (dwindle, master or scrolling) is restored at once, because
 macOS keeps Space UUIDs across restarts. After a Mac restart window identities and
-terminal titles often change, so a tree that is still unmatched after 90 seconds
-stops being protected and the desktop is saved again as it is. A corrupt or
+terminal titles often change, so when an app has exactly as many unmatched windows
+on the desktop as it saved, they are paired in creation order (only their places in
+that desktop's layout depend on it). A tree still incomplete after 90 seconds is
+restored without the windows that never returned, unless its arrangement was changed
+meanwhile, and the desktop is saved again as it is. A corrupt or
 newer-version file is preserved and reported. Numeric Space renumbering never causes ordinal matching. Set
 `restore-layouts = false` to disable native loading/saving; existing files are retained.
 The virtual `window-state.json` and recovery journal are untouched.

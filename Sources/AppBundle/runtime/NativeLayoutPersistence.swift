@@ -127,7 +127,12 @@ final class NativeLayoutPersistence {
             }
             let since = firstAttempt[uuid] ?? now()
             firstAttempt[uuid] = since
-            if since.duration(to: now()) >= pendingGrace { pending.remove(uuid) }
+            if since.duration(to: now()) >= pendingGrace {
+                // Windows that have not returned by now are not coming back: keep the rest,
+                // unless the user has meanwhile chosen another arrangement for this desktop.
+                if workspace.arrangement == record.arrangement { _ = restore(record, to: workspace, allowPartial: true) }
+                pending.remove(uuid)
+            }
         }
     }
 
@@ -148,10 +153,11 @@ final class NativeLayoutPersistence {
         }
     }
 
-    /// Restore only a complete, uniquely matched tree. Missing/ambiguous windows
-    /// leave the snapshot pending and protected from autosave, rather than
-    /// flattening a partially restored group or guessing another Space's window.
-    func restore(_ record: NativePersistedLayout, to workspace: Workspace) -> Bool {
+    /// Restore a uniquely matched tree. Only windows already on this desktop are ever
+    /// matched, never another Space's. Missing windows leave the snapshot pending and
+    /// protected from autosave; once its grace period ends, `allowPartial` restores
+    /// the tree without them instead of discarding it.
+    func restore(_ record: NativePersistedLayout, to workspace: Workspace, allowPartial: Bool = false) -> Bool {
         guard record.supported else { return false }
         let candidates = workspace.allLeafWindowsRecursive
         let live = candidates.compactMap { window in window.restartIdentity.map { (window.windowId, $0) } }
@@ -163,7 +169,8 @@ final class NativeLayoutPersistence {
                   matched[oldID] == nil else { continue }
             matched[oldID] = window
         }
-        guard matched.count == savedWindows.count else { return false }
+        pairRemainingByApp(saved: savedWindows, candidates: candidates, matched: &matched)
+        guard matched.count == savedWindows.count || allowPartial && !matched.isEmpty else { return false }
         let previous = workspace.rootTilingContainer
         previous.unbindFromParent()
         restoreTreeRecursive(frozenContainer: record.root, parent: workspace, index: INDEX_BIND_LAST, windowsById: matched)
@@ -184,6 +191,23 @@ final class NativeLayoutPersistence {
         workspace.masterRatio = record.masterRatio
         workspace.masterStackLayout = .tiles
         workspace.restoreNativeMasterGroupIndex(record.masterIndex)
+        if matched.count < savedWindows.count { workspace.normalizeContainers() } // Drop groups left empty.
         return true
+    }
+
+    /// After a restart, process IDs change and terminal titles move on or repeat, so
+    /// windows rarely match one by one. When an app has exactly as many unmatched
+    /// windows here as it saved, they are paired in creation order: only their places
+    /// in this desktop's layout depend on it.
+    private func pairRemainingByApp(saved: [FrozenWindow], candidates: [Window], matched: inout [UInt32: Window]) {
+        let used = Set(matched.values.map(\.windowId))
+        let savedByApp = Dictionary(grouping: saved.filter { matched[$0.id] == nil && $0.restartIdentity != nil },
+            by: { $0.restartIdentity!.bundleId })
+        let liveByApp = Dictionary(grouping: candidates.filter { !used.contains($0.windowId) && $0.restartIdentity != nil },
+            by: { $0.restartIdentity!.bundleId })
+        for (app, savedWindows) in savedByApp {
+            guard let liveWindows = liveByApp[app], liveWindows.count == savedWindows.count else { continue }
+            for (old, window) in zip(savedWindows, liveWindows.sorted { $0.windowId < $1.windowId }) { matched[old.id] = window }
+        }
     }
 }

@@ -482,6 +482,51 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertEqual(saved.spaces.values.first?.arrangement, .master, "Saving resumes after the grace period")
     }
 
+    func testAfterARebootWindowsOfOneAppArePairedInOrder() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tabGroup, index: 0)
+        let windows = [TestWindow.new(id: 1, parent: tabs), TestWindow.new(id: 2, parent: tabs), TestWindow.new(id: 3, parent: root)]
+        for window in windows {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "terminal", pid: 99, launchDate: Date(timeIntervalSince1970: 1), title: "~")
+        }
+        workspace.transitionArrangement(to: .scrolling)
+        let record = NativePersistedLayout(workspace)
+        // Reboot: same app, new process, titles that repeat or changed, a flat new tree.
+        let fresh = [TestWindow.new(id: 11, parent: root), TestWindow.new(id: 12, parent: root), TestWindow.new(id: 13, parent: root)]
+        for window in windows { window.unbindFromParent() }
+        for (i, window) in fresh.enumerated() {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "terminal", pid: 500, launchDate: Date(timeIntervalSince1970: 2), title: i == 0 ? "~" : "vim")
+        }
+        workspace.transitionArrangement(to: .dwindle)
+        let store = NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        XCTAssertTrue(store.restore(record, to: workspace))
+        XCTAssertEqual(workspace.arrangement, .scrolling)
+        let group = try XCTUnwrap(workspace.rootTilingContainer.children.first as? TilingContainer)
+        XCTAssertEqual(group.layout, .tabGroup)
+        XCTAssertEqual(group.children.map { ($0 as? Window)?.windowId }, [11, 12], "The tab group comes back, in creation order")
+    }
+
+    func testAMissingWindowIsDroppedFromTheRestoredTreeOnlyWhenPartialIsAllowed() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let split = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 1, parent: split)
+        let b = TestWindow.new(id: 2, parent: split)
+        let c = TestWindow.new(id: 3, parent: root)
+        a.restartIdentity = RestartWindowIdentity(bundleId: "editor", pid: 99, launchDate: Date(timeIntervalSince1970: 1), title: "a")
+        b.restartIdentity = RestartWindowIdentity(bundleId: "browser", pid: 98, launchDate: Date(timeIntervalSince1970: 1), title: "b")
+        c.restartIdentity = RestartWindowIdentity(bundleId: "chat", pid: 97, launchDate: Date(timeIntervalSince1970: 1), title: "c")
+        let record = NativePersistedLayout(workspace)
+        b.unbindFromParent() // The browser never comes back.
+        let store = NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+        XCTAssertFalse(store.restore(record, to: workspace), "During the grace period the tree waits for every window")
+        XCTAssertTrue(store.restore(record, to: workspace, allowPartial: true))
+        XCTAssertEqual(Set(workspace.allLeafWindowsRecursive.map(\.windowId)), [1, 3])
+    }
+
     func testUnreadableNativePersistenceIsNeverOverwritten() async throws {
         _ = nativeWorkspace()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
