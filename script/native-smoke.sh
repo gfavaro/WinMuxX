@@ -62,7 +62,7 @@ else
         fi
         if [ "$monitors" -ge 2 ]; then
             before=$(space_of "$window")
-            wm move-node-to-monitor --window-id "$window" next >/dev/null
+            wm move-node-to-monitor --window-id "$window" --wrap-around next >/dev/null
             sleep 0.5
             away=$(space_of "$window")
             [ -n "$away" ] && [ "$away" != "$before" ] && pass "move-node-to-monitor next (desktop $away)" || fail "move-node-to-monitor next"
@@ -84,7 +84,11 @@ if grep -q "No visible scrolling desktop" <<<"$probe"; then
     skip "scrolling pan (no scrolling desktop showing)"
 else
     lag=$(grep -o 'p90 [0-9]* ms' <<<"$probe" | head -1 | grep -o '[0-9]*')
-    [ -n "$lag" ] && [ "$lag" -le 100 ] && pass "scrolling pan p90 lag ${lag} ms" || fail "scrolling pan lag: $(grep 'lag' <<<"$probe" | head -1)"
+    if grep -q "over 0 samples" <<<"$probe"; then
+        skip "scrolling pan (every column fits on screen; nothing to pan)"
+    else
+        [ -n "$lag" ] && [ "$lag" -le 100 ] && pass "scrolling pan p90 lag ${lag} ms" || fail "scrolling pan lag: $(grep 'lag' <<<"$probe" | head -1)"
+    fi
 fi
 
 [ "$(crash_count)" -eq "$crashes_before" ] && pass "no new crash reports" || fail "new crash report in ~/Library/Logs/DiagnosticReports"
