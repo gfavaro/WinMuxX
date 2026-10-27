@@ -88,7 +88,7 @@ struct ResizeCommand: Command {
                 orientation == .h ? $0.minimumLayoutSize.width > 0 : $0.minimumLayoutSize.height > 0
             }
             if let blocked {
-                MinimumSizeNoticePanel.shared.show(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
+                NoticePanel.shared.showMinimumSize(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
                                                    dimension: blockedAxis, minimum: blocked.minimumLayoutSize)
             }
         }
@@ -115,7 +115,7 @@ private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units,
     let maximum = max(metrics.areaWidth - column.frameStartInset - column.frameEndInset, lower)
     let actual = min(max(requested, lower), maximum)
     if requested + 1 < lower, let blocked = group.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }).first(where: { $0.minimumLayoutSize.width > 0 }) {
-        MinimumSizeNoticePanel.shared.show(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
+        NoticePanel.shared.showMinimumSize(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
                                            dimension: "width", minimum: blocked.minimumLayoutSize)
     }
     if abs(actual - column.width) < 0.5 {

@@ -188,11 +188,19 @@ extension HotKey {
                     isQuery: commands.allSatisfy { $0.isQuery || $0.isPresentation },
                     shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
                 ) { () throws in
-                    _ = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
+                    let result = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
+                    showShortcutFailure(binding, result)
                 }
             }
         }
     }
+}
+
+/// A shortcut has no terminal to print to, so its error shows briefly on screen.
+/// Failures without a message (an ordinary no-op) stay silent.
+@MainActor func showShortcutFailure(_ binding: String, _ result: CmdResult) {
+    guard result.exitCode != 0, let message = result.stderr.first(where: { !$0.isEmpty }) else { return }
+    NoticePanel.shared.show(title: "\(binding) did not run", body: message, seconds: 2.5)
 }
 
 /// Called from the local keyDown monitor when the Escape key (or other prefix key)
