@@ -11,11 +11,17 @@ func buildWorkspaceSidebarModelState() async -> WorkspaceSidebarModelState {
     )
     let activeProjectId = currentFocus.workspace.projectId
     let projects = buildWorkspaceSidebarProjectViewModels()
-    let workspaces = await buildWorkspaceSidebarWorkspaceViewModels(
-        currentFocus: currentFocus,
-        workspaceLabels: config.workspaceSidebar.workspaceLabels,
-        availableMonitors: availableMonitors,
-    )
+    let workspaces = runtime.workspaceBackend.kind == .native
+        ? await buildNativeWorkspaceSidebarWorkspaceViewModels(
+            currentFocus: currentFocus,
+            workspaceLabels: config.workspaceSidebar.workspaceLabels,
+            availableMonitors: availableMonitors,
+        )
+        : await buildWorkspaceSidebarWorkspaceViewModels(
+            currentFocus: currentFocus,
+            workspaceLabels: config.workspaceSidebar.workspaceLabels,
+            availableMonitors: availableMonitors,
+        )
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceSidebarResolvedPanelMonitor())
     return WorkspaceSidebarModelState(
         workspaces: workspaces,

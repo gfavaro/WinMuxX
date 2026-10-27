@@ -43,7 +43,10 @@ import Foundation
             _serverArgs.isReadOnly = _serverArgs.isReadOnly || !config.nativeSpaces.tilingEnabled
             let owner = runtime
             owner.workspaceBackend.startObservation { [weak owner] _, _ in
-                owner?.withValue { updateTrayText() }
+                owner?.withValue {
+                    updateTrayText()
+                    owner?.task { await updateWorkspaceSidebarModel() }
+                }
             }
             isWinMuxRuntimeReady = true
             startUnixSocketServer()
