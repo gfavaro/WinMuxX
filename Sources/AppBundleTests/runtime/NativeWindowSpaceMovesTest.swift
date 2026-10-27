@@ -68,7 +68,7 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
         let hidden = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
         let showing = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let window = TestWindow.new(id: 70, parent: hidden.rootTilingContainer)
-        window.nativeLayoutEligible = true
+        window.nativeLayoutEligible = false // Never eligible while its desktop is not showing.
         membership = "2"
         let result = try await run(mover(arrives: true), "move-node-to-workspace 1")
         XCTAssertEqual(result.exitCode, 0, result.stderr.joined())

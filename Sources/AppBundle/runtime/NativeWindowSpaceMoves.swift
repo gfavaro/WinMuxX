@@ -134,11 +134,14 @@ final class NativeWindowSpaceMoves {
     }
 
     /// The window to move, on any desktop: moves go by window ID and each arrival is
-    /// confirmed, so the active-desktop fence of tiling commands is not needed. An
-    /// explicit window must still be one native tiling manages.
+    /// confirmed, so the active-desktop fence of tiling commands is not needed. The window
+    /// must belong to a native desktop's layout; layout eligibility is not required,
+    /// since windows on desktops that are not showing are never eligible.
     private func movableWindow(_ args: some CmdArgs, _ env: CmdEnv, _ io: CmdIo) -> Window? {
         guard let window = args.resolveUncheckedTarget(env, io)?.windowOrNil else { _ = io.err(noWindowIsFocused); return nil }
-        guard window.nativeLayoutEligible else { _ = io.err("Window \(window.windowId) is not managed by native tiling"); return nil }
+        guard runtime.workspaceBackend.nativeLayouts.retainedByUUID.values.contains(where: { $0 === window.nodeWorkspace }) else {
+            _ = io.err("Window \(window.windowId) is not on a native desktop WinMuxX manages"); return nil
+        }
         return window
     }
 

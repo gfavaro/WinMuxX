@@ -48,7 +48,8 @@ else
     else
         pass "test window $window adopted"
         home=$(space_of "$window")
-        other=$(wm list-workspaces --monitor focused --format '%{workspace} %{workspace-is-visible}' | awk '$2 == "false" { print $1; exit }')
+        # Another desktop on any display that has more than one; the window can join any desktop.
+        other=$(wm list-workspaces --all --format '%{workspace} %{workspace-is-visible}' | awk -v home="$home" '$2 == "false" && $1 != home { print $1; exit }')
         if [ -n "$other" ]; then
             wm move-node-to-workspace --window-id "$window" "$other" >/dev/null
             sleep 0.5
@@ -57,7 +58,7 @@ else
             sleep 0.5
             [ "$(space_of "$window")" = "$home" ] && pass "move back to desktop $home" || fail "move back to desktop $home"
         else
-            skip "move-node-to-workspace (no other desktop on this display)"
+            skip "move-node-to-workspace (no other desktop)"
         fi
         if [ "$monitors" -ge 2 ]; then
             before=$(space_of "$window")
