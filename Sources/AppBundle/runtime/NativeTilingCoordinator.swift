@@ -67,6 +67,7 @@ final class NativeTilingCoordinator {
         backend.nativeWriteAuthority.replace(snapshot: snapshot, identities: identities)
         await synchronizeFocus()
         guard generation == version else { return }
+        backend.noteNativeActivity()
         if mouseMonitor == nil && !isUnitTest {
             let owner = runtime
             mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp]) { [weak owner] event in

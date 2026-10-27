@@ -79,6 +79,25 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
         XCTAssertTrue(posts.isEmpty)
     }
 
+    func testBackAndForthReturnsToTheDisplaysPreviousDesktop() async throws {
+        let nav = navigator { $0.targetSpaceID }
+        let tracker = runtime.workspaceBackend.nativeActivity
+        tracker.runHooks = { _, _ in }
+        tracker.execWorkspaceChange = { _, _ in }
+        tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
+        let first = try await run(nav, "workspace 3")
+        XCTAssertEqual(first.exitCode, 0)
+        tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
+        let io = CmdIo(stdin: .emptyStdin)
+        let back = await nav.runBackAndForth(io: io)
+        XCTAssertTrue(back, io.stderr.joined())
+        XCTAssertEqual(active, "1")
+        tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
+        let auto = try await run(nav, "workspace --auto-back-and-forth 1")
+        XCTAssertEqual(auto.exitCode, 0)
+        XCTAssertEqual(active, "3", "Already on 1, so it returns to the previous desktop")
+    }
+
     func testOnlyNumberedAndRelativeTargetsAreNativeNavigation() throws {
         func supported(_ command: String) throws -> Bool {
             try NativeSpaceNavigator.supports(XCTUnwrap(parseCommand(command).cmdOrDie as? WorkspaceCommand).args)
@@ -86,6 +105,6 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
         XCTAssertTrue(try supported("workspace 2"))
         XCTAssertTrue(try supported("workspace next --wrap-around"))
         XCTAssertFalse(try supported("workspace web"))
-        XCTAssertFalse(try supported("workspace --auto-back-and-forth 2"))
+        XCTAssertTrue(try supported("workspace --auto-back-and-forth 2"))
     }
 }

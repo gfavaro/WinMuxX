@@ -35,6 +35,7 @@ final class WorkspaceBackendState {
     let nativePersistence = NativeLayoutPersistence()
     let nativeNavigation = NativeSpaceNavigator()
     let nativeWindowMoves = NativeWindowSpaceMoves()
+    let nativeActivity = NativeActivityTracker()
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
         return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
@@ -81,8 +82,17 @@ final class WorkspaceBackendState {
         switch command {
             case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
             case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
+            case is WorkspaceBackAndForthCommand: true
             default: false
         }
+    }
+
+    /// Feeds desktop history and native hooks; call after observations and focus sync.
+    func noteNativeActivity() {
+        guard kind == .native, let displays = nativeObservedDisplays() else { return }
+        let focused = focus.workspace
+        let display = nativeLayouts.currentBySpaceID.values.contains { $0 === focused } ? focused.workspaceMonitor.displayUUID : nil
+        nativeActivity.observe(displays, focusedDisplay: display, focusedWindow: focus.windowOrNil?.windowId)
     }
 
     /// Live switching is intentionally unavailable until all motion/recovery

@@ -25,7 +25,7 @@ final class NativeSpaceNavigator {
 
     /// Arguments native navigation implements; anything else stays unsupported.
     static func supports(_ args: WorkspaceCmdArgs) -> Bool {
-        guard !args.autoBackAndForth, !args.useStdin, args.internalName == nil else { return false }
+        guard !args.useStdin, args.internalName == nil else { return false }
         switch args.target.val {
             case .relative: return true
             case .direct(let name): return Int(name.raw) != nil
@@ -33,13 +33,38 @@ final class NativeSpaceNavigator {
     }
 
     func run(_ args: WorkspaceCmdArgs, io: CmdIo) async -> Bool {
-        guard isSupported() else { return io.err("Native Space switching requires macOS 27 or later") }
-        guard canPostEvents() else { return io.err("Native Space switching needs WinMuxX Accessibility permission") }
-        let displays: [NativeSpaceDisplay]
-        do { displays = try await topology() } catch { return io.err("Native Spaces unavailable: \(error)") }
-        guard var plan = resolve(args, displays, io) else { return false }
+        guard let displays = await readyTopology(io), var plan = resolve(args, displays, io) else { return false }
+        if plan.isNoop, args.autoBackAndForth,
+           let display = displays.first(where: { $0.identifier == plan.displayIdentifier }),
+           let previous = runtime.workspaceBackend.nativeActivity.previousDesktop(on: display),
+           let back = NativeSpaceNavigation.toward(spaceID: previous, on: display) {
+            plan = back
+        }
+        return await perform(plan, failIfNoop: args.failIfNoop, io: io)
+    }
+
+    /// `workspace-back-and-forth`: the focused display's previous desktop.
+    func runBackAndForth(io: CmdIo) async -> Bool {
+        guard let displays = await readyTopology(io),
+              let id = targetDisplay(monitor: nil, displays, io),
+              let display = displays.first(where: { $0.identifier == id }) else { return false }
+        guard let previous = runtime.workspaceBackend.nativeActivity.previousDesktop(on: display),
+              let plan = NativeSpaceNavigation.toward(spaceID: previous, on: display) else {
+            return io.err("No previous desktop on this display")
+        }
+        return await perform(plan, failIfNoop: false, io: io)
+    }
+
+    private func readyTopology(_ io: CmdIo) async -> [NativeSpaceDisplay]? {
+        guard isSupported() else { _ = io.err("Native Space switching requires macOS 27 or later"); return nil }
+        guard canPostEvents() else { _ = io.err("Native Space switching needs WinMuxX Accessibility permission"); return nil }
+        do { return try await topology() } catch { _ = io.err("Native Spaces unavailable: \(error)"); return nil }
+    }
+
+    private func perform(_ initial: NativeSpaceSwitchPlan, failIfNoop: Bool, io: CmdIo) async -> Bool {
+        var plan = initial
         if plan.isNoop {
-            if args.failIfNoop { return false }
+            if failIfNoop { return false }
             io.err("Already on that Space. Tip: use --fail-if-noop to exit with non-zero code")
             return true
         }
@@ -77,7 +102,7 @@ final class NativeSpaceNavigator {
                 }
                 return plan
             case .relative(let direction):
-                guard let display = targetDisplay(args, displays, io) else { return nil }
+                guard let display = targetDisplay(monitor: args.monitorDescription, displays, io) else { return nil }
                 guard let plan = NativeSpaceNavigation.adjacent(next: direction == .next, wrapAround: args.wrapAround,
                     on: display, in: displays) else {
                     _ = io.err("No \(direction == .next ? "next" : "previous") Space on this display")
@@ -89,9 +114,9 @@ final class NativeSpaceNavigator {
 
     /// The display Control-arrow would act on: the focused native desktop's display,
     /// else the one under the pointer.
-    private func targetDisplay(_ args: WorkspaceCmdArgs, _ displays: [NativeSpaceDisplay], _ io: CmdIo) -> String? {
+    private func targetDisplay(monitor: MonitorDescription?, _ displays: [NativeSpaceDisplay], _ io: CmdIo) -> String? {
         let known = Set(displays.map(\.identifier))
-        if let description = args.monitorDescription {
+        if let description = monitor {
             guard let uuid = description.resolveMonitor(sortedMonitors: sortedMonitors)?.displayUUID, known.contains(uuid) else {
                 _ = io.err("No native Space display matches '\(description)'")
                 return nil

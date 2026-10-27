@@ -199,7 +199,7 @@ func stateColorHex(_ color: NSColor) -> String {
     return CmdEnv(extraEnvironment: [
         "WINMUX_EVENT": event, "WINMUX_MODE": activeMode ?? "", "WINMUX_PREV_MODE": previousMode ?? "",
         "WINMUX_MODE_INITIAL": mode?.initial ?? "", "WINMUX_MODE_COLOR": mode.map { stateColorHex(menuBarModeColor($0)) } ?? "",
-        "WINMUX_WORKSPACE": focus.workspace.name, "WINMUX_WINDOW_ID": focus.windowOrNil.map { String($0.windowId) } ?? "",
+        "WINMUX_WORKSPACE": userFacingWorkspaceName(focus.workspace), "WINMUX_WINDOW_ID": focus.windowOrNil.map { String($0.windowId) } ?? "",
         "WINMUX_MONITOR_UUID": focus.workspace.workspaceMonitor.displayUUID ?? "",
         "WINMUX_ENABLED": String(TrayMenuModel.shared.isEnabled), "WINMUX_SUSPENDED": String(runtime.hotkeys.hotkeysSuspended),
         "WINMUX_STATE_REVISION": String(runtime.publicState.revision), "WINMUX_STATE_INSTANCE": runtime.publicState.instanceId,

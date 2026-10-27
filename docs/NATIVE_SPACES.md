@@ -131,7 +131,9 @@ running configuration.
 displays in Mission Control order, skipping fullscreen Spaces. `workspace next|prev`
 follows Control-arrow on the focused native desktop's display (otherwise the display
 under the pointer), fullscreen Spaces included; `--wrap-around` and `--monitor` are
-honored. Named targets, `--auto-back-and-forth` and `--stdin` stay unsupported.
+honored. `workspace-back-and-forth` and `--auto-back-and-forth` return to the
+display's previous desktop (fullscreen Spaces are skipped in that history). Named
+targets and `--stdin` stay unsupported.
 A navigation command cannot share a binding with window commands.
 
 Navigation posts a synthetic Dock swipe, adapted from Dinky (MIT) and mimi. It needs
@@ -161,6 +163,15 @@ instead of guessing. Each move is confirmed by re-reading the window's Space.
 `on-window-detected` rules that run `move-node-to-workspace` move windows opened after
 WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
 desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
+
+## Hooks
+
+`after-startup-command` runs once the first native observation arrives.
+`exec-on-workspace-change`, `on-focus-changed` and `on-focused-monitor-changed` run
+when native observation or focus synchronization sees that change, and
+`WINMUX_WORKSPACE`, `WINMUX_FOCUSED_WORKSPACE` and `WINMUX_PREV_WORKSPACE` carry
+desktop numbers (empty for a fullscreen Space). Hook commands follow the same native
+command support as shortcuts.
 
 ## Sidebar
 
