@@ -164,6 +164,17 @@ instead of guessing. Each move is confirmed by re-reading the window's Space.
 WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
 desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
 
+## Tab groups
+
+With `window-tabs.enabled`, Tabbed groups (`layout tab-group`, `stack-with`, the tab
+drag overlay when `drag-stack-layout = 'tabbed'`) work natively, with the usual tab
+strip. Native mode never parks windows in a screen corner, so inactive tabs keep the
+active tab's frame behind it: every tab stays visible in Mission Control and reachable
+if WinMuxX quits. After each native layout an active tab that a sibling covers is
+raised with AX (adapted from Dinky), which does not activate its app; a raise that
+would move keyboard focus to another window of the frontmost app waits until focus
+agrees. Accordion stays unsupported until its peeking edges get full ordering.
+
 ## Mouse
 
 Layout pauses while a mouse button is down. Dragging a tiled window shows the same

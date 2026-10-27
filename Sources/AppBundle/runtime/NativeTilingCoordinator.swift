@@ -96,6 +96,8 @@ final class NativeTilingCoordinator {
                   let workspace = backend.nativeLayouts.activeWorkspace(on: display.identifier) else { continue }
             do { try await workspace.layoutWorkspace() }
             catch { status = "Native layout suspended: \(error)"; backend.nativeWriteAuthority.invalidate(); ready = false; return }
+            guard generation == version else { return }
+            await raiseCoveredNativeTabs(in: workspace, frontToBack: onScreenWindowOrder())
         }
         await backend.nativePersistence.save(backend.nativeLayouts)
         guard generation == version else { return }
@@ -103,7 +105,7 @@ final class NativeTilingCoordinator {
         hasCompletedInitialLayout = true
         status = "Native tiling active"
         updateTrayText()
-        WindowBorderController.shared.refresh()
+        await updateWindowTabModel() // Also refreshes borders.
     }
 
     /// Reads the frontmost window once its drag has ended and adopts a resize or a
@@ -154,7 +156,9 @@ final class NativeTilingCoordinator {
                  // Per-window actions; observation reconciles the states they produce.
                  is FullscreenCommand, is MacosNativeFullscreenCommand, is MacosNativeMinimizeCommand,
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
-                 is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand: return true
+                 is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand: return true
+            // Tab groups stack natively only with window tabs; Accordion overlap is not shown yet.
+            case is StackWithCommand: return config.windowTabs.enabled
             case let command as MoveCommand: return command.args.boundaries == .workspace
             case let command as FocusCommand:
                 return command.args.boundaries == .workspace && command.args.boundariesAction != .wrapAroundAllMonitors
@@ -162,7 +166,8 @@ final class NativeTilingCoordinator {
                 return command.args.layouts.val.allSatisfy { $0 == .dwindle || $0 == .master }
             case let command as LayoutCommand:
                 return !command.args.forNextDetectedWindow && command.args.toggleBetween.val.allSatisfy {
-                    [.tiles, .h_tiles, .v_tiles, .horizontal, .vertical, .auto, .tiling, .floating].contains($0)
+                    [.tiles, .h_tiles, .v_tiles, .horizontal, .vertical, .auto, .tiling, .floating].contains($0) ||
+                        $0 == .tabGroup && config.windowTabs.enabled
                 }
             default: return false
         }

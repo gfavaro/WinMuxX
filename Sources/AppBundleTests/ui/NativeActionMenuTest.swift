@@ -24,7 +24,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
     }
 
-    func testMenuListsDesktopsAndOnlyCommandsTheNativeBackendRuns() throws {
+    func testNativeUsesTheVirtualMenuWithDesktopsAndUnavailableItemsDisabled() throws {
         let previousMode = activeMode
         defer { activeMode = previousMode }
         activeMode = mainModeId
@@ -32,24 +32,24 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         config.modes[mainModeId] = parseConfig("""
         [mode.main.binding]
         alt-2 = 'workspace 2'
-        alt-shift-2 = 'move-node-to-workspace 2'
         """).config.modes[mainModeId]
+        _ = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-b"]).focusWorkspace()
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
         XCTAssertEqual(titles.first, "WinMuxX · Mail")
-        let desktop = try XCTUnwrap(menu.items.first { $0.title == "Mail" })
-        XCTAssertEqual(desktop.state, .on)
-        XCTAssertEqual(desktop.keyEquivalent, "2", "Registered navigation shortcuts are shown")
-        XCTAssertEqual(menu.items.first { $0.title == "Desktop 1" }?.state, .off)
-        XCTAssertEqual(menu.items.first { $0.title == "Fullscreen App" }?.isEnabled, false)
-        for title in ["Previous Desktop", "Next Desktop", "Focus", "Move Window", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Reload Config", "Quit WinMuxX"] {
+        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes",
+                      "Workspace Controls…", "Refresh Desktops", "Reload Config", "Settings…", "Enabled", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
-        for title in ["Workspaces", "Join With", "Settings…", "Enabled", "Workspace Controls…"] {
-            XCTAssertFalse(titles.contains(title), title)
-        }
-        let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu).items.map(\.title)
-        XCTAssertFalse(layout.contains("Tabbed") || layout.contains("Accordion") || layout.contains("Scrolling"))
+        let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
+        let mail = try XCTUnwrap(workspaces.items.first { $0.title == "Mail" })
+        XCTAssertEqual(mail.state, .on)
+        XCTAssertEqual(mail.keyEquivalent, "2")
+        XCTAssertTrue(workspaces.items.contains { $0.title == "Desktop 1" })
+        let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
+        XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "Not available with native Spaces")
+        XCTAssertEqual(menu.items.first { $0.title == "Enabled" }?.isEnabled, false)
+        XCTAssertEqual(menu.items.first { $0.title == "Workspace Controls…" }?.isEnabled, false)
     }
 }

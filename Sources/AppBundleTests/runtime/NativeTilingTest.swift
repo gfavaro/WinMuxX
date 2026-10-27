@@ -143,19 +143,34 @@ final class NativeTilingTest: WorkspaceTestCase {
     func testNativeLayoutRejectsUnsupportedRetainedGroupsBeforeAnyFrameWrite() async throws {
         let workspace = nativeWorkspace()
         let root = workspace.rootTilingContainer
-        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tabGroup, index: 0)
+        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stacked, index: 0)
         let a = TestWindow.new(id: 1, parent: tabs)
         let b = TestWindow.new(id: 2, parent: tabs)
         do {
             try await workspace.layoutWorkspace()
-            XCTFail("Native overlapping groups must remain suspended")
+            XCTFail("Native Accordion must remain suspended")
         } catch { XCTAssertTrue(error is NativeTilingUnsupportedLayout) }
         XCTAssertTrue(workspace.rootTilingContainer === root)
         XCTAssertTrue(root.children.first === tabs)
-        XCTAssertEqual(tabs.layout, .tabGroup)
+        XCTAssertEqual(tabs.layout, .stacked)
         XCTAssertEqual(tabs.children, [a, b])
         XCTAssertNil(a.lastAppliedLayoutPhysicalRect)
         XCTAssertNil(b.lastAppliedLayoutPhysicalRect)
+    }
+
+    func testNativeTabbedGroupStacksInactiveTabsAtTheActiveFrame() async throws {
+        config.windowTabs.enabled = true
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        let tabs = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .h, .tabGroup, index: 0)
+        let a = TestWindow.new(id: 1, parent: tabs)
+        let b = TestWindow.new(id: 2, parent: tabs)
+        b.markAsMostRecentChild()
+        try await workspace.layoutWorkspace()
+        let active = try XCTUnwrap(b.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(a.lastAppliedLayoutPhysicalRect, active, "Inactive tabs wait behind, never parked")
+        XCTAssertTrue(a.isInactiveWindowTab)
+        XCTAssertFalse(b.isInactiveWindowTab)
     }
 
     func testIncomingSpaceReadPreservesUnqueriedDisplaysAndRetiresOutgoingPresentation() throws {
@@ -328,7 +343,9 @@ final class NativeTilingTest: WorkspaceTestCase {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
             XCTAssertTrue(NativeTilingCoordinator.supports(command), text)
         }
-        for text in ["workspace 2", "move-node-to-workspace 2", "layout tabbed", "workspace-layout scrolling",
+        config.windowTabs.enabled = true
+        XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout tabbed").unwrap().0)))
+        for text in ["workspace 2", "move-node-to-workspace 2", "layout accordion", "workspace-layout scrolling",
                      "move --boundaries all-monitors-outer-frame left",
                      "focus --boundaries all-monitors-outer-frame left"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
@@ -438,5 +455,26 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertNotEqual(rejected.exitCode, 0)
         XCTAssertTrue(rejected.stderr.joined().contains("eligible"))
         XCTAssertEqual(group.children, [a, b])
+    }
+}
+
+@MainActor
+final class NativeTabStackingTest: WorkspaceTestCase {
+    func testOnlyActiveTabsCoveredBySiblingsAreRaised() throws {
+        config.windowTabs.enabled = true
+        let workspace = Workspace.get(byName: "tabs")
+        let tabs = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, .h, .tabGroup, index: 0)
+        let inactive = TestWindow.new(id: 11, parent: tabs)
+        let active = TestWindow.new(id: 12, parent: tabs)
+        active.markAsMostRecentChild()
+        let other = TestWindow.new(id: 13, parent: workspace.rootTilingContainer)
+        // TestWindow is not a MacWindow, so check the ordering decision through the ids.
+        func covered(_ order: [UInt32]) -> Bool {
+            let position = Dictionary(order.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            return tabs.allLeafWindowsRecursive.contains { $0 !== active && (position[$0.windowId] ?? .max) < position[active.windowId]! }
+        }
+        XCTAssertTrue(covered([inactive.windowId, active.windowId, other.windowId]))
+        XCTAssertFalse(covered([other.windowId, active.windowId, inactive.windowId]), "Unrelated windows never force a raise")
+        XCTAssertTrue(nativeTabsToRaise(in: workspace, position: [11: 0, 12: 1]).isEmpty, "Only real app windows are raised")
     }
 }

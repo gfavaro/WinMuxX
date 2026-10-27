@@ -69,7 +69,9 @@ struct NativeTilingUnsupportedLayout: Error, CustomStringConvertible {
 extension Workspace {
     @MainActor var supportsNativeTiling: Bool {
         func supported(_ container: TilingContainer) -> Bool {
-            [.tiles, .dwindle].contains(container.layout) && container.children.allSatisfy {
+            // Tabbed groups stack their tabs at one frame; see raiseCoveredNativeTabs.
+            ([.tiles, .dwindle].contains(container.layout) || container.layout == .tabGroup && container.usesWindowTabBehavior) &&
+                container.children.allSatisfy {
                 guard let nested = $0 as? TilingContainer else { return true }
                 return supported(nested)
             }
@@ -321,7 +323,13 @@ extension TilingContainer {
                 context,
             )
             for child in children where child != activeChild {
-                try await child.hideTabbedWindows(context.workspace)
+                if runtime.workspaceBackend.kind == .native {
+                    // Native never parks windows: inactive tabs wait behind the active one.
+                    try await child.layoutRecursive(contentPoint, width: contentWidth, height: contentHeight,
+                        virtual: contentVirtual, context)
+                } else {
+                    try await child.hideTabbedWindows(context.workspace)
+                }
             }
             return
         }

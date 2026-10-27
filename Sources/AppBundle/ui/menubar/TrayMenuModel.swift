@@ -71,6 +71,7 @@ extension ObservableObject {
         let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Observation only"
         let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
         TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
         return
     }
     let focus = focus
