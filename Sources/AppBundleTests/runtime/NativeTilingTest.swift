@@ -443,6 +443,44 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertEqual(restoredGroup.layout, .tiles)
     }
 
+    func testUnmatchedDesktopKeepsItsArrangementAndIsSavedAgainAfterGrace() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let window = TestWindow.new(id: 1, parent: root)
+        _ = TestWindow.new(id: 2, parent: root)
+        window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+            launchDate: Date(timeIntervalSince1970: 1), title: "before reboot")
+        workspace.transitionArrangement(to: .scrolling)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("native.json")
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let first = NativeLayoutPersistence(url: url)
+        await first.reconcile(layouts)
+        await first.save(layouts)
+        // After a reboot: new process, new title, layout reset by the fresh tree.
+        window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 500,
+            launchDate: Date(timeIntervalSince1970: 2), title: "after reboot")
+        workspace.transitionArrangement(to: .dwindle)
+        var clock = ContinuousClock.now
+        let second = NativeLayoutPersistence(url: url)
+        second.now = { clock }
+        await second.reconcile(layouts)
+        XCTAssertEqual(workspace.arrangement, .scrolling, "The desktop's arrangement survives a restart")
+        XCTAssertEqual(second.pendingCount, 1)
+        workspace.transitionArrangement(to: .master)
+        await second.reconcile(layouts)
+        XCTAssertEqual(workspace.arrangement, .master, "The fallback applies once; later choices are the user's")
+        clock = clock.advanced(by: .seconds(120))
+        await second.reconcile(layouts)
+        XCTAssertEqual(second.pendingCount, 0)
+        await second.save(layouts)
+        struct File: Decodable { let spaces: [String: NativePersistedLayout] }
+        let saved = try JSONDecoder().decode(File.self, from: Data(contentsOf: url))
+        XCTAssertEqual(saved.spaces.values.first?.arrangement, .master, "Saving resumes after the grace period")
+    }
+
     func testUnreadableNativePersistenceIsNeverOverwritten() async throws {
         _ = nativeWorkspace()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

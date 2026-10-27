@@ -113,9 +113,12 @@ Native layout state is stored separately in
 `~/Library/Application Support/WinMux-GF/native-space-layouts-v1.json`, keyed by Space
 UUID. Restore only binds uniquely matched windows already in that Space. It neither
 launches apps nor moves windows between Spaces/displays. A missing or ambiguous
-window keeps its complete saved tree pending and protected from autosave; a corrupt
-or newer-version file is preserved and reported. Unsupported saved group layouts
-remain pending. Numeric Space renumbering never causes ordinal matching. Set
+window keeps its complete saved tree pending and protected from autosave, but the
+desktop's arrangement (dwindle, master or scrolling) is restored at once, because
+macOS keeps Space UUIDs across restarts. After a Mac restart window identities and
+terminal titles often change, so a tree that is still unmatched after 90 seconds
+stops being protected and the desktop is saved again as it is. A corrupt or
+newer-version file is preserved and reported. Numeric Space renumbering never causes ordinal matching. Set
 `restore-layouts = false` to disable native loading/saving; existing files are retained.
 The virtual `window-state.json` and recovery journal are untouched.
 

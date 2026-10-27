@@ -79,7 +79,13 @@ final class NativeLayoutPersistence {
     private var writable = true
     private var saved: [String: NativePersistedLayout] = [:]
     private var pending = Set<String>()
+    private var arrangementApplied = Set<String>()
+    private var firstAttempt: [String: ContinuousClock.Instant] = [:]
     private(set) var lastError: String?
+    var now: () -> ContinuousClock.Instant = { .now }
+    /// After a Mac restart window identities change and terminal titles move on, so a
+    /// complete match may never come. Past this, the desktop is saved again as it is.
+    var pendingGrace: Duration = .seconds(90)
     var pendingCount: Int { pending.count }
 
     init(url: URL? = nil) {
@@ -109,9 +115,18 @@ final class NativeLayoutPersistence {
         }
         guard !Task.isCancelled, layouts.snapshot != nil else { return }
         for (uuid, workspace) in layouts.retainedByUUID where workspace.isVisible {
-            if pending.contains(uuid), let record = saved[uuid] {
-                if restore(record, to: workspace) { pending.remove(uuid) }
+            guard pending.contains(uuid), let record = saved[uuid] else { continue }
+            if restore(record, to: workspace) { pending.remove(uuid); continue }
+            // macOS keeps a desktop's identity across restarts, so its arrangement is
+            // restored even when its windows cannot all be matched.
+            if arrangementApplied.insert(uuid).inserted, [.dwindle, .master, .scrolling].contains(record.arrangement),
+               workspace.arrangement != record.arrangement {
+                workspace.transitionArrangement(to: record.arrangement)
+                workspace.masterRatio = record.masterRatio
             }
+            let since = firstAttempt[uuid] ?? now()
+            firstAttempt[uuid] = since
+            if since.duration(to: now()) >= pendingGrace { pending.remove(uuid) }
         }
     }
 
