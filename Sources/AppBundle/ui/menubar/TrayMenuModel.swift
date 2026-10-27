@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import NativeSpaces
 
 public final class TrayMenuModel: ObservableObject {
     @MainActor public static let shared = TrayMenuModel()
@@ -63,10 +64,13 @@ extension ObservableObject {
 
 @MainActor func updateTrayText() {
     if runtime.workspaceBackend.kind == .native {
-        let available = runtime.workspaceBackend.observation?.inventory.currentSnapshot != nil
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, "Spaces")
-        let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "read-only"
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, available ? "Native Spaces (\(state))" : "Native Spaces (observation unavailable)")
+        let displays = nativeObservedDisplays() ?? []
+        let display = displays.first { $0.identifier == focus.workspace.workspaceMonitor.displayUUID } ?? displays.first
+        let number = display.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, number.map(String.init) ?? "Spaces")
+        let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Observation only"
+        let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
+        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
         return
     }
     let focus = focus

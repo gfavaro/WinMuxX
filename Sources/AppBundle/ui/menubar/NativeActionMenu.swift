@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Common
+import NativeSpaces
 
 /// AppKit can notify effectiveAppearance again while a status button is rendered.
 /// Accept only actual scheme changes so rendering cannot feed its own observer.
@@ -83,11 +84,20 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         if runtime.workspaceBackend.kind == .native {
-            statusItem?.length = NSStatusItem.squareLength
-            statusItem?.button?.attributedTitle = NSAttributedString(string: "")
-            statusItem?.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Native Spaces")
-            statusItem?.button?.toolTip = TrayMenuModel.shared.menuBarWorkspaceName
-            statusItem?.button?.setAccessibilityLabel("WinMuxX, \(TrayMenuModel.shared.menuBarWorkspaceName)")
+            let model = TrayMenuModel.shared
+            if model.menuBarConfiguration.indicator == .workspace, Int(model.menuBarWorkspaceIndicator) != nil {
+                statusItem?.length = NSStatusItem.variableLength
+                statusItem?.button?.image = nil
+                statusItem?.button?.attributedTitle = NSAttributedString(string: model.menuBarWorkspaceIndicator,
+                    attributes: [.foregroundColor: NSColor.labelColor])
+                statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+            } else {
+                statusItem?.length = NSStatusItem.squareLength
+                statusItem?.button?.attributedTitle = NSAttributedString(string: "")
+                statusItem?.button?.image = NSImage(systemSymbolName: "square.stack.3d.up", accessibilityDescription: "Native Spaces")
+            }
+            statusItem?.button?.toolTip = "WinMuxX · \(model.menuBarWorkspaceName)"
+            statusItem?.button?.setAccessibilityLabel("WinMuxX, \(model.menuBarWorkspaceName)")
             return
         }
         let model = TrayMenuModel.shared
@@ -133,23 +143,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.autoenablesItems = false
-        if runtime.workspaceBackend.kind == .native {
-            let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "read-only"
-            menu.addItem(NSMenuItem(title: "Native Spaces · \(state)", action: nil, keyEquivalent: ""))
-            if let inventory = runtime.workspaceBackend.observation?.inventory {
-                menu.addItem(NSMenuItem(title: "Observation: \(inventory.status)", action: nil, keyEquivalent: ""))
-                for record in inventory.records {
-                    let title = "\(record.isActive ? "●" : "○") Space \(record.space.id) · \(record.space.isDesktop ? "Desktop" : "Unmanaged")"
-                    menu.addItem(NSMenuItem(title: title, action: nil, keyEquivalent: ""))
-                }
-            }
-            menu.addItem(.separator())
-            menu.addItem(callbackItem("Refresh native observations", #selector(refreshNativeSpaces)))
-            menu.addItem(callbackItem("Native diagnostics…", #selector(openDiagnostics)))
-            menu.addItem(callbackItem("Open config…", #selector(openConfig)))
-            menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
-            return
-        }
+        if runtime.workspaceBackend.kind == .native { return buildNativeMenu(menu) }
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
         capturedRuleTarget = focus.windowOrNil.flatMap { window -> QuickFloatingRuleTarget? in
             guard let app = window as? MacWindow, let bundleId = app.macApp.rawAppBundleId else { return nil }
@@ -266,6 +260,98 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             item.isEnabled = !WindowRecoveryController.shared.isRecovering
             menu.addItem(item)
         }
+        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+    }
+
+    /// Desktops come from macOS; only commands the native backend runs are offered.
+    private func buildNativeMenu(_ menu: NSMenu) {
+        let backend = runtime.workspaceBackend
+        bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
+        let displays = nativeObservedDisplays() ?? []
+        let focusedDisplay = focus.workspace.workspaceMonitor.displayUUID
+        let current = displays.first { $0.identifier == focusedDisplay } ?? displays.first
+        let number = current.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
+        let title = current == nil ? "Native Spaces" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
+        menu.addItem(NSMenuItem(title: "WinMuxX · \(title)", action: nil, keyEquivalent: ""))
+        if case .unavailable(let reason) = backend.observation?.inventory.status {
+            menu.addItem(NSMenuItem(title: "⚠ Native Spaces unavailable: \(reason)", action: nil, keyEquivalent: ""))
+        } else if !backend.nativeTilingEnabled {
+            menu.addItem(NSMenuItem(title: "Tiling off (observation only)", action: nil, keyEquivalent: ""))
+        } else if !backend.nativeTiling.ready {
+            menu.addItem(NSMenuItem(title: "Tiling paused: \(backend.nativeTiling.status)", action: nil, keyEquivalent: ""))
+        }
+        if activeMode != mainModeId {
+            menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
+        }
+        func add(_ title: String, _ script: String, to menu: NSMenu) -> NSMenuItem? {
+            guard case .cmd(let command) = parseCommand(script), backend.accepts(command) else { return nil }
+            return addCommand(title, command: command, to: menu, requiresWindow: command is WorkspaceCommand ? false : nil)
+        }
+
+        menu.addItem(.separator())
+        var desktop = 0
+        for display in displays {
+            if displays.count > 1 {
+                let name = sortedMonitors.first { $0.displayUUID == display.identifier }?.name ?? "Display"
+                let header = NSMenuItem(title: name, action: nil, keyEquivalent: "")
+                header.isEnabled = false
+                menu.addItem(header)
+            }
+            for space in display.spaces {
+                guard space.isDesktop else {
+                    let item = NSMenuItem(title: "Fullscreen App", action: nil, keyEquivalent: "")
+                    item.isEnabled = false
+                    item.state = space.id == display.activeSpaceID ? .on : .off
+                    menu.addItem(item)
+                    continue
+                }
+                desktop += 1
+                let item = add(nativeDesktopDisplayName(desktop), "workspace \(desktop)", to: menu)
+                item?.state = space.id == display.activeSpaceID ? .on : .off
+            }
+        }
+        _ = add("Previous Desktop", "workspace prev", to: menu)
+        _ = add("Next Desktop", "workspace next", to: menu)
+
+        if backend.nativeTilingEnabled {
+            menu.addItem(.separator())
+            for (title, command) in [("Focus", "focus"), ("Move Window", "move")] {
+                addSubmenu(title, to: menu) { submenu in
+                    for direction in ["left", "down", "up", "right"] { _ = add(direction.capitalized, "\(command) \(direction)", to: submenu) }
+                }
+            }
+            addSubmenu("Resize", to: menu) { submenu in
+                for (title, script) in [("Wider", "resize width +50"), ("Narrower", "resize width -50"),
+                                        ("Taller", "resize height +50"), ("Shorter", "resize height -50")] {
+                    _ = add(title, script, to: submenu)
+                }
+            }
+            addSubmenu("Layout", to: menu) { submenu in
+                let arrangement = focus.workspace.arrangement
+                add("Dwindle", "workspace-layout dwindle", to: submenu)?.state = arrangement == .dwindle ? .on : .off
+                add("Master", "workspace-layout master", to: submenu)?.state = arrangement == .master ? .on : .off
+                submenu.addItem(.separator())
+                _ = add("Horizontal", "layout horizontal", to: submenu)
+                _ = add("Vertical", "layout vertical", to: submenu)
+                submenu.addItem(.separator())
+                _ = add("Swap with Master", "swap-with-master", to: submenu)
+                _ = add("Toggle Floating", "layout floating tiling", to: submenu)
+            }
+            _ = add("Balance Sizes", "balance-sizes", to: menu)
+        }
+        if config.modes.count > 1, backend.nativeTilingEnabled {
+            addSubmenu("Mode", to: menu) { submenu in
+                for mode in config.modes.keys.sorted() {
+                    add(mode, "mode \(mode)", to: submenu)?.state = mode == activeMode ? .on : .off
+                }
+            }
+        }
+
+        menu.addItem(.separator())
+        addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
+        menu.addItem(callbackItem("Open Config…", #selector(openConfig)))
+        menu.addItem(callbackItem("Refresh Desktops", #selector(refreshNativeSpaces)))
+        menu.addItem(callbackItem("Diagnostics…", #selector(openDiagnostics)))
         menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
     }
 

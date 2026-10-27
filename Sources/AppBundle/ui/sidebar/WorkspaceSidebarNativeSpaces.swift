@@ -14,7 +14,7 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
     availableMonitors: [Monitor],
 ) async -> [WorkspaceSidebarWorkspaceViewModel] {
     let layouts = runtime.workspaceBackend.nativeLayouts
-    guard let displays = nativeSidebarDisplays() else { return [] }
+    guard let displays = nativeObservedDisplays() else { return [] }
     var result: [WorkspaceSidebarWorkspaceViewModel] = []
     var number = 0
     for display in displays {
@@ -22,12 +22,12 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
         for space in display.spaces where space.isDesktop {
             number += 1
             guard let monitor, let uuid = space.uuid, let workspace = layouts.retainedByUUID[uuid] else { continue }
-            let label = workspaceLabels[String(number)]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let label = nativeDesktopLabel(number, labels: workspaceLabels)
             let isActive = space.id == display.activeSpaceID
             result.append(WorkspaceSidebarWorkspaceViewModel(
                 name: workspace.name,
                 projectId: workspace.projectId,
-                displayName: label.isEmpty ? "Desktop \(number)" : label,
+                displayName: nativeDesktopDisplayName(number, labels: workspaceLabels),
                 sidebarLabel: label,
                 isGeneratedName: true,
                 monitorScopeId: workspaceSidebarMonitorScopeId(for: monitor),
@@ -41,9 +41,20 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
     return result
 }
 
+/// A `workspace-labels` entry keyed by desktop number names that desktop.
+func nativeDesktopLabel(_ number: Int, labels: [String: String]) -> String {
+    labels[String(number)]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+}
+
+@MainActor
+func nativeDesktopDisplayName(_ number: Int, labels: [String: String]? = nil) -> String {
+    let label = nativeDesktopLabel(number, labels: labels ?? config.workspaceSidebar.workspaceLabels)
+    return label.isEmpty ? "Desktop \(number)" : label
+}
+
 /// The last observation stays listed during a read, so rows don't flicker away.
 @MainActor
-private func nativeSidebarDisplays() -> [NativeSpaceDisplay]? {
+func nativeObservedDisplays() -> [NativeSpaceDisplay]? {
     let backend = runtime.workspaceBackend
     return (backend.observation?.inventory.lastSnapshot ?? backend.nativeLayouts.snapshot)?.displays
 }
@@ -52,7 +63,7 @@ private func nativeSidebarDisplays() -> [NativeSpaceDisplay]? {
 @MainActor
 func nativeDesktopNumber(forSidebarWorkspace name: String) -> Int? {
     let layouts = runtime.workspaceBackend.nativeLayouts
-    guard let displays = nativeSidebarDisplays() else { return nil }
+    guard let displays = nativeObservedDisplays() else { return nil }
     var number = 0
     for display in displays {
         for space in display.spaces where space.isDesktop {
