@@ -33,6 +33,7 @@ final class WorkspaceBackendState {
     let nativeWindows = NativeWindowReconciler()
     let nativeTiling = NativeTilingCoordinator()
     let nativePersistence = NativeLayoutPersistence()
+    let nativeNavigation = NativeSpaceNavigator()
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
         return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
@@ -44,10 +45,20 @@ final class WorkspaceBackendState {
     /// Control-arrow for its own Space switching instead of WinMuxX swallowing them.
     func accepts(_ command: any Command) -> Bool {
         kind == .virtual || command is DoctorCommand || command is ReloadConfigCommand ||
-            (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
+            Self.isNativeNavigation(command) || (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
     }
 
-    func accepts(_ commands: [any Command]) -> Bool { commands.allSatisfy(accepts) }
+    /// Navigation runs outside the native tiling command fence, so a sequence may
+    /// pair it only with diagnostics, never with window commands.
+    func accepts(_ commands: [any Command]) -> Bool {
+        guard commands.allSatisfy(accepts) else { return false }
+        return kind == .virtual || !commands.contains(where: Self.isNativeNavigation) ||
+            commands.allSatisfy { Self.isNativeNavigation($0) || $0 is DoctorCommand || $0 is ReloadConfigCommand }
+    }
+
+    static func isNativeNavigation(_ command: any Command) -> Bool {
+        (command as? WorkspaceCommand).map { NativeSpaceNavigator.supports($0.args) } ?? false
+    }
 
     /// Live switching is intentionally unavailable until all motion/recovery
     /// owners can be handed over transactionally. Configuration enforces restart.

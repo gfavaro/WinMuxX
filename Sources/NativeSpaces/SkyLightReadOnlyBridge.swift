@@ -2,8 +2,9 @@ import CoreGraphics
 import Darwin
 import Foundation
 
-/// The only private API boundary. No activation, move, add/remove, tag mutation,
-/// scripting addition, symbol-table scanning or synthesized input is exposed.
+/// The read-side private API boundary. No activation, move, add/remove, tag mutation,
+/// scripting addition or symbol-table scanning is exposed. Explicit Space navigation
+/// is the only synthesized input, isolated in NativeDockSwipe.
 /// Calls are serialized by NativeSpacesReader, away from the main actor.
 protocol NativeSpacesQuerying {
     func copyDisplays() throws -> [[String: Any]]
