@@ -266,7 +266,8 @@ final class NativeTilingCoordinator {
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand,
-                 is ScrollingFocusCommand, is ScrollingMoveCommand, is ScrollingPinCommand: return true
+                 is ScrollingFocusCommand, is ScrollingMoveCommand, is ScrollingPinCommand,
+                 is UndoLayoutCommand: return true
             case is StackWithCommand, is FlattenWorkspaceTreeCommand: return true
             case is MoveCommand: return true
             case let command as FocusCommand:

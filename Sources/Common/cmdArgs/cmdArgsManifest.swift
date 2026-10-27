@@ -39,6 +39,7 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case reloadConfig = "reload-config"
     case resize
     case scrollingCenter = "scrolling-center"
+    case undoLayout = "undo-layout"
     case scrollingWidth = "scrolling-width"
     case scrollingMinimap = "scrolling-minimap"
     case scrollingFocus = "scrolling-focus"
@@ -162,6 +163,8 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(parseWorkspaceLayoutCmdArgs)
             case .scrollingCenter:
                 result[kind.rawValue] = SubCommandParser(ScrollingCenterCmdArgs.init)
+            case .undoLayout:
+                result[kind.rawValue] = SubCommandParser(UndoLayoutCmdArgs.init)
             case .scrollingWidth:
                 result[kind.rawValue] = SubCommandParser(ScrollingWidthCmdArgs.init)
             case .scrollingMinimap:

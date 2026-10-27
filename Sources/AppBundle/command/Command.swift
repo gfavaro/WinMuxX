@@ -123,12 +123,14 @@ extension [Command] {
             if WorkspaceBackendState.isNativeNavigation(command), !NativeTilingCommandScope.active {
                 await runtime.workspaceBackend.awaitCurrentObservation()
             }
+            let undoState = LayoutUndoHistory.shared.before(command)
             let commandSucc: Bool
             if let handled = try await runtime.workspaceBackend.current.run(command, env: env, io: io) {
                 commandSucc = handled
             } else {
                 commandSucc = try await command.run(env, io)
             }
+            if let undoState { LayoutUndoHistory.shared.commandFinished(undoState) }
             isSucc = commandSucc && isSucc
             if !command.isQuery && !command.isPresentation {
                 refreshModel()

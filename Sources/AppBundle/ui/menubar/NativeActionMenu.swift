@@ -211,6 +211,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             addCommand("Pin Column Left", script: "scrolling-pin left", to: submenu)
             addCommand("Pin Column Right", script: "scrolling-pin right", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
+            submenu.addItem(.separator())
+            addCommand("Undo Layout Change", script: "undo-layout", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
         if capturedRuleTarget != nil {

@@ -29,6 +29,7 @@ let projectRoot: URL = {
 @MainActor
 func setUpWorkspacesForTests() {
     layoutForNextDetectedWindow = nil
+    LayoutUndoHistory.shared.reset()
     for workspace in Workspace.all {
         for child in workspace.children {
             child.unbindFromParent()
