@@ -24,6 +24,17 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         XCTAssertFalse(parseConfig("workspace-backend = 'native'").errors.isEmpty)
     }
 
+    func testSettingsBackendChoiceWritesAConfigThatSelectsIt() {
+        let existing = "start-at-login = true\n"
+        for (choice, kind, tiled) in [(WorkspaceBackendChoice.virtual, WorkspaceBackendKind.virtual, false), (.native, .native, false), (.nativeTiled, .native, true)] {
+            let parsed = parseConfig(applyingSettingsConfigEdits(choice.configEdits, to: existing))
+            XCTAssertTrue(parsed.errors.isEmpty, "\(choice): \(parsed.errors)")
+            XCTAssertEqual(parsed.config.workspaceBackend, kind)
+            XCTAssertEqual(parsed.config.nativeSpaces.tilingEnabled, tiled)
+            XCTAssertTrue(parsed.config.startAtLogin, "Other settings are kept")
+        }
+    }
+
     func testReloadRejectsBackendSwitchWithoutPublishingOrMutatingWorkspace() async throws {
         let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
         defer { try? FileManager.default.removeItem(at: file) }
