@@ -385,6 +385,28 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.arrangement, .master)
     }
 
+    func testScrollingDesktopWithTabGroupIsRestoredAfterRestart() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tabGroup, index: 0)
+        let windows = [TestWindow.new(id: 1, parent: tabs), TestWindow.new(id: 2, parent: tabs), TestWindow.new(id: 3, parent: root)]
+        for window in windows {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+                launchDate: Date(timeIntervalSince1970: 1), title: "\(window.windowId)")
+        }
+        windows[2].scrollingColumnWidth = 0.6
+        workspace.arrangement = .scrolling
+        let record = NativePersistedLayout(workspace)
+        XCTAssertTrue(record.supported)
+        workspace.arrangement = .dwindle
+        XCTAssertTrue(NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+            .restore(record, to: workspace))
+        XCTAssertEqual(workspace.arrangement, .scrolling)
+        XCTAssertEqual((workspace.rootTilingContainer.children.first as? TilingContainer)?.layout, .tabGroup)
+        XCTAssertEqual(windows[2].scrollingColumnWidth, 0.6)
+    }
+
     func testNativePersistenceRoundTripProtectsIncompleteSavedTreeFromAutosave() async throws {
         let workspace = nativeWorkspace()
         let root = workspace.rootTilingContainer

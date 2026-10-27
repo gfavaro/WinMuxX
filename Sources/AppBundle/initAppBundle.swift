@@ -52,6 +52,7 @@ import Foundation
                     updateTrayText()
                     WindowBorderController.shared.refresh()
                     owner?.workspaceBackend.noteNativeActivity()
+                    RawWorkspaceTouchSource.shared.updateDemand()
                     owner?.task { await updateWorkspaceSidebarModel() }
                 }
             }

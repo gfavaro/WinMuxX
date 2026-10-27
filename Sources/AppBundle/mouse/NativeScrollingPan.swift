@@ -12,6 +12,8 @@ final class NativeScrollingTouchRouter {
     private var axes = WorkspaceGestureAxisRouter(fingers: 2)
     private var started = false
     private(set) var ownsGesture = false
+    /// Why the last two-finger touch did or did not become a pan, for doctor.
+    private(set) var lastDecision = "none"
     private var device: UInt64?
     private weak var workspace: Workspace?
     private var monitorPoint: CGPoint?
@@ -32,21 +34,32 @@ final class NativeScrollingTouchRouter {
         guard ownsGesture else { return }
         if frame.device != device { controller.reset(); ownsGesture = false; return }
         guard let (axis, frames) = axes.route(frame) else {
-            if axes.isRejected { controller.reset(); ownsGesture = false }
+            if axes.isRejected { controller.reset(); ownsGesture = false; lastDecision = "rejected: finger count or contacts changed" }
             if frame.fingers == 0 { controller.reset(commit: true) }
             return
         }
-        guard axis == .horizontal else { ownsGesture = false; return }
+        guard axis == .horizontal else { ownsGesture = false; lastDecision = "vertical: left to macOS"; return }
         controller.handle(frames, capturedWorkspace: workspace, capturedMonitorPoint: monitorPoint,
             capturedOffset: offset, capturedTopology: topology, capturedEpoch: epoch)
+        lastDecision = controller.isMotionActive ? "panning" : "declined by the gesture controller (ready \(isWinMuxRuntimeReady), " +
+            "mouse manipulation \(isMouseManipulationActive), button down \(isLeftMouseButtonDown), " +
+            "Mission Control \(WindowBorderController.shared.isMissionControlActive), " +
+            "same desktop \(workspace?.scrollingTopologySignature == topology && workspace?.scrollingSessionEpoch == epoch))"
     }
 
     private func capture() {
         let point = pointer()
-        guard config.scrolling.gestureEnabled, runtime.workspaceBackend.nativeTilingEnabled, optionOnly(),
-              let monitor = sortedMonitors.first(where: { $0.rect.contains(point) }) else { return }
+        guard config.scrolling.gestureEnabled else { lastDecision = "scrolling gestures are disabled in config"; return }
+        guard runtime.workspaceBackend.nativeTilingEnabled else { lastDecision = "native tiling is off"; return }
+        guard optionOnly() else { lastDecision = "Option was not held alone when the fingers touched down"; return }
+        guard let monitor = sortedMonitors.first(where: { $0.rect.contains(point) }) else {
+            lastDecision = "pointer is not on a display"; return
+        }
         let target = monitor.activeWorkspace
-        guard target.arrangement == .scrolling, target.isVisible else { return }
+        guard target.arrangement == .scrolling, target.isVisible else {
+            lastDecision = "desktop under the pointer is not scrolling"; return
+        }
+        lastDecision = "latched; waiting for horizontal movement"
         workspace = target
         monitorPoint = monitor.rect.topLeftCorner
         offset = target.scrollingMetrics.clampedOffset(target.scrollingOffset)

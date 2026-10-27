@@ -36,6 +36,13 @@ func nativeSpacesDiagnosticReport() -> String {
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
+    let touch = RawWorkspaceTouchSource.shared
+    lines.append("Scrolling pan: touch \(touch.status), \(touch.frameCount) frames, max \(touch.maximumFingerCount) fingers; " +
+        "last: \(NativeScrollingTouchRouter.shared.lastDecision)")
+    for monitor in sortedMonitors {
+        let shown = runtime.workspaces.visibleWorkspace(for: monitor)
+        lines.append("  \(monitor.name): \(shown.map { "\(userFacingWorkspaceName($0)) \($0.arrangement)" } ?? "no desktop bound")")
+    }
     lines.append("Native saved layouts pending complete matching: \(runtime.workspaceBackend.nativePersistence.pendingCount)")
     if let error = runtime.workspaceBackend.nativePersistence.lastError { lines.append(error) }
     lines.append("Accessibility permission for this development process: \(AXIsProcessTrusted() ? "available" : "not granted"). Observation does not request it.")
