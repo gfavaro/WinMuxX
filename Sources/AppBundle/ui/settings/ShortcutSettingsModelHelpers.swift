@@ -76,6 +76,27 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "flatten", title: "Flatten Workspace Tree", command: "flatten-workspace-tree"),
             ],
         ),
+        .init(
+            id: "managed-scrolling",
+            category: .managed,
+            title: "Scrolling",
+            summary: "Columns on a scrolling strip: jump, reorder, pin and size them.",
+            actions: [
+                shortcutAction(id: "layout-scrolling", title: "Scrolling Layout", command: "workspace-layout scrolling"),
+                shortcutAction(id: "scrolling-first", title: "Focus First Column", command: "scrolling-focus first"),
+                shortcutAction(id: "scrolling-last", title: "Focus Last Column", command: "scrolling-focus last"),
+            ] + (1...4).map {
+                shortcutAction(id: "scrolling-focus-\($0)", title: "Focus Column \($0)", command: "scrolling-focus \($0)")
+            } + [
+                shortcutAction(id: "scrolling-move-first", title: "Move Column to Start", command: "scrolling-move first"),
+                shortcutAction(id: "scrolling-move-last", title: "Move Column to End", command: "scrolling-move last"),
+                shortcutAction(id: "scrolling-pin-left", title: "Pin Column Left", command: "scrolling-pin left"),
+                shortcutAction(id: "scrolling-pin-right", title: "Pin Column Right", command: "scrolling-pin right"),
+                shortcutAction(id: "scrolling-center", title: "Centre Column", command: "scrolling-center"),
+                shortcutAction(id: "scrolling-width-next", title: "Next Column Width", command: "scrolling-width next"),
+                shortcutAction(id: "scrolling-width-full", title: "Full Width", command: "scrolling-width full"),
+            ],
+        ),
         .init(id: "managed-stack", category: .managed, title: "Grouping", summary: nil,
               actions: ["left", "down", "up", "right"].map {
                   shortcutAction(id: "stack-\($0)", title: "Stack \($0.capitalized)", command: "stack-with \($0)")

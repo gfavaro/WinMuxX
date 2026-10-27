@@ -207,6 +207,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             addCommand("Center Scrolling Column", script: "scrolling-center", to: submenu)
             addCommand("Show Scrolling Minimap", script: "scrolling-minimap", to: submenu)
             addCommand("Cycle Scrolling Width", script: "scrolling-width next", to: submenu)
+            addCommand("Pin Column Left", script: "scrolling-pin left", to: submenu)
+            addCommand("Pin Column Right", script: "scrolling-pin right", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
