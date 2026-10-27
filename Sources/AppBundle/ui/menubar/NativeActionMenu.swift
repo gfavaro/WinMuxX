@@ -30,7 +30,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName, stopped: String?)?
     private var capturedRuleTarget: QuickFloatingRuleTarget?
 
     func install(checkForUpdates: (() -> Void)?) {
@@ -83,8 +83,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement, stopped: model.menuBarTilingStoppedReason)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, previous.stopped == state.stopped, lastModePresentation == model.modePresentation { return }
         lastIconState = state
         lastModePresentation = model.modePresentation
         let mode = model.isEnabled ? model.modePresentation : nil
@@ -92,12 +92,13 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let color = mode?.color(dark: dark, increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
         let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
         let arrangementName = state.arrangement.rawValue.capitalized
-        let arrangementDescription = " · \(arrangementName) layout"
+        let arrangementDescription = " · \(arrangementName) layout" + (state.stopped.map { " · \($0)" } ?? "")
         if model.isEnabled && state.indicator == .workspace {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
             let title = NSMutableAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor])
             if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
+            if state.stopped != nil { title.append(NSAttributedString(string: " ⏸", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
             statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
             statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + arrangementDescription + modeDescription
@@ -108,7 +109,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         statusItem?.button?.attributedTitle = NSAttributedString(string: "")
         statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux, \(arrangementName) layout" + modeDescription : "WinMux disabled")
         let image = menuBarIconImage(
-            enabled: model.isEnabled,
+            enabled: model.isEnabled && state.stopped == nil,
             arrangement: state.arrangement,
             appearance: model.menuBarConfiguration.iconAppearance,
             keyboardTint: color,

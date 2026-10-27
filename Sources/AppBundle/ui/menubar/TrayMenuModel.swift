@@ -11,6 +11,8 @@ public final class TrayMenuModel: ObservableObject {
     @Published var menuBarWorkspaceIndicator: String = "1"
     @Published var menuBarWorkspaceName: String = ""
     @Published var menuBarWorkspaceArrangement: WorkspaceLayoutName = .dwindle
+    /// Why native tiling has stopped until something outside WinMuxX changes.
+    @Published var menuBarTilingStoppedReason: String? = nil
     /// Is "layouting" enabled
     @Published var isEnabled: Bool = true
     @Published var shortcutHealth: ShortcutHealth = .available
@@ -109,4 +111,6 @@ extension ObservableObject {
     let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
+    let tiling = runtime.workspaceBackend.nativeTiling
+    TrayMenuModel.shared.setIfChanged(\.menuBarTilingStoppedReason, runtime.workspaceBackend.nativeTilingEnabled && tiling.isStopped ? tiling.status : nil)
 }

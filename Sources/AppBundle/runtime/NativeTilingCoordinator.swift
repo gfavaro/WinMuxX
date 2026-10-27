@@ -19,7 +19,11 @@ enum NativeTilingCommandScope {
 /// Spaces nor uses virtual activation, parking, recovery or layout algorithms.
 @MainActor
 final class NativeTilingCoordinator {
-    private(set) var status = "Observation only"
+    private(set) var status = "Observation only" {
+        didSet { if status != oldValue { isStopped = false; updateTrayText() } }
+    }
+    /// Tiling stays off until something outside WinMuxX changes; the tray marks it.
+    private(set) var isStopped = false
     private(set) var ready = false
     /// Set by the first completed layout; windows registered before it existed at startup.
     private(set) var hasCompletedInitialLayout = false
@@ -37,6 +41,12 @@ final class NativeTilingCoordinator {
         for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }
     }
 
+    private func stopTiling(_ reason: String) {
+        status = reason
+        isStopped = true
+        updateTrayText()
+    }
+
     func stop() {
         invalidate()
         MacApp.cancelPendingFocus()
@@ -48,14 +58,14 @@ final class NativeTilingCoordinator {
         let acceptStart = ContinuousClock.now
         defer { nativePanTiming.record("accept (after read)", acceptStart.duration(to: .now)) }
         guard runtime.workspaceBackend.nativeTilingEnabled else { return }
-        guard !serverArgs.isReadOnly else { status = "Tiling suppressed by read-only startup"; return }
+        guard !serverArgs.isReadOnly else { stopTiling("Tiling suppressed by read-only startup"); return }
         guard TrayMenuModel.shared.isEnabled else { status = "Tiling disabled (enable on resumes it)"; return }
         guard AXIsProcessTrusted(), runtime.workspaceBackend.observation?.windowEventsAvailable == true else {
-            status = "Tiling suspended: Accessibility or native lifecycle events unavailable"
+            stopTiling("Tiling suspended: Accessibility or native lifecycle events unavailable")
             return
         }
         guard ProcessInfo.processInfo.operatingSystemVersion.majorVersion >= 27 else {
-            status = "Tiling suspended: Mission Control observation is not validated on this macOS version"
+            stopTiling("Tiling suspended: Mission Control observation is not validated on this macOS version")
             return
         }
         let version = generation
@@ -73,9 +83,11 @@ final class NativeTilingCoordinator {
         guard snapshot.displays.contains(where: { backend.nativeLayouts.activeWorkspace(on: $0.identifier) != nil }) else {
             // One shared set of desktops across displays is reported as "Main"; native
             // tiling lays out per display, so it says why instead of doing nothing.
-            status = snapshot.displays.contains(where: { $0.identifier == "Main" })
-                ? "Tiling unavailable: turn on Displays have separate Spaces (System Settings › Desktop & Dock)"
-                : "Tiling paused: no active ordinary desktop"
+            if snapshot.displays.contains(where: { $0.identifier == "Main" }) {
+                stopTiling("Tiling unavailable: turn on Displays have separate Spaces (System Settings › Desktop & Dock)")
+            } else {
+                status = "Tiling paused: no active ordinary desktop"
+            }
             return
         }
         await backend.nativePersistence.reconcile(backend.nativeLayouts)
@@ -119,7 +131,7 @@ final class NativeTilingCoordinator {
             guard generation == version,
                   let workspace = backend.nativeLayouts.activeWorkspace(on: display.identifier) else { continue }
             do { try await workspace.layoutWorkspace() }
-            catch { status = "Native layout suspended: \(error)"; backend.nativeWriteAuthority.invalidate(); ready = false; return }
+            catch { stopTiling("Native layout suspended: \(error)"); backend.nativeWriteAuthority.invalidate(); ready = false; return }
             guard generation == version else { return }
             await raiseCoveredNativeTabs(in: workspace, frontToBack: onScreenWindowOrder())
         }
@@ -129,7 +141,6 @@ final class NativeTilingCoordinator {
         hasCompletedInitialLayout = true
         if scrollingReadRequestedAt != nil { scrollingReadRequestedAt = nil; relayoutVisibleScrolling() }
         status = "Native tiling active"
-        updateTrayText()
         await updateWindowTabModel() // Also refreshes borders.
     }
 
