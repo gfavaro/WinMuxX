@@ -24,7 +24,8 @@ import Foundation
             // An invalid native configuration must never fall back to a virtual
             // manager that starts parking windows. Defaults remain available for
             // diagnostics/UI, but startup stays physically read-only until restart.
-            _serverArgs.isReadOnly = true
+            // A config that never asked for native Spaces falls back as it always did.
+            if bootstrappedConfigUrl.map(configFileRequestsNativeBackend) ?? false { _serverArgs.isReadOnly = true }
             var out = ""
             check(
                 try await reloadConfig(forceConfigUrl: defaultConfigUrl, stdout: &out),
@@ -172,4 +173,24 @@ private func initServerArgs() {
     if let path = serverArgs.configLocation, !FileManager.default.fileExists(atPath: path) {
         exit(1, err: "\(path) doesn't exist")
     }
+}
+
+/// Whether a config file asks for native Spaces, read from its text so that it works
+/// even when the file does not parse.
+func configFileRequestsNativeBackend(_ url: URL) -> Bool {
+    guard let text = try? String(contentsOf: url, encoding: .utf8) else { return false }
+    return configTextRequestsNativeBackend(text)
+}
+
+func configTextRequestsNativeBackend(_ text: String) -> Bool {
+    let lines = text.split(separator: "\n").map { $0.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? "" }
+        .map { $0.trimmingCharacters(in: .whitespaces) }
+    var inBackendTable = false
+    for line in lines where !line.isEmpty {
+        if line.hasPrefix("[") { inBackendTable = line == "[workspace-backend]"; continue }
+        let compact = line.replacingOccurrences(of: " ", with: "").replacingOccurrences(of: "'", with: "\"")
+        if inBackendTable, compact == "type=\"native\"" { return true }
+        if compact == "workspace-backend.type=\"native\"" { return true }
+    }
+    return false
 }

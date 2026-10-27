@@ -163,7 +163,9 @@ final class MasterLayoutTest: WorkspaceTestCase {
             layout = 'scrolling'
             """)
         XCTAssertTrue(parsed.errors.isEmpty, parsed.errors.map(\.description).joined(separator: "\n"))
-        for invalid in ["[scrolling]\ncolumn-width = 0", "[scrolling]\nwidth-presets = [0.5, 0.25]", "[workspace.Code]\nlayout = 'tiles'"] {
+        // Root layouts from before arrangements (tiles, accordion, tab-group) stay valid for upgrades.
+        XCTAssertTrue(parseConfig("[workspace.Code]\nlayout = 'tiles'").errors.isEmpty)
+        for invalid in ["[scrolling]\ncolumn-width = 0", "[scrolling]\nwidth-presets = [0.5, 0.25]", "[workspace.Code]\nlayout = 'spiral'"] {
             XCTAssertFalse(parseConfig(invalid).errors.isEmpty, invalid)
         }
         let workspace = focus.workspace
