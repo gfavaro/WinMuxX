@@ -92,30 +92,37 @@ struct ShortcutBehaviorSettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
 
             }
-            SettingsSection("Workspace swipes — experimental") {
-                SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
-                    persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
+            if runtime.workspaceBackend.kind == .native {
+                SettingsSection("Gestures") {
+                    Text("WinMuxX is using macOS Spaces, so macOS swipes between desktops and opens Mission Control. Hold Option and scroll with two fingers to pan a scrolling desktop.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
-                    persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
+            } else {
+                SettingsSection("Workspace swipes — experimental") {
+                    SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
+                        persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
+                    }
+                    SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
+                        persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
+                    }
+                    .disabled(!workspaceSwipes)
+                    SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
+                        help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
+                        persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
+                    }
+                    .disabled(!workspaceSwipes)
+                    Text(workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
+                        .font(.callout).foregroundStyle(.secondary)
+                    Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .disabled(!workspaceSwipes)
-                SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
-                    help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
-                    persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
+                SettingsSection("Workspace overview") {
+                    SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
+                        persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
+                    }
+                    Text("Use workspace-overview from a shortcut or the CLI. For the gesture, assign macOS Mission Control to four fingers or turn its gesture off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                        .font(.callout).foregroundStyle(.secondary)
                 }
-                .disabled(!workspaceSwipes)
-                Text(workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
-                    .font(.callout).foregroundStyle(.secondary)
-                Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-            SettingsSection("Workspace overview") {
-                SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
-                    persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
-                }
-                Text("Use workspace-overview from a shortcut or the CLI. For the gesture, assign macOS Mission Control to four fingers or turn its gesture off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
-                    .font(.callout).foregroundStyle(.secondary)
             }
             scrollingSettingsSection
             SettingsSection("Pointer focus") {

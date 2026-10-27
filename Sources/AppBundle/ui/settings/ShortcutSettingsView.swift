@@ -129,9 +129,15 @@ struct ShortcutSettingsView: View {
                     case .shortcuts:
                         ShortcutSettingsShortcutsView(model: model, query: $shortcutSearch)
                     case .workspaces:
-                        ShortcutSettingsWorkspacePane(model: model)
+                        VStack(spacing: 0) {
+                            NativeSpacesSettingsNote("WinMuxX is using macOS Spaces: workspace shortcuts switch to macOS desktop 1, 2, 3 and so on. Names, projects and persistent workspaces apply to WinMuxX workspaces.")
+                            ShortcutSettingsWorkspacePane(model: model)
+                        }
                     case .displays:
-                        SettingsDisplaysView(model: model, displays: displays, onGeneral: { selectedItem = .general })
+                        VStack(spacing: 0) {
+                            NativeSpacesSettingsNote("WinMuxX is using macOS Spaces: each display has its own desktops in Mission Control. Workspace assignments here apply to WinMuxX workspaces.")
+                            SettingsDisplaysView(model: model, displays: displays, onGeneral: { selectedItem = .general })
+                        }
                     case .windows:
                         ShortcutBehaviorSettingsView(model: model)
                     case .sidebar:
@@ -343,5 +349,20 @@ struct ShortcutRow: View {
             .frame(width: 160, height: 28)
         }
         .padding(.vertical, 6)
+    }
+}
+
+/// Explains, while macOS Spaces runs, which settings on a page apply only to WinMuxX workspaces.
+private struct NativeSpacesSettingsNote: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        if runtime.workspaceBackend.kind == .native {
+            Label(text, systemImage: "info.circle")
+                .font(.callout).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20).padding(.top, 12)
+        }
     }
 }

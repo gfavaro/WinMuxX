@@ -6,14 +6,18 @@ struct ShortcutGeneralSettingsView: View {
     @SettingsDraft("auto-reload-config", load: { config.autoReloadConfig }) private var autoReloadConfig: Bool
 
     @SettingsDraft("start-workspaces-on-main-monitor", load: { config.startWorkspacesOnMainMonitor }) private var startWorkspacesOnMain: Bool
+    @SettingsDraft("native-spaces.restore-layouts", load: { config.nativeSpaces.restoreLayouts }) private var restoreNativeLayouts: Bool
+    private let runsNative = runtime.workspaceBackend.kind == .native
     /// Applied only by restarting: a running WinMuxX keeps its backend (see `reload-config`).
     @State private var backendChoice = WorkspaceBackendChoice.running
 
     var body: some View {
         SettingsScrollView {
             SettingsSection("Startup") {
-                SettingsToggle("Start workspaces on main display", id: "start-workspaces-on-main-monitor", isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
-                    persistRootBool("start-workspaces-on-main-monitor", startWorkspacesOnMain)
+                if !runsNative {
+                    SettingsToggle("Start workspaces on main display", id: "start-workspaces-on-main-monitor", isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
+                        persistRootBool("start-workspaces-on-main-monitor", startWorkspacesOnMain)
+                    }
                 }
                 SettingsToggle("Start at login", id: "start-at-login", isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
                     persistRootBool("start-at-login", startAtLogin)
@@ -27,6 +31,11 @@ struct ShortcutGeneralSettingsView: View {
                 }
                 Text("WinMuxX workspaces hide inactive windows off screen and move whole workspaces between displays. macOS Spaces keeps every window on a real desktop, so Mission Control and swipes between desktops work as usual.")
                     .font(.caption).foregroundStyle(.secondary)
+                if runsNative {
+                    SettingsToggle("Restore desktop layouts", id: "native-spaces.restore-layouts", isOn: $restoreNativeLayouts, help: "Remember each desktop's layout and put it back after WinMuxX or the Mac restarts.") {
+                        persistSettingsConfig(section: "native-spaces", key: "restore-layouts", renderedValue: restoreNativeLayouts ? "true" : "false", model: model)
+                    }
+                }
                 if backendChoice != .running {
                     HStack {
                         Text("Saves the choice and restarts WinMuxX.").font(.caption).foregroundStyle(.secondary)
