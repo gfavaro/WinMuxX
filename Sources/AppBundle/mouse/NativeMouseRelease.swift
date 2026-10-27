@@ -30,3 +30,50 @@ func adoptNativeMouseRelease(_ window: Window, actual: Rect, pointer: CGPoint) -
     swapNodes(window, drop)
     return .swapped(with: drop.windowId)
 }
+
+@MainActor private var lastNativeDragOverlayUpdate: ContinuousClock.Instant?
+
+/// While a tiled native window is dragged, shows the same drop overlays as virtual
+/// workspaces (swap, split, a desktop in the sidebar). Called for its move events.
+@MainActor
+func updateNativeDragOverlay(_ window: Window) {
+    guard runtime.workspaceBackend.nativeTilingEnabled, NSEvent.pressedMouseButtons & 1 != 0,
+          window.parent is TilingContainer, window.nodeWorkspace?.isVisible == true else { return }
+    let now = ContinuousClock.now
+    if let last = lastNativeDragOverlayUpdate, now - last < .milliseconds(16) { return }
+    lastNativeDragOverlayUpdate = now
+    currentlyManipulatedWithMouseWindowId = window.windowId
+    setCurrentMouseManipulationKind(.move)
+    _ = updatePendingWindowDragIntent(sourceWindow: window, mouseLocation: mouseLocation)
+}
+
+/// Applies the overlay the user dropped on. A desktop other than the window's own is
+/// a native Space move; the rest are tree edits the next layout shows. Returns false
+/// when no overlay was showing.
+@MainActor
+func applyNativeDragIntent() async -> Bool {
+    guard let intent = pendingWindowDragIntent else {
+        if currentlyManipulatedWithMouseWindowId != nil { cancelManipulatedWithMouseState() }
+        lastNativeDragOverlayUpdate = nil
+        return false
+    }
+    defer {
+        clearPendingWindowDragIntent()
+        cancelManipulatedWithMouseState()
+        lastNativeDragOverlayUpdate = nil
+    }
+    let name: String? = switch intent.kind {
+        case .moveToWorkspace(let name), .moveToWorkspaceZone(let name, _): name
+        default: nil
+    }
+    if let name, let target = Workspace.existing(byName: name),
+       Window.get(byId: intent.sourceWindowId)?.nodeWorkspace !== target {
+        guard let number = nativeDesktopNumber(of: target) else { return true }
+        if let error = try? await runNativeCommands(["move-node-to-workspace --window-id \(intent.sourceWindowId) \(number)"]) {
+            MessageModel.shared.message = Message(description: "Move window", body: error)
+        }
+        return true
+    }
+    _ = applyPendingWindowDragIntentIfPossible()
+    return true
+}

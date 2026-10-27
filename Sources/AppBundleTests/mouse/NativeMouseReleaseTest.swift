@@ -47,4 +47,22 @@ final class NativeMouseReleaseTest: XCTestCase {
         XCTAssertEqual(adoptNativeMouseRelease(first, actual: moved, pointer: offscreen), .none)
         XCTAssertEqual(root.children.compactMap { ($0 as? Window)?.windowId }, [31001, 31002])
     }
+
+    func testNativeDragOverlaysOfferOnlyLayoutsNativeTilingShows() async throws {
+        let native = WinMuxRuntime()
+        native.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        try await native.withValue {
+            XCTAssertTrue(isWindowDragIntentKindEnabled(.swap(targetWindowId: 1)))
+            XCTAssertTrue(isWindowDragIntentKindEnabled(.stackSplit(targetWindowId: 1, position: .left)))
+            XCTAssertTrue(isWindowDragIntentKindEnabled(.moveToWorkspace(workspaceName: "x")))
+            XCTAssertFalse(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: 1)), "Tabs overlap windows")
+            XCTAssertFalse(isWindowDragIntentKindEnabled(.createWorkspace()), "macOS owns desktops")
+            currentlyManipulatedWithMouseWindowId = 5
+            setCurrentMouseManipulationKind(.move)
+            let applied = await applyNativeDragIntent()
+            XCTAssertFalse(applied)
+            XCTAssertNil(currentlyManipulatedWithMouseWindowId, "A drop without an overlay still ends the drag")
+        }
+        XCTAssertTrue(isWindowDragIntentKindEnabled(.createWorkspace()), "Virtual keeps every overlay")
+    }
 }

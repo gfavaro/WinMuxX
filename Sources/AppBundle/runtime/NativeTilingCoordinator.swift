@@ -109,12 +109,21 @@ final class NativeTilingCoordinator {
     /// Reads the frontmost window once its drag has ended and adopts a resize or a
     /// drop onto another tile; the read that follows lays the desktop out again.
     func adoptMouseRelease() async {
-        guard hasCompletedInitialLayout, let front = NSWorkspace.shared.frontmostApplication,
-              let app = try? await MacApp.getOrRegister(front),
-              let window = try? await app.getFocusedWindow(),
-              let actual = try? await window.getAxRect() else { return }
-        _ = adoptNativeMouseRelease(window, actual: actual, pointer: mouseLocation)
+        let intent = pendingWindowDragIntent.map { "\($0.kind)" }
+        if await applyNativeDragIntent() { return lastMouseRelease = "applied overlay \(intent ?? "")" }
+        guard hasCompletedInitialLayout else { return lastMouseRelease = "ignored: no completed native layout yet" }
+        guard let front = NSWorkspace.shared.frontmostApplication, let app = try? await MacApp.getOrRegister(front),
+              let window = try? await app.getFocusedWindow() else {
+            return lastMouseRelease = "ignored: frontmost window is not managed"
+        }
+        guard let actual = try? await window.getAxRect() else { return lastMouseRelease = "ignored: window \(window.windowId) frame unreadable" }
+        let target = window.lastAppliedLayoutPhysicalRect.map { "\($0)" } ?? "none"
+        let outcome = adoptNativeMouseRelease(window, actual: actual, pointer: mouseLocation)
+        lastMouseRelease = "window \(window.windowId): \(outcome); actual \(actual), layout \(target)"
     }
+
+    /// The last release decision, for doctor.
+    private(set) var lastMouseRelease = "none"
 
     func synchronizeFocus() async {
         hasManagedNativeFocus = false

@@ -12,6 +12,13 @@ enum WindowDragIntentKind: Equatable {
 
 @MainActor
 func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
+    if runtime.workspaceBackend.kind == .native {
+        // Native layout cannot show overlapping tab groups yet, and macOS owns desktops.
+        switch kind {
+            case .swap, .stackSplit, .moveToWorkspace, .moveToWorkspaceZone: return true
+            case .tabStack, .reorderTab, .detachTab, .createWorkspace, .sidebarHover: return false
+        }
+    }
     switch kind {
         case .tabStack, .reorderTab:
             return config.windowTabs.enabled

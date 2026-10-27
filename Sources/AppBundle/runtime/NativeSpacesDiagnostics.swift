@@ -35,6 +35,7 @@ func nativeSpacesDiagnosticReport() -> String {
         tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
+    lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
     lines.append("Native saved layouts pending complete matching: \(runtime.workspaceBackend.nativePersistence.pendingCount)")
     if let error = runtime.workspaceBackend.nativePersistence.lastError { lines.append(error) }
     lines.append("Accessibility permission for this development process: \(AXIsProcessTrusted() ? "available" : "not granted"). Observation does not request it.")

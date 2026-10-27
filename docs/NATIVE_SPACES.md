@@ -166,12 +166,15 @@ desktop in the sidebar moves it there, and the tray menu has Move Window to Desk
 
 ## Mouse
 
-Layout pauses while a mouse button is down. When the left button is released, the
-frontmost window is read once: a tiled window whose size changed keeps it, through
-the same weight and Dwindle-ratio changes as a virtual mouse resize (a lone window's
-width becomes its manual width); one dragged onto another tile on its desktop swaps
-with it. Anything else returns to its tile. There is no live preview while dragging,
-and drops onto the sidebar or another display are not handled.
+Layout pauses while a mouse button is down. Dragging a tiled window shows the same
+drop overlays as virtual workspaces for swapping with a tile, splitting a tile
+(left/right/above/below) and dropping onto a desktop in the sidebar, which moves the
+window to that desktop. Tab and accordion stacking overlays stay off until native
+layout can show overlapping groups. On release the overlay's action is applied;
+without one, the frontmost window is read once: a tiled window whose size changed
+keeps it, through the same weight and Dwindle-ratio changes as a virtual mouse
+resize (a lone window's width becomes its manual width), and one dropped onto another
+tile swaps with it. Anything else returns to its tile.
 
 ## Hooks
 
