@@ -20,18 +20,7 @@ final class NativeActivityTracker {
         let owner = runtime
         owner.task { _ = try? await runLightSession(.onFocusChanged, token) { try await commands.runCmdSeq(env, .emptyStdin) } }
     }
-    var execWorkspaceChange: (_ new: String, _ previous: String) -> Void = { new, previous in
-        guard let exec = config.execOnWorkspaceChange.first else { return }
-        let process = Process()
-        process.executableURL = URL(filePath: exec)
-        process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
-        var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
-        environment[WINMUX_FOCUSED_WORKSPACE] = new
-        environment[WINMUX_PREV_WORKSPACE] = previous
-        environment[WINMUX_WORKSPACE] = new
-        process.environment = environment
-        _ = Result { try process.run() }
-    }
+    var execWorkspaceChange: (_ new: String, _ previous: String) -> Void = { runExecOnWorkspaceChange(new: $0, previous: $1) }
 
     /// Call after every observation and native focus synchronization; repeated
     /// calls with unchanged state do nothing.

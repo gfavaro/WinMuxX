@@ -64,6 +64,19 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
             "The pan ends with a whole column revealed")
     }
 
+    func testANewPlainScrollEndsThePanAndReachesTheApp() {
+        let (workspace, _) = fixture()
+        let pan = NativeScrollingPan()
+        let point = workspace.workspaceMonitor.rect.center
+        XCTAssertTrue(pan.handle(scroll(-120, phase: 1, at: point)))
+        XCTAssertTrue(pan.isPanning)
+        XCTAssertFalse(pan.handle(scroll(0, dy: -30, option: false, phase: 1, at: point)), "A new vertical scroll goes to the app")
+        XCTAssertFalse(pan.isPanning)
+        XCTAssertTrue(nativePanIgnoresNotification(kAXFocusedWindowChangedNotification as String), "Its own raises keep the permits")
+        XCTAssertTrue(WorkspaceBackendState.runsOutsideNativeTilingFence(try! XCTUnwrap(parseCommand("mode main").unwrap().0)),
+            "mode switches bindings even while tiling is paused")
+    }
+
     func testNonScrollingDesktopsKeepTheirScrollEvents() {
         let workspace = nativeDesktop()
         TestWindow.new(id: 97100, parent: workspace.rootTilingContainer)

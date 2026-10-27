@@ -16,4 +16,15 @@ final class NativeSpaceTransitionGuardTests: XCTestCase {
             XCTAssertFalse(NativeSpaceTransitionGuard.isMissionControlVisible([ordinary], screenSizes: sizes, bundleIdentifierForPID: bundle))
         }
     }
+
+    func testOrdinaryWindowsNeedNoBundleLookup() {
+        var lookups = 0
+        let rows: [[String: Any]] = (0..<50).map { [kCGWindowOwnerPID as String: $0, kCGWindowLayer as String: 0,
+            kCGWindowBounds as String: ["X": 0, "Y": 0, "Width": 800, "Height": 600]] }
+        XCTAssertFalse(NativeSpaceTransitionGuard.isMissionControlVisible(rows, screenSizes: [CGSize(width: 1920, height: 1080)]) { _ in
+            lookups += 1
+            return nil
+        })
+        XCTAssertEqual(lookups, 0, "Only layer-19 windows are looked up")
+    }
 }

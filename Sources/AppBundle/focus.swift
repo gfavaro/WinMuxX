@@ -315,15 +315,19 @@ extension Workspace {
         workspace: newWorkspace,
         prevWorkspace: oldWorkspace,
     ))
-    if let exec = config.execOnWorkspaceChange.first {
-        let process = Process()
-        process.executableURL = URL(filePath: exec)
-        process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
-        var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
-        environment[WINMUX_FOCUSED_WORKSPACE] = newWorkspace
-        environment[WINMUX_PREV_WORKSPACE] = oldWorkspace
-        environment[WINMUX_WORKSPACE] = newWorkspace
-        process.environment = environment
-        _ = Result { try process.run() }
-    }
+    runExecOnWorkspaceChange(new: newWorkspace, previous: oldWorkspace)
+}
+
+/// `exec-on-workspace-change`, shared by both backends.
+@MainActor func runExecOnWorkspaceChange(new newWorkspace: String, previous oldWorkspace: String) {
+    guard let exec = config.execOnWorkspaceChange.first else { return }
+    let process = Process()
+    process.executableURL = URL(filePath: exec)
+    process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
+    var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
+    environment[WINMUX_FOCUSED_WORKSPACE] = newWorkspace
+    environment[WINMUX_PREV_WORKSPACE] = oldWorkspace
+    environment[WINMUX_WORKSPACE] = newWorkspace
+    process.environment = environment
+    _ = Result { try process.run() }
 }

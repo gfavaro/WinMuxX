@@ -89,7 +89,10 @@ private func scheduleNativeRuleMove(_ move: MoveNodeToWorkspaceCommand, window i
         for _ in 0..<40 where !owner.workspaceBackend.nativeTiling.ready { try? await Task.sleep(for: .milliseconds(50)) }
         let io = CmdIo(stdin: .emptyStdin)
         if !(await owner.workspaceBackend.nativeWindowMoves.run(move.args, env: .defaultEnv.copy(\.windowId, id), io: io)) {
-            nativeSkippedWindowRuleCommands.insert("\(move.args) (failed: \(io.stderr.last ?? "unknown"))")
+            // One entry per rule, keeping its latest failure, so the set stays bounded.
+            let rule = "\(move.args)"
+            nativeSkippedWindowRuleCommands = nativeSkippedWindowRuleCommands.filter { !$0.hasPrefix(rule + " (failed") }
+            nativeSkippedWindowRuleCommands.insert("\(rule) (failed: \(io.stderr.last ?? "unknown"))")
         }
     }
 }

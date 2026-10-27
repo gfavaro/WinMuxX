@@ -89,7 +89,9 @@ final class WorkspaceBackendState {
                  is ListAppsCommand, is ListModesCommand, is ListExecEnvVarsCommand, is ConfigCommand,
                  is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand, is MoveMouseCommand,
                  // Starts a process; no window or Space is touched.
-                 is ExecAndForgetCommand: true
+                 is ExecAndForgetCommand,
+                 // Switches key bindings only; it must work while tiling is paused.
+                 is ModeCommand: true
             default: false
         }
     }

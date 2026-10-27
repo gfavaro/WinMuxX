@@ -119,11 +119,13 @@ struct ReloadConfigCommand: Command {
                 }
                 if runtime.workspaceBackend.kind == .native {
                     if runtime.workspaceBackend.nativeTilingEnabled {
-                        try await activateMode(activeMode ?? mainModeId, runCallbacks: false)
+                        // As in virtual mode: disabled stays without shortcuts, and a mode the
+                        // new config dropped falls back to main.
+                        try await activateMode(activeMode.map { parsedConfig.modes[$0] == nil ? mainModeId : $0 }, runCallbacks: false)
                         runtime.workspaceBackend.observation?.requestRead(event: "nativeConfigReload")
                     }
-                    TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, parsedConfig.menuBar)
-                    updateTrayText()
+                    syncStartAtLogin()
+                    applyReloadedConfigurationToRunningApp()
                     MessageModel.shared.message = nil
                     return true
                 }

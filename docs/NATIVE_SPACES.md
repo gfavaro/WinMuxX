@@ -44,8 +44,8 @@ In every native mode, `list-workspaces`, `list-windows`, `list-apps`, `list-mode
 are named by desktop number (`%{workspace}` prints `2`), and `--workspace 2` selects
 Desktop 2; internal `__native_space_*` names never appear. `palette` lists windows by
 desktop, and choosing one on another desktop switches there before focusing it. Other
-CLI commands, including `list-monitors`, `state` and subscriptions, return an explicit
-unsupported error. The sidebar lists native desktops (see [sidebar](#sidebar)); the
+CLI commands, including `state` and subscriptions, return an explicit unsupported
+error; `list-monitors` answers from the real displays. The sidebar lists native desktops (see [sidebar](#sidebar)); the
 workspace overview is left to Mission Control. Projects are disabled in
 native mode by design: virtual projects stay untouched for a later rollback.
 

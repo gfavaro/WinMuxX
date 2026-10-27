@@ -7,9 +7,10 @@ public enum NativeSpaceTransitionGuard {
     public static func isMissionControlVisible(_ windows: [[String: Any]], screenSizes: [CGSize],
                                                bundleIdentifierForPID: (pid_t) -> String?) -> Bool {
         windows.contains { window in
-            guard let pid = (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+            // Layer first: the bundle lookup creates an NSRunningApplication per window.
+            guard (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 19,
+                  let pid = (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
                   bundleIdentifierForPID(pid) == "com.apple.WindowManager",
-                  (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 19,
                   let bounds = window[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: bounds), frame.width > 0, frame.height > 0 else { return false }
             return screenSizes.contains { abs($0.width - frame.width) < 2 && abs($0.height - frame.height) < 2 }

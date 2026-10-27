@@ -59,14 +59,19 @@ final class NativeScrollingPan {
     /// Returns whether the event belongs to a pan and must not reach the app.
     func handle(_ scroll: Scroll) -> Bool {
         if let workspace {
-            // An ongoing pan owns every event until macOS's momentum ends.
+            // A new gesture that is not an Option pan ends the pan rather than being swallowed.
+            if scroll.momentumPhase == 0, scroll.phase == 1, !scroll.optionOnly {
+                settle()
+                return false
+            }
+            // Otherwise the pan owns its events until macOS's momentum ends.
             pan(workspace, by: scroll.deltaX)
             if scroll.momentumPhase == 3 { settle() } else { settleWhenIdle() }
             return true
         }
         guard scroll.optionOnly, scroll.isContinuous, scroll.momentumPhase == 0 else { return false }
-        guard config.scrolling.gestureEnabled, runtime.workspaceBackend.nativeTilingEnabled else {
-            lastDecision = "scrolling gestures or native tiling are off"; return false
+        guard config.scrolling.gestureEnabled, runtime.workspaceBackend.nativeTilingEnabled, TrayMenuModel.shared.isEnabled else {
+            lastDecision = "scrolling gestures, native tiling or WinMuxX are off"; return false
         }
         guard abs(scroll.deltaX) > abs(scroll.deltaY) else { lastDecision = "vertical: left to the app"; return false }
         guard let monitor = sortedMonitors.first(where: { $0.rect.contains(scroll.point) }),
@@ -130,9 +135,12 @@ final class NativeScrollingPan {
 }
 
 /// Geometry notifications a pan's own window moves produce.
+/// Geometry and focus notifications a pan's own moves and raises produce; none of them
+/// changes which windows belong to the desktop.
 func nativePanIgnoresNotification(_ notif: String) -> Bool {
     notif == kAXMovedNotification as String || notif == kAXResizedNotification as String ||
-        notif == kAXWindowMovedNotification as String || notif == kAXWindowResizedNotification as String
+        notif == kAXWindowMovedNotification as String || notif == kAXWindowResizedNotification as String ||
+        notif == kAXFocusedWindowChangedNotification as String
 }
 
 /// The column whose centre is nearest the viewport's centre; ties follow the last
