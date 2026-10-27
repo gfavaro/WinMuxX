@@ -241,6 +241,49 @@ enum GlobalObserver {
             return event
         })
 
+        installKeyboardMonitors()
+    }
+
+    /// Native Spaces: the sidebar's edge reveal, hover and drags, and tap and sequence
+    /// bindings. Focus-follows-mouse and virtual mouse resizing stay virtual-only.
+    @MainActor
+    static func initNativeInputObserver() {
+        guard !isInitialized else { return }
+        isInitialized = true
+        retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
+            runOnMainActor {
+                finishWorkspaceSidebarDragAfterGlobalMouseUp()
+                WorkspaceSidebarPanel.scheduleHoverRecheckForVisiblePanels()
+            }
+        })
+        let pointerActivityMask: NSEvent.EventTypeMask = [
+            .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp,
+            .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel,
+        ]
+        retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: pointerActivityMask, handler: onNativePointerActivity))
+        retainEventMonitor(NSEvent.addLocalMonitorForEvents(matching: pointerActivityMask) { event in
+            onNativePointerActivity(event)
+            return event
+        })
+        installKeyboardMonitors()
+    }
+
+    private static func onNativePointerActivity(_ event: NSEvent) {
+        let eventType = event.type
+        let timestamp = event.timestamp
+        let screenPoint = NSEvent.mouseLocation
+        let point = normalizeAppKitScreenPoint(screenPoint)
+        runOnMainActor {
+            MousePointerTracker.shared.note(point: point, timestamp: timestamp)
+            WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
+            WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
+            WorkspaceSidebarPanel.noteHoverPointerActivityForVisiblePanels(timestamp: timestamp)
+            noteTapBindingKeyDown()
+        }
+    }
+
+    @MainActor
+    private static func installKeyboardMonitors() {
         retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: onFlagsChanged))
         retainEventMonitor(NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             onFlagsChanged(event)

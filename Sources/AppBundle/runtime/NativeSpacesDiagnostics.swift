@@ -37,6 +37,19 @@ func nativeSpacesDiagnosticReport() -> String {
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
     lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")
+    let model = TrayMenuModel.shared
+    lines.append("Sidebar: enabled \(config.workspaceSidebar.enabled), scopes \(model.workspaceSidebarMonitorScopes.map(\.id)), " +
+        "selected \(model.workspaceSidebarSelectedMonitorScopeId), target \(model.workspaceSidebarTargetMonitorScopeId), " +
+        "focused \(model.workspaceSidebarFocusedMonitorScopeId)")
+    for row in model.workspaceSidebarWorkspaces {
+        let items = row.items.map { item -> String in
+            switch item.kind {
+                case .window(let w): "\(w.windowId) \(w.appName)\(w.isFocused ? "*" : "")"
+                case .tabGroup(let g): "tabs[\(g.id)]"
+            }
+        }
+        lines.append("  \(row.displayName) [\(row.monitorScopeId)\(row.isVisible ? ", visible" : "")\(row.isFocused ? ", focused" : "")]: \(items.joined(separator: ", "))")
+    }
     lines.append("Windows listed on desktops not showing: \(NativeUnvisitedWindows.shared.bySpaceID.values.map(\.count).reduce(0, +))")
     lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")
     for monitor in sortedMonitors {

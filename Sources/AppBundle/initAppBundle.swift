@@ -44,6 +44,7 @@ import Foundation
             let owner = runtime
             WindowBorderController.shared.startMissionControlMonitoring()
             if config.nativeSpaces.tilingEnabled { NativeScrollingPan.shared.start() }
+            GlobalObserver.initNativeInputObserver()
             owner.workspaceBackend.startObservation { [weak owner] _, _ in
                 owner?.withValue {
                     updateTrayText()
