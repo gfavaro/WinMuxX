@@ -309,7 +309,7 @@ final class MacWindow: Window {
     // todo it's part of the window layout and should be moved to layoutRecursive.swift
     @MainActor
     func hideInCorner(_ corner: OptimalHideCorner, force: Bool = false) async throws {
-        guard runtime.workspaceBackend.kind == .virtual else { return }
+        guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return }
         guard let nodeMonitor else { return }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent `hideInCorner` calls
         if !isHiddenInCorner {

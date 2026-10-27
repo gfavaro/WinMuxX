@@ -19,7 +19,7 @@ struct FocusCommand: Command {
         // Native floating windows retain their ownership and physical geometry.
         // Do not temporarily rebind them across asynchronous AX reads. Explicit
         // --window-id focus still supports them without a tree mutation.
-        let includeFloating = args.floatingAsTiling && runtime.workspaceBackend.kind == .virtual
+        let includeFloating = args.floatingAsTiling && runtime.workspaceBackend.capabilities.arrangesFloatingWindows
         let floatingWindows = includeFloating ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
         defer {
             if includeFloating {

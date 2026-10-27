@@ -63,17 +63,7 @@ extension ObservableObject {
 }
 
 @MainActor func updateTrayText() {
-    if runtime.workspaceBackend.kind == .native {
-        let displays = nativeObservedDisplays() ?? []
-        let display = displays.first { $0.identifier == focus.workspace.workspaceMonitor.displayUUID } ?? displays.first
-        let number = display.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, number.map(String.init) ?? "Spaces")
-        let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Observation only"
-        let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
-        TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
-        return
-    }
+    if runtime.workspaceBackend.current.updateTray() { return }
     let focus = focus
     let workspace = focus.workspace
     let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)
@@ -107,4 +97,16 @@ extension ObservableObject {
     }
     TrayMenuModel.shared.setIfChanged(\.workspaces, workspaces)
 
+}
+
+/// The tray indicator for native Spaces: the desktop number, its name and tiling state.
+@MainActor func updateNativeTrayText() {
+    let displays = nativeObservedDisplays() ?? []
+    let display = displays.first { $0.identifier == focus.workspace.workspaceMonitor.displayUUID } ?? displays.first
+    let number = display.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, number.map(String.init) ?? "Spaces")
+    let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Observation only"
+    let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
+    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
 }

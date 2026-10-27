@@ -48,7 +48,8 @@ func initTerminationHandler() {
 
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
-        if runtime.workspaceBackend.kind == .native {
+        // Native windows were never parked, so there is nothing to restore on quit.
+        if !runtime.workspaceBackend.capabilities.usesVirtualRecovery {
             runtime.workspaceBackend.stop()
             return
         }

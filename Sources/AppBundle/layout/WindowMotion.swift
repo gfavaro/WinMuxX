@@ -99,7 +99,7 @@ final class WindowMotion: NSObject {
 
     func apply(_ window: Window, target: CGRect) async throws {
         let target = windowMotionNativeTarget(target)
-        if runtime.workspaceBackend.kind == .native {
+        if !runtime.workspaceBackend.capabilities.animatesWindowMotion {
             window.setAxFrame(target.origin, target.size)
             return
         }

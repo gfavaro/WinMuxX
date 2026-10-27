@@ -205,7 +205,7 @@ private struct LayoutContext {
 extension Window {
     @MainActor
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
-        if runtime.workspaceBackend.kind == .native { return }
+        guard runtime.workspaceBackend.capabilities.arrangesFloatingWindows else { return }
         // A failed corner restoration must retry from its saved position, rather
         // than treating the still-parked native frame as a cross-display move.
         guard !isHiddenInCorner else { return }

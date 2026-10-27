@@ -7,6 +7,17 @@ positioning/focus/fullscreen checks passed; broader native validation remains pe
 lifecycle, parking and recovery. `NativeSpaces` isolates dynamic read-side SkyLight
 access and generation-checked event reconciliation. Layout trees/algorithms remain
 shared, with native visibility filtering and separate UUID-keyed persistence.
+
+When behaviour differs between the backends, shared code does not check
+`workspaceBackend.kind`. It asks `runtime.workspaceBackend.current` (the
+`WorkspaceBackend` protocol in `runtime/WorkspaceBackend.swift`) for behaviour:
+commands with their own implementation, listing and naming workspaces, the sidebar,
+the palette, focus side effects, diagnostics, the tray and geometry events. It asks
+`workspaceBackend.capabilities` for policy, such as parking hidden windows, virtual
+recovery, animated motion, arranging floating windows, publishing state and owning
+workspace lifecycle. Checking `kind` directly is left to the native tiling engine
+itself: its command fence, layout projection, write validation, startup and
+observers. Add a protocol method or capability rather than a new `kind` check.
 See [native mode and rollback](docs/NATIVE_SPACES.md), the
 [assessment](docs/NATIVE_SPACES_ASSESSMENT.md) and [decision record](docs/NATIVE_SPACES_ADR.md).
 

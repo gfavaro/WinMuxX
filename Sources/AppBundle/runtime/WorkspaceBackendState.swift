@@ -13,11 +13,18 @@ struct WorkspaceBackendCapabilities: Equatable, Sendable {
     let tilesWindows: Bool
     let parksInactiveWindows: Bool
     let usesVirtualRecovery: Bool
+    /// Window moves travel through WinMuxX's animation; native frames are written directly.
+    var animatesWindowMotion = true
+    /// Floating windows get frames from layout; native ones keep their physical geometry.
+    var arrangesFloatingWindows = true
+    /// Publishes state to `subscribe` clients.
+    var publishesState = true
 
     static let virtual = Self(ownsWorkspaceLifecycle: true, activatesWorkspaces: true,
         relocatesWorkspaces: true, tilesWindows: true, parksInactiveWindows: true, usesVirtualRecovery: true)
     static let nativeObservation = Self(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
-        relocatesWorkspaces: false, tilesWindows: false, parksInactiveWindows: false, usesVirtualRecovery: false)
+        relocatesWorkspaces: false, tilesWindows: false, parksInactiveWindows: false, usesVirtualRecovery: false,
+        animatesWindowMotion: false, arrangesFloatingWindows: false, publishesState: false)
 }
 
 /// The runtime owns one backend selection. Existing Workspace trees and layout
@@ -43,7 +50,8 @@ final class WorkspaceBackendState {
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
         return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
-            relocatesWorkspaces: false, tilesWindows: nativeTilingEnabled, parksInactiveWindows: false, usesVirtualRecovery: false)
+            relocatesWorkspaces: false, tilesWindows: nativeTilingEnabled, parksInactiveWindows: false, usesVirtualRecovery: false,
+            animatesWindowMotion: false, arrangesFloatingWindows: false, publishesState: false)
     }
 
     /// Whether this backend implements a command. Native shortcuts whose commands

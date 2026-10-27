@@ -44,6 +44,13 @@ protocol WorkspaceBackend: AnyObject {
     func extraPaletteItems() -> [SwitcherPaletteItem]
     /// After a command outside native tiling's fence moved focus.
     func focusDidMove(to window: Window?)
+
+    /// The `doctor` report, or nil for the shared one.
+    func diagnosticsReport() async -> String?
+    /// Fills the tray's workspace indicator; false leaves it to the shared code.
+    func updateTray() -> Bool
+    /// A window's geometry changed (a move when `moved`); false leaves it to the shared mouse handling.
+    func windowGeometryChanged(_ windowId: UInt32?, moved: Bool) -> Bool
 }
 
 @MainActor
@@ -92,6 +99,9 @@ final class VirtualWorkspaceBackend: WorkspaceBackend {
 
     func extraPaletteItems() -> [SwitcherPaletteItem] { [] }
     func focusDidMove(to window: Window?) {}
+    func diagnosticsReport() async -> String? { nil }
+    func updateTray() -> Bool { false }
+    func windowGeometryChanged(_ windowId: UInt32?, moved: Bool) -> Bool { false }
 }
 
 /// Native Spaces: macOS owns desktops, so they are numbered in Control-N order, and
@@ -144,5 +154,17 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
         // Inside the fence the coordinator brings the result forward itself.
         guard !NativeTilingCommandScope.active else { return }
         window?.nativeFocus()
+    }
+
+    func diagnosticsReport() async -> String? { nativeSpacesDiagnosticReport() }
+    func updateTray() -> Bool { updateNativeTrayText(); return true }
+
+    /// Native mode has no live drag driver: geometry is re-read on demand, and a moving
+    /// tiled window shows the drop overlays.
+    func windowGeometryChanged(_ windowId: UInt32?, moved: Bool) -> Bool {
+        guard let windowId, let window = Window.get(byId: windowId) else { return true }
+        window.invalidateLastKnownNativeState()
+        if moved { updateNativeDragOverlay(window) }
+        return true
     }
 }

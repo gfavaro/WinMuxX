@@ -12,17 +12,16 @@ enum WindowDragIntentKind: Equatable {
 
 @MainActor
 func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
-    if runtime.workspaceBackend.kind == .native {
-        // macOS owns desktops; stacking follows the same rules as virtual workspaces.
-        switch kind {
-            case .createWorkspace, .sidebarHover: return false
-            default: break
-        }
-    }
+    let capabilities = runtime.workspaceBackend.capabilities
     switch kind {
         case .tabStack, .reorderTab:
             return config.windowTabs.enabled
-        case .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone, .createWorkspace, .sidebarHover:
+        // With native Spaces macOS creates desktops, and hovering does not switch them.
+        case .createWorkspace:
+            return capabilities.ownsWorkspaceLifecycle
+        case .sidebarHover:
+            return capabilities.activatesWorkspaces
+        case .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone:
             return true
     }
 }

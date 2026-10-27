@@ -174,7 +174,7 @@ func stateColorHex(_ color: NSColor) -> String {
 
 /// No native reads, payload construction or repeating source on this path.
 @MainActor func requestPublicStateUpdate(structural: Bool = false) {
-    guard runtime.workspaceBackend.kind == .virtual else { return }
+    guard runtime.workspaceBackend.capabilities.publishesState else { return }
     let store = runtime.publicState
     store.changed()
     if structural { store.structureDirty = true }
