@@ -16,6 +16,30 @@ final class MoveCommandTest: XCTestCase {
         assertEquals(root.layoutDescription, .h_tiles([.window(2), .window(1)]))
     }
 
+    func testMasterMoveSwapsVerticallyAndStopsAtTheEdge() async throws {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let master = TestWindow.new(id: 7301, parent: root)
+        let upper = TestWindow.new(id: 7302, parent: root)
+        let lower = TestWindow.new(id: 7303, parent: root)
+        workspace.transitionArrangement(to: .master)
+        try await workspace.layoutWorkspace()
+        let upperRect = try XCTUnwrap(upper.lastAppliedLayoutPhysicalRect)
+        let lowerRect = try XCTUnwrap(lower.lastAppliedLayoutPhysicalRect)
+        XCTAssertNotEqual(upperRect.minY, lowerRect.minY, "The stack is vertical")
+        XCTAssertTrue(upper.focusWindow())
+        let down = try await MoveCommand(args: MoveCmdArgs(rawArgs: [], .down)).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(down.exitCode, 0, "Vertical moves swap within the stack")
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(upper.lastAppliedLayoutPhysicalRect, lowerRect)
+        XCTAssertEqual(lower.lastAppliedLayoutPhysicalRect, upperRect)
+        XCTAssertTrue(master.focusWindow())
+        let stop = try XCTUnwrap(parseCommand("move --boundaries-action stop left").cmdOrDie as? MoveCommand)
+        let left = try await stop.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(left.exitCode, 0, "--boundaries-action stop succeeds at the workspace edge, as it did before")
+    }
+
     func testDwindleMoveSwapsSameParentSlotsWithoutChangingRatios() async throws {
         config.defaultRootContainerLayout = .dwindle
         let workspace = Workspace.get(byName: name)

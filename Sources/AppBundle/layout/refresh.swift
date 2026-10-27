@@ -583,6 +583,14 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     let invalidateNativeStateAppPid: pid_t? =
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
+        // Both backends: a sheet appearing or going away changes what scrolling reveals.
+        if let emittingAppPid,
+           notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
+            notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {
+            for window in MacWindow.allWindows where window.macApp.pid == emittingAppPid {
+                window.invalidateScrollingSheetCache()
+            }
+        }
         if runtime.workspaceBackend.kind == .native {
             // A pan's own window moves must not revoke the permits it is streaming
             // with; the pan reads once when it settles.
@@ -590,13 +598,6 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
             runtime.workspaceBackend.nativeWriteAuthority.invalidate()
             runtime.workspaceBackend.observation?.requestRead(event: "axWindowChange")
             return
-        }
-        if let emittingAppPid,
-           notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
-            notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {
-            for window in MacWindow.allWindows where window.macApp.pid == emittingAppPid {
-                window.invalidateScrollingSheetCache()
-            }
         }
         if let destroyedWindowId {
             WindowBorderController.shared.remove(windowId: destroyedWindowId)

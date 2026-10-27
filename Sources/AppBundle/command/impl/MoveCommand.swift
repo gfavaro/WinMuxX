@@ -16,7 +16,16 @@ struct MoveCommand: Command {
             return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
         }
         if target.workspace.arrangement == .master {
-            return moveWorkspaceGroup(currentWindow, direction: direction, workspace: target.workspace)
+            if moveWorkspaceGroup(currentWindow, direction: direction, workspace: target.workspace) { return true }
+            // Within a group, or vertically, swap with the spatial neighbour as master always did.
+            if let neighbor = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction, excludingMoveNode: currentNode) {
+                swapWindows(currentWindow, neighbor)
+                return true
+            }
+            // Master slots stay fixed; crossing a pane edge must not wrap the master root
+            // in an implicit split. Other displays and the boundary action still apply.
+            if args.boundaries == .workspace { return args.boundariesAction == .stop }
+            return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
         }
         if currentWindow.nodeWorkspace?.rootTilingContainer.layout == .dwindle,
            let neighbor = dwindleDirectionalFocusTarget(
