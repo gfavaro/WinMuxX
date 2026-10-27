@@ -50,7 +50,6 @@ func nativeSpacesDiagnosticReport() -> String {
         }
         lines.append("  \(row.displayName) [\(row.monitorScopeId)\(row.isVisible ? ", visible" : "")\(row.isFocused ? ", focused" : "")]: \(items.joined(separator: ", "))")
     }
-    lines.append("Unclassified windows skipped in the last reconciliation: \(runtime.workspaceBackend.nativeWindows.skippedUnclassifiedCount) (\(runtime.workspaceBackend.nativeWindows.unclassified.count) remembered)")
     lines.append("Chrome refreshes after observations: \(NativeObservationChrome.shared.refreshes) for \(NativeObservationChrome.shared.requests) completed reads")
     lines.append("Windows listed on desktops not showing: \(NativeUnvisitedWindows.shared.bySpaceID.values.map(\.count).reduce(0, +))")
     lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")

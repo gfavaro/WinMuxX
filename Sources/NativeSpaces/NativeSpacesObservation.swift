@@ -70,8 +70,6 @@ public final class NativeSpacesObservation {
     /// read: a pan's own window moves would otherwise trigger a full read per step.
     /// Closures and Space/display changes are never held. The holder reads once after.
     public var holdsWindowReads: (() -> Bool)?
-    /// Every WindowServer window event, with its window when the event names one.
-    public var onWindowEvent: ((UInt32?) -> Void)?
     public private(set) var heldEventCount = 0
 
     private func holds(_ event: String) -> Bool {
@@ -86,7 +84,6 @@ public final class NativeSpacesObservation {
         windowEventsSubscription = NativeSpacesWindowEvents.shared.subscribe { [weak self] event in
             guard let self else { return }
             self.windowEventCount += 1
-            self.onWindowEvent?(event.windowID)
             if !event.confirmsClosure, !event.changesTopology, self.holds("windowServerWindowChange") { return }
             self.onWindowsChanged?()
             if event.confirmsClosure, let id = event.windowID { self.onWindowClosed?(id) }

@@ -14,10 +14,6 @@ final class NativeWindowReconciler {
     private(set) var pendingWindowCount = 0
     private(set) var writePreflight: (passed: Int, blocked: Int)?
     private(set) var timedOutAppCount = 0
-    /// Windows AX could not classify (helpers, overlays, popups) are not re-classified on
-    /// every read: each is skipped briefly, and an event about it or its app clears that.
-    private(set) var unclassified = UnclassifiedWindows()
-    private(set) var skippedUnclassifiedCount = 0
 
     func invalidate() {
         generation &+= 1
@@ -49,8 +45,7 @@ final class NativeWindowReconciler {
                 let groups = Dictionary(grouping: pids.keys, by: { pids[$0]! })
                 self.timedOutAppCount = 0
                 try await withThrowingTaskGroup(of: Void.self) { group in
-                    self.skippedUnclassifiedCount = 0
-                for (pid, ids) in groups {
+                    for (pid, ids) in groups {
                         group.addTask { @Sendable @MainActor in
                             let work = owner.throwingTask {
                                 guard let running = NSRunningApplication(processIdentifier: pid),
@@ -59,17 +54,8 @@ final class NativeWindowReconciler {
                                 for id in ids.sorted() {
                                     try Task.checkCancellation()
                                     guard self.generation == version else { throw CancellationError() }
-                                    if MacWindow.allWindowsMap[id] == nil, self.unclassified.skips(id) {
-                                        self.skippedUnclassifiedCount += 1
-                                        continue
-                                    }
-                                    do {
-                                        let window = try await MacWindow.getOrRegister(windowId: id, macApp: app)
-                                        window?.nativeLayoutEligible = window != nil
-                                        if window == nil, MacWindow.allWindowsMap[id] == nil { self.unclassified.note(id, pid: pid) }
-                                        else { self.unclassified.forget(windowID: id) }
-                                    } catch is CancellationError { throw CancellationError() }
-                                    catch {} // A failed read is not a classification.
+                                    let window = try? await MacWindow.getOrRegister(windowId: id, macApp: app)
+                                    window?.nativeLayoutEligible = window != nil
                                 }
                             }
                             // Match the existing app refresh's cooperative budget.
@@ -138,9 +124,6 @@ final class NativeWindowReconciler {
         }
     }
 
-    func forgetUnclassified(windowID: UInt32) { unclassified.forget(windowID: windowID) }
-    func forgetUnclassified(pid: pid_t) { unclassified.forget(pid: pid) }
-
     static func updateEligibility(_ snapshot: NativeSpacesSnapshot, windows: [Window],
                                   ownerPIDs: [UInt32: Int32], layouts: NativeSpaceLayouts) {
         let queried = Set(snapshot.reconciliationSpaceIDs ?? snapshot.displays.map(\.activeSpaceID))
@@ -170,17 +153,4 @@ private func nativeWindowOwnerPIDs(_ ids: Set<UInt32>) -> [UInt32: Int32] {
         result[id] = pid
     }
     return result
-}
-
-/// Recently unclassifiable windows, skipped until `ttl` passes or an event about them arrives.
-struct UnclassifiedWindows {
-    var ttl: Duration = .seconds(5)
-    var now: () -> ContinuousClock.Instant = { .now }
-    private var entries: [UInt32: (pid: pid_t, until: ContinuousClock.Instant)] = [:]
-    var count: Int { entries.count }
-
-    func skips(_ windowID: UInt32) -> Bool { entries[windowID].map { now() < $0.until } ?? false }
-    mutating func note(_ windowID: UInt32, pid: pid_t) { entries[windowID] = (pid, now().advanced(by: ttl)) }
-    mutating func forget(windowID: UInt32) { entries[windowID] = nil }
-    mutating func forget(pid: pid_t) { entries = entries.filter { $0.value.pid != pid } }
 }

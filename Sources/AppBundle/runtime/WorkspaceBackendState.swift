@@ -129,9 +129,6 @@ final class WorkspaceBackendState {
         let owner = runtime
         observation = observer
         observer.holdsWindowReads = { MainActor.assumeIsolated { NativeScrollingPan.shared.isPanning } }
-        observer.onWindowEvent = { [weak self] id in
-            if let id { self?.nativeWindows.forgetUnclassified(windowID: id) }
-        }
         observer.onWindowsChanged = { [weak owner] in
             guard let owner else { return }
             owner.withValue {
