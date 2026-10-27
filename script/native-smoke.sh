@@ -17,6 +17,8 @@ skip() { echo "SKIP  $1"; }
 wm() { "${cli[@]}" "$@" 2>&1; }
 space_of() { wm list-windows --monitor all --format '%{window-id} %{workspace}' | awk -v id="$1" '$1 == id { print $2 }'; }
 crash_count() { ls ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -c '^WinMux'; }
+# The app macOS has in front, not WinMuxX's own focus record.
+front_app() { lsappinfo info -only name "$(lsappinfo front)" | head -1 | sed 's/.*"\(.*\)".*/\1/'; }
 
 crashes_before=$(crash_count)
 doctor=$(wm doctor)
@@ -59,6 +61,21 @@ else
             [ "$(space_of "$window")" = "$home" ] && pass "move back to desktop $home" || fail "move back to desktop $home"
         else
             skip "move-node-to-workspace (no other desktop)"
+        fi
+        if [ -n "$other" ]; then
+            start=$(wm list-workspaces --monitor focused --visible)
+            wm move-node-to-workspace --window-id "$window" --focus-follows-window "$other" >/dev/null
+            sleep 1.5
+            [ "$(front_app)" = "TextEdit" ] && pass "focus follows a moved window (macOS front app)" || fail "focus follows a moved window: front is $(front_app)"
+            wm workspace "$home" >/dev/null
+            sleep 1.5
+            wm focus --window-id "$window" >/dev/null
+            sleep 1.5
+            [ "$(front_app)" = "TextEdit" ] && [ "$(space_of "$window")" = "$other" ] && pass "focus --window-id on a desktop not showing" ||
+                fail "focus --window-id on a desktop not showing: front is $(front_app)"
+            wm move-node-to-workspace --window-id "$window" "$home" >/dev/null
+            sleep 0.5
+            wm workspace "$start" >/dev/null 2>&1
         fi
         if [ "$monitors" -ge 2 ]; then
             before=$(space_of "$window")
