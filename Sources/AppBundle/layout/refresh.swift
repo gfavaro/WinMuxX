@@ -134,7 +134,7 @@ func scheduleRefreshSession(
     recordsActivation: Bool = true,
 ) {
     runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
-    if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, name.hasPrefix("scrolling") {
+    if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, nativeScrollingRelayoutEvents.contains(name) {
         return runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
     }
     // Startup owns the first enumeration and tree restoration. AX notifications from
@@ -200,6 +200,15 @@ func scheduleRefreshSession(
         }
     }
 }
+
+/// Scrolling events that change only the strip's offset or its in-memory tree, never which
+/// windows a desktop owns: native mode re-lays out showing scrolling desktops at once
+/// instead of waiting for a full observation read. Listed explicitly, not by name prefix.
+let nativeScrollingRelayoutEvents: Set<String> = [
+    "scrollingCenter", "scrollingGesture", "scrollingGestureCancelled", "scrollingGestureSettleFrame",
+    "scrollingGestureSettled", "scrollingMinimapSelection", "scrollingMove", "scrollingPin", "scrollingWidth",
+    "moveScrollingColumn", "moveWithinScrollingColumn", "resizeScrollingColumn", "joinScrolling",
+]
 
 @MainActor
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,

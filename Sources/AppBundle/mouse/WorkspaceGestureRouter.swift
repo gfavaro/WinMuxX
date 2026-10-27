@@ -86,6 +86,18 @@ final class WorkspaceGestureRouter {
 
     init(dependencies: WorkspaceGestureRouterDependencies = .live) { self.dependencies = dependencies }
 
+    /// What a touch sequence latched at its start, cleared when its fingers lift.
+    private func clearSequenceState() {
+        sequenceStarted = false
+        optionLatched = false
+        scrollingEnabledAtStart = false
+        scrollingWorkspaceAtStart = nil
+        scrollingMonitorPointAtStart = nil
+        scrollingOffsetAtStart = nil
+        scrollingTopologyAtStart = nil
+        scrollingEpochAtStart = nil
+    }
+
     func reset() {
         let cancelsInteraction = interactive
         interactive = false
@@ -94,15 +106,8 @@ final class WorkspaceGestureRouter {
         eligible = false
         verticalProgress = 0
         velocity = 0
-        sequenceStarted = false
+        clearSequenceState()
         contactDeviceAtStart = nil
-        optionLatched = false
-        scrollingEnabledAtStart = false
-        scrollingWorkspaceAtStart = nil
-        scrollingMonitorPointAtStart = nil
-        scrollingOffsetAtStart = nil
-        scrollingTopologyAtStart = nil
-        scrollingEpochAtStart = nil
         WorkspaceScrollingGestureController.shared.reset()
         if cancelsInteraction { dependencies.endOverviewGesture?(false, 0) }
     }
@@ -134,9 +139,7 @@ final class WorkspaceGestureRouter {
             if axes.isRejected { WorkspaceScrollingGestureController.shared.reset() }
             if frame.fingers == 0 {
                 WorkspaceScrollingGestureController.shared.reset(commit: true)
-                sequenceStarted = false; optionLatched = false; scrollingEnabledAtStart = false
-                scrollingWorkspaceAtStart = nil; scrollingMonitorPointAtStart = nil
-                scrollingOffsetAtStart = nil; scrollingTopologyAtStart = nil; scrollingEpochAtStart = nil
+                clearSequenceState()
             }
             return
         }
@@ -152,17 +155,12 @@ final class WorkspaceGestureRouter {
                     capturedTopology: scrollingTopologyAtStart,
                     capturedEpoch: scrollingEpochAtStart)
                 if frame.fingers == 0 {
-                    sequenceStarted = false; optionLatched = false; scrollingEnabledAtStart = false
-                    scrollingWorkspaceAtStart = nil; scrollingMonitorPointAtStart = nil
-                    scrollingOffsetAtStart = nil; scrollingTopologyAtStart = nil; scrollingEpochAtStart = nil
+                    clearSequenceState()
                 }
                 return
             case .ignore:
                 if frame.fingers == 0 {
-                    sequenceStarted = false; optionLatched = false
-                    scrollingEnabledAtStart = false
-                    scrollingWorkspaceAtStart = nil; scrollingMonitorPointAtStart = nil
-                    scrollingOffsetAtStart = nil; scrollingTopologyAtStart = nil; scrollingEpochAtStart = nil
+                    clearSequenceState()
                 }
                 return
             case .workspaceSwipe:
@@ -217,9 +215,7 @@ final class WorkspaceGestureRouter {
             }
         }
         if frame.fingers == 0 {
-            sequenceStarted = false; optionLatched = false; scrollingEnabledAtStart = false
-            scrollingWorkspaceAtStart = nil; scrollingMonitorPointAtStart = nil
-            scrollingOffsetAtStart = nil; scrollingTopologyAtStart = nil; scrollingEpochAtStart = nil
+            clearSequenceState()
         }
     }
 }

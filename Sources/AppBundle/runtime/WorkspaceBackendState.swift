@@ -22,6 +22,14 @@ struct WorkspaceBackendCapabilities: Equatable, Sendable {
 
     static let virtual = Self(ownsWorkspaceLifecycle: true, activatesWorkspaces: true,
         relocatesWorkspaces: true, tilesWindows: true, parksInactiveWindows: true, usesVirtualRecovery: true)
+    /// Native observation, with native tiling on or off.
+    func withTiling(_ enabled: Bool) -> Self {
+        Self(ownsWorkspaceLifecycle: ownsWorkspaceLifecycle, activatesWorkspaces: activatesWorkspaces,
+             relocatesWorkspaces: relocatesWorkspaces, tilesWindows: enabled, parksInactiveWindows: parksInactiveWindows,
+             usesVirtualRecovery: usesVirtualRecovery, animatesWindowMotion: animatesWindowMotion,
+             arrangesFloatingWindows: arrangesFloatingWindows, publishesState: publishesState)
+    }
+
     static let nativeObservation = Self(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
         relocatesWorkspaces: false, tilesWindows: false, parksInactiveWindows: false, usesVirtualRecovery: false,
         animatesWindowMotion: false, arrangesFloatingWindows: false, publishesState: false)
@@ -53,9 +61,7 @@ final class WorkspaceBackendState {
     var current: any WorkspaceBackend { kind == .native ? nativeBackend : virtualBackend }
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
-        return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
-            relocatesWorkspaces: false, tilesWindows: nativeTilingEnabled, parksInactiveWindows: false, usesVirtualRecovery: false,
-            animatesWindowMotion: false, arrangesFloatingWindows: false, publishesState: false)
+        return WorkspaceBackendCapabilities.nativeObservation.withTiling(nativeTilingEnabled)
     }
 
     /// Whether this backend implements a command. Native shortcuts whose commands
