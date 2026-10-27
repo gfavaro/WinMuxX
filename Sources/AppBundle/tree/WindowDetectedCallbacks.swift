@@ -54,6 +54,8 @@ private func onWindowDetected(_ window: Window) async throws {
 /// reconciliation, before native commands can run, so rules apply only what native
 /// tiling implements for a new window: floating or tiling it.
 @MainActor var nativeSkippedWindowRuleCommands: Set<String> = []
+/// Schedules a rule's move for a window opened after launch; tests replace it.
+@MainActor var nativeRuleMoveScheduler: (MoveNodeToWorkspaceCommand, UInt32) -> Void = { scheduleNativeRuleMove($0, window: $1) }
 
 @MainActor
 func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) async throws {
@@ -61,8 +63,11 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
         guard stillOwned() else { return }
         for command in callback.run {
             if let move = command as? MoveNodeToWorkspaceCommand, runtime.workspaceBackend.accepts(move) {
-                // Existing windows stay put at startup; only windows opened later are moved.
-                if runtime.workspaceBackend.nativeTiling.hasCompletedInitialLayout { scheduleNativeRuleMove(move, window: window.windowId) }
+                // Existing windows stay put, including ones first seen when their desktop is
+                // visited later; only windows opened after launch are moved.
+                if !runtime.workspaceBackend.windowsPresentAtLaunch.contains(window.windowId) {
+                    nativeRuleMoveScheduler(move, window.windowId)
+                }
                 continue
             }
             guard let layout = command as? LayoutCommand, !layout.args.forNextDetectedWindow,

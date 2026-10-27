@@ -45,6 +45,9 @@ import Foundation
             WindowBorderController.shared.startMissionControlMonitoring()
             if config.nativeSpaces.tilingEnabled { NativeScrollingPan.shared.start() }
             GlobalObserver.initNativeInputObserver()
+            owner.workspaceBackend.windowsPresentAtLaunch = Set(
+                (CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+                    .compactMap { ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value })
             owner.workspaceBackend.startObservation { [weak owner] inventory, _ in
                 // The observer reports both a read's start and its result; chrome follows results.
                 guard inventory.status != .reading else { return }

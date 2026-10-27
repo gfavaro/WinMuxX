@@ -188,7 +188,8 @@ remove either piece; `doctor` then reports moves unavailable and the command fai
 instead of guessing. Each move is confirmed by re-reading the window's Space.
 
 `on-window-detected` rules that run `move-node-to-workspace` move windows opened after
-WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
+WinMuxX starts; windows that existed when native mode started are never moved by a
+rule, including ones first seen later when their desktop is visited. Dragging a window onto a
 desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
 
 ## Scrolling

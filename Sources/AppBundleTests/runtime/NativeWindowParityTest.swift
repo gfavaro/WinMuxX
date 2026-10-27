@@ -39,4 +39,20 @@ final class NativeWindowParityTest: WorkspaceTestCase {
         try await applyNativeWindowDetectedRules(window) { false }
         XCTAssertTrue(window.parent === workspace.rootTilingContainer)
     }
+
+    func testMoveRulesSkipWindowsThatExistedAtLaunchEvenWhenFirstSeenLater() async throws {
+        config.onWindowDetected = parseConfig("""
+        [[on-window-detected]]
+        run = 'move-node-to-workspace 3'
+        """).config.onWindowDetected
+        var scheduled: [UInt32] = []
+        let original = nativeRuleMoveScheduler
+        nativeRuleMoveScheduler = { _, id in scheduled.append(id) }
+        defer { nativeRuleMoveScheduler = original }
+        runtime.workspaceBackend.windowsPresentAtLaunch = [50]
+        let workspace = Workspace.get(byName: "native-desktop")
+        try await applyNativeWindowDetectedRules(TestWindow.new(id: 50, parent: workspace.rootTilingContainer)) { true }
+        try await applyNativeWindowDetectedRules(TestWindow.new(id: 51, parent: workspace.rootTilingContainer)) { true }
+        XCTAssertEqual(scheduled, [51], "Only the window opened after launch moves")
+    }
 }
