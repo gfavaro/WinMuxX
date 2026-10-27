@@ -197,8 +197,8 @@ desktop in the sidebar moves it there, and the tray menu has Move Window to Desk
 
 ## Scrolling
 
-`workspace-layout scrolling`, `scrolling-center`, `scrolling-width` and
-`scrolling-minimap` work natively, per desktop. Columns scrolled out of view stay at
+`workspace-layout scrolling`, `scrolling-center`, `scrolling-width`, `scrolling-focus`,
+`scrolling-move`, `scrolling-pin` and `scrolling-minimap` work natively, per desktop. Columns scrolled out of view stay at
 the display edges as previews (or behind visible columns next to another display);
 they are never parked in a corner, so they stay on their desktop and reachable.
 Overlap order uses the same AX raises as virtual scrolling.

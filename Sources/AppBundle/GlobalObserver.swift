@@ -90,6 +90,7 @@ enum GlobalObserver {
         let modifierFlags = event.modifierFlags
         runOnMainActor {
             noteTapBindingFlagsChanged(keyCode: keyCode, modifierFlags: modifierFlags)
+            WorkspaceScrollingMinimap.shared.modifiersChanged(modifierFlags)
         }
     }
 

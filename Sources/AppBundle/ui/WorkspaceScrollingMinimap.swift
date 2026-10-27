@@ -51,6 +51,21 @@ final class WorkspaceScrollingMinimap: NSObject {
         return true
     }
 
+    /// `[scrolling] minimap-hold-modifiers`: holding exactly those keys keeps the
+    /// minimap up over the focused scrolling workspace; releasing them lets it fade.
+    func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
+        let required = config.scrolling.minimapHoldModifiers
+        guard !required.isEmpty else { return }
+        let held = flags.intersection([.control, .option, .command, .shift]) == required
+        if held, !holding, focus.workspace.arrangement == .scrolling {
+            holding = show(focus.workspace, duringGesture: true)
+        } else if !held, holding {
+            holding = false
+            endGesture()
+        }
+    }
+    private var holding = false
+
     func endGesture() {
         lifetime.pan(false, at: now)
         modelDidChange()
@@ -135,7 +150,12 @@ final class WorkspaceScrollingMinimap: NSObject {
                   workspace.isVisible else { return }
             self.selectGroup(id)
         }
-        let groups = workspace.workspaceLayoutUnits
+        view.reordered = { [weak self, weak workspace] id, index in
+            guard let self, let workspace, self.workspace === workspace, workspace.isVisible else { return }
+            workspace.moveScrollingColumn(id, toStripIndex: index)
+            self.modelDidChange()
+        }
+        let groups = workspace.scrollingStripUnits
         let representatives = groups.compactMap(\.mostRecentWindowRecursive)
         let models = groups.map { group -> ScrollingMinimapTile in
             let windows = group.allLeafWindowsRecursive

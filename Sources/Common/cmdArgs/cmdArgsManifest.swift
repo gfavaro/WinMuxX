@@ -41,6 +41,9 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case scrollingCenter = "scrolling-center"
     case scrollingWidth = "scrolling-width"
     case scrollingMinimap = "scrolling-minimap"
+    case scrollingFocus = "scrolling-focus"
+    case scrollingMove = "scrolling-move"
+    case scrollingPin = "scrolling-pin"
     case split
     case stackWith = "stack-with"
     case state
@@ -163,6 +166,12 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(ScrollingWidthCmdArgs.init)
             case .scrollingMinimap:
                 result[kind.rawValue] = SubCommandParser(ScrollingMinimapCmdArgs.init)
+            case .scrollingFocus:
+                result[kind.rawValue] = SubCommandParser(ScrollingFocusCmdArgs.init)
+            case .scrollingMove:
+                result[kind.rawValue] = SubCommandParser(ScrollingMoveCmdArgs.init)
+            case .scrollingPin:
+                result[kind.rawValue] = SubCommandParser(ScrollingPinCmdArgs.init)
             case .workspaceOverview:
                 result[kind.rawValue] = SubCommandParser(WorkspaceOverviewCmdArgs.init)
             case .workspaceBackAndForth:

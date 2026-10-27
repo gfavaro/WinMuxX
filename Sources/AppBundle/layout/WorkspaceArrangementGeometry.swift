@@ -21,14 +21,19 @@ extension Workspace {
             case .scrolling:
                 let geometry = scrollingGeometry(in: rect, gaps: gaps)
                 scrollingOffset = geometry.clampedOffset
-                return zip(workspaceLayoutUnits, geometry.columns).map { node, frame in
+                // A pinned column sits at its edge, above the strip.
+                let pinned = scrollingPinSplit(in: rect, gaps: gaps).flatMap { split in
+                    pinnedScrollingColumn.map { WorkspaceGroupFrame(node: $0, physical: split.pinned, virtual: split.pinned,
+                                                                   visibility: .visible, stackingIndex: geometry.columns.count) }
+                }
+                return zip(scrollingStripUnits, geometry.columns).map { node, frame in
                     WorkspaceGroupFrame(node: node,
                         physical: Rect(topLeftX: frame.physicalFrame.minX, topLeftY: frame.physicalFrame.minY,
                                        width: frame.physicalFrame.width, height: frame.physicalFrame.height),
                         virtual: Rect(topLeftX: frame.logicalFrame.minX, topLeftY: frame.logicalFrame.minY,
                                       width: frame.logicalFrame.width, height: frame.logicalFrame.height),
                         visibility: frame.visibility, stackingIndex: geometry.stackingOrder.firstIndex(of: frame.index) ?? frame.index)
-                }
+                } + (pinned.map { [$0] } ?? [])
             case .master:
                 let primary = masterGroupIndex
                 guard groups.indices.contains(primary) else { return [] }

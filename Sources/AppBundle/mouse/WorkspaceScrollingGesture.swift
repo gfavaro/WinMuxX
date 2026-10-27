@@ -197,7 +197,7 @@ final class WorkspaceScrollingGestureController {
             clear()
             return
         }
-        let destination = metrics.revealedOffset(for: chosen, current: workspace.scrollingOffset)
+        let destination = metrics.focusedOffset(for: chosen, current: workspace.scrollingOffset)
         let selected = chosen.node.mostRecentWindowRecursive
         workspace.lastScrollingFocusWindowId = selected?.windowId
         workspace.scrollingAnchorWindowId = selected?.windowId

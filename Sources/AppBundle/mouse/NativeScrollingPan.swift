@@ -119,7 +119,7 @@ final class NativeScrollingPan {
         guard let column = nearestScrollingColumn(in: metrics, offset: workspace.scrollingOffset, direction: lastDirection) else {
             return runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
         }
-        workspace.scrollingOffset = metrics.revealedOffset(for: column, current: workspace.scrollingOffset)
+        workspace.scrollingOffset = metrics.focusedOffset(for: column, current: workspace.scrollingOffset)
         if let window = column.node.mostRecentWindowRecursive, window.focusWindow() {
             workspace.lastScrollingFocusWindowId = window.windowId
             window.nativeFocus()

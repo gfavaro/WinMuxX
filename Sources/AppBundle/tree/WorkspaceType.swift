@@ -24,6 +24,9 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     }
     var scrollingSessionEpoch: UInt64 = 0
     var scrollingOffset: CGFloat = 0
+    /// A column held at a screen edge, full height, while the rest of the strip scrolls.
+    weak var scrollingPinnedNode: TreeNode?
+    var scrollingPinSide = ScrollingPinCmdArgs.Side.left
     var lastScrollingFocusWindowId: UInt32?
     var scrollingAnchorWindowId: UInt32?
     var scrollingAnchorViewportPosition: CGFloat?

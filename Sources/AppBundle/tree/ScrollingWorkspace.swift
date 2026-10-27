@@ -166,6 +166,20 @@ struct ScrollingWorkspaceMetrics {
         clampedOffset(column.start + column.width / 2 - areaWidth / 2)
     }
 
+    /// Where the strip goes when focus lands on `column`, per `center-focused-column`.
+    @MainActor
+    func focusedOffset(for column: ScrollingColumnMetric, current: CGFloat,
+                       mode: ScrollingCenterMode = config.scrolling.centerFocusedColumn) -> CGFloat {
+        switch mode {
+            case .never: return revealedOffset(for: column, current: current)
+            case .always: return centeredOffset(for: column)
+            case .onOverflow:
+                // Already wholly visible: stay. Otherwise centre instead of edging it in.
+                let current = clampedOffset(current)
+                return revealedOffset(for: column, current: current) == current ? current : centeredOffset(for: column)
+        }
+    }
+
     func revealedOffset(for column: ScrollingColumnMetric, current: CGFloat) -> CGFloat {
         revealedOffset(start: column.start, end: column.start + column.width, current: current)
     }
@@ -182,18 +196,54 @@ struct ScrollingWorkspaceMetrics {
 }
 
 extension Workspace {
+    /// The pinned column while it is still a column of this scrolling strip and others remain.
+    @MainActor
+    var pinnedScrollingColumn: TreeNode? {
+        guard arrangement == .scrolling, let node = scrollingPinnedNode, node.parent === rootTilingContainer,
+              workspaceLayoutUnits.count > 1, workspaceLayoutUnits.contains(where: { $0 === node }) else { return nil }
+        return node
+    }
+
+    /// The columns that scroll: every layout unit except a pinned one.
+    @MainActor
+    var scrollingStripUnits: [TreeNode] {
+        let pinned = pinnedScrollingColumn
+        return workspaceLayoutUnits.filter { $0 !== pinned }
+    }
+
+    /// The pinned column's frame at its screen edge, and the rect left for the strip.
+    @MainActor
+    func scrollingPinSplit(in rect: Rect, gaps: ResolvedGaps) -> (pinned: Rect, strip: Rect)? {
+        guard let pinned = pinnedScrollingColumn else { return nil }
+        let gap = CGFloat(gaps.inner.horizontal)
+        let share = min(pinned.scrollingColumnWidth ?? config.scrolling.columnWidth, 0.8)
+        let minimum = pinned.minimumLayoutExtent(along: .h, gaps: gaps, rect: rect)
+        let width = min(max((rect.width * share).rounded(), minimum), rect.width * 0.8).rounded()
+        let stripWidth = max(1, rect.width - width - gap)
+        return scrollingPinSide == .left
+            ? (Rect(topLeftX: rect.minX, topLeftY: rect.minY, width: width, height: rect.height),
+               Rect(topLeftX: rect.minX + width + gap, topLeftY: rect.minY, width: stripWidth, height: rect.height))
+            : (Rect(topLeftX: rect.maxX - width, topLeftY: rect.minY, width: width, height: rect.height),
+               Rect(topLeftX: rect.minX, topLeftY: rect.minY, width: stripWidth, height: rect.height))
+    }
+
     @MainActor
     func scrollingGeometry(in rect: Rect? = nil, gaps: ResolvedGaps? = nil) -> ScrollingWorkspaceGeometry {
-        let rect = rect ?? workspaceTilingRect(self)
+        let fullRect = rect ?? workspaceTilingRect(self)
         let gaps = gaps ?? ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor)
+        let pin = scrollingPinSplit(in: fullRect, gaps: gaps)
+        let rect = pin?.strip ?? fullRect
         let bounds = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
         let monitorRect = workspaceMonitor.rect
         let parking = CGRect(x: monitorRect.minX, y: monitorRect.minY, width: monitorRect.width, height: monitorRect.height)
         let otherDisplays = monitors.filter { $0.rect.topLeftCorner != monitorRect.topLeftCorner }
         let overlapsVertically: (Rect) -> Bool = { $0.minY < monitorRect.maxY && $0.maxY > monitorRect.minY }
-        let leftWall = otherDisplays.contains { abs($0.rect.maxX - monitorRect.minX) < 1 && overlapsVertically($0.rect) }
-        let rightWall = otherDisplays.contains { abs($0.rect.minX - monitorRect.maxX) < 1 && overlapsVertically($0.rect) }
-        let units = workspaceLayoutUnits
+        // A pinned column is a wall: the strip shows no previews on its side.
+        let leftWall = pin != nil && scrollingPinSide == .left ||
+            otherDisplays.contains { abs($0.rect.maxX - monitorRect.minX) < 1 && overlapsVertically($0.rect) }
+        let rightWall = pin != nil && scrollingPinSide == .right ||
+            otherDisplays.contains { abs($0.rect.minX - monitorRect.maxX) < 1 && overlapsVertically($0.rect) }
+        let units = scrollingStripUnits
         let focused = lastScrollingFocusWindowId.flatMap(Window.get(byId:))
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
         let focusedIndex = focused.flatMap { focused in units.firstIndex(where: { $0 === focused.topLevelWorkspaceGroup }) }
@@ -212,7 +262,7 @@ extension Workspace {
     @MainActor
     var scrollingMetrics: ScrollingWorkspaceMetrics {
         let rect = workspaceTilingRect(self)
-        let units = workspaceLayoutUnits
+        let units = scrollingStripUnits
         let geometry = scrollingGeometry(in: rect)
         let columns = zip(units, geometry.columns).map { node, frame in
             ScrollingColumnMetric(node: node,

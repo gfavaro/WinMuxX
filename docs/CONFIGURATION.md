@@ -193,6 +193,8 @@ width-presets = [0.25, 0.3333, 0.5, 0.6667, 0.75, 1.0]
 gesture-enabled = true
 gesture-sensitivity = 1.0
 minimap-enabled = true
+center-focused-column = 'never'   # never, on-overflow or always
+minimap-hold-modifiers = []       # e.g. ['ctrl', 'alt']
 
 [workspace.'Code']
 layout = 'scrolling'
@@ -201,6 +203,14 @@ layout = 'scrolling'
 Option plus a three-finger horizontal swipe pans a scrolling workspace. Plain three-finger swipes continue to switch workspaces. `scrolling-width next|previous|full` changes the focused column width, and `scrolling-center` centres it. The clickable minimap appears while navigating. Scrolled-out columns leave a 25-point edge preview; previews at display walls stay within their owning display.
 
 A fitting strip is centered. An overflowing strip clamps at both ends; explicit centering respects those bounds. Focus and minimap selection reveal the selected column with the smallest necessary movement. The minimap appears on the workspace's display. Its tiles preserve the column proportions with one scale for both width and height, and show app icons, window titles and tab/split markers. Short strips are centered rather than stretched across the panel. The preview height can grow for narrow columns to retain 32-point click targets without distorting their shapes. A dashed outline tracks the visible area; the accent border marks the focused group. Click a group to focus and reveal it. The map stays visible during panning or while hovered, then fades after 1.5 seconds of inactivity.
+
+`center-focused-column` decides where the strip goes when focus lands on a column: `never` scrolls only as far as needed to show it, `on-overflow` centres it when it would otherwise be partly off screen, and `always` centres it. It applies to keyboard focus, minimap clicks and settling swipes.
+
+`scrolling-focus 1-9|first|last` focuses a column by its place on the strip, with 9 the last column as with browser tabs; `scrolling-move 1-9|first|last` moves the focused column there. A horizontal `move` pops a window out of a stacked column to the left or right, and `stack-with` or `join-with` pulls it into a neighbouring one.
+
+`scrolling-pin left|right` pins the focused column to that screen edge at full height while the rest of the strip scrolls in the space beside it; the same command unpins it. The pinned column keeps its width preset, leaves the strip and the minimap, and blocks edge previews on its side. Pins last until unpinned or the column leaves the workspace; they are not saved across restarts.
+
+With `minimap-hold-modifiers` set, holding exactly those keys keeps the minimap up over a focused scrolling workspace, and releasing them lets it fade. Dragging a minimap tile sideways reorders the strip's columns; a click still focuses the column.
 
 Run `scrolling-minimap toggle` (the argument is optional) or choose **Layout → Show Scrolling Minimap** to keep it open without a gesture. Use Left/Right to select, Return to activate, and Escape to dismiss. Narrow columns retain at least 32-point targets; the map scrolls horizontally when needed. Fresh configurations bind Control–Option–M; existing configurations can assign it in Settings → Shortcuts or add a binding:
 

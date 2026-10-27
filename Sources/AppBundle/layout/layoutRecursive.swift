@@ -92,7 +92,7 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
            workspace.lastScrollingFocusWindowId != focused.windowId,
            let column = metrics.columns.first(where: { $0.node === focused.topLevelWorkspaceGroup })
         {
-            workspace.scrollingOffset = metrics.revealedOffset(for: column, current: workspace.scrollingOffset)
+            workspace.scrollingOffset = metrics.focusedOffset(for: column, current: workspace.scrollingOffset)
             workspace.lastScrollingFocusWindowId = focused.windowId
         }
         workspace.scrollingOffset = metrics.clampedOffset(workspace.scrollingOffset)
@@ -114,7 +114,7 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
     let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
     for frame in frames {
         for window in frame.node.allLeafWindowsRecursive {
-            window.isConcealedByScrolling = workspace.arrangement == .scrolling &&
+            window.isConcealedByScrolling = workspace.arrangement == .scrolling && frame.node !== workspace.pinnedScrollingColumn &&
                 !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size)
                     .intersects(workspace.scrollingMetrics.geometry.area)
         }

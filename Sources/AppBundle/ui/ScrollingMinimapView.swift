@@ -13,6 +13,8 @@ struct ScrollingMinimapTile: Equatable {
 final class ScrollingMinimapView: NSView {
     override var isFlipped: Bool { true }
     var selected: ((ObjectIdentifier) -> Void)?
+    /// A tile dragged to a new place on the strip: its group, and the destination index.
+    var reordered: ((ObjectIdentifier, Int) -> Void)?
     var hoverChanged: ((Bool) -> Void)?
     var dismissRequested: (() -> Void)?
     private var tracking: NSTrackingArea?
@@ -76,6 +78,7 @@ final class ScrollingMinimapView: NSView {
                 let button = ScrollingMinimapButton(model: model)
                 button.target = self
                 button.action = #selector(selectTile(_:))
+                button.dropped = { [weak self] button, midX in self?.dropTile(button, at: midX) }
                 tileCanvas.addSubview(button)
                 return button
             }
@@ -112,6 +115,15 @@ final class ScrollingMinimapView: NSView {
     override func mouseExited(with event: NSEvent) { hovered = false; hoverChanged?(false) }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var acceptsFirstResponder: Bool { true }
+    /// The place among the other tiles whose centre the dropped tile passed.
+    private func dropTile(_ dropped: ScrollingMinimapButton, at midX: CGFloat) {
+        let others = buttons.filter { $0 !== dropped }
+        let index = others.filter { $0.frame.midX < midX }.count
+        guard let current = buttons.firstIndex(where: { $0 === dropped }) else { return }
+        if index != current { reordered?(dropped.model.id, index) }
+        else { dropped.frame.origin.x = geometry.map { $0.tiles[current].minX } ?? dropped.frame.origin.x }
+    }
+
     func beginKeyboardNavigation() {
         keyboardNavigation = true
         tileCanvas.selectedIndex = focusedIndex
@@ -209,6 +221,26 @@ private final class ScrollingMinimapButton: NSButton {
     private var focused = false
     private var keyboardSelected = false
     private var configured = false
+
+    /// Called on release after a horizontal drag, with the tile's centre in the canvas.
+    var dropped: ((ScrollingMinimapButton, CGFloat) -> Void)?
+
+    /// A click activates the tile; a drag past a few points moves it to reorder columns.
+    override func mouseDown(with event: NSEvent) {
+        guard let window, dropped != nil else { return super.mouseDown(with: event) }
+        let start = event.locationInWindow
+        let origin = frame.origin.x
+        var dragging = false
+        while let next = window.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            let delta = next.locationInWindow.x - start.x
+            if next.type == .leftMouseUp {
+                if dragging { dropped?(self, frame.midX) } else { _ = sendAction(action, to: target) }
+                return
+            }
+            if !dragging, abs(delta) > 4 { dragging = true; superview?.addSubview(self) } // Drawn above its neighbours.
+            if dragging { frame.origin.x = origin + delta }
+        }
+    }
 
     init(model: ScrollingMinimapTile) {
         self.model = model

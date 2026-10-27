@@ -243,7 +243,8 @@ final class NativeTilingCoordinator {
                  is FullscreenCommand, is MacosNativeFullscreenCommand, is MacosNativeMinimizeCommand,
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
-                 is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand: return true
+                 is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand,
+                 is ScrollingFocusCommand, is ScrollingMoveCommand, is ScrollingPinCommand: return true
             case is StackWithCommand, is FlattenWorkspaceTreeCommand: return true
             case is MoveCommand: return true
             case let command as FocusCommand:
@@ -301,7 +302,7 @@ final class NativeTilingCoordinator {
             if let monitorMove {
                 return await runtime.workspaceBackend.nativeWindowMoves.run(monitorMove, env: env, io: io)
             }
-            if commands.contains(where: { $0 is FocusCommand }) {
+            if commands.contains(where: { $0 is FocusCommand || $0 is ScrollingFocusCommand }) {
                 focus.windowOrNil?.nativeFocus()
             } else {
                 runtime.workspaceBackend.observation?.requestRead(event: "nativeCommandCompleted")
