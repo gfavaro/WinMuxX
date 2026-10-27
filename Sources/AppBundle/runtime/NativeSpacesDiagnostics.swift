@@ -37,6 +37,7 @@ func nativeSpacesDiagnosticReport() -> String {
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
     lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")
+    lines.append("Windows listed on desktops not showing: \(NativeUnvisitedWindows.shared.bySpaceID.values.map(\.count).reduce(0, +))")
     lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")
     for monitor in sortedMonitors {
         let shown = runtime.workspaces.visibleWorkspace(for: monitor)

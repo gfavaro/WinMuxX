@@ -49,6 +49,7 @@ import Foundation
                     updateTrayText()
                     WindowBorderController.shared.refresh()
                     owner?.workspaceBackend.noteNativeActivity()
+                    NativeUnvisitedWindows.shared.refresh()
                     owner?.task { await updateWorkspaceSidebarModel() }
                 }
             }

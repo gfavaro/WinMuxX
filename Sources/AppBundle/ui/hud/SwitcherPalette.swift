@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import NativeSpaces
 import SwiftUI
 
 private let switcherPalettePanelId = "WinMux.switcherPalette"
@@ -195,7 +196,7 @@ final class SwitcherPalettePanel: NSPanelHud {
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.menuBarButton, token) {
                 if runtime.workspaceBackend.kind == .native {
-                    if let error = try await runNativeCommands(nativeFocusWindowCommands(windowId)) {
+                    if let error = try await focusNativeWindow(windowId) {
                         MessageModel.shared.message = Message(description: "Palette", body: error)
                     }
                     return
@@ -268,7 +269,22 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
             items[index] = item
         }
     }
-    return items.compactMap { $0 }
+    return items.compactMap { $0 } + (runtime.workspaceBackend.kind == .native ? nativeListedPaletteItems() : [])
+}
+
+/// Windows on desktops not showing yet; choosing one switches there first.
+@MainActor
+private func nativeListedPaletteItems() -> [SwitcherPaletteItem] {
+    let displays = nativeObservedDisplays() ?? []
+    return NativeUnvisitedWindows.shared.bySpaceID.flatMap { space, windows -> [SwitcherPaletteItem] in
+        guard let number = NativeSpaceNavigation.desktopNumber(of: space, in: displays) else { return [] }
+        return windows.map { listed in
+            let app = NSRunningApplication(processIdentifier: listed.pid)
+            let appName = app?.localizedName ?? app?.bundleIdentifier ?? "Unknown"
+            return SwitcherPaletteItem(id: listed.windowId, title: listed.title ?? appName, appName: appName, icon: app?.icon,
+                workspaceName: "", isFocused: false, workspaceTitle: nativeDesktopDisplayName(number))
+        }
+    }
 }
 
 @MainActor

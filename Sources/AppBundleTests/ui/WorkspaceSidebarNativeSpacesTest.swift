@@ -38,6 +38,16 @@ final class WorkspaceSidebarNativeSpacesTest: WorkspaceTestCase {
         XCTAssertNil(nativeDesktopNumber(forSidebarWorkspace: "1"), "Virtual names are not native rows")
     }
 
+    func testWindowsOnDesktopsNotShowingAreListedUnderTheirDesktop() async {
+        let monitor = observe(active: "1")
+        NativeUnvisitedWindows.shared.set([NativeListedWindow(windowId: 4242, spaceID: "2", pid: getpid(), title: "Report")])
+        defer { NativeUnvisitedWindows.shared.set([]) }
+        let rows = await buildNativeWorkspaceSidebarWorkspaceViewModels(
+            currentFocus: focus, workspaceLabels: [:], availableMonitors: [monitor])
+        XCTAssertEqual(rows.map { $0.items.map(\.id) }, [[], ["window:4242"]])
+        XCTAssertEqual(NativeUnvisitedWindows.shared.spaceID(of: 4242), "2")
+    }
+
     func testVirtualOnlyEditsExplainInsteadOfMutating() throws {
         _ = observe(active: "1")
         let before = Workspace.all.map(\.name)

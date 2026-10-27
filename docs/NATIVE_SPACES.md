@@ -231,8 +231,11 @@ With `[workspace-sidebar] enabled`, native mode lists desktops as "Desktop N"; a
 `workspace-labels` entry keyed by the desktop number (`"2" = "Mail"`) renames it, and
 renaming a row in the sidebar writes that entry to the running config. Labels follow
 the desktop's position, as Control-N does, so reordering desktops in Mission Control
-moves the name with the number. Rows show the windows each native layout retains, so
-a desktop not yet visited shows none. Selecting a desktop switches to it; selecting a
+moves the name with the number. Rows show the windows each native layout retains,
+then windows WindowServer reports on desktops not showing (ordinary app windows on one
+Space; titles need Screen Recording). Those are listed only: native tiling adopts a
+window through AX once its desktop is visited, so choosing one in the sidebar or the
+palette switches to its desktop first and focuses it once it is adopted. Selecting a desktop switches to it; selecting a
 window on another desktop switches first, then focuses it when tiling is enabled;
 dropping a window on a desktop moves it there. Creating, deleting or rearranging
 desktops and projects explain that Mission Control owns desktops instead of acting.

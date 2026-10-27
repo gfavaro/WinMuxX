@@ -1,3 +1,4 @@
+import AppKit
 import Common
 import NativeSpaces
 
@@ -7,8 +8,9 @@ import NativeSpaces
 // `workspace-labels` entry keyed by desktop number. Virtual-only edits (create,
 // delete, tab-group drags, projects) are unavailable.
 
-/// Desktops in macOS Control-N order, with the windows each native layout retains.
-/// Desktops not yet visited show no windows until their layout is first observed.
+/// Desktops in macOS Control-N order, with the windows each native layout retains,
+/// then windows WindowServer reports on desktops not showing, which are adopted once
+/// their desktop is visited.
 @MainActor
 func buildNativeWorkspaceSidebarWorkspaceViewModels(
     currentFocus: LiveFocus,
@@ -36,11 +38,24 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
                 monitorName: availableMonitors.count > 1 ? monitor.name : nil,
                 isFocused: isActive && currentFocus.workspace === workspace,
                 isVisible: isActive,
-                items: await buildWorkspaceSidebarItems(for: workspace, currentFocus: currentFocus),
+                items: await buildWorkspaceSidebarItems(for: workspace, currentFocus: currentFocus) +
+                    nativeListedSidebarItems(space.id, workspaceName: workspace.name),
             ))
         }
     }
     return result
+}
+
+@MainActor
+private func nativeListedSidebarItems(_ spaceID: String, workspaceName: String) -> [WorkspaceSidebarItemViewModel] {
+    (NativeUnvisitedWindows.shared.bySpaceID[spaceID] ?? []).map { listed in
+        let app = NSRunningApplication(processIdentifier: listed.pid)
+        return .init(kind: .window(WorkspaceSidebarWindowViewModel(
+            windowId: listed.windowId, workspaceName: workspaceName,
+            appName: app?.localizedName ?? app?.bundleIdentifier ?? "Unknown",
+            appBundleId: app?.bundleIdentifier, appBundlePath: app?.bundleURL?.path,
+            title: listed.title, isFocused: false)))
+    }
 }
 
 /// Handles a sidebar action in native mode. Actions that only make sense for
@@ -52,7 +67,11 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
             runNativeSidebarCommands(["workspace \(number)"])
         case .selectWindow(let windowId):
-            runNativeSidebarCommands(nativeFocusWindowCommands(windowId))
+            WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
+            runWorkspaceSidebarSession {
+                if let error = try await focusNativeWindow(windowId) { return showWorkspaceSidebarError(error) }
+                await updateWorkspaceSidebarModel()
+            }
         case .selectMonitorScope(let scopeId):
             selectWorkspaceSidebarMonitorScope(scopeId, viewModel: viewModel)
         case .clearDropPreview:
