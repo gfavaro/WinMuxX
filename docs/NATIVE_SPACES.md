@@ -330,6 +330,15 @@ the test configuration, and pause the installed manager with a bounded restorati
 watchdog. Stop the development manager before returning to a working desktop.
 Never interpret fixture success as validation of restrictive third-party apps.
 
+## Development loop
+
+`script/native-dev.sh run` builds a debug WinMuxX, bundles it as "WinMuxX Native Dev"
+(`com.gfavaro.winmuxx.debug`, its own command socket), signs it with the local
+identity, stops the installed WinMuxX and launches the dev app in native mode with
+`~/.config/winmuxx/native-spaces-test-144.toml` (or `WINMUX_NATIVE_CONFIG`). Commands
+go to it with `script/native-dev.sh cli <command>`; `script/native-dev.sh stop` quits it
+and relaunches the installed app. Grant Accessibility to "WinMuxX Native Dev" once.
+
 ## Troubleshooting
 
 - **Control-arrow or Control-number stopped switching Spaces:** a build before
