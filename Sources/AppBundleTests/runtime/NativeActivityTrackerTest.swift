@@ -32,4 +32,18 @@ final class NativeActivityTrackerTest: XCTestCase {
         XCTAssertEqual(hooks, ["startup", "focus-changed"])
         XCTAssertEqual(tracker.previousDesktop(on: displays(active: "2")[0]), "1", "Fullscreen is skipped in history")
     }
+
+    func testPreviousFocusedWindowFollowsFocusChanges() {
+        setUpWorkspacesForTests()
+        let tracker = NativeActivityTracker()
+        tracker.runHooks = { _, _ in }
+        tracker.execWorkspaceChange = { _, _ in }
+        tracker.observe(displays(active: "1"), focusedDisplay: "display-a", focusedWindow: 10)
+        XCTAssertNil(tracker.previousFocusedWindow)
+        tracker.observe(displays(active: "1"), focusedDisplay: "display-a", focusedWindow: 11)
+        XCTAssertEqual(tracker.previousFocusedWindow, 10)
+        tracker.observe(displays(active: "1"), focusedDisplay: "display-a", focusedWindow: nil)
+        tracker.observe(displays(active: "1"), focusedDisplay: "display-a", focusedWindow: 12)
+        XCTAssertEqual(tracker.previousFocusedWindow, 11, "An empty desktop in between is not a window to return to")
+    }
 }

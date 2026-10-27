@@ -128,3 +128,29 @@ final class MacAppTeardownTest: XCTestCase {
         }
     }
 }
+
+@MainActor
+final class NativeEnableTest: XCTestCase {
+    func testDisablingPausesNativeTilingAndEnablingResumesIt() async throws {
+        setUpWorkspacesForTests()
+        let native = WinMuxRuntime()
+        native.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let wasEnabled = TrayMenuModel.shared.isEnabled
+        defer { TrayMenuModel.shared.isEnabled = wasEnabled }
+        try await native.withValue {
+            let io = CmdIo(stdin: .emptyStdin)
+            let off = try XCTUnwrap(parseCommand("enable off").unwrap().0)
+            let disabled = try await native.workspaceBackend.current.run(off, env: .defaultEnv, io: io)
+            XCTAssertEqual(disabled, true, io.stderr.joined())
+            XCTAssertFalse(TrayMenuModel.shared.isEnabled)
+            XCTAssertFalse(native.workspaceBackend.nativeTiling.ready, "Native tiling stops writing")
+            let on = try XCTUnwrap(parseCommand("enable on").unwrap().0)
+            let enabled = try await native.workspaceBackend.current.run(on, env: .defaultEnv, io: io)
+            XCTAssertEqual(enabled, true)
+            XCTAssertTrue(TrayMenuModel.shared.isEnabled)
+            XCTAssertTrue(native.workspaceBackend.accepts(try XCTUnwrap(parseCommand("focus-back-and-forth").unwrap().0)))
+            XCTAssertTrue(native.workspaceBackend.accepts(try XCTUnwrap(parseCommand("exec-and-forget true").unwrap().0)))
+            XCTAssertTrue(native.workspaceBackend.accepts(try XCTUnwrap(parseCommand("flatten-workspace-tree").unwrap().0)))
+        }
+    }
+}

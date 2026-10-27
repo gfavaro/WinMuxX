@@ -12,6 +12,8 @@ final class NativeActivityTracker {
     private(set) var previousByDisplay: [String: String] = [:]
     private var focusedDisplay: String?
     private var focusedWindow: UInt32?
+    /// The window focused before the current one, for `focus-back-and-forth`.
+    private(set) var previousFocusedWindow: UInt32?
     private var hasStarted = false
     var runHooks: ([any Command], CmdEnv) -> Void = { commands, env in
         guard !commands.isEmpty, let token: RunSessionGuard = .isServerEnabled else { return }
@@ -56,6 +58,7 @@ final class NativeActivityTracker {
             execWorkspaceChange(name(change.to), name(change.from))
         }
         if window != focusedWindow {
+            if let focusedWindow { previousFocusedWindow = focusedWindow }
             focusedWindow = window
             broadcastEvent(.focusChanged(windowId: window, workspace: userFacingWorkspaceName(focus.workspace)))
             runHooks(config.onFocusChanged, hookEnvironment(event: "focus-changed").withFocus(focus))

@@ -95,7 +95,11 @@ Configured shortcut modes are
 available. A binding whose commands the native backend cannot run is not registered,
 so its keys keep reaching macOS and the focused app: an unchanged virtual config can
 no longer swallow Control-arrow or Control-number. In a mode with
-`exit-on-unbound-key`, such keys count as unbound. Summoning workspaces, project commands, agent operations and
+`exit-on-unbound-key`, such keys count as unbound. `exec-and-forget` runs as usual,
+`flatten-workspace-tree` edits the focused desktop's tree, `focus-back-and-forth`
+returns to the previously focused window (switching desktop first when needed), and
+`enable off|on|toggle` pauses and resumes native tiling and shortcuts; windows were
+never parked, so nothing is restored. Summoning workspaces, project commands, agent operations and
 subscriptions remain unsupported. `move-node-to-workspace` moves windows between Spaces (see
 [moving windows](#moving-windows-between-spaces)).
 

@@ -49,7 +49,8 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertTrue(workspaces.items.contains { $0.title == "Desktop 1" })
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
         XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "layout accordion", "Accordion overlaps natively")
-        XCTAssertEqual(menu.items.first { $0.title == "Enabled" }?.isEnabled, false)
+        XCTAssertNil(menu.items.first { $0.title == "Enabled" }?.toolTip.flatMap { $0 == "Not available with native Spaces" ? $0 : nil },
+            "enable pauses and resumes native tiling")
         XCTAssertEqual(menu.items.first { $0.title == "Workspace Controls…" }?.isEnabled, false)
     }
 }

@@ -119,6 +119,8 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
             case let command as MoveNodeToMonitorCommand: await state.nativeWindowMoves.run(command.args, env: env, io: io)
             case let command as MoveWorkspaceToMonitorCommand: await state.nativeWindowMoves.run(command.args, env: env, io: io)
             case let command as FocusMonitorCommand: nativeFocusMonitor(command.args, env: env, io: io)
+            case is FocusBackAndForthCommand: try await focusPreviousWindow(io)
+            case let command as EnableCommand: try await setEnabled(command.args, io)
             default: nil
         }
     }
@@ -154,6 +156,49 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
         // Inside the fence the coordinator brings the result forward itself.
         guard !NativeTilingCommandScope.active else { return }
         window?.nativeFocus()
+    }
+
+    /// Brings back the window focused before, switching to its desktop first when needed.
+    private func focusPreviousWindow(_ io: CmdIo) async throws -> Bool {
+        guard let id = state.nativeActivity.previousFocusedWindow, Window.get(byId: id) != nil else {
+            return io.err("Prev window has been closed")
+        }
+        if let error = try await focusNativeWindow(id) { return io.err(error) }
+        return true
+    }
+
+    /// `enable`: native windows were never parked, so disabling only stops tiling and
+    /// shortcuts, and enabling resumes them with a fresh observation.
+    private func setEnabled(_ args: EnableCmdArgs, _ io: CmdIo) async throws -> Bool {
+        let model = TrayMenuModel.shared
+        let newState: Bool = switch args.targetState.val {
+            case .on: true
+            case .off: false
+            case .toggle: !model.isEnabled
+        }
+        if newState == model.isEnabled {
+            if !args.failIfNoop {
+                io.out((newState ? "Already enabled" : "Already disabled") + "Tip: use --fail-if-noop to exit with non-zero code")
+            }
+            return !args.failIfNoop
+        }
+        model.isEnabled = newState
+        WindowBorderController.shared.setEnabled(newState)
+        if newState {
+            try await activateMode(mainModeId)
+            state.observation?.requestRead(event: "enabled")
+        } else {
+            MacApp.cancelPendingFocus()
+            clearPendingWindowDragIntent()
+            cancelManipulatedWithMouseState()
+            model.isWorkspaceSidebarExpanded = false
+            state.nativeTiling.invalidate("disabled")
+            try await activateMode(nil)
+        }
+        WorkspaceSidebarPanel.refreshAll()
+        WindowTabStripPanelController.shared.refresh()
+        updateTrayText()
+        return true
     }
 
     func diagnosticsReport() async -> String? { nativeSpacesDiagnosticReport() }

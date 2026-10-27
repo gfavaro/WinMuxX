@@ -49,6 +49,7 @@ final class NativeTilingCoordinator {
         defer { nativePanTiming.record("accept (after read)", acceptStart.duration(to: .now)) }
         guard runtime.workspaceBackend.nativeTilingEnabled else { return }
         guard !serverArgs.isReadOnly else { status = "Tiling suppressed by read-only startup"; return }
+        guard TrayMenuModel.shared.isEnabled else { status = "Tiling disabled (enable on resumes it)"; return }
         guard AXIsProcessTrusted(), runtime.workspaceBackend.observation?.windowEventsAvailable == true else {
             status = "Tiling suspended: Accessibility or native lifecycle events unavailable"
             return
@@ -243,7 +244,7 @@ final class NativeTilingCoordinator {
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand: return true
-            case is StackWithCommand: return true
+            case is StackWithCommand, is FlattenWorkspaceTreeCommand: return true
             case is MoveCommand: return true
             case let command as FocusCommand:
                 return command.args.boundaries == .workspace && command.args.boundariesAction != .wrapAroundAllMonitors

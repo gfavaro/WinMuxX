@@ -83,7 +83,9 @@ final class WorkspaceBackendState {
         switch command {
             case is DoctorCommand, is ReloadConfigCommand, is ListWorkspacesCommand, is ListWindowsCommand,
                  is ListAppsCommand, is ListModesCommand, is ListExecEnvVarsCommand, is ConfigCommand,
-                 is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand, is MoveMouseCommand: true
+                 is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand, is MoveMouseCommand,
+                 // Starts a process; no window or Space is touched.
+                 is ExecAndForgetCommand: true
             default: false
         }
     }
@@ -97,7 +99,7 @@ final class WorkspaceBackendState {
             // Focus may leave the desktop toward another display; it moves no window.
             case let command as FocusCommand: command.args.boundaries == .allMonitorsOuterFrame
             case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand,
-                 is MoveWorkspaceToMonitorCommand: true
+                 is MoveWorkspaceToMonitorCommand, is FocusBackAndForthCommand, is EnableCommand: true
             default: false
         }
     }
