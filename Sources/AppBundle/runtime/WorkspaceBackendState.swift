@@ -65,13 +65,13 @@ final class WorkspaceBackendState {
         isNativeNavigation(command) || isNativeDiagnosticOrQuery(command)
     }
 
-    /// Read-only commands that answer from config or native snapshots, and the
-    /// palette and sidebar, whose selections run their own native commands.
+    /// Read-only commands that answer from config or native snapshots, the palette and
+    /// sidebar, whose selections run their own native commands, and pointer moves.
     static func isNativeDiagnosticOrQuery(_ command: any Command) -> Bool {
         switch command {
             case is DoctorCommand, is ReloadConfigCommand, is ListWorkspacesCommand, is ListWindowsCommand,
                  is ListAppsCommand, is ListModesCommand, is ListExecEnvVarsCommand, is ConfigCommand,
-                 is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand: true
+                 is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand, is MoveMouseCommand: true
             default: false
         }
     }
@@ -82,6 +82,8 @@ final class WorkspaceBackendState {
         switch command {
             case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
             case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
+            // Focus may leave the desktop toward another display; it moves no window.
+            case let command as FocusCommand: command.args.boundaries == .allMonitorsOuterFrame
             case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand,
                  is MoveWorkspaceToMonitorCommand: true
             default: false

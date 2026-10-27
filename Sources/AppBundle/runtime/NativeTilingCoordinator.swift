@@ -4,6 +4,9 @@ import NativeSpaces
 
 enum NativeTilingCommandScope {
     @TaskLocal static var active = false
+    /// `move --boundaries all-monitors-outer-frame` past a display edge: the window
+    /// leaves the fenced desktop, so the native move runs after the command.
+    @MainActor static var pendingMonitorMove: MoveNodeToMonitorCmdArgs?
     @TaskLocal static var validateTarget: (@MainActor @Sendable () -> Bool)?
 }
 
@@ -233,7 +236,7 @@ final class NativeTilingCoordinator {
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand: return true
             case is StackWithCommand: return true
-            case let command as MoveCommand: return command.args.boundaries == .workspace
+            case is MoveCommand: return true
             case let command as FocusCommand:
                 return command.args.boundaries == .workspace && command.args.boundariesAction != .wrapAroundAllMonitors
             case let command as WorkspaceLayoutCommand:
@@ -278,8 +281,13 @@ final class NativeTilingCoordinator {
                 try await commands.runCmdSeq(env, io)
             }
         }
+        let monitorMove = NativeTilingCommandScope.pendingMonitorMove
+        NativeTilingCommandScope.pendingMonitorMove = nil
         if result {
             guard validate() else { return io.err("Native command target changed before completion") }
+            if let monitorMove {
+                return await runtime.workspaceBackend.nativeWindowMoves.run(monitorMove, env: env, io: io)
+            }
             if commands.contains(where: { $0 is FocusCommand }) {
                 focus.windowOrNil?.nativeFocus()
             } else {

@@ -158,7 +158,11 @@ destination desktop's layout. Observation-only mode never moves windows.
 `move-node-to-monitor` moves a window to the desktop another display is showing,
 through the same confirmed move, and `focus-monitor` focuses the most recent window of
 the desktop the target display shows; both resolve directions, next/prev and patterns
-as in virtual mode. `list-monitors` answers from the real displays.
+as in virtual mode. `list-monitors` answers from the real displays, and `move-mouse`
+(also from `on-focused-monitor-changed`) moves the pointer as in virtual mode.
+`focus --boundaries all-monitors-outer-frame` continues onto the next display's desktop,
+and `move --boundaries all-monitors-outer-frame` past a display edge moves the window
+there through the same confirmed move once the command ends.
 
 macOS cannot move a desktop to another display without SIP changes (Mission Control
 can, by dragging its thumbnail). `move-workspace-to-monitor` therefore moves the

@@ -174,7 +174,10 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
                 let moveNodeToMonitorArgs = MoveNodeToMonitorCmdArgs(target: .direction(direction))
                     .copy(\.windowId, focusWindow.windowId)
                     .copy(\.focusFollowsWindow, focus.windowOrNil == focusWindow)
-
+                if runtime.workspaceBackend.kind == .native {
+                    NativeTilingCommandScope.pendingMonitorMove = moveNodeToMonitorArgs
+                    return true
+                }
                 return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).runVirtual(env, io)
             } else {
                 return hitAllMonitorsOuterFrameBoundaries(node, workspace, args, direction)

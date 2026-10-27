@@ -344,8 +344,11 @@ final class NativeTilingTest: WorkspaceTestCase {
         config.windowTabs.enabled = true
         XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout tabbed").unwrap().0)))
         XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout accordion").unwrap().0)))
+        // Past a display edge the move runs after the fenced command; focus across displays
+        // runs outside the fence as navigation.
+        XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("move --boundaries all-monitors-outer-frame left").unwrap().0)))
+        XCTAssertTrue(WorkspaceBackendState.isNativeNavigation(try XCTUnwrap(parseCommand("focus --boundaries all-monitors-outer-frame left").unwrap().0)))
         for text in ["workspace 2", "move-node-to-workspace 2",
-                     "move --boundaries all-monitors-outer-frame left",
                      "focus --boundaries all-monitors-outer-frame left"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
             XCTAssertFalse(NativeTilingCoordinator.supports(command), text)

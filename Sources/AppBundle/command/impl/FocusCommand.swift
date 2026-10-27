@@ -6,6 +6,15 @@ struct FocusCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        let focused = try await focusInTree(env, io)
+        // Outside the native tiling fence (across displays), bring the result forward here.
+        if focused, runtime.workspaceBackend.kind == .native, !NativeTilingCommandScope.active {
+            focus.windowOrNil?.nativeFocus()
+        }
+        return focused
+    }
+
+    @MainActor private func focusInTree(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
         target.workspace.lastScrollingFocusWindowId = nil

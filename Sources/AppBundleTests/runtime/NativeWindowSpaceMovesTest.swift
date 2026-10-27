@@ -206,6 +206,28 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
             "A desktop already on that display stays")
     }
 
+    func testDirectionalFocusAndMoveCrossToTheNextDisplay() async throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
+        let right = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
+        let here = TestWindow.new(id: 71, parent: left.rootTilingContainer)
+        let there = TestWindow.new(id: 72, parent: right.rootTilingContainer)
+        _ = here.focusWindow()
+        let focusRight = try XCTUnwrap(parseCommand("focus --boundaries all-monitors-outer-frame right").cmdOrDie as? FocusCommand)
+        let io = CmdIo(stdin: .emptyStdin)
+        let focused = try await focusRight.run(.defaultEnv, io)
+        XCTAssertTrue(focused, io.stderr.joined())
+        XCTAssertEqual(focus.windowOrNil?.windowId, there.windowId)
+
+        _ = here.focusWindow()
+        let moveRight = try XCTUnwrap(parseCommand("move --boundaries all-monitors-outer-frame right").cmdOrDie as? MoveCommand)
+        XCTAssertTrue(moveRight.run(.defaultEnv, io), io.stderr.joined())
+        let pending = try XCTUnwrap(NativeTilingCommandScope.pendingMonitorMove, "Deferred until the fenced command ends")
+        NativeTilingCommandScope.pendingMonitorMove = nil
+        XCTAssertEqual(pending.windowId, here.windowId)
+        XCTAssertTrue(here.nodeWorkspace === left, "The tree waits for the confirmed native move")
+    }
+
     func testFocusMonitorFocusesTheOtherDisplaysRecentWindow() throws {
         let layouts = runtime.workspaceBackend.nativeLayouts
         let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
