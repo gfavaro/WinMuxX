@@ -114,3 +114,17 @@ final class TestWriteGuardTest: XCTestCase {
         XCTAssertFalse(isTemporaryPath(URL(filePath: "/tmpfoo/x")), "A prefix of a temporary name is not temporary")
     }
 }
+
+final class MacAppTeardownTest: XCTestCase {
+    /// A thread-guarded value left out of destroy() crashes WinMuxX whenever an app quits.
+    func testEveryThreadGuardedValueIsDestroyed() throws {
+        let source = URL(filePath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appending(path: "AppBundle/tree/MacApp.swift")
+        let text = try String(contentsOf: source, encoding: .utf8)
+        let guarded = text.matches(of: /let (\w+): ThreadGuardedValue</).map { String($0.1) }
+        XCTAssertFalse(guarded.isEmpty)
+        for name in guarded {
+            XCTAssertTrue(text.contains("\(name).destroy()"), "\(name) is never destroyed in MacApp.destroy()")
+        }
+    }
+}

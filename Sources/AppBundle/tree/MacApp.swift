@@ -664,8 +664,9 @@ final class MacApp: AbstractApp {
             job.cancel()
         }
         setFrameJobs = [:]
-        thread?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, appAxSubscriptions, axApp, axAppFastTimeout] job in
+        thread?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, validatedSessions, appAxSubscriptions, axApp, axAppFastTimeout] job in
             animatedSizes.destroy()
+            validatedSessions.destroy()
             appAxSubscriptions.destroy() // Destroy AX objects in reverse order of their creation
             windows.destroy()
             destroyedWindows.destroy()
