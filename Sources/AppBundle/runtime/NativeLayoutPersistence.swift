@@ -35,7 +35,7 @@ struct NativePersistedLayout: Codable, Equatable, Sendable {
     var supported: Bool {
         func supported(_ container: FrozenContainer) -> Bool {
             // The same layouts native tiling shows; tab groups stack, scrolling keeps edge columns.
-            [.tiles, .dwindle, .tabGroup].contains(container.layout) && container.children.allSatisfy {
+            [.tiles, .dwindle, .tabGroup, .stacked].contains(container.layout) && container.children.allSatisfy {
                 if case .container(let child) = $0 { return supported(child) }
                 if case .window(let window) = $0 { return !window.isFullscreen }
                 return false

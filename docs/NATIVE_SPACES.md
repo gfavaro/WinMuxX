@@ -95,10 +95,8 @@ Configured shortcut modes are
 available. A binding whose commands the native backend cannot run is not registered,
 so its keys keep reaching macOS and the focused app: an unchanged virtual config can
 no longer swallow Control-arrow or Control-number. In a mode with
-`exit-on-unbound-key`, such keys count as unbound. Cross-display movement, tabs,
-Accordion, scrolling, fullscreen commands, launch hooks, window-detection command
-hooks, project commands, agent operations, virtual queries and subscriptions remain
-unsupported. `move-node-to-workspace` moves windows between Spaces (see
+`exit-on-unbound-key`, such keys count as unbound. Cross-display movement, project
+commands, agent operations and subscriptions remain unsupported. `move-node-to-workspace` moves windows between Spaces (see
 [moving windows](#moving-windows-between-spaces)).
 
 Every queued frame write and retry requires a current generation permit, fresh
@@ -194,15 +192,17 @@ active tab's frame behind it: every tab stays visible in Mission Control and rea
 if WinMuxX quits. After each native layout an active tab that a sibling covers is
 raised with AX (adapted from Dinky), which does not activate its app; a raise that
 would move keyboard focus to another window of the frontmost app waits until focus
-agrees. Accordion stays unsupported until its peeking edges get full ordering.
+agrees. Accordion (`layout accordion`, or Tabbed without `window-tabs.enabled`) lays
+its windows out as in virtual mode, each peeking out by `tab-group-padding`, and its
+active window is raised the same way.
 
 ## Mouse
 
 Layout pauses while a mouse button is down. Dragging a tiled window shows the same
 drop overlays as virtual workspaces for swapping with a tile, splitting a tile
 (left/right/above/below) and dropping onto a desktop in the sidebar, which moves the
-window to that desktop. Tab and accordion stacking overlays stay off until native
-layout can show overlapping groups. On release the overlay's action is applied;
+window to that desktop. Tab and Accordion stacking overlays follow
+`drag-stack-layout` as in virtual mode. On release the overlay's action is applied;
 without one, the frontmost window is read once: a tiled window whose size changed
 keeps it, through the same weight and Dwindle-ratio changes as a virtual mouse
 resize (a lone window's width becomes its manual width), and one dropped onto another
@@ -246,7 +246,7 @@ Unknown/native fullscreen Space types and shared/all-Spaces/unknown memberships
 are observable but excluded from the proposed native tiling policy. Missing UUIDs
 cannot be restored by guessing an ordinal. Numeric IDs are not restart identities.
 
-Tab/accordion integration, the palette and overview are pending. The opt-in tiling path
+The workspace overview is left to Mission Control. The opt-in tiling path
 and native persistence have automated coverage. Initial physical Dwindle/Master,
 resize, focus, minimize/restore and fullscreen checks passed on one display;
 Mission Control's detection signature also passed a user-assisted read-only check.

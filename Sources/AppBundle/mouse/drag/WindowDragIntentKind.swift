@@ -13,11 +13,10 @@ enum WindowDragIntentKind: Equatable {
 @MainActor
 func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
     if runtime.workspaceBackend.kind == .native {
-        // Native stacks tabbed groups but not Accordion yet, and macOS owns desktops.
+        // macOS owns desktops; stacking follows the same rules as virtual workspaces.
         switch kind {
-            case .swap, .stackSplit, .moveToWorkspace, .moveToWorkspaceZone: return true
-            case .tabStack, .reorderTab, .detachTab: return config.windowTabs.enabled && config.dragStackLayout == .tabGroup
             case .createWorkspace, .sidebarHover: return false
+            default: break
         }
     }
     switch kind {

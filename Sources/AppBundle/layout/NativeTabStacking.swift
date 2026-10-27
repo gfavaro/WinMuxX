@@ -2,7 +2,8 @@ import AppKit
 
 /// Native tab groups keep inactive tabs at the active tab's frame instead of parking
 /// them in a corner, so every window stays visible in Mission Control and reachable if
-/// WinMuxX quits. The active tab must therefore be frontmost within its group. After a
+/// WinMuxX quits; Accordion overlaps its windows. The active window must therefore be
+/// frontmost within its group. After a
 /// native layout, an active tab that a sibling covers is raised with AX, which does not
 /// activate its app; a raise that would move keyboard focus to another window of the
 /// frontmost app is skipped until focus agrees. Approach adapted from Dinky (MIT).
@@ -19,10 +20,18 @@ func raiseCoveredNativeTabs(in workspace: Workspace, frontToBack: [UInt32]) asyn
 /// Active tabs some sibling in their group is in front of; `position` is front-to-back.
 @MainActor
 func nativeTabsToRaise(in workspace: Workspace, position: [UInt32: Int]) -> [MacWindow] {
-    workspace.rootTilingContainer.allTabbedContainersRecursive.compactMap { group in
+    workspace.rootTilingContainer.allStackingContainersRecursive.compactMap { group in
         guard let active = group.tabActiveWindow as? MacWindow, let activeIndex = position[active.windowId] else { return nil }
         let covered = group.allLeafWindowsRecursive.contains { $0 !== active && (position[$0.windowId] ?? .max) < activeIndex }
         return covered ? active : nil
+    }
+}
+
+extension TilingContainer {
+    /// Tabbed and Accordion groups, whose windows overlap natively.
+    @MainActor var allStackingContainersRecursive: [TilingContainer] {
+        let nested = children.flatMap { ($0 as? TilingContainer)?.allStackingContainersRecursive ?? [] }
+        return ([.tabGroup, .stacked].contains(layout) && children.count > 1 ? [self] : []) + nested
     }
 }
 

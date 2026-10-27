@@ -140,22 +140,19 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertTrue(root.children.first === window)
     }
 
-    func testNativeLayoutRejectsUnsupportedRetainedGroupsBeforeAnyFrameWrite() async throws {
+    func testNativeAccordionOverlapsItsWindowsWithoutParkingThem() async throws {
         let workspace = nativeWorkspace()
         let root = workspace.rootTilingContainer
-        let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stacked, index: 0)
-        let a = TestWindow.new(id: 1, parent: tabs)
-        let b = TestWindow.new(id: 2, parent: tabs)
-        do {
-            try await workspace.layoutWorkspace()
-            XCTFail("Native Accordion must remain suspended")
-        } catch { XCTAssertTrue(error is NativeTilingUnsupportedLayout) }
-        XCTAssertTrue(workspace.rootTilingContainer === root)
-        XCTAssertTrue(root.children.first === tabs)
-        XCTAssertEqual(tabs.layout, .stacked)
-        XCTAssertEqual(tabs.children, [a, b])
-        XCTAssertNil(a.lastAppliedLayoutPhysicalRect)
-        XCTAssertNil(b.lastAppliedLayoutPhysicalRect)
+        let accordion = TilingContainer(parent: root, adaptiveWeight: 1, .h, .stacked, index: 0)
+        let a = TestWindow.new(id: 1, parent: accordion)
+        let b = TestWindow.new(id: 2, parent: accordion)
+        b.markAsMostRecentChild()
+        try await workspace.layoutWorkspace()
+        let first = try XCTUnwrap(a.lastAppliedLayoutPhysicalRect)
+        let second = try XCTUnwrap(b.lastAppliedLayoutPhysicalRect)
+        XCTAssertLessThan(first.minX, second.minX, "Each window peeks out by the padding")
+        XCTAssertGreaterThan(first.maxX, second.minX, "Accordion windows overlap")
+        XCTAssertEqual(root.allStackingContainersRecursive.map { $0 === accordion }, [true], "The active one is raised")
     }
 
     func testNativeTabbedGroupStacksInactiveTabsAtTheActiveFrame() async throws {
@@ -346,7 +343,8 @@ final class NativeTilingTest: WorkspaceTestCase {
         }
         config.windowTabs.enabled = true
         XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout tabbed").unwrap().0)))
-        for text in ["workspace 2", "move-node-to-workspace 2", "layout accordion",
+        XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout accordion").unwrap().0)))
+        for text in ["workspace 2", "move-node-to-workspace 2",
                      "move --boundaries all-monitors-outer-frame left",
                      "focus --boundaries all-monitors-outer-frame left"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)

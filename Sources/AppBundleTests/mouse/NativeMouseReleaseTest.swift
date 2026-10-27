@@ -59,7 +59,7 @@ final class NativeMouseReleaseTest: XCTestCase {
             config.dragStackLayout = .tabGroup
             XCTAssertTrue(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: 1)), "Tabbed groups stack natively")
             config.dragStackLayout = .stacked
-            XCTAssertFalse(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: 1)), "Accordion overlap is not shown yet")
+            XCTAssertTrue(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: 1)), "Accordion overlaps natively")
             XCTAssertFalse(isWindowDragIntentKindEnabled(.createWorkspace()), "macOS owns desktops")
             currentlyManipulatedWithMouseWindowId = 5
             setCurrentMouseManipulationKind(.move)

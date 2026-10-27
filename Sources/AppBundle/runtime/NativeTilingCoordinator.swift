@@ -211,8 +211,7 @@ final class NativeTilingCoordinator {
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand: return true
-            // Tab groups stack natively only with window tabs; Accordion overlap is not shown yet.
-            case is StackWithCommand: return config.windowTabs.enabled
+            case is StackWithCommand: return true
             case let command as MoveCommand: return command.args.boundaries == .workspace
             case let command as FocusCommand:
                 return command.args.boundaries == .workspace && command.args.boundariesAction != .wrapAroundAllMonitors
@@ -220,8 +219,8 @@ final class NativeTilingCoordinator {
                 return command.args.layouts.val.allSatisfy { $0 == .dwindle || $0 == .master || $0 == .scrolling }
             case let command as LayoutCommand:
                 return !command.args.forNextDetectedWindow && command.args.toggleBetween.val.allSatisfy {
-                    [.tiles, .h_tiles, .v_tiles, .horizontal, .vertical, .auto, .tiling, .floating].contains($0) ||
-                        $0 == .tabGroup && config.windowTabs.enabled
+                    [.tiles, .h_tiles, .v_tiles, .horizontal, .vertical, .auto, .tiling, .floating,
+                     .tabGroup, .hTabGroup, .vTabGroup, .stacked].contains($0)
                 }
             default: return false
         }

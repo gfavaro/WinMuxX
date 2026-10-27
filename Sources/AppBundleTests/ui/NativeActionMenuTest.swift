@@ -48,7 +48,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertEqual(mail.keyEquivalent, "2")
         XCTAssertTrue(workspaces.items.contains { $0.title == "Desktop 1" })
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
-        XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "Not available with native Spaces")
+        XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "layout accordion", "Accordion overlaps natively")
         XCTAssertEqual(menu.items.first { $0.title == "Enabled" }?.isEnabled, false)
         XCTAssertEqual(menu.items.first { $0.title == "Workspace Controls…" }?.isEnabled, false)
     }

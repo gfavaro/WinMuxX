@@ -69,8 +69,9 @@ struct NativeTilingUnsupportedLayout: Error, CustomStringConvertible {
 extension Workspace {
     @MainActor var supportsNativeTiling: Bool {
         func supported(_ container: TilingContainer) -> Bool {
-            // Tabbed groups stack their tabs at one frame; see raiseCoveredNativeTabs.
-            ([.tiles, .dwindle].contains(container.layout) || container.layout == .tabGroup && container.usesWindowTabBehavior) &&
+            // Tabbed groups stack their tabs at one frame and Accordion overlaps them;
+            // either way the active window is raised, see raiseCoveredNativeTabs.
+            [.tiles, .dwindle, .tabGroup, .stacked].contains(container.layout) &&
                 container.children.allSatisfy {
                 guard let nested = $0 as? TilingContainer else { return true }
                 return supported(nested)
