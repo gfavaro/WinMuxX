@@ -268,8 +268,10 @@ final class NativeTilingCoordinator {
         runtime.workspaceBackend.observation?.requestRead(event: "nativeCommand")
         // Bounded readiness wait, with no additional native queries. Reconciliation
         // is owned by the event pipeline; newer events can supersede it safely.
-        for _ in 0..<100 {
-            try await Task.sleep(for: .milliseconds(50))
+        // A read takes a few to tens of milliseconds; poll finely so commands are not
+        // held a fixed 50 ms.
+        for _ in 0..<1000 {
+            try await Task.sleep(for: .milliseconds(5))
             if ready { break }
             if case .unavailable = runtime.workspaceBackend.observation?.inventory.status { break }
         }

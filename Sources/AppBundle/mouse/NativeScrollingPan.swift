@@ -70,10 +70,9 @@ final class NativeScrollingPan {
         }
         guard abs(scroll.deltaX) > abs(scroll.deltaY) else { lastDecision = "vertical: left to the app"; return false }
         guard let monitor = sortedMonitors.first(where: { $0.rect.contains(scroll.point) }),
-              monitor.activeWorkspace.arrangement == .scrolling, monitor.activeWorkspace.isVisible else {
+              let target = nativeActiveDesktop(on: monitor), target.arrangement == .scrolling, target.isVisible else {
             lastDecision = "desktop under the pointer is not scrolling"; return false
         }
-        let target = monitor.activeWorkspace
         workspace = target
         lastDirection = 0
         lastDecision = "panning"

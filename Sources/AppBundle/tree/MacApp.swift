@@ -302,7 +302,7 @@ final class MacApp: AbstractApp {
         }
     }
 
-    /// The permit alone, without AX reads: for gesture steps after a full check.
+    /// The permit alone, with no AX or WindowServer reads: for gesture steps after a full check.
     @MainActor
     private func nativePermitCheck(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
@@ -310,7 +310,7 @@ final class MacApp: AbstractApp {
               let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
             return { _ in throw NativeSpaceWriteError.revoked }
         }
-        return { _ in try permit.check() }
+        return { _ in try permit.checkGranted() }
     }
 
     @MainActor

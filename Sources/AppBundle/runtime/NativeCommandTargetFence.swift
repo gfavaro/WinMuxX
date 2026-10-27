@@ -20,7 +20,10 @@ struct NativeCommandTargetFence {
             let workspaceName = command.args.workspaceName?.raw ?? env.workspaceName
             let workspace: Workspace?
             if let id { workspace = Window.get(byId: id)?.nodeWorkspace }
-            else if let workspaceName { workspace = Workspace.existing(byName: workspaceName) }
+            else if let workspaceName {
+                // A desktop number wins over a leftover virtual workspace of the same name.
+                workspace = runtime.workspaceBackend.current.workspace(named: workspaceName) ?? Workspace.existing(byName: workspaceName)
+            }
             else { workspace = defaultFocus?.workspace }
             guard let workspace,
                   layouts.retainedByUUID.values.contains(where: { $0 === workspace }),

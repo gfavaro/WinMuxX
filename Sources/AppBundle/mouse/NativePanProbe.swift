@@ -43,7 +43,7 @@ final class NativePanTiming {
 @MainActor
 func simulateNativePan() async -> String {
     // Pan toward whichever side has room, then back, so a clamped edge never hides lag.
-    guard let workspace = sortedMonitors.first(where: { $0.activeWorkspace.arrangement == .scrolling })?.activeWorkspace else {
+    guard let workspace = sortedMonitors.lazy.compactMap(nativeActiveDesktop(on:)).first(where: { $0.arrangement == .scrolling }) else {
         return await simulateNativePan(stepDelta: -10)
     }
     let metrics = workspace.scrollingMetrics
@@ -69,10 +69,10 @@ private final class PanSampler: @unchecked Sendable {
 func simulateNativePan(steps: Int = 120, stepDelta: Double, interval: Duration = .milliseconds(8)) async -> String {
     guard runtime.workspaceBackend.nativeTilingEnabled else { return "Native tiling is not active" }
     guard CGPreflightPostEventAccess() else { return "WinMuxX cannot post events (Accessibility)" }
-    guard let monitor = sortedMonitors.first(where: { $0.activeWorkspace.arrangement == .scrolling }) else {
+    guard let monitor = sortedMonitors.first(where: { nativeActiveDesktop(on: $0)?.arrangement == .scrolling }),
+          let workspace = nativeActiveDesktop(on: monitor) else {
         return "No visible scrolling desktop"
     }
-    let workspace = monitor.activeWorkspace
     let point = monitor.rect.center
     let windows = workspace.allLeafWindowsRecursive
     let ids = Set(windows.map(\.windowId))

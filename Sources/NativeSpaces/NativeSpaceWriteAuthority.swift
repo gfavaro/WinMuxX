@@ -42,6 +42,12 @@ public struct NativeSpaceWritePermit: Sendable {
     public func check() throws {
         try authority.check(generation: generation, identity: identity)
     }
+
+    /// Only whether the authority still grants this permit: no live IPC. For repeated
+    /// writes after a full check, such as a pan's streamed steps.
+    public func checkGranted() throws {
+        guard authority.grants(generation: generation, identity: identity) else { throw NativeSpaceWriteError.revoked }
+    }
 }
 
 /// Explicit focus generates its own app-activation notifications. Those invalidate
@@ -127,6 +133,10 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
                   identity.processLaunchDate == processLaunchDate else { return nil }
             return NativeSpaceFocusLease(identity: identity, validateLive: validateLive)
         }
+    }
+
+    fileprivate func grants(generation: UInt64, identity: NativeWindowWriteIdentity) -> Bool {
+        lock.withLock { self.generation == generation && allowed[identity.windowID] == identity }
     }
 
     fileprivate func check(generation: UInt64, identity: NativeWindowWriteIdentity) throws {

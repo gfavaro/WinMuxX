@@ -60,13 +60,22 @@ func nativeDisplay(_ display: NativeSpaceDisplay, isShownOn monitor: Monitor) ->
     display.identifier == "Main" ? monitor.rect.topLeftCorner == mainMonitor.rect.topLeftCorner : display.identifier == monitor.displayUUID
 }
 
+/// The desktop a display shows, or nil while it shows a fullscreen Space or is not
+/// observed. Unlike `Monitor.activeWorkspace`, it never falls back to virtual
+/// workspace rearrangement.
+@MainActor
+func nativeActiveDesktop(on monitor: Monitor) -> Workspace? {
+    guard let display = nativeObservedDisplays()?.first(where: { nativeDisplay($0, isShownOn: monitor) }) else { return nil }
+    return runtime.workspaceBackend.nativeLayouts.activeWorkspace(on: display.identifier)
+}
+
 /// `focus-monitor`: focuses the most recent window of the desktop that display shows.
 @MainActor
 func nativeFocusMonitor(_ args: FocusMonitorCmdArgs, env: CmdEnv, io: CmdIo) -> Bool {
     guard let target = args.resolveTargetOrReportError(env, io) else { return false }
     switch args.target.val.resolve(target.workspace.workspaceMonitor, wrapAround: args.wrapAround) {
         case .success(let monitor):
-            let desktop = monitor.activeWorkspace
+            guard let desktop = nativeActiveDesktop(on: monitor) else { return io.err("\(monitor.name) shows no desktop") }
             guard let window = desktop.mostRecentWindowRecursive else {
                 return io.err("\(nativeDesktopNumber(of: desktop).map { nativeDesktopDisplayName($0) } ?? "The desktop") on \(monitor.name) has no window to focus")
             }

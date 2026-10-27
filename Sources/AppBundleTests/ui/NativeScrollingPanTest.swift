@@ -1,18 +1,33 @@
 @testable import AppBundle
 import AppKit
 import Common
+@testable import NativeSpaces
 import XCTest
 
 @MainActor
 final class NativeScrollingPanTest: WorkspaceTestCase {
+    /// An observed native desktop showing on the test display.
+    private func nativeDesktop() -> Workspace {
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let rect = Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080)
+        let monitor = TestMonitor(displayUUID: "display-a", monitorAppKitNsScreenScreensId: 1,
+            name: "display-a", rect: rect, visibleRect: rect, isMain: true)
+        setMonitorsForTests([monitor])
+        var inventory = NativeWorkspaceInventory()
+        _ = inventory.publish(NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "1",
+            spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0)])], windows: [], readMilliseconds: 0, capturedAt: .now),
+            for: inventory.invalidate())
+        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
+        return runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-a"]!
+    }
+
     private func fixture() -> (Workspace, [TestWindow]) {
-        let workspace = focus.workspace
+        let workspace = nativeDesktop()
         workspace.rootTilingContainer.layout = .tiles
         let windows = (0..<4).map { TestWindow.new(id: UInt32(97000 + $0), parent: workspace.rootTilingContainer) }
         windows.forEach { $0.scrollingColumnWidth = 0.7 }
         workspace.transitionArrangement(to: .scrolling)
         _ = windows[0].focusWindow()
-        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
         return (workspace, windows)
     }
 
@@ -50,9 +65,21 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
     }
 
     func testNonScrollingDesktopsKeepTheirScrollEvents() {
-        let workspace = focus.workspace
+        let workspace = nativeDesktop()
         TestWindow.new(id: 97100, parent: workspace.rootTilingContainer)
-        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
         XCTAssertFalse(NativeScrollingPan().handle(scroll(-120, at: workspace.workspaceMonitor.rect.center)))
+    }
+
+    func testADisplayShowingAFullscreenSpaceHasNoDesktopAndCreatesNone() {
+        let desktop = nativeDesktop()
+        var inventory = NativeWorkspaceInventory()
+        _ = inventory.publish(NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "9",
+            spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0), NativeSpace(id: "9", uuid: "full", type: 4)])],
+            windows: [], readMilliseconds: 0, capturedAt: .now), for: inventory.invalidate())
+        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [desktop.workspaceMonitor])
+        let before = Workspace.all.count
+        XCTAssertNil(nativeActiveDesktop(on: desktop.workspaceMonitor))
+        XCTAssertFalse(NativeScrollingPan().handle(scroll(-120, at: desktop.workspaceMonitor.rect.center)))
+        XCTAssertEqual(Workspace.all.count, before, "No virtual workspace is created for the display")
     }
 }

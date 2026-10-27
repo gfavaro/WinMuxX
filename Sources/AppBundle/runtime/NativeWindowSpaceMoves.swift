@@ -67,7 +67,7 @@ final class NativeWindowSpaceMoves {
             case .success(let target): monitor = target
             case .failure(let message): return io.err(message)
         }
-        let destination = monitor.activeWorkspace
+        guard let destination = nativeActiveDesktop(on: monitor) else { return io.err("\(monitor.name) shows no desktop windows can join") }
         guard destination !== source else { return true }
         let windows = source.allLeafWindowsRecursive
         // Windows of a desktop not visited yet are known only by ID; they move too and are

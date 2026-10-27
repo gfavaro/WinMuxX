@@ -42,6 +42,8 @@ protocol WorkspaceBackend: AnyObject {
     func bringForward(_ windowId: UInt32) async throws -> String?
     /// Palette entries beyond the workspace trees.
     func extraPaletteItems() -> [SwitcherPaletteItem]
+    /// The workspace a display shows; native desktops never fall back to virtual rearrangement.
+    func shownWorkspace(on monitor: Monitor) -> Workspace?
     /// After a command outside native tiling's fence moved focus.
     func focusDidMove(to window: Window?)
 
@@ -98,6 +100,7 @@ final class VirtualWorkspaceBackend: WorkspaceBackend {
     }
 
     func extraPaletteItems() -> [SwitcherPaletteItem] { [] }
+    func shownWorkspace(on monitor: Monitor) -> Workspace? { monitor.activeWorkspace }
     func focusDidMove(to window: Window?) {}
     func diagnosticsReport() async -> String? { nil }
     func updateTray() -> Bool { false }
@@ -151,6 +154,7 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
 
     func bringForward(_ windowId: UInt32) async throws -> String? { try await focusNativeWindow(windowId) }
     func extraPaletteItems() -> [SwitcherPaletteItem] { nativeListedPaletteItems() }
+    func shownWorkspace(on monitor: Monitor) -> Workspace? { nativeActiveDesktop(on: monitor) }
 
     func focusDidMove(to window: Window?) {
         // Inside the fence the coordinator brings the result forward itself.

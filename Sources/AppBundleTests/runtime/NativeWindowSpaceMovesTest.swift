@@ -241,6 +241,16 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         XCTAssertTrue(here.nodeWorkspace === left, "The tree waits for the confirmed native move")
     }
 
+    func testTheTilingFenceAcceptsADesktopNumber() throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        _ = Workspace.get(byName: "1") // A leftover virtual workspace named like desktop 1 must not shadow it.
+        let command = try XCTUnwrap(parseCommand("balance-sizes --workspace 1").unwrap().0)
+        XCTAssertNotNil(NativeCommandTargetFence([command], env: .defaultEnv, defaultFocus: nil, layouts: layouts))
+        let env = CmdEnv.defaultEnv.copy(\.workspaceName, "3")
+        let balance = try XCTUnwrap(parseCommand("balance-sizes").unwrap().0)
+        XCTAssertNotNil(NativeCommandTargetFence([balance], env: env, defaultFocus: nil, layouts: layouts), "Desktop 3 on the other display")
+    }
+
     func testFocusMonitorFocusesTheOtherDisplaysRecentWindow() throws {
         let layouts = runtime.workspaceBackend.nativeLayouts
         let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])

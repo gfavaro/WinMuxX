@@ -73,5 +73,5 @@ extension Window {
 /// Native desktops are also named by their number, as `workspace N` does.
 @MainActor
 private func nativeAwareWorkspace(named name: String) -> Workspace? {
-    Workspace.existing(byName: name) ?? runtime.workspaceBackend.current.workspace(named: name)
+    runtime.workspaceBackend.current.workspace(named: name) ?? Workspace.existing(byName: name)
 }

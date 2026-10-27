@@ -111,7 +111,7 @@ func nativeBringHere(_ name: String, targetMonitorScopeId: String?) -> (MoveWork
     let monitors = sortedMonitors
     let scope = targetMonitorScopeId.flatMap { id in monitors.firstIndex { workspaceSidebarMonitorScopeId(for: $0) == id } }
     guard let index = scope ?? monitors.firstIndex(where: { $0.rect.contains(mouseLocation) }),
-          monitors[index].activeWorkspace !== source,
+          nativeActiveDesktop(on: monitors[index]) !== source,
           case .cmd(let command) = parseCommand("move-workspace-to-monitor \(index + 1)"),
           let move = command as? MoveWorkspaceToMonitorCommand else { return nil }
     return (move.args, .defaultEnv.copy(\.workspaceName, source.name))

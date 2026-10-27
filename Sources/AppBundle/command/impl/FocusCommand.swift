@@ -138,7 +138,10 @@ struct FocusCommand: Command {
             }
 
             if let targetMonitor = monitors.getOrNil(atIndex: index) {
-                return targetMonitor.activeWorkspace.focusWorkspace()
+                guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: targetMonitor) else {
+                    return io.err("\(targetMonitor.name) shows no desktop")
+                }
+                return shown.focusWorkspace()
             } else {
                 guard let wrapped = monitors.get(wrappingIndex: index) else { return false }
                 return hitAllMonitorsOuterFrameBoundaries(target, io, args, direction, wrapped)
@@ -161,8 +164,9 @@ struct FocusCommand: Command {
         case .wrapAroundTheWorkspace:
             return wrapAroundTheWorkspace(target, io, direction)
         case .wrapAroundAllMonitors:
-            wrappedMonitor.activeWorkspace.findLeafWindowRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
-            return wrappedMonitor.activeWorkspace.focusWorkspace()
+            guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: wrappedMonitor) else { return false }
+            shown.findLeafWindowRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
+            return shown.focusWorkspace()
     }
 }
 
