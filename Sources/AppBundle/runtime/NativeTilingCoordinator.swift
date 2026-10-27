@@ -114,7 +114,6 @@ final class NativeTilingCoordinator {
         status = "Native tiling active"
         updateTrayText()
         await updateWindowTabModel() // Also refreshes borders.
-        RawWorkspaceTouchSource.shared.updateDemand() // Touches are read only while a scrolling desktop shows.
     }
 
     /// Reads the frontmost window once its drag has ended and adopts a resize or a

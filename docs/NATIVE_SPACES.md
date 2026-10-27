@@ -173,17 +173,13 @@ they are never parked in a corner, so they stay on their desktop and reachable.
 Overlap order uses the same AX raises as virtual scrolling.
 
 macOS keeps three- and four-finger swipes for switching Spaces, so native mode pans
-with **Option + two fingers** moved horizontally on a trackpad over a scrolling
-desktop (`[scrolling] gesture-enabled` and `gesture-sensitivity` apply). The pan reads
-the same raw trackpad touches and runs the same gesture controller as virtual
-mode's Option + three fingers: one viewport per 0.24 of trackpad travel, tracked
-velocity, and the shared settling spring onto the nearest column (instant with
-Reduce Motion), which is then focused. Option is latched when the fingers touch
-down; a vertical two-finger move stays an ordinary scroll. While a pan owns the
-fingers, its scroll events and their trailing momentum are swallowed so the app
-under the pointer does not scroll too. Touches are read only while a scrolling
-desktop is visible. Viewport changes re-lay out the desktop immediately rather than
-waiting for an observation read. The minimap shows while panning and when opened with
+with **Option + two-finger horizontal scroll** on a trackpad over a scrolling desktop
+(`[scrolling] gesture-enabled` and `gesture-sensitivity` apply). Those scroll events
+are consumed, including the momentum macOS adds after the fingers lift, so the pan
+moves with the system's own scrolling curve; other scrolls, mouse wheels and other
+desktops are untouched. When the momentum ends, the column nearest the middle is
+revealed and focused. Viewport changes re-lay out the desktop immediately rather than waiting for
+an observation read. The minimap shows while panning and when opened with
 `scrolling-minimap`; clicking a column reveals and focuses it.
 
 ## Tab groups

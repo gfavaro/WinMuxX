@@ -13,9 +13,7 @@ final class WorkspaceGestureCoordinator {
         applyingConfiguration = true
         defer { applyingConfiguration = false }
         cancelInteractions()
-        RawWorkspaceTouchSource.shared.onFrame = runtime.workspaceBackend.kind == .native
-            ? { NativeScrollingTouchRouter.shared.handle($0) } // Config reloads keep the native pan.
-            : { WorkspaceGestureRouter.shared.handle($0) }
+        RawWorkspaceTouchSource.shared.onFrame = { WorkspaceGestureRouter.shared.handle($0) }
         RawWorkspaceTouchSource.shared.syncConfiguration()
     }
     func reset() {

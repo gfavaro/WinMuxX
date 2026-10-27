@@ -1,9 +1,6 @@
 import AppKit
 import QuartzCore
 
-/// Fingers in a scrolling pan: macOS keeps three for Spaces in native mode.
-@MainActor func scrollingPanFingerCount() -> Int { runtime.workspaceBackend.kind == .native ? 2 : 3 }
-
 @MainActor
 struct ScrollingGestureDependencies {
     var eligible: () -> Bool = {
@@ -109,7 +106,7 @@ final class WorkspaceScrollingGestureController {
             }
             guard contactGate.allows(frame) else { continue }
             if frame.fingers < 0 { contactGate.interrupt(); reset(); continue }
-            if frame.fingers < scrollingPanFingerCount() {
+            if frame.fingers < 3 {
                 reset(commit: true)
                 continue
             }
@@ -119,7 +116,7 @@ final class WorkspaceScrollingGestureController {
             }
             guard let anchor, let workspace, workspace.arrangement == .scrolling,
                   frame.device == anchor.device, frame.contacts == anchor.contacts,
-                  frame.fingers == scrollingPanFingerCount(), frame.x.isFinite, frame.y.isFinite,
+                  frame.fingers == 3, frame.x.isFinite, frame.y.isFinite,
                   (0...1).contains(frame.x), (0...1).contains(frame.y),
                   frame.timestamp.isFinite, frame.timestamp >= anchor.timestamp,
                   frame.timestamp - anchor.timestamp <= 10,
@@ -151,7 +148,7 @@ final class WorkspaceScrollingGestureController {
     private func begin(at frame: WorkspaceTouchFrame, workspace captured: Workspace?, monitorPoint: CGPoint?,
                        offset capturedOffset: CGFloat?, topology capturedTopology: String?, epoch capturedEpoch: UInt64?) -> Bool {
         guard config.scrolling.gestureEnabled, dependencies.eligible(),
-              frame.fingers == scrollingPanFingerCount(), frame.x.isFinite, frame.y.isFinite, frame.timestamp.isFinite,
+              frame.fingers == 3, frame.x.isFinite, frame.y.isFinite, frame.timestamp.isFinite,
               (0...1).contains(frame.x), (0...1).contains(frame.y),
               let point = monitorPoint, let workspace = captured,
               workspace.arrangement == .scrolling, workspace.isVisible,
@@ -214,7 +211,7 @@ final class WorkspaceScrollingGestureController {
             isMotionActive = false
             scheduleRefreshSession(.globalObserver("scrollingGestureSettled"))
             clear()
-            if let selected { focusSettledScrollingWindow(selected) }
+            if let selected { _ = selected.focusWindow() }
             WorkspaceScrollingMinimap.shared.show(workspace)
             return
         }
@@ -247,7 +244,7 @@ final class WorkspaceScrollingGestureController {
             self.settleTask = nil
             scheduleRefreshSession(.globalObserver("scrollingGestureSettled"))
             self.clear()
-            if let selected { focusSettledScrollingWindow(selected) }
+            if let selected { _ = selected.focusWindow() }
             WorkspaceScrollingMinimap.shared.show(workspace)
         }
     }
@@ -290,23 +287,5 @@ final class WorkspaceScrollingGestureController {
         topology = nil
         ownerEpoch = nil
         isMotionActive = false
-    }
-}
-
-/// Settling focuses the revealed column; native mode focuses the real window too.
-@MainActor private func focusSettledScrollingWindow(_ window: Window) {
-    guard window.focusWindow() else { return }
-    if runtime.workspaceBackend.kind == .native { window.nativeFocus() }
-}
-
-/// The column whose centre is nearest the viewport's centre; ties follow the last
-/// movement direction.
-func nearestScrollingColumn(in metrics: ScrollingWorkspaceMetrics, offset: CGFloat, direction: CGFloat) -> ScrollingColumnMetric? {
-    let center = offset + metrics.areaWidth / 2
-    return metrics.columns.min { lhs, rhs in
-        let a = abs(lhs.start + lhs.width / 2 - center)
-        let b = abs(rhs.start + rhs.width / 2 - center)
-        if abs(a - b) < 0.5, direction != 0 { return direction > 0 ? lhs.start > rhs.start : lhs.start < rhs.start }
-        return a < b
     }
 }

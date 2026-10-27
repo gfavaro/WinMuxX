@@ -36,9 +36,7 @@ func nativeSpacesDiagnosticReport() -> String {
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
-    let touch = RawWorkspaceTouchSource.shared
-    lines.append("Scrolling pan: touch \(touch.status), \(touch.frameCount) frames, max \(touch.maximumFingerCount) fingers; " +
-        "last: \(NativeScrollingTouchRouter.shared.lastDecision); fingers: \(NativeScrollingTouchRouter.shared.lastTrace)")
+    lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")
     lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")
     for monitor in sortedMonitors {
         let shown = runtime.workspaces.visibleWorkspace(for: monitor)
