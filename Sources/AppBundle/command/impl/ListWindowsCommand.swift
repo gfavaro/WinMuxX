@@ -17,9 +17,7 @@ struct ListWindowsCommand: Command {
                 return io.err(noWindowIsFocused)
             }
         } else {
-            let allWorkspaces = runtime.workspaceBackend.kind == .native
-                ? nativeDesktopWorkspaces().map(\.workspace)
-                : userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace)
+            let allWorkspaces = runtime.workspaceBackend.current.listedWorkspaces(.userFacing)
             var workspaces: Set<Workspace> = args.filteringOptions.workspaces.isEmpty
                 ? allWorkspaces.toSet()
                 : args.filteringOptions.workspaces

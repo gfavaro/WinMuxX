@@ -83,3 +83,23 @@ final class NativeObservationChromeTest: XCTestCase {
         XCTAssertEqual(chrome.refreshes, 1)
     }
 }
+
+@MainActor
+final class WorkspaceBackendInterfaceTest: XCTestCase {
+    func testEachBackendAnswersForItselfAndOnlyNativeClaimsCommands() async throws {
+        let virtual = WinMuxRuntime()
+        let native = WinMuxRuntime()
+        native.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        XCTAssertTrue(virtual.workspaceBackend.current is VirtualWorkspaceBackend)
+        XCTAssertTrue(native.workspaceBackend.current is NativeWorkspaceBackend)
+        let workspace = try XCTUnwrap(parseCommand("workspace 2").unwrap().0)
+        let io = CmdIo(stdin: .emptyStdin)
+        let claimed = try await virtual.withValue { try await virtual.workspaceBackend.current.run(workspace, env: .defaultEnv, io: io) }
+        XCTAssertNil(claimed, "Virtual runs the shared implementation")
+        let focusLeft = try XCTUnwrap(parseCommand("focus left").unwrap().0)
+        let passed = try await native.withValue { try await native.workspaceBackend.current.run(focusLeft, env: .defaultEnv, io: io) }
+        XCTAssertNil(passed, "Native leaves tiling commands to the shared implementation and its fence")
+        XCTAssertTrue(virtual.workspaceBackend.current.hasProjects)
+        XCTAssertFalse(native.workspaceBackend.current.hasProjects)
+    }
+}

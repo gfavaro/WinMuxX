@@ -40,8 +40,8 @@ func handleWorkspaceSidebarAction(
     viewModel: TrayMenuModel = TrayMenuModel.shared,
     targetMonitorScopeId: String? = nil,
 ) {
-    if runtime.workspaceBackend.kind == .native {
-        return handleNativeWorkspaceSidebarAction(action, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
+    if runtime.workspaceBackend.current.handleSidebarAction(action, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId) {
+        return
     }
     switch action {
         case .selectWorkspace(let name):

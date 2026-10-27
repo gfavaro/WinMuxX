@@ -524,23 +524,10 @@ func menuCommandRequiresWindow(_ command: any Command) -> Bool {
 
 @MainActor
 func menuWorkspaceTargets() -> [(workspace: Workspace, target: String)] {
-    if runtime.workspaceBackend.kind == .native {
-        return nativeDesktopWorkspaces().map { ($0.workspace, String($0.number)) }
-    }
-    return userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: focus.workspace)
-        .filter { $0.projectId == focus.workspace.projectId }
-        .map { workspace in
-            let target = workspace.usesAutomaticDisplayName
-                ? automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focus.workspace).map(String.init) ?? workspace.name
-                : workspace.name
-            return (workspace, target)
-        }
+    runtime.workspaceBackend.current.commandTargets()
 }
 
 @MainActor
 func menuWorkspaceTitle(_ workspace: Workspace) -> String {
-    if runtime.workspaceBackend.kind == .native, let number = nativeDesktopNumber(of: workspace) {
-        return nativeDesktopDisplayName(number)
-    }
-    return workspaceDisplayName(workspace.name)
+    runtime.workspaceBackend.current.title(ofWorkspaceNamed: workspace.name)
 }

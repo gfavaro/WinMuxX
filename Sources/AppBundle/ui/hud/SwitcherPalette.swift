@@ -195,16 +195,9 @@ final class SwitcherPalettePanel: NSPanelHud {
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.menuBarButton, token) {
-                if runtime.workspaceBackend.kind == .native {
-                    if let error = try await focusNativeWindow(windowId) {
-                        MessageModel.shared.message = Message(description: "Palette", body: error)
-                    }
-                    return
+                if let error = try await runtime.workspaceBackend.current.bringForward(windowId) {
+                    MessageModel.shared.message = Message(description: "Palette", body: error)
                 }
-                guard let window = Window.get(byId: windowId), let liveFocus = window.toLiveFocusOrNil() else { return }
-                window.markAsMostRecentChild()
-                _ = setFocus(to: liveFocus)
-                window.nativeFocus()
             }
         }
     }
@@ -247,10 +240,11 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
     let focusedWindowId = focus.windowOrNil?.windowId
     let focusedWorkspace = focus.workspace
     // Focused workspace first, then the rest — so an empty query shows nearby windows on top.
-    let candidates = runtime.workspaceBackend.kind == .native ? nativeDesktopWorkspaces().map(\.workspace) : Workspace.all
+    let candidates = runtime.workspaceBackend.current.listedWorkspaces(.all)
+    // A focused workspace outside the listing (a native fullscreen Space) adds nothing.
     let workspaces = candidates.contains(focusedWorkspace)
         ? [focusedWorkspace] + candidates.filter { $0 != focusedWorkspace }
-        : runtime.workspaceBackend.kind == .native ? candidates : [focusedWorkspace] + candidates
+        : candidates
     let indexedWindows = workspaces.flatMap { workspace in
         workspace.allLeafWindowsRecursive.filter(\.isBound).map { (window: $0, workspaceName: workspace.name) }
     }
@@ -269,12 +263,12 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
             items[index] = item
         }
     }
-    return items.compactMap { $0 } + (runtime.workspaceBackend.kind == .native ? nativeListedPaletteItems() : [])
+    return items.compactMap { $0 } + runtime.workspaceBackend.current.extraPaletteItems()
 }
 
 /// Windows on desktops not showing yet; choosing one switches there first.
 @MainActor
-private func nativeListedPaletteItems() -> [SwitcherPaletteItem] {
+func nativeListedPaletteItems() -> [SwitcherPaletteItem] {
     let displays = nativeObservedDisplays() ?? []
     return NativeUnvisitedWindows.shared.bySpaceID.flatMap { space, windows -> [SwitcherPaletteItem] in
         guard let number = NativeSpaceNavigation.desktopNumber(of: space, in: displays) else { return [] }
@@ -294,9 +288,9 @@ func makeSwitcherPaletteItem(
     focusedWindowId: UInt32?,
 ) async -> SwitcherPaletteItem {
     let appName = window.app.name ?? window.app.rawAppBundleId ?? "Unknown"
-    let nativeNumber = runtime.workspaceBackend.kind == .native ? nativeDesktopNumber(forSidebarWorkspace: workspaceName) : nil
-    let workspaceTitle = nativeNumber.map { nativeDesktopDisplayName($0) } ?? workspaceDisplayName(workspaceName)
-    let projectName = nativeNumber != nil ? nil : Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) }
+    let backend = runtime.workspaceBackend.current
+    let workspaceTitle = backend.title(ofWorkspaceNamed: workspaceName)
+    let projectName = backend.hasProjects ? Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) } : nil
     // A cold cache previously indexed every Finder window as only "Finder" until some other
     // UI happened to fetch its title. Fetch first-sight titles before showing the palette so
     // folder names are searchable immediately; known stale titles still return instantly and

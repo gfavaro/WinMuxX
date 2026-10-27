@@ -7,9 +7,6 @@ struct WorkspaceCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
-        if runtime.workspaceBackend.kind == .native {
-            return await runtime.workspaceBackend.nativeNavigation.run(args, io: io)
-        }
         let focusedMonitor = focus.workspace.workspaceMonitor
         let activationMonitor: Monitor
         if let description = args.monitorDescription {

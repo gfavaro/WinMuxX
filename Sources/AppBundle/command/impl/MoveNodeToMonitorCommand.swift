@@ -5,14 +5,9 @@ struct MoveNodeToMonitorCommand: Command {
     let args: MoveNodeToMonitorCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
-    func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
-        if runtime.workspaceBackend.kind == .native {
-            return await runtime.workspaceBackend.nativeWindowMoves.run(args, env: env, io: io)
-        }
-        return runVirtual(env, io)
-    }
+    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool { runVirtual(env, io) }
 
-    /// Virtual workspaces move the node synchronously; `move` across monitors calls this.
+    /// Moves the node synchronously; `move` across monitors calls this directly.
     @MainActor
     func runVirtual(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }

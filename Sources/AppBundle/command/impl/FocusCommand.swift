@@ -7,10 +7,7 @@ struct FocusCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         let focused = try await focusInTree(env, io)
-        // Outside the native tiling fence (across displays), bring the result forward here.
-        if focused, runtime.workspaceBackend.kind == .native, !NativeTilingCommandScope.active {
-            focus.windowOrNil?.nativeFocus()
-        }
+        if focused { runtime.workspaceBackend.current.focusDidMove(to: focus.windowOrNil) }
         return focused
     }
 

@@ -6,7 +6,6 @@ struct FocusMonitorCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
-        if runtime.workspaceBackend.kind == .native { return nativeFocusMonitor(args, env: env, io: io) }
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         return switch args.target.val.resolve(target.workspace.workspaceMonitor, wrapAround: args.wrapAround) {
             case .success(let targetMonitor): targetMonitor.activeWorkspace.focusWorkspace()

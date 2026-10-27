@@ -5,9 +5,6 @@ struct MoveNodeToWorkspaceCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache: Bool = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
-        if runtime.workspaceBackend.kind == .native {
-            return await runtime.workspaceBackend.nativeWindowMoves.run(args, env: env, io: io)
-        }
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
         let subjectWs = window.nodeWorkspace

@@ -40,15 +40,13 @@ func nativeDesktopNumber(forSidebarWorkspace name: String) -> Int? {
 /// The name scripts and queries see: the desktop number in native mode.
 @MainActor
 func userFacingWorkspaceName(_ workspace: Workspace) -> String {
-    guard runtime.workspaceBackend.kind == .native else { return workspace.name }
-    return nativeDesktopNumber(of: workspace).map(String.init) ?? workspace.name
+    runtime.workspaceBackend.current.scriptName(of: workspace)
 }
 
 /// Resolves a workspace name typed by a user; native mode accepts desktop numbers.
 @MainActor
 func userWorkspace(named name: String) -> Workspace? {
-    guard runtime.workspaceBackend.kind == .native else { return Workspace.existing(byName: name) }
-    return Int(name).flatMap { number in nativeDesktopWorkspaces().first { $0.number == number }?.workspace }
+    runtime.workspaceBackend.current.workspace(named: name)
 }
 
 @MainActor

@@ -120,7 +120,12 @@ extension [Command] {
             if NativeTilingCommandScope.validateTarget?() == false {
                 return io.err("Native command target changed during execution")
             }
-            let commandSucc = try await command.run(env, io)
+            let commandSucc: Bool
+            if let handled = try await runtime.workspaceBackend.current.run(command, env: env, io: io) {
+                commandSucc = handled
+            } else {
+                commandSucc = try await command.run(env, io)
+            }
             isSucc = commandSucc && isSucc
             if !command.isQuery && !command.isPresentation {
                 refreshModel()

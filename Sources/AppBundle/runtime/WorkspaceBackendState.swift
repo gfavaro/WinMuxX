@@ -36,6 +36,10 @@ final class WorkspaceBackendState {
     let nativeNavigation = NativeSpaceNavigator()
     let nativeWindowMoves = NativeWindowSpaceMoves()
     let nativeActivity = NativeActivityTracker()
+    private lazy var virtualBackend = VirtualWorkspaceBackend()
+    private lazy var nativeBackend = NativeWorkspaceBackend(self)
+    /// What differs between the backends; shared code asks this instead of `kind`.
+    var current: any WorkspaceBackend { kind == .native ? nativeBackend : virtualBackend }
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
         return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
