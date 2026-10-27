@@ -60,8 +60,16 @@ requires a complete unique match within the owning Space; incomplete or unsuppor
 records are retained, never replaced by a partial autosave. Private APIs remain
 read-side only; physical positioning uses guarded existing AX operations.
 
-Native creation/deletion, cross-Space moves, whole-Space relocation and project
-mapping remain explicit unsupported capabilities. Projects are disabled in native
+Native creation/deletion, cross-display moves, whole-Space relocation and project
+mapping remain explicit unsupported capabilities.
+
+Cross-Space window moves were adopted at the user's request, reversing the earlier
+exclusion of symbol-table scanning: `NativeWindowSpaceMover` resolves SkyLight's
+unexported bridged-operation dispatcher from its symbol table and dispatches
+`SLSBridgedMoveWindowsToManagedSpaceOperation` (Dinky's approach). A synthetic
+title-bar drag was rejected as visible, slow and unusable without a standard title
+bar. Resolution happens once and fails closed; moves require tiling, are confirmed by
+membership reads, and rules never move pre-existing windows at startup. Projects are disabled in native
 mode (option B): virtual projects stay untouched instead of gaining a second,
 UUID-dependent hierarchy whose reboot stability is unverified.
 

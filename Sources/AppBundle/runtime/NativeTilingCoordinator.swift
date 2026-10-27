@@ -13,6 +13,8 @@ enum NativeTilingCommandScope {
 final class NativeTilingCoordinator {
     private(set) var status = "Observation only"
     private(set) var ready = false
+    /// Set by the first completed layout; windows registered before it existed at startup.
+    private(set) var hasCompletedInitialLayout = false
     private var hasManagedNativeFocus = false
     private var generation: UInt64 = 0
     private var shortcutsInstalled = false
@@ -93,6 +95,7 @@ final class NativeTilingCoordinator {
         await backend.nativePersistence.save(backend.nativeLayouts)
         guard generation == version else { return }
         ready = true
+        hasCompletedInitialLayout = true
         status = "Native tiling active"
         updateTrayText()
         WindowBorderController.shared.refresh()

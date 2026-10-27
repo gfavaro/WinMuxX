@@ -60,6 +60,11 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
     for callback in config.onWindowDetected where try await callback.matches(window) {
         guard stillOwned() else { return }
         for command in callback.run {
+            if let move = command as? MoveNodeToWorkspaceCommand, runtime.workspaceBackend.accepts(move) {
+                // Existing windows stay put at startup; only windows opened later are moved.
+                if runtime.workspaceBackend.nativeTiling.hasCompletedInitialLayout { scheduleNativeRuleMove(move, window: window.windowId) }
+                continue
+            }
             guard let layout = command as? LayoutCommand, !layout.args.forNextDetectedWindow,
                   let target = layout.args.toggleBetween.val.first(where: { $0 == .floating || $0 == .tiling }) else {
                 nativeSkippedWindowRuleCommands.insert("\(command.args)")
@@ -68,6 +73,19 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
             if target == .floating, let workspace = window.nodeWorkspace { window.bindAsFloatingWindow(to: workspace) }
         }
         if !callback.checkFurtherCallbacks { return }
+    }
+}
+
+/// Runs after registration finishes, once native tiling is ready to resolve the window.
+@MainActor
+private func scheduleNativeRuleMove(_ move: MoveNodeToWorkspaceCommand, window id: UInt32) {
+    let owner = runtime
+    owner.task {
+        for _ in 0..<40 where !owner.workspaceBackend.nativeTiling.ready { try? await Task.sleep(for: .milliseconds(50)) }
+        let io = CmdIo(stdin: .emptyStdin)
+        if !(await owner.workspaceBackend.nativeWindowMoves.run(move.args, env: .defaultEnv.copy(\.windowId, id), io: io)) {
+            nativeSkippedWindowRuleCommands.insert("\(move.args) (failed: \(io.stderr.last ?? "unknown"))")
+        }
     }
 }
 

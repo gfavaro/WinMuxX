@@ -93,8 +93,8 @@ no longer swallow Control-arrow or Control-number. In a mode with
 `exit-on-unbound-key`, such keys count as unbound. Cross-display movement, tabs,
 Accordion, scrolling, fullscreen commands, launch hooks, window-detection command
 hooks, project commands, agent operations, virtual queries and subscriptions remain
-unsupported. Moving windows between Spaces (`move-node-to-workspace`) has no
-synthetic fallback.
+unsupported. `move-node-to-workspace` moves windows between Spaces (see
+[moving windows](#moving-windows-between-spaces)).
 
 Every queued frame write and retry requires a current generation permit, fresh
 Space/process ownership and non-minimized/non-fullscreen AX state. Minimum-size
@@ -138,6 +138,24 @@ confirm the landing, a short landing is retried once from the observed Space, an
 switch that still has not landed after about a second is reported. A newer request
 supersedes an older one. Without Accessibility permission macOS drops the events
 silently, so the command fails up front instead.
+
+## Moving windows between Spaces
+
+With tiling enabled, `move-node-to-workspace N|next|prev` moves a window to another
+desktop, with the same numbering as `workspace`; next/prev step through the window's
+display's desktops, skipping fullscreen Spaces, and `--focus-follows-window` follows
+it. `--window-id` and `--fail-if-noop` are honored. The window's node joins the
+destination desktop's layout. Observation-only mode never moves windows.
+
+The move uses SkyLight's `SLSBridgedMoveWindowsToManagedSpaceOperation` through a
+dispatcher SkyLight does not export, found by scanning its symbol table (adapted from
+Dinky, MIT). It works with SIP enabled and takes milliseconds, but a macOS update can
+remove either piece; `doctor` then reports moves unavailable and the command fails
+instead of guessing. Each move is confirmed by re-reading the window's Space.
+
+`on-window-detected` rules that run `move-node-to-workspace` move windows opened after
+WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
+desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
 
 ## Sidebar
 

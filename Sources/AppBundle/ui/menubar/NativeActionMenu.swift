@@ -315,6 +315,13 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
         if backend.nativeTilingEnabled {
             menu.addItem(.separator())
+            if NativeWindowSpaceMover.isAvailable {
+                addSubmenu("Move Window to Desktop", to: menu) { submenu in
+                    for number in 1...max(desktop, 1) {
+                        _ = add(nativeDesktopDisplayName(number), "move-node-to-workspace \(number)", to: submenu)
+                    }
+                }
+            }
             for (title, command) in [("Focus", "focus"), ("Move Window", "move")] {
                 addSubmenu(title, to: menu) { submenu in
                     for direction in ["left", "down", "up", "right"] { _ = add(direction.capitalized, "\(command) \(direction)", to: submenu) }

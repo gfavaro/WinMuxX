@@ -20,13 +20,13 @@ final class NativeWindowParityTest: WorkspaceTestCase {
     func testRulesFloatOrTileNewWindowsAndReportWhatTheySkip() async throws {
         config.onWindowDetected = parseConfig("""
         [[on-window-detected]]
-        run = ['layout floating', 'move-node-to-workspace 2']
+        run = ['layout floating', 'move-node-to-monitor 2']
         """).config.onWindowDetected
         let workspace = Workspace.get(byName: "native-desktop")
         let window = TestWindow.new(id: 40, parent: workspace.rootTilingContainer)
         try await applyNativeWindowDetectedRules(window) { true }
         XCTAssertTrue(window.parent === workspace, "Floated on its own desktop")
-        XCTAssertEqual(nativeSkippedWindowRuleCommands, ["move-node-to-workspace 2"])
+        XCTAssertEqual(nativeSkippedWindowRuleCommands, ["move-node-to-monitor 2"])
     }
 
     func testRulesLeaveAWindowWhoseOwnershipChangedDuringMatching() async throws {

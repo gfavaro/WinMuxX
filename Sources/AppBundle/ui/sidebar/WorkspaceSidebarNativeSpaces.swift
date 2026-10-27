@@ -3,7 +3,8 @@ import NativeSpaces
 
 // With native Spaces the sidebar lists macOS desktops instead of virtual workspaces.
 // Rows reuse the virtual view models; selection routes through native navigation,
-// and virtual-only edits (create, rename, delete, drag, projects) are unavailable.
+// dragging a window onto a desktop moves it there, and virtual-only edits (create,
+// rename, delete, tab-group drags, projects) are unavailable.
 
 /// Desktops in macOS Control-N order, with the windows each native layout retains.
 /// Desktops not yet visited show no windows until their layout is first observed.
@@ -97,7 +98,10 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             clearWorkspaceSidebarDropPreview()
         case .previewWindowDrop, .previewTabGroupDrop:
             break
-        case .createWorkspace, .renameWorkspace, .deleteWorkspace, .moveWindow, .moveTabGroup,
+        case .moveWindow(let windowId, let name):
+            guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
+            runNativeSidebarCommands(["move-node-to-workspace --window-id \(windowId) \(number)"])
+        case .createWorkspace, .renameWorkspace, .deleteWorkspace, .moveTabGroup,
              .moveWindowToNewWorkspace, .moveTabGroupToNewWorkspace,
              .selectProject, .createProject, .renameProject, .setProjectColor, .deleteProject:
             showWorkspaceSidebarError("macOS owns native Spaces: add, remove and rearrange desktops in Mission Control. Projects are available with virtual workspaces.")

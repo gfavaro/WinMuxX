@@ -37,7 +37,7 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
         let bindings = parseConfig("""
         [mode.main.binding]
         ctrl-left = 'workspace prev'
-        ctrl-down = 'move-node-to-workspace 2'
+        ctrl-down = 'move-node-to-monitor 2'
         alt-h = 'focus left'
         alt-b = ['balance-sizes', 'workspace 2']
         [mode.main.binding-tap]
@@ -56,7 +56,7 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
             config = bindings
             defer { resetHotKeys() }
             try await activateMode(mainModeId)
-            // Cross-Space moves stay with macOS; navigation can't share a sequence with window commands.
+            // Cross-display moves stay with macOS; navigation can't share a sequence with window commands.
             XCTAssertEqual(Set(runtime.hotkeys.hotkeys.values.compactMap(\.keyCombo.key)), [.h, .leftArrow])
             XCTAssertTrue(runtime.hotkeys.activeTapBindings.isEmpty)
         }

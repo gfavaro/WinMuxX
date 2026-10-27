@@ -34,6 +34,7 @@ final class WorkspaceBackendState {
     let nativeTiling = NativeTilingCoordinator()
     let nativePersistence = NativeLayoutPersistence()
     let nativeNavigation = NativeSpaceNavigator()
+    let nativeWindowMoves = NativeWindowSpaceMoves()
     var capabilities: WorkspaceBackendCapabilities {
         if kind == .virtual { return .virtual }
         return WorkspaceBackendCapabilities(ownsWorkspaceLifecycle: false, activatesWorkspaces: false,
@@ -44,8 +45,10 @@ final class WorkspaceBackendState {
     /// fail this check are left unregistered, so macOS keeps keys such as
     /// Control-arrow for its own Space switching instead of WinMuxX swallowing them.
     func accepts(_ command: any Command) -> Bool {
+        // Moving windows writes; observation-only mode stays physically read-only.
         kind == .virtual || command is DoctorCommand || command is ReloadConfigCommand ||
-            Self.isNativeNavigation(command) || (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
+            (Self.isNativeNavigation(command) && (nativeTilingEnabled || !(command is MoveNodeToWorkspaceCommand))) ||
+            (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
     }
 
     /// Navigation runs outside the native tiling command fence, so a sequence may
@@ -56,8 +59,14 @@ final class WorkspaceBackendState {
             commands.allSatisfy { Self.isNativeNavigation($0) || $0 is DoctorCommand || $0 is ReloadConfigCommand }
     }
 
+    /// Space navigation and cross-Space window moves: Space-level operations that run
+    /// without native tiling, outside its command fence.
     static func isNativeNavigation(_ command: any Command) -> Bool {
-        (command as? WorkspaceCommand).map { NativeSpaceNavigator.supports($0.args) } ?? false
+        switch command {
+            case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
+            case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
+            default: false
+        }
     }
 
     /// Live switching is intentionally unavailable until all motion/recovery

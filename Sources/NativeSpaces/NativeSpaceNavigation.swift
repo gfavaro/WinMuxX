@@ -50,6 +50,12 @@ public enum NativeSpaceNavigation {
         display.spaces.firstIndex { $0.id == spaceID }.flatMap { plan(display, to: $0) }
     }
 
+    /// The 1-based desktop number of a Space, or nil for a fullscreen or unknown Space.
+    public static func desktopNumber(of spaceID: String, in displays: [NativeSpaceDisplay]) -> Int? {
+        let desktops = displays.flatMap { $0.spaces.filter(\.isDesktop) }
+        return desktops.firstIndex { $0.id == spaceID }.map { $0 + 1 }
+    }
+
     /// The 1-based desktop number of a display's active Space, or nil on a
     /// fullscreen Space. Inverse of `desktop(number:in:)`.
     public static func activeDesktopNumber(on displayIdentifier: String, in displays: [NativeSpaceDisplay]) -> Int? {
