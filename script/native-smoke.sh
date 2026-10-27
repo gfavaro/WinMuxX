@@ -79,10 +79,11 @@ else
         fi
         if [ "$monitors" -ge 2 ]; then
             before=$(space_of "$window")
-            wm move-node-to-monitor --window-id "$window" --wrap-around next >/dev/null
+            output=$(wm move-node-to-monitor --window-id "$window" --wrap-around next)
             sleep 0.5
             away=$(space_of "$window")
-            [ -n "$away" ] && [ "$away" != "$before" ] && pass "move-node-to-monitor next (desktop $away)" || fail "move-node-to-monitor next"
+            [ -n "$away" ] && [ "$away" != "$before" ] && pass "move-node-to-monitor next (desktop $away)" ||
+                fail "move-node-to-monitor next: from $before, now ${away:-unknown}: ${output:-no output}"
             wm move-node-to-workspace --window-id "$window" "$home" >/dev/null
             sleep 0.5
             [ "$(space_of "$window")" = "$home" ] && pass "move back from the other display" || fail "move back from the other display"
