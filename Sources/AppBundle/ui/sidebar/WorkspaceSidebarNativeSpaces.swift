@@ -92,6 +92,17 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             break
         case .moveWindow(let windowId, let name):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
+            if Window.get(byId: windowId) == nil, NativeUnvisitedWindows.shared.spaceID(of: windowId) != nil {
+                // Listed only: no tree holds it yet, so it moves by ID.
+                runWorkspaceSidebarSession {
+                    let io = CmdIo(stdin: .emptyStdin)
+                    if !(await runtime.workspaceBackend.nativeWindowMoves.moveListed(windowId, toDesktop: number, io: io)) {
+                        showWorkspaceSidebarError(io.stderr.last ?? "Move failed")
+                    }
+                    await updateWorkspaceSidebarModel()
+                }
+                return
+            }
             runNativeSidebarCommands(["move-node-to-workspace --window-id \(windowId) \(number)"])
         case .renameWorkspace(let name, let displayName):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }

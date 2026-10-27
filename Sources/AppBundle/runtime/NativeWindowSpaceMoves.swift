@@ -147,6 +147,32 @@ final class NativeWindowSpaceMoves {
         return window
     }
 
+    /// Moves a window known only from WindowServer (listed for a desktop not visited
+    /// yet) to a desktop by number. No tree holds it; it is adopted when its desktop shows.
+    func moveListed(_ id: UInt32, toDesktop number: Int, io: CmdIo) async -> Bool {
+        guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
+        let state: NativeSpacesSnapshot
+        do { state = try await snapshot([id]) } catch { return io.err("Native Spaces unavailable: \(error)") }
+        let desktops = Set(state.displays.flatMap { $0.spaces.filter(\.isDesktop).map(\.id) })
+        guard let source = state.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID, desktops.contains(source) else {
+            return io.err("Window \(id) is not on exactly one desktop")
+        }
+        guard let plan = NativeSpaceNavigation.desktop(number: number, in: state.displays),
+              let spaceID = UInt64(plan.targetSpaceID) else { return io.err("Desktop \(number) doesn't exist; add it in Mission Control") }
+        guard plan.targetSpaceID != source else { return true }
+        guard move(id, spaceID) else { return io.err("Moving window \(id) to desktop \(number) failed") }
+        let deadline = ContinuousClock.now + arrivalTimeout
+        while ContinuousClock.now < deadline {
+            try? await Task.sleep(for: pollInterval)
+            if (try? await snapshot([id]))?.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID == plan.targetSpaceID {
+                runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
+                NativeUnvisitedWindows.shared.refresh()
+                return true
+            }
+        }
+        return io.err("Window \(id) did not arrive on desktop \(number)")
+    }
+
     /// A move or Space switch requests a read, which revokes write and focus permits;
     /// focus waits until that read has reissued them.
     private func focusWhenReady(_ window: Window) async {

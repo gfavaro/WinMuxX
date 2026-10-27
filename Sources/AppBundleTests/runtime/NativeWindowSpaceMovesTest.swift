@@ -75,6 +75,17 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
         XCTAssertTrue(window.nodeWorkspace === showing)
     }
 
+    func testAListedWindowMovesByIdToADesktopNumber() async throws {
+        membership = "1"
+        let io = CmdIo(stdin: .emptyStdin)
+        let mover = mover(arrives: true)
+        let ok = await mover.moveListed(70, toDesktop: 2, io: io)
+        XCTAssertTrue(ok, io.stderr.joined())
+        XCTAssertEqual(moves.map(\.1), [2], "Desktop 2 skips the fullscreen Space")
+        let bad = await mover.moveListed(70, toDesktop: 9, io: io)
+        XCTAssertFalse(bad)
+    }
+
     func testUnconfirmedMoveIsReportedAndLeavesTheTree() async throws {
         let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-a"])
         let window = TestWindow.new(id: 70, parent: source.rootTilingContainer)
@@ -239,6 +250,18 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         let pending = try XCTUnwrap(sink.pending, "Deferred until the fenced command ends")
         XCTAssertEqual(pending.windowId, here.windowId)
         XCTAssertTrue(here.nodeWorkspace === left, "The tree waits for the confirmed native move")
+    }
+
+    func testFocusingAWindowOnAHiddenDesktopRunsAsNavigation() throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let hidden = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
+        let shown = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
+        _ = TestWindow.new(id: 75, parent: hidden.rootTilingContainer)
+        _ = TestWindow.new(id: 76, parent: shown.rootTilingContainer)
+        let away = try XCTUnwrap(parseCommand("focus --window-id 75").cmdOrDie as? FocusCommand)
+        let here = try XCTUnwrap(parseCommand("focus --window-id 76").cmdOrDie as? FocusCommand)
+        XCTAssertTrue(WorkspaceBackendState.isNativeNavigation(away), "Switches to its desktop first, outside the fence")
+        XCTAssertFalse(WorkspaceBackendState.isNativeNavigation(here), "A showing desktop's window stays a fenced tiling command")
     }
 
     func testTheTilingFenceAcceptsADesktopNumber() throws {

@@ -123,6 +123,8 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
             case let command as MoveWorkspaceToMonitorCommand: await state.nativeWindowMoves.run(command.args, env: env, io: io)
             case let command as FocusMonitorCommand: nativeFocusMonitor(command.args, env: env, io: io)
             case is FocusBackAndForthCommand: try await focusPreviousWindow(io)
+            case let command as FocusCommand where WorkspaceBackendState.focusesWindowOnHiddenDesktop(command):
+                try await focusWindowOnHiddenDesktop(command.args.windowId, io)
             case let command as EnableCommand: try await setEnabled(command.args, io)
             default: nil
         }
@@ -160,6 +162,12 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
         // Inside the fence the coordinator brings the result forward itself.
         guard !NativeTilingCommandScope.active else { return }
         window?.nativeFocus()
+    }
+
+    private func focusWindowOnHiddenDesktop(_ id: UInt32?, _ io: CmdIo) async throws -> Bool {
+        guard let id else { return false }
+        if let error = try await focusNativeWindow(id) { return io.err(error) }
+        return true
     }
 
     /// Brings back the window focused before, switching to its desktop first when needed.

@@ -101,11 +101,19 @@ final class WorkspaceBackendState {
             case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
             case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
             // Focus may leave the desktop toward another display; it moves no window.
-            case let command as FocusCommand: command.args.boundaries == .allMonitorsOuterFrame
+            case let command as FocusCommand:
+                command.args.boundaries == .allMonitorsOuterFrame || focusesWindowOnHiddenDesktop(command)
             case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand,
                  is MoveWorkspaceToMonitorCommand, is FocusBackAndForthCommand, is EnableCommand: true
             default: false
         }
+    }
+
+    /// `focus --window-id` for a window whose desktop is not showing switches there first,
+    /// so it runs as navigation rather than inside the tiling fence.
+    static func focusesWindowOnHiddenDesktop(_ command: FocusCommand) -> Bool {
+        guard let id = command.args.windowId, let workspace = Window.get(byId: id)?.nodeWorkspace else { return false }
+        return !workspace.isVisible
     }
 
     /// Feeds desktop history and native hooks; call after observations and focus sync.
