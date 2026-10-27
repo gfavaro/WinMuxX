@@ -20,7 +20,11 @@ final class NativeTilingCoordinator {
     private var shortcutsInstalled = false
     private var mouseMonitor: Any?
 
-    func invalidate() {
+    /// Invalidations and skipped scrolling layouts by reason, for the pan probe.
+    var probeCounts: [String: Int] = [:]
+
+    func invalidate(_ reason: String = "other") {
+        probeCounts["invalidate: \(reason)", default: 0] += 1
         generation &+= 1
         ready = false
         hasManagedNativeFocus = false
@@ -111,6 +115,7 @@ final class NativeTilingCoordinator {
         guard generation == version else { return }
         ready = true
         hasCompletedInitialLayout = true
+        if scrollingReadRequestedAt != nil { scrollingReadRequestedAt = nil; relayoutVisibleScrolling() }
         status = "Native tiling active"
         updateTrayText()
         await updateWindowTabModel() // Also refreshes borders.
@@ -139,7 +144,15 @@ final class NativeTilingCoordinator {
     /// visible scrolling desktops at once under the current write permits; waiting for
     /// an observation read would make panning lag. Requests coalesce into one pass.
     func relayoutVisibleScrolling() {
-        guard ready else { return runtime.workspaceBackend.observation?.requestRead(event: "nativeScrolling") ?? () }
+        probeCounts["relayout requested", default: 0] += 1
+        guard ready else {
+            probeCounts["relayout skipped: not ready", default: 0] += 1
+            // Every read starts by invalidating, so a read per scroll step would keep
+            // tiling unready for the whole pan. Ask once; accept() lays out after it.
+            if let asked = scrollingReadRequestedAt, asked.duration(to: .now) < .milliseconds(250) { return }
+            scrollingReadRequestedAt = .now
+            return runtime.workspaceBackend.observation?.requestRead(event: "nativeScrolling") ?? ()
+        }
         if scrollingLayoutTask != nil { scrollingLayoutPending = true; return }
         scrollingLayoutTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -148,7 +161,10 @@ final class NativeTilingCoordinator {
                 let version = generation
                 for workspace in runtime.workspaceBackend.nativeLayouts.currentBySpaceID.values
                     where workspace.isVisible && workspace.arrangement == .scrolling {
-                    guard ready, generation == version, !holdsForMouseRelease else { break }
+                    guard ready, generation == version, !holdsForMouseRelease else {
+                        probeCounts["relayout aborted: \(!ready ? "not ready" : generation != version ? "generation" : "mouse")", default: 0] += 1
+                        break
+                    }
                     let start = ContinuousClock.now
                     do { try await workspace.layoutWorkspace() } catch { break }
                     noteScrollingLayout(start.duration(to: .now), during: workspace.scrollingGestureMotionActive)
@@ -157,6 +173,8 @@ final class NativeTilingCoordinator {
             scrollingLayoutTask = nil
         }
     }
+
+    private var scrollingReadRequestedAt: ContinuousClock.Instant?
 
     /// Layout timings of the current or last pan, for doctor.
     private(set) var scrollingLayoutTiming = "none"

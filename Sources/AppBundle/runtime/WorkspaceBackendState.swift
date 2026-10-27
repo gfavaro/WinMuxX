@@ -115,14 +115,14 @@ final class WorkspaceBackendState {
             guard let owner else { return }
             owner.withValue {
                 owner.workspaceBackend.nativeWriteAuthority.invalidate()
-                owner.workspaceBackend.nativeTiling.invalidate()
+                owner.workspaceBackend.nativeTiling.invalidate("WindowServer event")
             }
         }
         observer.onWindowClosed = { [weak owner] id in
             guard let owner else { return }
             owner.withValue {
                 owner.workspaceBackend.nativeWriteAuthority.invalidate()
-                owner.workspaceBackend.nativeTiling.invalidate()
+                owner.workspaceBackend.nativeTiling.invalidate("window closed")
                 owner.workspaceBackend.nativeWindows.invalidate()
                 guard let window = MacWindow.allWindowsMap[id] else { return }
                 window.garbageCollect(skipClosedWindowsCache: true)
@@ -133,7 +133,7 @@ final class WorkspaceBackendState {
             guard let self, let owner else { return }
             owner.withValue {
                 self.nativeWriteAuthority.invalidate()
-                self.nativeTiling.invalidate()
+                self.nativeTiling.invalidate("read: \(event)")
                 self.nativeWindows.invalidate()
                 for window in MacWindow.allWindows { window.suspendMinimumObservationForMotion() }
                 self.nativeLayouts.reconcile(inventory, displays: owner.displays.all())
