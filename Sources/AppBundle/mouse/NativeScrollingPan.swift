@@ -46,7 +46,7 @@ final class NativeScrollingPan {
                     phase: event.getIntegerValueField(.scrollWheelEventScrollPhase),
                     momentumPhase: event.getIntegerValueField(.scrollWheelEventMomentumPhase),
                     point: event.location)
-                let consumed = MainActor.assumeIsolated { NativeScrollingPan.shared.handle(scroll) }
+                let consumed = MainActor.assumeIsolated { nativePanTiming.measure("scroll event") { NativeScrollingPan.shared.handle(scroll) } }
                 return consumed ? nil : Unmanaged.passUnretained(event)
             }, userInfo: nil) else { return }
         self.tap = tap
@@ -80,6 +80,7 @@ final class NativeScrollingPan {
         target.scrollingGestureMotionActive = true
         // A session streams window moves without per-step readback.
         target.scrollingGestureSessionID = UUID()
+        WindowBorderController.shared.refresh() // Hides borders until the pan settles.
         pan(target, by: scroll.deltaX)
         settleWhenIdle()
         return true
@@ -92,8 +93,8 @@ final class NativeScrollingPan {
         let next = metrics.clampedOffset(current - deltaX * CGFloat(config.scrolling.gestureSensitivity))
         if next != current { lastDirection = next > current ? 1 : -1 }
         workspace.scrollingOffset = next
-        _ = WorkspaceScrollingMinimap.shared.show(workspace, duringGesture: true)
-        runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
+        nativePanTiming.measure("minimap show") { _ = WorkspaceScrollingMinimap.shared.show(workspace, duringGesture: true) }
+        nativePanTiming.measure("relayout request") { runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling() }
     }
 
     /// Devices without scroll phases end a pan after a pause.

@@ -43,7 +43,8 @@ final class WorkspaceScrollingMinimap: NSObject {
         if explicitly {
             panel?.makeKeyAndOrderFront(nil)
             view?.beginKeyboardNavigation()
-        } else {
+        } else if panel?.isVisible != true {
+            // Reordering on every pan step costs a WindowServer round trip.
             panel?.orderFrontRegardless()
         }
         scheduleDismissal()

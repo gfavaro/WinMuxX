@@ -111,6 +111,7 @@ final class WorkspaceBackendState {
         let observer = NativeSpacesObservation()
         let owner = runtime
         observation = observer
+        observer.holdsWindowReads = { MainActor.assumeIsolated { NativeScrollingPan.shared.isPanning } }
         observer.onWindowsChanged = { [weak owner] in
             guard let owner else { return }
             owner.withValue {
@@ -131,6 +132,8 @@ final class WorkspaceBackendState {
         }
         observer.onChange = { [weak self, weak owner] inventory, event in
             guard let self, let owner else { return }
+            let start = ContinuousClock.now
+            defer { nativePanTiming.record("observation change", start.duration(to: .now)) }
             owner.withValue {
                 self.nativeWriteAuthority.invalidate()
                 self.nativeTiling.invalidate("read: \(event)")

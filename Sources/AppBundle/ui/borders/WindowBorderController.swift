@@ -115,6 +115,9 @@ final class WindowBorderController {
 
     func windowGeometryChanged(_ windowId: UInt32) {
         guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
+        // Borders are hidden during a native pan; redrawing each moved window's
+        // border would take most of the main thread.
+        guard !NativeScrollingPan.shared.isPanning else { return }
         refreshMovingBorder(windowId)
         // Poll only the moving window between notifications, which can arrive well
         // after the WindowServer has already moved the content.
@@ -145,7 +148,7 @@ final class WindowBorderController {
     func refresh(nativeSnapshot: [[String: Any]]? = nil) {
         guard !isUnitTest else { return }
         synchronizeNativeWindowSubscriptions()
-        guard !missionControlState.active else { clear(); return }
+        guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }
         let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])

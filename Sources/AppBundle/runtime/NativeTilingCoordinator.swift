@@ -40,6 +40,8 @@ final class NativeTilingCoordinator {
     }
 
     func accept(_ snapshot: NativeSpacesSnapshot, identities: [NativeWindowWriteIdentity]) async {
+        let acceptStart = ContinuousClock.now
+        defer { nativePanTiming.record("accept (after read)", acceptStart.duration(to: .now)) }
         guard runtime.workspaceBackend.nativeTilingEnabled else { return }
         guard !serverArgs.isReadOnly else { status = "Tiling suppressed by read-only startup"; return }
         guard AXIsProcessTrusted(), runtime.workspaceBackend.observation?.windowEventsAvailable == true else {
@@ -167,6 +169,7 @@ final class NativeTilingCoordinator {
                     }
                     let start = ContinuousClock.now
                     do { try await workspace.layoutWorkspace() } catch { break }
+                    nativePanTiming.record("scrolling layout", start.duration(to: .now))
                     noteScrollingLayout(start.duration(to: .now), during: workspace.scrollingGestureMotionActive)
                 }
             } while scrollingLayoutPending

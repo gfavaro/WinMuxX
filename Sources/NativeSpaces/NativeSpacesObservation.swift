@@ -66,10 +66,25 @@ public final class NativeSpacesObservation {
         }
     }
 
+    /// While true, ordinary window events and app notifications are held instead of
+    /// read: a pan's own window moves would otherwise trigger a full read per step.
+    /// Closures and Space/display changes are never held. The holder reads once after.
+    public var holdsWindowReads: (() -> Bool)?
+    public private(set) var heldEventCount = 0
+
+    private func holds(_ event: String) -> Bool {
+        guard holdsWindowReads?() == true,
+              !["activeSpaceDidChange", "windowServerSpaceChange", "displayTopologyChanged", "screensDidWake",
+                "sessionDidBecomeActive", "stopped"].contains(event) else { return false }
+        heldEventCount += 1
+        return true
+    }
+
     private func subscribeToSystemEvents() {
         windowEventsSubscription = NativeSpacesWindowEvents.shared.subscribe { [weak self] event in
             guard let self else { return }
             self.windowEventCount += 1
+            if !event.confirmsClosure, !event.changesTopology, self.holds("windowServerWindowChange") { return }
             self.onWindowsChanged?()
             if event.confirmsClosure, let id = event.windowID { self.onWindowClosed?(id) }
             if event.changesTopology { self.requestRead(event: "windowServerSpaceChange") }
@@ -87,7 +102,10 @@ public final class NativeSpacesObservation {
             (NotificationCenter.default, NSApplication.didChangeScreenParametersNotification, "displayTopologyChanged"),
         ] {
             let token = source.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.requestRead(event: label) }
+                MainActor.assumeIsolated {
+                    guard let self, !self.holds(label) else { return }
+                    self.requestRead(event: label)
+                }
             }
             registrations.append((source, token))
         }
