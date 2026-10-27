@@ -167,7 +167,9 @@ same confirmed move, and the layout tree follows. Into an empty desktop it arriv
 whole, with its arrangement (scrolling, master, dwindle), groups and floating windows;
 into a desktop that has windows it joins as one group. The macOS desktop itself stays
 on its display, emptied, and the most recently used moved window is focused. Windows
-that do not arrive stay where they were and are reported.
+that do not arrive stay where they were and are reported. In the sidebar, "Bring Here"
+(and confirming "On another display. Bring here?") does the same for that desktop,
+bringing its windows and layout to the display whose sidebar was used.
 
 The move uses SkyLight's `SLSBridgedMoveWindowsToManagedSpaceOperation` through a
 dispatcher SkyLight does not export, found by scanning its symbol table (adapted from

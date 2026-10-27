@@ -61,9 +61,21 @@ private func nativeListedSidebarItems(_ spaceID: String, workspaceName: String) 
 /// Handles a sidebar action in native mode. Actions that only make sense for
 /// virtual workspaces explain why they are unavailable instead of acting.
 @MainActor
-func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewModel: TrayMenuModel) {
+func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewModel: TrayMenuModel,
+                                       targetMonitorScopeId: String? = nil) {
     switch action {
-        case .selectWorkspace(let name), .overrideWorkspaceInUse(let name):
+        case .overrideWorkspaceInUse(let name):
+            // macOS keeps the desktop on its display; its windows and layout come here.
+            guard let (args, env) = nativeBringHere(name, targetMonitorScopeId: targetMonitorScopeId) else { return }
+            WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
+            runWorkspaceSidebarSession {
+                let io = CmdIo(stdin: .emptyStdin)
+                if !(await runtime.workspaceBackend.nativeWindowMoves.run(args, env: env, io: io)) {
+                    showWorkspaceSidebarError(io.stderr.last ?? "Bring Here failed")
+                }
+                await updateWorkspaceSidebarModel()
+            }
+        case .selectWorkspace(let name):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
             runNativeSidebarCommands(["workspace \(number)"])
         case .selectWindow(let windowId):
@@ -89,6 +101,20 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
              .selectProject, .createProject, .renameProject, .setProjectColor, .deleteProject:
             showWorkspaceSidebarError("macOS owns native Spaces: add, remove and rearrange desktops in Mission Control. Projects are available with virtual workspaces.")
     }
+}
+
+/// "Bring Here": move a desktop's windows to the desktop the sidebar's display shows.
+/// Native desktop names are reserved, so the desktop travels in the command env.
+@MainActor
+func nativeBringHere(_ name: String, targetMonitorScopeId: String?) -> (MoveWorkspaceToMonitorCmdArgs, CmdEnv)? {
+    guard let source = Workspace.existing(byName: name) else { return nil }
+    let monitors = sortedMonitors
+    let scope = targetMonitorScopeId.flatMap { id in monitors.firstIndex { workspaceSidebarMonitorScopeId(for: $0) == id } }
+    guard let index = scope ?? monitors.firstIndex(where: { $0.rect.contains(mouseLocation) }),
+          monitors[index].activeWorkspace !== source,
+          case .cmd(let command) = parseCommand("move-workspace-to-monitor \(index + 1)"),
+          let move = command as? MoveWorkspaceToMonitorCommand else { return nil }
+    return (move.args, .defaultEnv.copy(\.workspaceName, source.name))
 }
 
 /// An empty name returns the desktop to "Desktop N". Labels follow the desktop's

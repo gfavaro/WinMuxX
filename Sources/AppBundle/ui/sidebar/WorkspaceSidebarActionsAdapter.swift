@@ -41,7 +41,7 @@ func handleWorkspaceSidebarAction(
     targetMonitorScopeId: String? = nil,
 ) {
     if runtime.workspaceBackend.kind == .native {
-        return handleNativeWorkspaceSidebarAction(action, viewModel: viewModel)
+        return handleNativeWorkspaceSidebarAction(action, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
     }
     switch action {
         case .selectWorkspace(let name):

@@ -177,6 +177,17 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         XCTAssertTrue(window.nodeWorkspace === destination)
     }
 
+    func testBringHereFromASidebarMovesTheDesktopToThatSidebarsDisplay() throws {
+        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-c"])
+        let left = workspaceSidebarMonitorScopeId(for: monitors[0])
+        let (args, env) = try XCTUnwrap(nativeBringHere(source.name, targetMonitorScopeId: left))
+        XCTAssertEqual(args.resolveTargetOrReportError(env, CmdIo(stdin: .emptyStdin))?.workspace, source)
+        guard case .success(let monitor) = args.target.val.resolve(monitors[1], wrapAround: false) else { return XCTFail() }
+        XCTAssertEqual(monitor.name, "left", "The sidebar's own display")
+        XCTAssertNil(nativeBringHere(source.name, targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: monitors[1])),
+            "A desktop already on that display stays")
+    }
+
     func testFocusMonitorFocusesTheOtherDisplaysRecentWindow() throws {
         let layouts = runtime.workspaceBackend.nativeLayouts
         let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
