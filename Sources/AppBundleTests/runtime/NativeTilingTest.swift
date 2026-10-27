@@ -527,6 +527,32 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertEqual(Set(workspace.allLeafWindowsRecursive.map(\.windowId)), [1, 3])
     }
 
+    func testAPinnedColumnIsRestoredWithItsDesktop() throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let windows = (1...3).map { TestWindow.new(id: UInt32($0), parent: root) }
+        for window in windows {
+            window.restartIdentity = RestartWindowIdentity(bundleId: "fixture", pid: 99,
+                launchDate: Date(timeIntervalSince1970: 1), title: "\(window.windowId)")
+        }
+        workspace.transitionArrangement(to: .scrolling)
+        workspace.scrollingPinnedNode = windows[2]
+        workspace.scrollingPinSide = .right
+        let record = NativePersistedLayout(workspace)
+        let reloaded = try JSONDecoder().decode(NativePersistedLayout.self, from: JSONEncoder().encode(record))
+        workspace.scrollingPinnedNode = nil
+        XCTAssertTrue(NativeLayoutPersistence(url: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+            .restore(reloaded, to: workspace))
+        XCTAssertTrue(workspace.pinnedScrollingColumn === windows[2])
+        XCTAssertEqual(workspace.scrollingPinSide, .right)
+        // Files written before pins existed still load.
+        var json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(record)) as! [String: Any]
+        json.removeValue(forKey: "pinnedWindowID"); json.removeValue(forKey: "pinSide")
+        let old = try JSONDecoder().decode(NativePersistedLayout.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertNil(old.pinnedWindowID)
+    }
+
     func testUnreadableNativePersistenceIsNeverOverwritten() async throws {
         _ = nativeWorkspace()
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

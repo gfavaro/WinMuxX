@@ -29,7 +29,7 @@ public struct ScrollingMoveCmdArgs: CmdArgs {
 }
 
 public struct ScrollingPinCmdArgs: CmdArgs {
-    public enum Side: String, CaseIterable, Sendable { case left, right }
+    public enum Side: String, CaseIterable, Sendable, Codable { case left, right }
     public var commonState: CmdArgsCommonState
     public init(rawArgs: StrArrSlice) { commonState = .init(rawArgs) }
     public static let parser: CmdParser<Self> = .init(

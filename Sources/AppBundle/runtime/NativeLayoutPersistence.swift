@@ -10,6 +10,9 @@ struct NativePersistedLayout: Codable, Equatable, Sendable {
     let preservesGroups: Bool
     let masterIndex: Int
     let masterRatio: CGFloat?
+    /// A window of the pinned scrolling column, and its side; absent in older files.
+    var pinnedWindowID: UInt32? = nil
+    var pinSide: ScrollingPinCmdArgs.Side? = nil
 
     @MainActor init(_ workspace: Workspace) {
         root = FrozenContainer(workspace.rootTilingContainer)
@@ -18,6 +21,8 @@ struct NativePersistedLayout: Codable, Equatable, Sendable {
         preservesGroups = workspace.preservesTopLevelGroups
         masterIndex = workspace.nativePersistentMasterGroupIndex
         masterRatio = workspace.masterRatio
+        pinnedWindowID = workspace.pinnedScrollingColumn?.mostRecentWindowRecursive?.windowId
+        pinSide = pinnedWindowID == nil ? nil : workspace.scrollingPinSide
     }
 
     var windows: [FrozenWindow] {
@@ -200,6 +205,10 @@ final class NativeLayoutPersistence {
         workspace.masterRatio = record.masterRatio
         workspace.masterStackLayout = .tiles
         workspace.restoreNativeMasterGroupIndex(record.masterIndex)
+        if let pinned = record.pinnedWindowID.flatMap({ matched[$0] }) {
+            workspace.scrollingPinnedNode = pinned.topLevelWorkspaceGroup
+            workspace.scrollingPinSide = record.pinSide ?? .left
+        }
         if matched.count < savedWindows.count { workspace.normalizeContainers() } // Drop groups left empty.
         return true
     }

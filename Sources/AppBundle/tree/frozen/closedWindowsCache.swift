@@ -43,6 +43,9 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let masterGroupIndex: Int?
     let masterRatio: CGFloat?
     let masterStackLayout: Layout?
+    /// A window of the pinned scrolling column, and its side.
+    let scrollingPinnedFrozenID: UInt32?
+    let scrollingPinSide: ScrollingPinCmdArgs.Side?
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -62,6 +65,8 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         case masterGroupIndex
         case masterRatio
         case masterStackLayout
+        case scrollingPinnedFrozenID
+        case scrollingPinSide
     }
 
     @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
@@ -87,6 +92,8 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
         masterStackLayout = workspace.masterStackLayout
+        scrollingPinnedFrozenID = workspace.pinnedScrollingColumn?.mostRecentWindowRecursive?.windowId
+        scrollingPinSide = scrollingPinnedFrozenID == nil ? nil : workspace.scrollingPinSide
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -123,6 +130,8 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         masterGroupIndex = try container.decodeIfPresent(Int.self, forKey: .masterGroupIndex)
         masterRatio = try container.decodeIfPresent(CGFloat.self, forKey: .masterRatio)
         masterStackLayout = try container.decodeIfPresent(Layout.self, forKey: .masterStackLayout)
+        scrollingPinnedFrozenID = try container.decodeIfPresent(UInt32.self, forKey: .scrollingPinnedFrozenID)
+        scrollingPinSide = try container.decodeIfPresent(ScrollingPinCmdArgs.Side.self, forKey: .scrollingPinSide)
     }
 }
 
@@ -216,6 +225,10 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
                   let column = workspace.scrollingMetrics.columns.first(where: { $0.node === fallback.topLevelWorkspaceGroup }) {
             workspace.scrollingOffset = workspace.scrollingMetrics.revealedOffset(for: column, current: 0)
             workspace.lastScrollingFocusWindowId = fallback.windowId
+        }
+        if let id = frozenWorkspace.scrollingPinnedFrozenID, let window = windowsById[id] {
+            workspace.scrollingPinnedNode = window.topLevelWorkspaceGroup
+            workspace.scrollingPinSide = frozenWorkspace.scrollingPinSide ?? .left
         }
         if frozenWorkspace.arrangement == nil, workspace.rootTilingContainer.layout == .master {
             migrateLegacyMasterTree(workspace)

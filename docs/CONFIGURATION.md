@@ -208,7 +208,7 @@ A fitting strip is centered. An overflowing strip clamps at both ends; explicit 
 
 `scrolling-focus 1-9|first|last` focuses a column by its place on the strip, with 9 the last column as with browser tabs; `scrolling-move 1-9|first|last` moves the focused column there. A horizontal `move` pops a window out of a stacked column to the left or right, and `stack-with` or `join-with` pulls it into a neighbouring one.
 
-`scrolling-pin left|right` pins the focused column to that screen edge at full height while the rest of the strip scrolls in the space beside it; the same command unpins it. The pinned column keeps its width preset, leaves the strip and the minimap, and blocks edge previews on its side. Pins last until unpinned or the column leaves the workspace; they are not saved across restarts.
+`scrolling-pin left|right` pins the focused column to that screen edge at full height while the rest of the strip scrolls in the space beside it; the same command unpins it. The pinned column keeps its width preset, leaves the strip and the minimap, and blocks edge previews on its side. Pins last until unpinned or the column leaves the workspace, and are saved with the workspace's layout (native desktops included), so they return after a restart.
 
 With `minimap-hold-modifiers` set, holding exactly those keys keeps the minimap up over a focused scrolling workspace, and releasing them lets it fade. Dragging a minimap tile sideways reorders the strip's columns; a click still focuses the column.
 
