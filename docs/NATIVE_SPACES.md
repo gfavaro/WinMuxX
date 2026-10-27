@@ -9,7 +9,10 @@ projects, gestures, display movement and recovery.
 
 ## Opt in and roll back
 
-Use an explicit configuration and restart the development app:
+Settings › General › Workspaces switches between WinMuxX workspaces and macOS
+Spaces (with or without tiling) and restarts WinMuxX; its Setup check reports
+Displays have separate Spaces and desktop reordering. Or use an explicit
+configuration and restart the development app:
 
 ```toml
 [workspace-backend]
@@ -357,5 +360,5 @@ and relaunches the installed app. Grant Accessibility to "WinMuxX Native Dev" on
 - **`workspace N` reports it did not land:** check `doctor` for the active Space and
   that desktop N exists in Mission Control. Report the macOS version; the Dock swipe
   payload is version-specific.
-- **Roll back:** set `[workspace-backend] type = "virtual"` (or remove the table) and
-  restart. Native layouts in `native-space-layouts-v1.json` are kept for next time.
+- **Roll back:** choose WinMuxX workspaces in Settings › General › Workspaces, or
+  set `[workspace-backend] type = "virtual"` (or remove the table) and restart. Native layouts in `native-space-layouts-v1.json` are kept for next time.

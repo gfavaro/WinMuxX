@@ -40,6 +40,9 @@ struct ShortcutGeneralSettingsView: View {
                     persistRootBool("auto-reload-config", autoReloadConfig)
                 }
             }
+            SettingsSection("Setup Check") {
+                SetupCheckView()
+            }
             SettingsSection("Troubleshooting") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {

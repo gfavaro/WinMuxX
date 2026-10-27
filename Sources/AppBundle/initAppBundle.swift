@@ -57,6 +57,7 @@ import Foundation
             isWinMuxRuntimeReady = true
             startUnixSocketServer()
             syncConfigFileWatcher()
+            showSetupCheckIfNeeded()
             return
         }
         if isDebug { await toggleReleaseServerIfDebug(.off) }
@@ -80,6 +81,7 @@ import Foundation
         scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
         reloadConfigIfSavedDuringStartup()
         schedulePersistedFrozenWorldSave()
+        showSetupCheckIfNeeded()
     }
 }
 

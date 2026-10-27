@@ -12,7 +12,9 @@ menu to adjust layouts, appearance and shortcuts. The current commands and
 configuration are in the [CLI help](COMMANDS.md) and
 [configuration guide](CONFIGURATION.md).
 
-Run `winmuxx doctor` in Terminal to see the config path, permissions, displays
+Settings › General has a **Setup check** for Accessibility, other window managers
+and trackpad gestures that clash with WinMuxX (in native mode, Spaces settings
+instead); it opens once on first launch if something needs attention. Run `winmuxx doctor` in Terminal to see the config path, permissions, displays
 and other window managers. For a guided overview, read
 [concepts](CONCEPTS.md), then [layouts](LAYOUTS.md) and
 [recipes](RECIPES.md). See [recovery](RELIABILITY.md) if an interrupted session
