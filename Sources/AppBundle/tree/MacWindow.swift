@@ -165,6 +165,7 @@ final class MacWindow: Window {
         window.recordAuthoritativeActualRect(rect)
         allWindowsMap[windowId] = window
         window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
+        try await applyNativeWindowDetectedRules(window) { layouts.accepts(registration) }
         return window
     }
 

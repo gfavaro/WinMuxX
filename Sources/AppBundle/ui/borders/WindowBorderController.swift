@@ -47,7 +47,9 @@ final class WindowBorderController {
                 if windowId != 0, controller.borderWindowIds.contains(windowId) { return }
                 if [UInt32(723), 806, 807, 808].contains(event) {
                     WorkspaceTransitionDiagnostics.recordNativeEvent(event, windowId: windowId)
-                    HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
+                    if runtime.workspaceBackend.kind == .virtual {
+                        HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
+                    }
                 }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),

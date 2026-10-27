@@ -42,9 +42,11 @@ import Foundation
             // this immutable startup flag. No permission prompts or virtual hooks.
             _serverArgs.isReadOnly = _serverArgs.isReadOnly || !config.nativeSpaces.tilingEnabled
             let owner = runtime
+            WindowBorderController.shared.startMissionControlMonitoring()
             owner.workspaceBackend.startObservation { [weak owner] _, _ in
                 owner?.withValue {
                     updateTrayText()
+                    WindowBorderController.shared.refresh()
                     owner?.task { await updateWorkspaceSidebarModel() }
                 }
             }

@@ -95,6 +95,7 @@ final class NativeTilingCoordinator {
         ready = true
         status = "Native tiling active"
         updateTrayText()
+        WindowBorderController.shared.refresh()
     }
 
     func synchronizeFocus() async {
@@ -123,6 +124,9 @@ final class NativeTilingCoordinator {
         switch command {
             case is DoctorCommand, is ReloadConfigCommand, is ModeCommand,
                  is ResizeCommand, is SwapCommand,
+                 // Per-window actions; observation reconciles the states they produce.
+                 is FullscreenCommand, is MacosNativeFullscreenCommand, is MacosNativeMinimizeCommand,
+                 is CloseCommand, is CloseAllWindowsButCurrentCommand,
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand: return true
             case let command as MoveCommand: return command.args.boundaries == .workspace
             case let command as FocusCommand:

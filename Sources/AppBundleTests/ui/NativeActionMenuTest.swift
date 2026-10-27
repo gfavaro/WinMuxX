@@ -43,10 +43,10 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertEqual(desktop.keyEquivalent, "2", "Registered navigation shortcuts are shown")
         XCTAssertEqual(menu.items.first { $0.title == "Desktop 1" }?.state, .off)
         XCTAssertEqual(menu.items.first { $0.title == "Fullscreen App" }?.isEnabled, false)
-        for title in ["Previous Desktop", "Next Desktop", "Focus", "Move Window", "Resize", "Layout", "Balance Sizes", "Reload Config", "Quit WinMuxX"] {
+        for title in ["Previous Desktop", "Next Desktop", "Focus", "Move Window", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Reload Config", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
-        for title in ["Workspaces", "Join With", "Fullscreen", "Settings…", "Enabled", "Workspace Controls…"] {
+        for title in ["Workspaces", "Join With", "Settings…", "Enabled", "Workspace Controls…"] {
             XCTAssertFalse(titles.contains(title), title)
         }
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu).items.map(\.title)

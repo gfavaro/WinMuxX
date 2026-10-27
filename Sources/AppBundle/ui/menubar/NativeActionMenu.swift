@@ -337,6 +337,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 _ = add("Swap with Master", "swap-with-master", to: submenu)
                 _ = add("Toggle Floating", "layout floating tiling", to: submenu)
             }
+            _ = add("Fullscreen", "fullscreen", to: menu)
             _ = add("Balance Sizes", "balance-sizes", to: menu)
         }
         if config.modes.count > 1, backend.nativeTilingEnabled {

@@ -50,6 +50,27 @@ private func onWindowDetected(_ window: Window) async throws {
     }
 }
 
+/// Rule commands native mode skipped, for doctor. Native windows register during
+/// reconciliation, before native commands can run, so rules apply only what native
+/// tiling implements for a new window: floating or tiling it.
+@MainActor var nativeSkippedWindowRuleCommands: Set<String> = []
+
+@MainActor
+func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) async throws {
+    for callback in config.onWindowDetected where try await callback.matches(window) {
+        guard stillOwned() else { return }
+        for command in callback.run {
+            guard let layout = command as? LayoutCommand, !layout.args.forNextDetectedWindow,
+                  let target = layout.args.toggleBetween.val.first(where: { $0 == .floating || $0 == .tiling }) else {
+                nativeSkippedWindowRuleCommands.insert("\(command.args)")
+                continue
+            }
+            if target == .floating, let workspace = window.nodeWorkspace { window.bindAsFloatingWindow(to: workspace) }
+        }
+        if !callback.checkFurtherCallbacks { return }
+    }
+}
+
 extension WindowDetectedCallback {
     @MainActor
     func matches(_ window: Window) async throws -> Bool {
