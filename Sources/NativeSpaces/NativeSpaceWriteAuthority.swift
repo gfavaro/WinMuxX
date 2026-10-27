@@ -82,6 +82,11 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
     private var generation: UInt64 = 0
     private var allowed: [UInt32: NativeWindowWriteIdentity] = [:]
     private let validateLive: @Sendable (NativeWindowWriteIdentity) throws -> Bool
+    /// A passed live check, reused briefly within the same generation: a layout's
+    /// back-to-back writes otherwise repeat the full WindowServer read per attribute.
+    /// Any invalidation starts a new generation, which discards the reuse at once.
+    private var liveValidated: [UInt32: (generation: UInt64, at: ContinuousClock.Instant)] = [:]
+    var liveValidationReuse: Duration = .milliseconds(100)
 
     public convenience init() { self.init(validateLive: Self.validateLive) }
 
@@ -93,6 +98,7 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
         lock.withLock {
             generation &+= 1
             allowed = [:]
+            liveValidated = [:]
         }
     }
 
@@ -116,6 +122,7 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
         lock.withLock {
             generation &+= 1
             allowed = next
+            liveValidated = [:]
         }
     }
 
@@ -142,8 +149,13 @@ public final class NativeSpaceWriteAuthority: @unchecked Sendable {
     fileprivate func check(generation: UInt64, identity: NativeWindowWriteIdentity) throws {
         func current() -> Bool { lock.withLock { self.generation == generation && allowed[identity.windowID] == identity } }
         guard current() else { throw NativeSpaceWriteError.revoked }
+        let reusable = lock.withLock {
+            liveValidated[identity.windowID].map { $0.generation == generation && $0.at.duration(to: .now) < liveValidationReuse } ?? false
+        }
+        if reusable { return }
         guard try validateLive(identity) else { throw NativeSpaceWriteError.liveOwnershipChanged }
         guard current() else { throw NativeSpaceWriteError.revoked }
+        lock.withLock { liveValidated[identity.windowID] = (generation, .now) }
     }
 
     private static func validateLive(_ identity: NativeWindowWriteIdentity) throws -> Bool {

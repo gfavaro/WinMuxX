@@ -211,6 +211,13 @@ final class NativeTilingCoordinator {
         panLayouts = (panLayouts.count + 1, panLayouts.totalMs + ms, max(panLayouts.maxMs, ms))
     }
 
+    /// Waits for the read in progress to be accepted and tiling to be ready again.
+    func waitUntilReady(timeout: Duration = .milliseconds(1500)) async -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !ready, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
+        return ready
+    }
+
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
     var holdsForMouseRelease = false
 

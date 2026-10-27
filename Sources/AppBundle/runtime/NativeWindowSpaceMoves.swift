@@ -90,14 +90,7 @@ final class NativeWindowSpaceMoves {
             return space != target.id
         }
         let failedToStart = movable.filter { !move($0, spaceID) }
-        var arrived = Set<UInt32>()
-        let deadline = ContinuousClock.now + arrivalTimeout
-        while arrived.count < movable.count - failedToStart.count, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: pollInterval)
-            if let read = try? await snapshot(movable) {
-                arrived = Set(read.windows.filter { $0.unambiguousSpaceID == target.id }.map(\.windowID))
-            }
-        }
+        let arrived = await awaitArrival(of: movable.filter { !failedToStart.contains($0) }, at: target.id)
         guard !arrived.isEmpty else { return io.err("No window of \(userFacingDesktopName(source)) arrived on \(monitor.name)") }
         if !windows.isEmpty, windows.allSatisfy({ arrived.contains($0.windowId) }) {
             transplant(source, into: destination)
@@ -161,22 +154,33 @@ final class NativeWindowSpaceMoves {
               let spaceID = UInt64(plan.targetSpaceID) else { return io.err("Desktop \(number) doesn't exist; add it in Mission Control") }
         guard plan.targetSpaceID != source else { return true }
         guard move(id, spaceID) else { return io.err("Moving window \(id) to desktop \(number) failed") }
+        guard await awaitArrival(of: [id], at: plan.targetSpaceID).contains(id) else {
+            return io.err("Window \(id) did not arrive on desktop \(number)")
+        }
+        runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
+        NativeUnvisitedWindows.shared.refresh()
+        return true
+    }
+
+    /// Every move is confirmed by re-reading membership: the windows of `ids` that are on
+    /// `spaceID` once all arrive or `arrivalTimeout` passes.
+    private func awaitArrival(of ids: [UInt32], at spaceID: String) async -> Set<UInt32> {
+        guard !ids.isEmpty else { return [] }
+        var arrived = Set<UInt32>()
         let deadline = ContinuousClock.now + arrivalTimeout
-        while ContinuousClock.now < deadline {
+        while arrived.count < ids.count, ContinuousClock.now < deadline {
             try? await Task.sleep(for: pollInterval)
-            if (try? await snapshot([id]))?.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID == plan.targetSpaceID {
-                runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
-                NativeUnvisitedWindows.shared.refresh()
-                return true
+            if let read = try? await snapshot(ids) {
+                arrived = Set(read.windows.filter { $0.unambiguousSpaceID == spaceID }.map(\.windowID))
             }
         }
-        return io.err("Window \(id) did not arrive on desktop \(number)")
+        return arrived
     }
 
     /// A move or Space switch requests a read, which revokes write and focus permits;
     /// focus waits until that read has reissued them.
     private func focusWhenReady(_ window: Window) async {
-        for _ in 0..<60 where !runtime.workspaceBackend.nativeTiling.ready { try? await Task.sleep(for: .milliseconds(25)) }
+        _ = await runtime.workspaceBackend.nativeTiling.waitUntilReady()
         guard window.focusWindow() else { return }
         window.nativeFocus()
     }
@@ -203,13 +207,7 @@ final class NativeWindowSpaceMoves {
         guard let spaceID = UInt64(target.id), move(id, spaceID) else {
             return io.err("Moving window \(id) to Space \(target.id) failed")
         }
-        let deadline = ContinuousClock.now + arrivalTimeout
-        var arrived = false
-        while !arrived, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: pollInterval)
-            arrived = (try? await snapshot([id]))?.windows.first { $0.windowID == id }?.unambiguousSpaceID == target.id
-        }
-        guard arrived else { return io.err("Window \(id) did not arrive on Space \(target.id)") }
+        guard await awaitArrival(of: [id], at: target.id).contains(id) else { return io.err("Window \(id) did not arrive on Space \(target.id)") }
         if let uuid = target.uuid, let destination = runtime.workspaceBackend.nativeLayouts.retainedByUUID[uuid],
            window.nodeWorkspace !== destination {
             if window.parent is Workspace {

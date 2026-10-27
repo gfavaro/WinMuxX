@@ -69,6 +69,25 @@ final class NativeSpaceWriteAuthorityTests: XCTestCase {
         XCTAssertThrowsError(try current.check()) { XCTAssertEqual($0 as? NativeSpaceWriteError, .revoked) }
     }
 
+    func testAPassedLiveCheckIsReusedBrieflyWithinOneGenerationOnly() throws {
+        final class Counter: @unchecked Sendable { let lock = NSLock(); var value = 0
+            func bump() { lock.withLock { value += 1 } } }
+        let counter = Counter()
+        let gate = NativeSpaceWriteAuthority { _ in counter.bump(); return true }
+        gate.replace(snapshot: snapshot(), identities: [identity])
+        let current = try XCTUnwrap(permit(gate))
+        try current.check()
+        try current.check()
+        try current.check()
+        XCTAssertEqual(counter.value, 1, "Back-to-back writes share one live check")
+        gate.replace(snapshot: snapshot(), identities: [identity])
+        try XCTUnwrap(permit(gate)).check()
+        XCTAssertEqual(counter.value, 2, "A new generation checks live again")
+        gate.liveValidationReuse = .zero
+        try XCTUnwrap(permit(gate)).check()
+        XCTAssertEqual(counter.value, 3, "Past the reuse window it checks again")
+    }
+
     func testDuplicateWindowIdentityDoesNotPickAnArbitraryOwner() {
         let gate = NativeSpaceWriteAuthority { _ in true }
         gate.replace(snapshot: snapshot(), identities: [identity, identity])

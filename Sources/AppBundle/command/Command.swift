@@ -120,6 +120,9 @@ extension [Command] {
             if NativeTilingCommandScope.validateTarget?() == false {
                 return io.err("Native command target changed during execution")
             }
+            if WorkspaceBackendState.isNativeNavigation(command), !NativeTilingCommandScope.active {
+                await runtime.workspaceBackend.awaitCurrentObservation()
+            }
             let commandSucc: Bool
             if let handled = try await runtime.workspaceBackend.current.run(command, env: env, io: io) {
                 commandSucc = handled

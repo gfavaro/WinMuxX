@@ -86,7 +86,7 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
 private func scheduleNativeRuleMove(_ move: MoveNodeToWorkspaceCommand, window id: UInt32) {
     let owner = runtime
     owner.task {
-        for _ in 0..<40 where !owner.workspaceBackend.nativeTiling.ready { try? await Task.sleep(for: .milliseconds(50)) }
+        _ = await owner.workspaceBackend.nativeTiling.waitUntilReady(timeout: .seconds(2))
         let io = CmdIo(stdin: .emptyStdin)
         if !(await owner.workspaceBackend.nativeWindowMoves.run(move.args, env: .defaultEnv.copy(\.windowId, id), io: io)) {
             // One entry per rule, keeping its latest failure, so the set stays bounded.

@@ -19,11 +19,27 @@ final class NativeUnvisitedWindows {
     private let reader = NativeSpacesReader()
     private var task: Task<Void, Never>?
     private var requested = false
+    private var lastStarted: ContinuousClock.Instant?
+    private var trailing: Task<Void, Never>?
+    /// Reads follow every app switch; this listing only needs to be reasonably fresh.
+    var minimumInterval: Duration = .seconds(2)
 
-    /// Reads the desktops that are not showing; coalesced, off the main actor.
+    /// Reads the desktops that are not showing; coalesced, throttled, off the main actor.
     func refresh() {
         guard runtime.workspaceBackend.kind == .native, !isUnitTest else { return }
         guard task == nil else { requested = true; return }
+        if let lastStarted, lastStarted.duration(to: .now) < minimumInterval {
+            // One trailing refresh catches the end of a burst.
+            guard trailing == nil else { return }
+            let wait = minimumInterval - lastStarted.duration(to: .now)
+            trailing = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: wait)
+                self?.trailing = nil
+                self?.refresh()
+            }
+            return
+        }
+        lastStarted = .now
         guard let displays = nativeObservedDisplays() else { return }
         let hidden = Set(displays.flatMap { display in
             display.spaces.filter { $0.isDesktop && $0.id != display.activeSpaceID }.map(\.id)
