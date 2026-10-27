@@ -53,7 +53,7 @@ final class NativeTilingCoordinator {
             return isMissionControlVisible(rows, screenSizes: screenSizes) { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }
         }.value
         guard generation == version else { return }
-        guard !missionControl, NSEvent.pressedMouseButtons == 0 else {
+        guard !missionControl, NSEvent.pressedMouseButtons == 0, !holdsForMouseRelease else {
             status = missionControl ? "Tiling paused for Mission Control" : "Tiling paused for mouse interaction"
             return
         }
@@ -72,14 +72,21 @@ final class NativeTilingCoordinator {
             let owner = runtime
             mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp]) { [weak owner] event in
                 let released = event.type == .leftMouseUp || event.type == .rightMouseUp
+                let leftButton = event.type == .leftMouseDown || event.type == .leftMouseUp
                 Task { @MainActor [weak owner] in
                     guard let owner else { return }
                     owner.withValue {
                         MacApp.cancelPendingFocus()
-                        guard released else { return owner.workspaceBackend.nativeWriteAuthority.invalidate() }
-                        let leftButton = event.type == .leftMouseUp
+                        let tiling = owner.workspaceBackend.nativeTiling
+                        guard released else {
+                            // A read queued by the drag's own move events must not lay the
+                            // window back out before its release is adopted.
+                            if leftButton { tiling.holdsForMouseRelease = true }
+                            return owner.workspaceBackend.nativeWriteAuthority.invalidate()
+                        }
                         owner.task {
-                            if leftButton { await owner.workspaceBackend.nativeTiling.adoptMouseRelease() }
+                            if leftButton { await tiling.adoptMouseRelease() }
+                            tiling.holdsForMouseRelease = false
                             owner.workspaceBackend.observation?.requestRead(event: "nativeMouseReleased")
                         }
                     }
@@ -90,6 +97,7 @@ final class NativeTilingCoordinator {
             shortcutsInstalled = true
             try? await activateMode(mainModeId, runCallbacks: false)
         }
+        guard !holdsForMouseRelease else { status = "Tiling paused for mouse interaction"; return }
         let targets = Set(snapshot.reconciliationSpaceIDs ?? snapshot.displays.map(\.activeSpaceID))
         for display in snapshot.displays where targets.contains(display.activeSpaceID) {
             guard generation == version,
@@ -123,6 +131,9 @@ final class NativeTilingCoordinator {
         let outcome = adoptNativeMouseRelease(window, actual: actual, pointer: mouseLocation)
         lastMouseRelease = "window \(window.windowId): \(outcome); actual \(actual), layout \(target)"
     }
+
+    /// Set at left mouse-down; layout waits until that drag's release is adopted.
+    var holdsForMouseRelease = false
 
     /// The last release decision, for doctor.
     private(set) var lastMouseRelease = "none"
