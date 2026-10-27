@@ -169,7 +169,9 @@ into a desktop that has windows it joins as one group. The macOS desktop itself 
 on its display, emptied, and the most recently used moved window is focused. Windows
 that do not arrive stay where they were and are reported. In the sidebar, "Bring Here"
 (and confirming "On another display. Bring here?") does the same for that desktop,
-bringing its windows and layout to the display whose sidebar was used.
+bringing its windows and layout to the display whose sidebar was used. The source may
+be a desktop that is not showing, including one whose windows are only listed (they
+move by ID and are adopted on arrival); `--workspace N` names it by desktop number.
 
 The move uses SkyLight's `SLSBridgedMoveWindowsToManagedSpaceOperation` through a
 dispatcher SkyLight does not export, found by scanning its symbol table (adapted from

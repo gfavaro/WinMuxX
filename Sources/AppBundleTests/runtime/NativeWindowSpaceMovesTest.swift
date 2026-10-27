@@ -177,6 +177,24 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         XCTAssertTrue(window.nodeWorkspace === destination)
     }
 
+    func testMoveWorkspaceToMonitorAlsoMovesWindowsOnlyListedForAnUnvisitedDesktop() async throws {
+        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-b"])
+        memberships[90] = "2"
+        NativeUnvisitedWindows.shared.set([NativeListedWindow(windowId: 90, spaceID: "2", pid: getpid(), title: nil)])
+        defer { NativeUnvisitedWindows.shared.set([]) }
+        let mover = NativeWindowSpaceMoves()
+        mover.isAvailable = { true }
+        mover.arrivalTimeout = .milliseconds(100)
+        mover.pollInterval = .milliseconds(5)
+        mover.snapshot = { [unowned self] _ in snapshot() }
+        mover.move = { [unowned self] id, space in memberships[id] = String(space); return true }
+        let args = try XCTUnwrap(parseCommand("move-workspace-to-monitor right").cmdOrDie as? MoveWorkspaceToMonitorCommand).args
+        let io = CmdIo(stdin: .emptyStdin)
+        let ok = await mover.run(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
+        XCTAssertTrue(ok, io.stderr.joined())
+        XCTAssertEqual(memberships[90], "6", "Moved by ID; adopted once it arrives on the showing desktop")
+    }
+
     func testBringHereFromASidebarMovesTheDesktopToThatSidebarsDisplay() throws {
         let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-c"])
         let left = workspaceSidebarMonitorScopeId(for: monitors[0])

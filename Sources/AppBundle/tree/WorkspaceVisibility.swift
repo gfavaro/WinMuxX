@@ -31,6 +31,8 @@ func workspaceHasLifecycleWindows(_ workspace: Workspace) -> Bool {
 
 @MainActor
 func isUserFacingWorkspace(_ workspace: Workspace, focusedWorkspace: Workspace? = nil) -> Bool {
+    // Every native desktop is user-facing, including one whose windows aren't adopted yet.
+    if runtime.workspaceBackend.kind == .native, nativeDesktopNumber(of: workspace) != nil { return true }
     return !workspace.isArchived &&
         (
             workspaceHasSidebarVisibleWindows(workspace) ||

@@ -16,7 +16,7 @@ extension CmdArgs {
         return target
     }
 
-    @MainActor private func resolveUncheckedTarget(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
+    @MainActor func resolveUncheckedTarget(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
         // Flags
         if let windowId {
             if let wi = Window.get(byId: windowId) {
@@ -27,7 +27,7 @@ extension CmdArgs {
             }
         }
         if let workspaceName {
-            guard let workspace = Workspace.existing(byName: workspaceName.raw),
+            guard let workspace = nativeAwareWorkspace(named: workspaceName.raw),
                   isUserFacingWorkspace(workspace, focusedWorkspace: focus.workspace)
             else {
                 io.err("Workspace '\(workspaceName.raw)' doesn't exist")
@@ -45,7 +45,7 @@ extension CmdArgs {
             }
         }
         if let wsName = env.workspaceName {
-            guard let workspace = Workspace.existing(byName: wsName),
+            guard let workspace = nativeAwareWorkspace(named: wsName),
                   isUserFacingWorkspace(workspace, focusedWorkspace: focus.workspace)
             else {
                 io.err("Workspace '\(wsName)' doesn't exist")
@@ -68,4 +68,10 @@ extension Window {
             return nil
         }
     }
+}
+
+/// Native desktops are also named by their number, as `workspace N` does.
+@MainActor
+private func nativeAwareWorkspace(named name: String) -> Workspace? {
+    Workspace.existing(byName: name) ?? (runtime.workspaceBackend.kind == .native ? userWorkspace(named: name) : nil)
 }

@@ -58,7 +58,10 @@ final class NativeWindowSpaceMoves {
     /// its arrangement, otherwise as one group. The emptied desktop stays in place.
     func run(_ args: MoveWorkspaceToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
         guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
-        guard let source = args.resolveTargetOrReportError(env, io)?.workspace else { return false }
+        // Any desktop may be the source, including one not showing: windows move by ID and
+        // each arrival is confirmed, so the active-desktop fence of tiling commands is not needed.
+        guard let source = args.resolveUncheckedTarget(env, io)?.workspace else { return false }
+        guard nativeDesktopNumber(of: source) != nil else { return io.err("Only a native desktop can move to another display") }
         let monitor: Monitor
         switch args.target.val.resolve(source.workspaceMonitor, wrapAround: args.wrapAround) {
             case .success(let target): monitor = target
@@ -67,8 +70,12 @@ final class NativeWindowSpaceMoves {
         let destination = monitor.activeWorkspace
         guard destination !== source else { return true }
         let windows = source.allLeafWindowsRecursive
-        guard !windows.isEmpty else { return io.err("\(userFacingDesktopName(source)) has no windows to move") }
-        let ids = windows.map(\.windowId)
+        // Windows of a desktop not visited yet are known only by ID; they move too and are
+        // adopted on arrival, since the destination desktop is showing.
+        let sourceSpace = runtime.workspaceBackend.nativeLayouts.currentBySpaceID.first { $0.value === source }?.key
+        let listed = sourceSpace.map { space in (NativeUnvisitedWindows.shared.bySpaceID[space] ?? []).map(\.windowId) } ?? []
+        let ids = windows.map(\.windowId) + listed.filter { id in !windows.contains { $0.windowId == id } }
+        guard !ids.isEmpty else { return io.err("\(userFacingDesktopName(source)) has no windows to move") }
         let state: NativeSpacesSnapshot
         do { state = try await snapshot(ids) } catch { return io.err("Native Spaces unavailable: \(error)") }
         guard let display = state.displays.first(where: { nativeDisplay($0, isShownOn: monitor) }),
@@ -90,7 +97,7 @@ final class NativeWindowSpaceMoves {
             }
         }
         guard !arrived.isEmpty else { return io.err("No window of \(userFacingDesktopName(source)) arrived on \(monitor.name)") }
-        if arrived.count == windows.count {
+        if !windows.isEmpty, windows.allSatisfy({ arrived.contains($0.windowId) }) {
             transplant(source, into: destination)
         } else {
             for window in windows where arrived.contains(window.windowId) {
@@ -103,8 +110,9 @@ final class NativeWindowSpaceMoves {
             destination.mostRecentWindowRecursive, focused.focusWindow() {
             focused.nativeFocus()
         }
-        let left = windows.count - arrived.count
-        return left == 0 || io.err("\(left) of \(windows.count) windows could not move and stay on \(userFacingDesktopName(source))")
+        NativeUnvisitedWindows.shared.refresh()
+        let left = movable.count - arrived.count
+        return left == 0 || io.err("\(left) of \(movable.count) windows could not move and stay on \(userFacingDesktopName(source))")
     }
 
     private func transplant(_ source: Workspace, into destination: Workspace) {
