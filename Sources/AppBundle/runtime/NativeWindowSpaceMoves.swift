@@ -83,8 +83,10 @@ final class NativeWindowSpaceMoves {
               let spaceID = UInt64(target.id) else {
             return io.err("\(monitor.name) shows no desktop windows can join")
         }
+        let desktops = Set(state.displays.flatMap { $0.spaces.filter(\.isDesktop).map(\.id) })
         let movable = ids.filter { id in
-            guard let space = state.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID else { return false }
+            // Fullscreen windows keep their own Space.
+            guard let space = state.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID, desktops.contains(space) else { return false }
             return space != target.id
         }
         let failedToStart = movable.filter { !move($0, spaceID) }
@@ -107,8 +109,8 @@ final class NativeWindowSpaceMoves {
         }
         runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
         if let focused = windows.first(where: { $0.windowId == focus.windowOrNil?.windowId && arrived.contains($0.windowId) }) ??
-            destination.mostRecentWindowRecursive, focused.focusWindow() {
-            focused.nativeFocus()
+            destination.mostRecentWindowRecursive {
+            await focusWhenReady(focused)
         }
         NativeUnvisitedWindows.shared.refresh()
         let left = movable.count - arrived.count
@@ -145,6 +147,14 @@ final class NativeWindowSpaceMoves {
         return window
     }
 
+    /// A move or Space switch requests a read, which revokes write and focus permits;
+    /// focus waits until that read has reissued them.
+    private func focusWhenReady(_ window: Window) async {
+        for _ in 0..<60 where !runtime.workspaceBackend.nativeTiling.ready { try? await Task.sleep(for: .milliseconds(25)) }
+        guard window.focusWindow() else { return }
+        window.nativeFocus()
+    }
+
     private func move(_ window: Window, focusFollowsWindow: Bool, failIfNoop: Bool, io: CmdIo,
                       target resolveTarget: (String, NativeSpaceDisplay, [NativeSpaceDisplay]) -> NativeSpace?) async -> Bool {
         guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
@@ -154,6 +164,9 @@ final class NativeWindowSpaceMoves {
         guard let source = state.windows.first(where: { $0.windowID == id })?.unambiguousSpaceID,
               let display = state.displays.first(where: { $0.spaces.contains { $0.id == source } }) else {
             return io.err("Window \(id) is not on exactly one native Space")
+        }
+        guard display.spaces.first(where: { $0.id == source })?.isDesktop == true else {
+            return io.err("Window \(id) is on a fullscreen Space; exit fullscreen to move it")
         }
         guard let target = resolveTarget(source, display, state.displays) else { return false }
         if target.id == source {
@@ -183,7 +196,7 @@ final class NativeWindowSpaceMoves {
         guard focusFollowsWindow, let number = NativeSpaceNavigation.desktopNumber(of: target.id, in: state.displays),
               case .cmd(let follow) = parseCommand("workspace \(number)"), let follow = follow as? WorkspaceCommand else { return true }
         guard await runtime.workspaceBackend.nativeNavigation.run(follow.args, io: io) else { return false }
-        window.nativeFocus()
+        await focusWhenReady(window)
         return true
     }
 
