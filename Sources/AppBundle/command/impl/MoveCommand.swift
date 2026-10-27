@@ -175,7 +175,7 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
                     .copy(\.windowId, focusWindow.windowId)
                     .copy(\.focusFollowsWindow, focus.windowOrNil == focusWindow)
 
-                return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).run(env, io)
+                return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).runVirtual(env, io)
             } else {
                 return hitAllMonitorsOuterFrameBoundaries(node, workspace, args, direction)
             }

@@ -95,8 +95,9 @@ Configured shortcut modes are
 available. A binding whose commands the native backend cannot run is not registered,
 so its keys keep reaching macOS and the focused app: an unchanged virtual config can
 no longer swallow Control-arrow or Control-number. In a mode with
-`exit-on-unbound-key`, such keys count as unbound. Cross-display movement, project
-commands, agent operations and subscriptions remain unsupported. `move-node-to-workspace` moves windows between Spaces (see
+`exit-on-unbound-key`, such keys count as unbound. Moving whole desktops between
+displays (`move-workspace-to-monitor`, summon), project commands, agent operations and
+subscriptions remain unsupported. `move-node-to-workspace` moves windows between Spaces (see
 [moving windows](#moving-windows-between-spaces)).
 
 Every queued frame write and retry requires a current generation permit, fresh
@@ -154,6 +155,13 @@ desktop, with the same numbering as `workspace`; next/prev step through the wind
 display's desktops, skipping fullscreen Spaces, and `--focus-follows-window` follows
 it. `--window-id` and `--fail-if-noop` are honored. The window's node joins the
 destination desktop's layout. Observation-only mode never moves windows.
+
+`move-node-to-monitor` moves a window to the desktop another display is showing,
+through the same confirmed move, and `focus-monitor` focuses the most recent window of
+the desktop the target display shows; both resolve directions, next/prev and patterns
+as in virtual mode. `list-monitors` answers from the real displays. macOS cannot move a
+whole desktop to another display without SIP changes, so `move-workspace-to-monitor`
+stays unsupported.
 
 The move uses SkyLight's `SLSBridgedMoveWindowsToManagedSpaceOperation` through a
 dispatcher SkyLight does not export, found by scanning its symbol table (adapted from

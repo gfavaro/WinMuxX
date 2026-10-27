@@ -102,7 +102,7 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
     func testNativeReadOnlyCommandsRejectVirtualQueriesAndMutation() async throws {
         runtime.workspaceBackend.selectForStartup(.native)
         let original = Workspace.all.count
-        for text in ["workspace web", "list-monitors", "enable off"] {
+        for text in ["workspace web", "move-workspace-to-monitor next", "enable off"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
             let result = try await command.run(.defaultEnv, .emptyStdin)
             XCTAssertNotEqual(result.exitCode, 0)

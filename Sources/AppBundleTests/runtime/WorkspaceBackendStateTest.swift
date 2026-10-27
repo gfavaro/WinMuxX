@@ -56,9 +56,9 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
             config = bindings
             defer { resetHotKeys() }
             try await activateMode(mainModeId)
-            // Cross-display moves stay with macOS; navigation can't share a sequence with window commands.
-            XCTAssertEqual(Set(runtime.hotkeys.hotkeys.values.compactMap(\.keyCombo.key)), [.h, .leftArrow])
-            XCTAssertTrue(runtime.hotkeys.activeTapBindings.isEmpty)
+            // Monitor moves and focus are native; navigation can't share a sequence with window commands.
+            XCTAssertEqual(Set(runtime.hotkeys.hotkeys.values.compactMap(\.keyCombo.key)), [.h, .downArrow, .leftArrow])
+            XCTAssertEqual(runtime.hotkeys.activeTapBindings.count, 1)
         }
     }
 

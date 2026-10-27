@@ -27,8 +27,34 @@ final class NativeWindowSpaceMoves {
     }
 
     func run(_ args: MoveNodeToWorkspaceCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
-        guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
         guard let window = args.resolveTargetOrReportError(env, io)?.windowOrNil else { return io.err(noWindowIsFocused) }
+        return await move(window, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop, io: io) {
+            self.resolve(args, from: $0, on: $1, in: $2, io)
+        }
+    }
+
+    /// `move-node-to-monitor`: the window joins the desktop that display shows.
+    func run(_ args: MoveNodeToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
+        guard let window = args.resolveTargetOrReportError(env, io)?.windowOrNil else { return io.err(noWindowIsFocused) }
+        guard let current = window.nodeMonitor else { return io.err(windowIsntPartOfTree(window)) }
+        let monitor: Monitor
+        switch args.target.val.resolve(current, wrapAround: args.wrapAround) {
+            case .success(let target): monitor = target
+            case .failure(let message): return io.err(message)
+        }
+        return await move(window, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop, io: io) { _, _, displays in
+            guard let display = displays.first(where: { nativeDisplay($0, isShownOn: monitor) }),
+                  let space = display.spaces.first(where: { $0.id == display.activeSpaceID }), space.isDesktop else {
+                _ = io.err("\(monitor.name) shows no desktop a window can join")
+                return nil
+            }
+            return space
+        }
+    }
+
+    private func move(_ window: Window, focusFollowsWindow: Bool, failIfNoop: Bool, io: CmdIo,
+                      target resolveTarget: (String, NativeSpaceDisplay, [NativeSpaceDisplay]) -> NativeSpace?) async -> Bool {
+        guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
         let id = window.windowId
         let state: NativeSpacesSnapshot
         do { state = try await snapshot(id) } catch { return io.err("Native Spaces unavailable: \(error)") }
@@ -36,9 +62,9 @@ final class NativeWindowSpaceMoves {
               let display = state.displays.first(where: { $0.spaces.contains { $0.id == source } }) else {
             return io.err("Window \(id) is not on exactly one native Space")
         }
-        guard let target = resolve(args, from: source, on: display, in: state.displays, io) else { return false }
+        guard let target = resolveTarget(source, display, state.displays) else { return false }
         if target.id == source {
-            if args.failIfNoop { return false }
+            if failIfNoop { return false }
             io.err("Window \(id) is already on that desktop. Tip: use --fail-if-noop to exit with non-zero code")
             return true
         }
@@ -61,7 +87,7 @@ final class NativeWindowSpaceMoves {
             }
         }
         runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
-        guard args.focusFollowsWindow, let number = NativeSpaceNavigation.desktopNumber(of: target.id, in: state.displays),
+        guard focusFollowsWindow, let number = NativeSpaceNavigation.desktopNumber(of: target.id, in: state.displays),
               case .cmd(let follow) = parseCommand("workspace \(number)"), let follow = follow as? WorkspaceCommand else { return true }
         guard await runtime.workspaceBackend.nativeNavigation.run(follow.args, io: io) else { return false }
         window.nativeFocus()

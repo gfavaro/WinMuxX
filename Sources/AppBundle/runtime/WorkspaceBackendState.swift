@@ -48,7 +48,7 @@ final class WorkspaceBackendState {
     func accepts(_ command: any Command) -> Bool {
         // Moving windows writes; observation-only mode stays physically read-only.
         kind == .virtual || Self.isNativeDiagnosticOrQuery(command) ||
-            (Self.isNativeNavigation(command) && (nativeTilingEnabled || !(command is MoveNodeToWorkspaceCommand))) ||
+            (Self.isNativeNavigation(command) && (nativeTilingEnabled || command is WorkspaceCommand || command is WorkspaceBackAndForthCommand)) ||
             (nativeTilingEnabled && NativeTilingCoordinator.supports(command))
     }
 
@@ -71,7 +71,7 @@ final class WorkspaceBackendState {
         switch command {
             case is DoctorCommand, is ReloadConfigCommand, is ListWorkspacesCommand, is ListWindowsCommand,
                  is ListAppsCommand, is ListModesCommand, is ListExecEnvVarsCommand, is ConfigCommand,
-                 is PaletteCommand, is OpenSidebarCommand: true
+                 is PaletteCommand, is OpenSidebarCommand, is ListMonitorsCommand: true
             default: false
         }
     }
@@ -82,7 +82,7 @@ final class WorkspaceBackendState {
         switch command {
             case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
             case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
-            case is WorkspaceBackAndForthCommand: true
+            case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand: true
             default: false
         }
     }

@@ -94,3 +94,66 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
         XCTAssertTrue(runtime.workspaceBackend.accepts(move))
     }
 }
+
+@MainActor
+final class NativeMonitorCommandsTest: WorkspaceTestCase {
+    private var membership = "1"
+    private var moves: [UInt64] = []
+    private var monitors: [Monitor] = []
+
+    override func setUp() async throws {
+        try await super.setUp()
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let left = Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080)
+        let right = Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080)
+        monitors = [
+            TestMonitor(displayUUID: "display-a", monitorAppKitNsScreenScreensId: 1, name: "left", rect: left, visibleRect: left, isMain: true),
+            TestMonitor(displayUUID: "display-b", monitorAppKitNsScreenScreensId: 2, name: "right", rect: right, visibleRect: right, isMain: false),
+        ]
+        setMonitorsForTests(monitors)
+        var inventory = NativeWorkspaceInventory()
+        XCTAssertTrue(inventory.publish(snapshot(), for: inventory.invalidate()))
+        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: monitors)
+    }
+
+    private func snapshot() -> NativeSpacesSnapshot {
+        NativeSpacesSnapshot(displays: [
+            NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "1", spaces: [
+                NativeSpace(id: "1", uuid: "desktop-a", type: 0), NativeSpace(id: "2", uuid: "desktop-b", type: 0)]),
+            NativeSpaceDisplay(identifier: "display-b", activeSpaceID: "6", spaces: [NativeSpace(id: "6", uuid: "desktop-c", type: 0)]),
+        ], windows: [NativeWindowMembership(windowID: 70, spaceIDs: [membership])], readMilliseconds: 0, capturedAt: .now)
+    }
+
+    func testMoveNodeToMonitorJoinsTheDesktopThatDisplayShows() async throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let source = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
+        let destination = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
+        let window = TestWindow.new(id: 70, parent: source.rootTilingContainer)
+        let mover = NativeWindowSpaceMoves()
+        mover.isAvailable = { true }
+        mover.arrivalTimeout = .milliseconds(100)
+        mover.pollInterval = .milliseconds(5)
+        mover.snapshot = { [unowned self] _ in snapshot() }
+        mover.move = { [unowned self] _, space in moves.append(space); membership = String(space); return true }
+        let args = try XCTUnwrap(parseCommand("move-node-to-monitor right").cmdOrDie as? MoveNodeToMonitorCommand).args
+        let io = CmdIo(stdin: .emptyStdin)
+        let ok = await mover.run(args, env: .defaultEnv.copy(\.windowId, 70), io: io)
+        XCTAssertTrue(ok, io.stderr.joined())
+        XCTAssertEqual(moves, [6], "The right display shows desktop 3 (Space 6)")
+        XCTAssertTrue(window.nodeWorkspace === destination)
+    }
+
+    func testFocusMonitorFocusesTheOtherDisplaysRecentWindow() throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
+        let right = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
+        let here = TestWindow.new(id: 71, parent: left.rootTilingContainer)
+        let there = TestWindow.new(id: 72, parent: right.rootTilingContainer)
+        _ = here.focusWindow()
+        let args = try XCTUnwrap(parseCommand("focus-monitor right").cmdOrDie as? FocusMonitorCommand).args
+        let io = CmdIo(stdin: .emptyStdin)
+        XCTAssertTrue(nativeFocusMonitor(args, env: .defaultEnv, io: io), io.stderr.joined())
+        XCTAssertEqual(focus.windowOrNil?.windowId, there.windowId)
+        XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("list-monitors").unwrap().0)))
+    }
+}

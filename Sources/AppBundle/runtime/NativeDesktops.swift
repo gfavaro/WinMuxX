@@ -1,3 +1,4 @@
+import Common
 import NativeSpaces
 
 // Native desktops as users and scripts see them: numbered in macOS Control-N order,
@@ -48,6 +49,30 @@ func userFacingWorkspaceName(_ workspace: Workspace) -> String {
 func userWorkspace(named name: String) -> Workspace? {
     guard runtime.workspaceBackend.kind == .native else { return Workspace.existing(byName: name) }
     return Int(name).flatMap { number in nativeDesktopWorkspaces().first { $0.number == number }?.workspace }
+}
+
+/// Native snapshots name the main display "Main" when it has no UUID of its own.
+@MainActor
+func nativeDisplay(_ display: NativeSpaceDisplay, isShownOn monitor: Monitor) -> Bool {
+    display.identifier == "Main" ? monitor.rect.topLeftCorner == mainMonitor.rect.topLeftCorner : display.identifier == monitor.displayUUID
+}
+
+/// `focus-monitor`: focuses the most recent window of the desktop that display shows.
+@MainActor
+func nativeFocusMonitor(_ args: FocusMonitorCmdArgs, env: CmdEnv, io: CmdIo) -> Bool {
+    guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+    switch args.target.val.resolve(target.workspace.workspaceMonitor, wrapAround: args.wrapAround) {
+        case .success(let monitor):
+            let desktop = monitor.activeWorkspace
+            guard let window = desktop.mostRecentWindowRecursive else {
+                return io.err("\(nativeDesktopNumber(of: desktop).map { nativeDesktopDisplayName($0) } ?? "The desktop") on \(monitor.name) has no window to focus")
+            }
+            guard window.focusWindow() else { return io.err("Window \(window.windowId) could not take focus") }
+            window.nativeFocus()
+            return true
+        case .failure(let message):
+            return io.err(message)
+    }
 }
 
 /// A `workspace-labels` entry keyed by desktop number names that desktop.

@@ -29,7 +29,7 @@ func nativeSpacesDiagnosticReport() -> String {
     var lines = ["WinMuxX — Native Spaces (experimental\(tiling ? " tiling" : " read-only"))",
         "Space switching: workspace N/next/prev via Dock swipe (macOS 27, Accessibility: \(NativeDockSwipe.canPostEvents ? "granted" : "missing")).",
         "Window moves: move-node-to-workspace N/next/prev via bridged SkyLight operation (\(NativeWindowSpaceMover.isAvailable ? "available" : "unavailable on this macOS")).",
-        "Space relocation, cross-display moves, projects and virtual recovery: unsupported.",
+        "Window moves to another display: move-node-to-monitor; moving whole desktops between displays, projects and virtual recovery: unsupported.",
         nativeSkippedWindowRuleCommands.isEmpty ? "Window rules: floating/tiling applied natively."
             : "Window rules: floating/tiling applied; skipped unsupported: \(nativeSkippedWindowRuleCommands.sorted().joined(separator: "; "))",
         tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
