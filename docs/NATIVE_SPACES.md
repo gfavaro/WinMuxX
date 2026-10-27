@@ -164,6 +164,23 @@ instead of guessing. Each move is confirmed by re-reading the window's Space.
 WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
 desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
 
+## Scrolling
+
+`workspace-layout scrolling`, `scrolling-center`, `scrolling-width` and
+`scrolling-minimap` work natively, per desktop. Columns scrolled out of view stay at
+the display edges as previews (or behind visible columns next to another display);
+they are never parked in a corner, so they stay on their desktop and reachable.
+Overlap order uses the same AX raises as virtual scrolling.
+
+macOS keeps three- and four-finger swipes for switching Spaces, so native mode pans
+with **Option + two-finger horizontal scroll** on a trackpad over a scrolling desktop
+(`[scrolling] gesture-enabled` and `gesture-sensitivity` apply). Those scroll events
+are consumed; other scrolls, mouse wheels and other desktops are untouched. When the
+scroll ends, momentum is ignored and the column nearest the middle is revealed and
+focused. Viewport changes re-lay out the desktop immediately rather than waiting for
+an observation read. The minimap shows while panning and when opened with
+`scrolling-minimap`; clicking a column reveals and focuses it.
+
 ## Tab groups
 
 With `window-tabs.enabled`, Tabbed groups (`layout tab-group`, `stack-with`, the tab

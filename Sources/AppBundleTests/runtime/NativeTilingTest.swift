@@ -339,13 +339,14 @@ final class NativeTilingTest: WorkspaceTestCase {
     }
 
     func testCommandPolicyRejectsCrossSpaceAndOverlappingLayoutsBeforeReadiness() throws {
-        for text in ["focus left", "move right", "resize width +20", "workspace-layout master", "layout floating"] {
+        for text in ["focus left", "move right", "resize width +20", "workspace-layout master", "layout floating",
+                     "workspace-layout scrolling", "scrolling-center", "scrolling-width next"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
             XCTAssertTrue(NativeTilingCoordinator.supports(command), text)
         }
         config.windowTabs.enabled = true
         XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("layout tabbed").unwrap().0)))
-        for text in ["workspace 2", "move-node-to-workspace 2", "layout accordion", "workspace-layout scrolling",
+        for text in ["workspace 2", "move-node-to-workspace 2", "layout accordion",
                      "move --boundaries all-monitors-outer-frame left",
                      "focus --boundaries all-monitors-outer-frame left"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)

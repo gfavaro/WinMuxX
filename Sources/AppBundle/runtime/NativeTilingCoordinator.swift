@@ -132,6 +132,30 @@ final class NativeTilingCoordinator {
         lastMouseRelease = "window \(window.windowId): \(outcome); actual \(actual), layout \(target)"
     }
 
+    private var scrollingLayoutTask: Task<Void, Never>?
+    private var scrollingLayoutPending = false
+
+    /// Scrolling viewport changes (panning, settling, minimap, commands) re-lay out the
+    /// visible scrolling desktops at once under the current write permits; waiting for
+    /// an observation read would make panning lag. Requests coalesce into one pass.
+    func relayoutVisibleScrolling() {
+        guard ready else { return runtime.workspaceBackend.observation?.requestRead(event: "nativeScrolling") ?? () }
+        if scrollingLayoutTask != nil { scrollingLayoutPending = true; return }
+        scrollingLayoutTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            repeat {
+                scrollingLayoutPending = false
+                let version = generation
+                for workspace in runtime.workspaceBackend.nativeLayouts.currentBySpaceID.values
+                    where workspace.isVisible && workspace.arrangement == .scrolling {
+                    guard ready, generation == version, !holdsForMouseRelease else { break }
+                    do { try await workspace.layoutWorkspace() } catch { break }
+                }
+            } while scrollingLayoutPending
+            scrollingLayoutTask = nil
+        }
+    }
+
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
     var holdsForMouseRelease = false
 
@@ -167,14 +191,15 @@ final class NativeTilingCoordinator {
                  // Per-window actions; observation reconciles the states they produce.
                  is FullscreenCommand, is MacosNativeFullscreenCommand, is MacosNativeMinimizeCommand,
                  is CloseCommand, is CloseAllWindowsButCurrentCommand,
-                 is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand: return true
+                 is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
+                 is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand: return true
             // Tab groups stack natively only with window tabs; Accordion overlap is not shown yet.
             case is StackWithCommand: return config.windowTabs.enabled
             case let command as MoveCommand: return command.args.boundaries == .workspace
             case let command as FocusCommand:
                 return command.args.boundaries == .workspace && command.args.boundariesAction != .wrapAroundAllMonitors
             case let command as WorkspaceLayoutCommand:
-                return command.args.layouts.val.allSatisfy { $0 == .dwindle || $0 == .master }
+                return command.args.layouts.val.allSatisfy { $0 == .dwindle || $0 == .master || $0 == .scrolling }
             case let command as LayoutCommand:
                 return !command.args.forNextDetectedWindow && command.args.toggleBetween.val.allSatisfy {
                     [.tiles, .h_tiles, .v_tiles, .horizontal, .vertical, .auto, .tiling, .floating].contains($0) ||

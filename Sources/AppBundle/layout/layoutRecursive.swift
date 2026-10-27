@@ -76,7 +76,8 @@ extension Workspace {
                 return supported(nested)
             }
         }
-        return [.dwindle, .master].contains(arrangement) && masterStackLayout == .tiles && supported(rootTilingContainer)
+        // Scrolling keeps out-of-view columns at the display edges, never parked in a corner.
+        return [.dwindle, .master, .scrolling].contains(arrangement) && masterStackLayout == .tiles && supported(rootTilingContainer)
     }
 }
 

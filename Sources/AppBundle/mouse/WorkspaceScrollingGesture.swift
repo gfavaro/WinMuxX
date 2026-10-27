@@ -250,15 +250,7 @@ final class WorkspaceScrollingGestureController {
     }
 
     private func nearestColumn(in metrics: ScrollingWorkspaceMetrics) -> ScrollingColumnMetric? {
-        let center = (workspace?.scrollingOffset ?? 0) + metrics.areaWidth / 2
-        return metrics.columns.min { lhs, rhs in
-            let a = abs(lhs.start + lhs.width / 2 - center)
-            let b = abs(rhs.start + rhs.width / 2 - center)
-            if abs(a - b) < 0.5, lastDirection != 0 {
-                return lastDirection > 0 ? lhs.start > rhs.start : lhs.start < rhs.start
-            }
-            return a < b
-        }
+        nearestScrollingColumn(in: metrics, offset: workspace?.scrollingOffset ?? 0, direction: lastDirection)
     }
 
     private func cancelSettlement(keepOffset: Bool) {

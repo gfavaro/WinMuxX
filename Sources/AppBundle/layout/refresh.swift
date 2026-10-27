@@ -134,6 +134,9 @@ func scheduleRefreshSession(
     recordsActivation: Bool = true,
 ) {
     runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
+    if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, name.hasPrefix("scrolling") {
+        return runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
+    }
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
     guard isUnitTest || isWinMuxRuntimeReady else { return }

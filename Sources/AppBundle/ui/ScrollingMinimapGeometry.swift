@@ -73,6 +73,7 @@ func focusScrollingMinimapGroup(_ id: ObjectIdentifier, in workspace: Workspace)
     guard workspace.arrangement == .scrolling,
           let group = workspace.workspaceLayoutUnits.first(where: { ObjectIdentifier($0) == id }),
           let window = group.mostRecentWindowRecursive, window.focusWindow() else { return false }
+    if runtime.workspaceBackend.kind == .native { window.nativeFocus() }
     if let column = workspace.scrollingMetrics.columns.first(where: { $0.node === group }) {
         workspace.scrollingOffset = workspace.scrollingMetrics.revealedOffset(for: column, current: workspace.scrollingOffset)
         workspace.lastScrollingFocusWindowId = window.windowId
