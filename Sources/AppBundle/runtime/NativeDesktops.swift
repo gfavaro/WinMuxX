@@ -51,6 +51,11 @@ func userWorkspace(named name: String) -> Workspace? {
     return Int(name).flatMap { number in nativeDesktopWorkspaces().first { $0.number == number }?.workspace }
 }
 
+@MainActor
+func userFacingDesktopName(_ workspace: Workspace) -> String {
+    nativeDesktopNumber(of: workspace).map { nativeDesktopDisplayName($0) } ?? "The desktop"
+}
+
 /// Native snapshots name the main display "Main" when it has no UUID of its own.
 @MainActor
 func nativeDisplay(_ display: NativeSpaceDisplay, isShownOn monitor: Monitor) -> Bool {

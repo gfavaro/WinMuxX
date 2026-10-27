@@ -95,8 +95,7 @@ Configured shortcut modes are
 available. A binding whose commands the native backend cannot run is not registered,
 so its keys keep reaching macOS and the focused app: an unchanged virtual config can
 no longer swallow Control-arrow or Control-number. In a mode with
-`exit-on-unbound-key`, such keys count as unbound. Moving whole desktops between
-displays (`move-workspace-to-monitor`, summon), project commands, agent operations and
+`exit-on-unbound-key`, such keys count as unbound. Summoning workspaces, project commands, agent operations and
 subscriptions remain unsupported. `move-node-to-workspace` moves windows between Spaces (see
 [moving windows](#moving-windows-between-spaces)).
 
@@ -159,9 +158,16 @@ destination desktop's layout. Observation-only mode never moves windows.
 `move-node-to-monitor` moves a window to the desktop another display is showing,
 through the same confirmed move, and `focus-monitor` focuses the most recent window of
 the desktop the target display shows; both resolve directions, next/prev and patterns
-as in virtual mode. `list-monitors` answers from the real displays. macOS cannot move a
-whole desktop to another display without SIP changes, so `move-workspace-to-monitor`
-stays unsupported.
+as in virtual mode. `list-monitors` answers from the real displays.
+
+macOS cannot move a desktop to another display without SIP changes (Mission Control
+can, by dragging its thumbnail). `move-workspace-to-monitor` therefore moves the
+desktop's windows instead: each joins the desktop the target display shows through the
+same confirmed move, and the layout tree follows. Into an empty desktop it arrives
+whole, with its arrangement (scrolling, master, dwindle), groups and floating windows;
+into a desktop that has windows it joins as one group. The macOS desktop itself stays
+on its display, emptied, and the most recently used moved window is focused. Windows
+that do not arrive stay where they were and are reported.
 
 The move uses SkyLight's `SLSBridgedMoveWindowsToManagedSpaceOperation` through a
 dispatcher SkyLight does not export, found by scanning its symbol table (adapted from

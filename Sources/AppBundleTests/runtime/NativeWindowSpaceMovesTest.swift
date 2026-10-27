@@ -116,12 +116,46 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: monitors)
     }
 
+    private var memberships: [UInt32: String] = [:]
+
     private func snapshot() -> NativeSpacesSnapshot {
         NativeSpacesSnapshot(displays: [
             NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "1", spaces: [
                 NativeSpace(id: "1", uuid: "desktop-a", type: 0), NativeSpace(id: "2", uuid: "desktop-b", type: 0)]),
             NativeSpaceDisplay(identifier: "display-b", activeSpaceID: "6", spaces: [NativeSpace(id: "6", uuid: "desktop-c", type: 0)]),
-        ], windows: [NativeWindowMembership(windowID: 70, spaceIDs: [membership])], readMilliseconds: 0, capturedAt: .now)
+        ], windows: [NativeWindowMembership(windowID: 70, spaceIDs: [membership])] +
+            memberships.map { NativeWindowMembership(windowID: $0.key, spaceIDs: [$0.value]) },
+        readMilliseconds: 0, capturedAt: .now)
+    }
+
+    func testMoveWorkspaceToMonitorCarriesTheLayoutIntoTheOtherDisplaysDesktop() async throws {
+        let layouts = runtime.workspaceBackend.nativeLayouts
+        let source = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
+        let destination = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
+        source.rootTilingContainer.layout = .tiles
+        let split = TilingContainer(parent: source.rootTilingContainer, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let a = TestWindow.new(id: 81, parent: split)
+        let b = TestWindow.new(id: 82, parent: split)
+        let c = TestWindow.new(id: 83, parent: source.rootTilingContainer)
+        let floating = TestWindow.new(id: 84, parent: source)
+        source.transitionArrangement(to: .scrolling)
+        for id in [81, 82, 83, 84] as [UInt32] { memberships[id] = "1" }
+        let mover = NativeWindowSpaceMoves()
+        mover.isAvailable = { true }
+        mover.arrivalTimeout = .milliseconds(100)
+        mover.pollInterval = .milliseconds(5)
+        mover.snapshot = { [unowned self] _ in snapshot() }
+        mover.move = { [unowned self] id, space in memberships[id] = String(space); return true }
+        let args = try XCTUnwrap(parseCommand("move-workspace-to-monitor right").cmdOrDie as? MoveWorkspaceToMonitorCommand).args
+        let io = CmdIo(stdin: .emptyStdin)
+        let ok = await mover.run(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
+        XCTAssertTrue(ok, io.stderr.joined())
+        XCTAssertEqual(Set(memberships.values), ["6"])
+        XCTAssertTrue([a, b, c, floating].allSatisfy { $0.nodeWorkspace === destination })
+        XCTAssertTrue(a.parent === b.parent && a.parent !== destination.rootTilingContainer, "The split arrives intact")
+        XCTAssertTrue(floating.parent === destination, "Floating windows stay floating")
+        XCTAssertEqual(destination.arrangement, .scrolling)
+        XCTAssertTrue(source.isEffectivelyEmpty, "The macOS desktop stays, emptied")
     }
 
     func testMoveNodeToMonitorJoinsTheDesktopThatDisplayShows() async throws {

@@ -82,7 +82,8 @@ final class WorkspaceBackendState {
         switch command {
             case let command as WorkspaceCommand: NativeSpaceNavigator.supports(command.args)
             case let command as MoveNodeToWorkspaceCommand: NativeWindowSpaceMoves.supports(command.args)
-            case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand: true
+            case is WorkspaceBackAndForthCommand, is MoveNodeToMonitorCommand, is FocusMonitorCommand,
+                 is MoveWorkspaceToMonitorCommand: true
             default: false
         }
     }
