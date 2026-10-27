@@ -102,12 +102,16 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
     func testNativeReadOnlyCommandsRejectVirtualQueriesAndMutation() async throws {
         runtime.workspaceBackend.selectForStartup(.native)
         let original = Workspace.all.count
-        for text in ["workspace 99", "list-workspaces --all", "enable off"] {
+        for text in ["workspace web", "list-workspaces --all", "enable off"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
             let result = try await command.run(.defaultEnv, .emptyStdin)
             XCTAssertNotEqual(result.exitCode, 0)
             XCTAssertTrue(result.stderr.joined().contains("unsupported"))
         }
+        // Numbered targets are native navigation; a missing desktop must not create a workspace.
+        let navigation = try XCTUnwrap(parseCommand("workspace 99").unwrap().0)
+        let navigated = try await navigation.run(.defaultEnv, .emptyStdin)
+        XCTAssertNotEqual(navigated.exitCode, 0)
         XCTAssertEqual(Workspace.all.count, original)
         XCTAssertTrue(TrayMenuModel.shared.isEnabled)
         let doctor = try XCTUnwrap(parseCommand("doctor").unwrap().0)

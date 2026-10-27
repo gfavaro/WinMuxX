@@ -1,7 +1,8 @@
 # Native Spaces (experimental)
 
-This branch implements read-only native Space observation and a separate experimental
-Dwindle/Master tiling opt-in. Basic positioning, explicit focus, minimize/restore
+This branch implements read-only native Space observation, a separate experimental
+Dwindle/Master tiling opt-in, native Space navigation and a sidebar listing native
+desktops. Basic positioning, explicit focus, minimize/restore
 and native fullscreen have been exercised on one SIP-enabled macOS 27.2 host.
 Broader native validation remains a release gate. Virtual workspaces remain the default and retain their layouts,
 projects, gestures, display movement and recovery.
@@ -18,9 +19,10 @@ type = "native" # observation only by default; virtual remains the default backe
 Native observation enumerates desktops and fullscreen Spaces per display, records
 window memberships, and follows public Space/display/session/application events
 plus dynamically resolved WindowServer lifecycle notifications.
-It does not request Accessibility or Screen Recording permission, activate Spaces,
-create/delete Spaces, move windows, park windows, run virtual startup hooks or
-register WinMuxX trackpad gestures/hotkeys. Mission Control and native gestures
+It does not request Accessibility or Screen Recording permission, create/delete
+Spaces, move windows between Spaces, park windows, run virtual startup hooks or
+register WinMuxX trackpad gestures. Spaces change only when macOS or an explicit
+`workspace` command switches them (see [navigation](#native-space-navigation)). Mission Control and native gestures
 remain under macOS control. When Accessibility permission already exists, active
 desktop windows are AX-classified into the existing layout trees without applying
 frames or running detection-command hooks. Missing AX responses retain nodes;
@@ -38,8 +40,9 @@ write permits. A local
 read-only ownership preflight checks real process/Space identity without granting
 the runtime any frame-write permits.
 In observation mode, other CLI commands, including virtual queries and subscriptions, return an explicit
-unsupported error. There is no automatic synthetic-input fallback for navigation.
-The sidebar, palette, overview and project mapping are not integrated yet.
+unsupported error. The sidebar lists native desktops (see [sidebar](#sidebar)); the
+palette and workspace overview are not integrated yet. Projects are disabled in
+native mode by design: virtual projects stay untouched for a later rollback.
 
 Change `type` back to `"virtual"` (or remove the table) and restart to roll back.
 Live backend changes are rejected before publishing configuration; `reload-config
@@ -76,17 +79,22 @@ and Dwindle shares survive temporary concealment. Floating windows keep their
 physical frames unless an explicit layout command changes them. No native gesture
 recognizer is installed.
 
-Supported commands are `focus` and `move` within workspace boundaries, `resize`,
+Supported commands are `workspace N|next|prev` (in every native mode, see
+[navigation](#native-space-navigation)), `focus` and `move` within workspace boundaries, `resize`,
 `swap`, `balance-sizes`, `split`, `swap-with-master`, `workspace-layout dwindle|master`,
 and `layout` for tiles/orientation/tiling/floating. Dwindle resizing with concealed
 siblings currently returns an unsupported error; restore those siblings first.
 Default command targets require verified native app focus; an unmanaged/fullscreen
 frontmost window cannot redirect commands to a previously focused desktop.
 Configured shortcut modes are
-available; unsupported commands in bindings return errors. Workspace switching,
-cross-display movement, tabs, Accordion, scrolling, fullscreen commands, launch hooks,
-window-detection command hooks, project commands, agent operations, virtual queries
-and subscriptions remain unsupported. Cross-Space movement has no synthetic fallback.
+available. A binding whose commands the native backend cannot run is not registered,
+so its keys keep reaching macOS and the focused app: an unchanged virtual config can
+no longer swallow Control-arrow or Control-number. In a mode with
+`exit-on-unbound-key`, such keys count as unbound. Cross-display movement, tabs,
+Accordion, scrolling, fullscreen commands, launch hooks, window-detection command
+hooks, project commands, agent operations, virtual queries and subscriptions remain
+unsupported. Moving windows between Spaces (`move-node-to-workspace`) has no
+synthetic fallback.
 
 Every queued frame write and retry requires a current generation permit, fresh
 Space/process ownership and non-minimized/non-fullscreen AX state. Minimum-size
@@ -112,6 +120,35 @@ native configuration from starting virtual parking as a fallback. Fix the file a
 restart to re-enable window management. A failed configuration reload retains the
 running configuration.
 
+## Native Space navigation
+
+`workspace N` follows macOS's Control-N numbering: ordinary desktops counted across
+displays in Mission Control order, skipping fullscreen Spaces. `workspace next|prev`
+follows Control-arrow on the focused native desktop's display (otherwise the display
+under the pointer), fullscreen Spaces included; `--wrap-around` and `--monitor` are
+honored. Named targets, `--auto-back-and-forth` and `--stdin` stay unsupported.
+A navigation command cannot share a binding with window commands.
+
+Navigation posts a synthetic Dock swipe, adapted from Dinky (MIT) and mimi. It needs
+no Mission Control keyboard shortcuts and works with SIP enabled, but it relies on
+private event fields and the IOHID payload layout the Dock reads on macOS 27; earlier
+systems report it as unsupported. The pointer briefly moves to the target display
+when it is elsewhere and is put back. Success is never assumed: fresh topology reads
+confirm the landing, a short landing is retried once from the observed Space, and a
+switch that still has not landed after about a second is reported. A newer request
+supersedes an older one. Without Accessibility permission macOS drops the events
+silently, so the command fails up front instead.
+
+## Sidebar
+
+With `[workspace-sidebar] enabled`, native mode lists desktops as "Desktop N"; a
+`workspace-labels` entry keyed by the desktop number (`"2" = "Mail"`) renames it.
+Rows show the windows each native layout retains, so a desktop not yet visited shows
+none. Selecting a desktop switches to it; selecting a window on another desktop
+switches first, then focuses it when tiling is enabled. Creating, renaming, deleting
+or rearranging desktops, dragging windows between them and projects explain that
+Mission Control owns desktops instead of acting.
+
 ## Failure handling and limits
 
 Read-side SkyLight symbols are dynamically resolved behind `NativeSpaces`.
@@ -131,7 +168,7 @@ Unknown/native fullscreen Space types and shared/all-Spaces/unknown memberships
 are observable but excluded from the proposed native tiling policy. Missing UUIDs
 cannot be restored by guessing an ordinal. Numeric IDs are not restart identities.
 
-Tab/accordion integration and native navigation are pending. The opt-in tiling path
+Tab/accordion integration, the palette and overview are pending. The opt-in tiling path
 and native persistence have automated coverage. Initial physical Dwindle/Master,
 resize, focus, minimize/restore and fullscreen checks passed on one display;
 Mission Control's detection signature also passed a user-assisted read-only check.
@@ -187,3 +224,16 @@ check for existing windows before enabling tiling, disable native persistence in
 the test configuration, and pause the installed manager with a bounded restoration
 watchdog. Stop the development manager before returning to a working desktop.
 Never interpret fixture success as validation of restrictive third-party apps.
+
+## Troubleshooting
+
+- **Control-arrow or Control-number stopped switching Spaces:** a build before
+  `55e4023d` registered virtual bindings it could not run. Update, or remove those
+  bindings from the native configuration.
+- **`workspace N` reports Accessibility:** grant WinMuxX Accessibility in System
+  Settings → Privacy & Security, then retry.
+- **`workspace N` reports it did not land:** check `doctor` for the active Space and
+  that desktop N exists in Mission Control. Report the macOS version; the Dock swipe
+  payload is version-specific.
+- **Roll back:** set `[workspace-backend] type = "virtual"` (or remove the table) and
+  restart. Native layouts in `native-space-layouts-v1.json` are kept for next time.

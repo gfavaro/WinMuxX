@@ -60,7 +60,18 @@ requires a complete unique match within the owning Space; incomplete or unsuppor
 records are retained, never replaced by a partial autosave. Private APIs remain
 read-side only; physical positioning uses guarded existing AX operations.
 
-Native creation/deletion, activation, cross-Space moves, whole-Space relocation and
-project mapping remain explicit unsupported capabilities.
+Native creation/deletion, cross-Space moves, whole-Space relocation and project
+mapping remain explicit unsupported capabilities. Projects are disabled in native
+mode (option B): virtual projects stay untouched instead of gaining a second,
+UUID-dependent hierarchy whose reboot stability is unverified.
+
+Activation was revisited after user testing showed the gap: with no navigation, an
+unchanged configuration's `workspace` bindings captured keys and then failed. Native
+`workspace` now posts a synthetic Dock swipe (Dinky/mimi, macOS 27) behind
+`NativeDockSwipe`, chosen over posting Control-number keystrokes, which depend on
+optional Mission Control shortcuts and fail silently when those are off. It is the
+only synthesized input, used only for explicit commands, confirmed by topology reads
+and reported when it does not land. Bindings the backend cannot run are no longer
+registered.
 
 See [assessment and measured Phase 0 results](NATIVE_SPACES_ASSESSMENT.md).
