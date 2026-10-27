@@ -164,6 +164,15 @@ instead of guessing. Each move is confirmed by re-reading the window's Space.
 WinMuxX starts; existing windows are never moved at startup. Dragging a window onto a
 desktop in the sidebar moves it there, and the tray menu has Move Window to Desktop.
 
+## Mouse
+
+Layout pauses while a mouse button is down. When the left button is released, the
+frontmost window is read once: a tiled window whose size changed keeps it, through
+the same weight and Dwindle-ratio changes as a virtual mouse resize (a lone window's
+width becomes its manual width); one dragged onto another tile on its desktop swaps
+with it. Anything else returns to its tile. There is no live preview while dragging,
+and drops onto the sidebar or another display are not handled.
+
 ## Hooks
 
 `after-startup-command` runs once the first native observation arrives.

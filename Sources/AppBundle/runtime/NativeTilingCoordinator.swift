@@ -76,8 +76,12 @@ final class NativeTilingCoordinator {
                     guard let owner else { return }
                     owner.withValue {
                         MacApp.cancelPendingFocus()
-                        if released { owner.workspaceBackend.observation?.requestRead(event: "nativeMouseReleased") }
-                        else { owner.workspaceBackend.nativeWriteAuthority.invalidate() }
+                        guard released else { return owner.workspaceBackend.nativeWriteAuthority.invalidate() }
+                        let leftButton = event.type == .leftMouseUp
+                        owner.task {
+                            if leftButton { await owner.workspaceBackend.nativeTiling.adoptMouseRelease() }
+                            owner.workspaceBackend.observation?.requestRead(event: "nativeMouseReleased")
+                        }
                     }
                 }
             }
@@ -100,6 +104,16 @@ final class NativeTilingCoordinator {
         status = "Native tiling active"
         updateTrayText()
         WindowBorderController.shared.refresh()
+    }
+
+    /// Reads the frontmost window once its drag has ended and adopts a resize or a
+    /// drop onto another tile; the read that follows lays the desktop out again.
+    func adoptMouseRelease() async {
+        guard hasCompletedInitialLayout, let front = NSWorkspace.shared.frontmostApplication,
+              let app = try? await MacApp.getOrRegister(front),
+              let window = try? await app.getFocusedWindow(),
+              let actual = try? await window.getAxRect() else { return }
+        _ = adoptNativeMouseRelease(window, actual: actual, pointer: mouseLocation)
     }
 
     func synchronizeFocus() async {
