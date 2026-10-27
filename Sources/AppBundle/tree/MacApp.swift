@@ -246,9 +246,12 @@ final class MacApp: AbstractApp {
     }
 
     /// Restack a window without setting main/focused attributes or activating its app.
-    func raiseWithoutActivating(_ windowId: UInt32) async throws {
+    @MainActor func raiseWithoutActivating(_ windowId: UInt32) async throws {
+        // A raise is an AX write too: in native mode it needs a live permit for the window.
+        let validate = nativeFrameValidation(windowId)
         try await withWindow(windowId) { window, job in
             try job.checkCancellation()
+            try validate?(window)
             let error = measuredAXOperation(.axAction) { AXUIElementPerformAction(window, kAXRaiseAction as CFString) }
             AXWindowOperation.current?.record(error, from: ObjectIdentifier(window))
         }

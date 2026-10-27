@@ -58,24 +58,21 @@ private func joinScrolling(_ window: Window, direction: CardinalDirection, works
     guard initialRoot.children.indices.contains(neighborIndex) else { return false }
     let neighbor = initialRoot.children[neighborIndex]
     return joinScrollingNodes(window.moveNode, with: neighbor, in: initialRoot, direction: direction,
-                              width: neighbor.scrollingColumnWidth, workspace: workspace,
-                              sourceIndex: sourceIndex, neighborIndex: neighborIndex)
+                              width: neighbor.scrollingColumnWidth, workspace: workspace)
 }
 
 @MainActor
 private func joinScrollingNodes(_ source: TreeNode, with target: TreeNode, in parent: TilingContainer,
-                                direction: CardinalDirection, width: CGFloat?, workspace: Workspace? = nil,
-                                sourceIndex: Int? = nil, neighborIndex: Int? = nil) -> Bool {
+                                direction: CardinalDirection, width: CGFloat?, workspace: Workspace? = nil) -> Bool {
     let adoptedWidth = width
-    let sourceIndex = sourceIndex ?? source.ownIndex ?? 0
-    let targetIndex = neighborIndex ?? target.ownIndex ?? 0
     source.unbindFromParent()
     // An atomic tab/accordion root becomes an ordinary column if a second
     // column is explicitly added; the old container remains nested intact.
     let host = workspace.map { ensureScrollingRootSupportsColumns($0) } ?? parent
     guard let currentTargetIndex = host.children.firstIndex(where: { $0 === target }) else { return false }
     let targetBinding = target.unbindFromParent()
-    let insertion = min(sourceIndex, currentTargetIndex)
+    // The pair takes the target's place; the source may have come from another container.
+    let insertion = currentTargetIndex
     let joined = TilingContainer(parent: host, adaptiveWeight: targetBinding.adaptiveWeight,
                                  parent.orientation.opposite, .tiles, index: insertion)
     joined.scrollingColumnWidth = adoptedWidth

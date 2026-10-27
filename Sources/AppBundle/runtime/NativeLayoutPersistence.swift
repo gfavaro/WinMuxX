@@ -139,6 +139,11 @@ final class NativeLayoutPersistence {
     func save(_ layouts: NativeSpaceLayouts) async {
         guard loaded, writable, config.nativeSpaces.restoreLayouts, !serverArgs.isReadOnly, !Task.isCancelled else { return }
         var next = saved
+        // Desktops removed in Mission Control are forgotten, but only against a current read.
+        if let snapshot = layouts.snapshot {
+            let existing = Set(snapshot.displays.flatMap(\.spaces).compactMap(\.uuid))
+            next = next.filter { existing.contains($0.key) }
+        }
         for (uuid, workspace) in layouts.retainedByUUID where !pending.contains(uuid) {
             next[uuid] = NativePersistedLayout(workspace)
         }
@@ -169,7 +174,11 @@ final class NativeLayoutPersistence {
                   matched[oldID] == nil else { continue }
             matched[oldID] = window
         }
-        pairRemainingByApp(saved: savedWindows, candidates: candidates, matched: &matched)
+        // Tiled and floating windows pair separately, so neither inherits the other's state.
+        let floatingIDs = Set(record.floating.map(\.id))
+        pairRemainingByApp(saved: savedWindows.filter { !floatingIDs.contains($0.id) },
+                           candidates: candidates.filter { !($0.parent is Workspace) }, matched: &matched)
+        pairRemainingByApp(saved: record.floating, candidates: candidates.filter { $0.parent is Workspace }, matched: &matched)
         guard matched.count == savedWindows.count || allowPartial && !matched.isEmpty else { return false }
         let previous = workspace.rootTilingContainer
         previous.unbindFromParent()

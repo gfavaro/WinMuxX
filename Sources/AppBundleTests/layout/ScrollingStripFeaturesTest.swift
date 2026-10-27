@@ -99,3 +99,27 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         XCTAssertEqual(workspace.scrollingStripUnits.map { ($0 as? Window)?.windowId }, [8101, 8102, 8103, 8100, 8104])
     }
 }
+
+@MainActor
+final class ScrollingJoinTest: XCTestCase {
+    override func setUp() async throws { setUpWorkspacesForTests() }
+
+    func testJoiningRightFromAStackKeepsColumnOrder() async throws {
+        let workspace = Workspace.get(byName: name)
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let upper = TestWindow.new(id: 8501, parent: stack)
+        let lower = TestWindow.new(id: 8502, parent: stack)
+        let neighbor = TestWindow.new(id: 8503, parent: root)
+        workspace.transitionArrangement(to: .scrolling)
+        XCTAssertTrue(lower.focusWindow())
+        let result = try await XCTUnwrap(parseCommand("join-with right").unwrap().0).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 0, result.stderr.joined())
+        let columns = workspace.scrollingStripUnits
+        XCTAssertEqual(columns.count, 2)
+        XCTAssertTrue(columns[0] === upper || columns[0].allLeafWindowsRecursive == [upper], "The stack stays first")
+        XCTAssertEqual(Set(columns[1].allLeafWindowsRecursive.map(\.windowId)), [lower.windowId, neighbor.windowId],
+            "The joined pair takes the neighbour's place, to the right")
+    }
+}
