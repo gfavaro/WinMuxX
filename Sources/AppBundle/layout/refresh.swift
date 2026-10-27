@@ -587,6 +587,8 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
             // A pan's own window moves must not revoke the permits it is streaming
             // with; the pan reads once when it settles.
             if NativeScrollingPan.shared.isPanning, nativePanIgnoresNotification(notif) { return }
+            // A window created or focused in this app may now classify.
+            if let emittingAppPid { runtime.workspaceBackend.nativeWindows.forgetUnclassified(pid: emittingAppPid) }
             runtime.workspaceBackend.nativeWriteAuthority.invalidate()
             runtime.workspaceBackend.observation?.requestRead(event: "axWindowChange")
             return

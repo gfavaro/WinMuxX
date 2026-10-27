@@ -154,3 +154,22 @@ final class NativeEnableTest: XCTestCase {
         }
     }
 }
+
+final class UnclassifiedWindowsTest: XCTestCase {
+    func testSkipsBrieflyAndForgetsOnEventsAboutTheWindowOrItsApp() {
+        var clock = ContinuousClock.now
+        var cache = UnclassifiedWindows()
+        cache.now = { clock }
+        cache.note(1, pid: 100)
+        cache.note(2, pid: 100)
+        cache.note(3, pid: 200)
+        XCTAssertTrue(cache.skips(1))
+        cache.forget(windowID: 1)
+        XCTAssertFalse(cache.skips(1), "An event about the window retries it")
+        cache.forget(pid: 100)
+        XCTAssertFalse(cache.skips(2), "The app's own window events retry all of its windows")
+        XCTAssertTrue(cache.skips(3))
+        clock = clock.advanced(by: .seconds(6))
+        XCTAssertFalse(cache.skips(3), "Every window is retried after the TTL")
+    }
+}
