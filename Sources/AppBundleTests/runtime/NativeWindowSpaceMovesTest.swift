@@ -221,9 +221,10 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
 
         _ = here.focusWindow()
         let moveRight = try XCTUnwrap(parseCommand("move --boundaries all-monitors-outer-frame right").cmdOrDie as? MoveCommand)
-        XCTAssertTrue(moveRight.run(.defaultEnv, io), io.stderr.joined())
-        let pending = try XCTUnwrap(NativeTilingCommandScope.pendingMonitorMove, "Deferred until the fenced command ends")
-        NativeTilingCommandScope.pendingMonitorMove = nil
+        let sink = NativeTilingCommandScope.MonitorMoveSink()
+        let moved = NativeTilingCommandScope.$monitorMoveSink.withValue(sink) { moveRight.run(.defaultEnv, io) }
+        XCTAssertTrue(moved, io.stderr.joined())
+        let pending = try XCTUnwrap(sink.pending, "Deferred until the fenced command ends")
         XCTAssertEqual(pending.windowId, here.windowId)
         XCTAssertTrue(here.nodeWorkspace === left, "The tree waits for the confirmed native move")
     }

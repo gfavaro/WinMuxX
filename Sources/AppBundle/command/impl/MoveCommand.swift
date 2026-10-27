@@ -175,7 +175,10 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
                     .copy(\.windowId, focusWindow.windowId)
                     .copy(\.focusFollowsWindow, focus.windowOrNil == focusWindow)
                 if runtime.workspaceBackend.kind == .native {
-                    NativeTilingCommandScope.pendingMonitorMove = moveNodeToMonitorArgs
+                    guard let sink = NativeTilingCommandScope.monitorMoveSink else {
+                        return io.err("Moving to another display runs through native tiling")
+                    }
+                    sink.pending = moveNodeToMonitorArgs
                     return true
                 }
                 return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).runVirtual(env, io)

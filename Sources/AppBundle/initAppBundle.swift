@@ -45,14 +45,10 @@ import Foundation
             WindowBorderController.shared.startMissionControlMonitoring()
             if config.nativeSpaces.tilingEnabled { NativeScrollingPan.shared.start() }
             GlobalObserver.initNativeInputObserver()
-            owner.workspaceBackend.startObservation { [weak owner] _, _ in
-                owner?.withValue {
-                    updateTrayText()
-                    WindowBorderController.shared.refresh()
-                    owner?.workspaceBackend.noteNativeActivity()
-                    NativeUnvisitedWindows.shared.refresh()
-                    owner?.task { await updateWorkspaceSidebarModel() }
-                }
+            owner.workspaceBackend.startObservation { [weak owner] inventory, _ in
+                // The observer reports both a read's start and its result; chrome follows results.
+                guard inventory.status != .reading else { return }
+                owner?.withValue { NativeObservationChrome.shared.schedule() }
             }
             isWinMuxRuntimeReady = true
             startUnixSocketServer()

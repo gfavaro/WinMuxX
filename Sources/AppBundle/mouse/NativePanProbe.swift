@@ -7,21 +7,32 @@ import Common
 @MainActor
 final class NativePanTiming {
     private var entries: [String: (count: Int, total: Double, max: Double)] = [:]
+    /// Only the probe records; otherwise measuring costs one flag check.
+    private(set) var enabled = false
     func reset() { entries = [:] }
+    func begin() { entries = [:]; enabled = true }
+    func end() { enabled = false }
+    func count(_ name: @autoclosure () -> String) {
+        guard enabled else { return }
+        entries[name(), default: (0, 0, 0)].count += 1
+    }
     func record(_ name: String, _ duration: Duration) {
+        guard enabled else { return }
         let ms = Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15
         let old = entries[name] ?? (0, 0, 0)
         entries[name] = (old.count + 1, old.total + ms, max(old.max, ms))
     }
     func measure<T>(_ name: String, _ body: () -> T) -> T {
+        guard enabled else { return body() }
         let start = ContinuousClock.now
         defer { record(name, start.duration(to: .now)) }
         return body()
     }
     var report: String {
         entries.sorted { $0.value.total > $1.value.total }.map {
-            String(format: "  %@: %d× total %.0f ms, avg %.1f ms, max %.1f ms", $0.key, $0.value.count, $0.value.total,
-                   $0.value.total / Double($0.value.count), $0.value.max)
+            $0.value.total == 0 ? "  \($0.key): \($0.value.count)" :
+                String(format: "  %@: %d× total %.0f ms, avg %.1f ms, max %.1f ms", $0.key, $0.value.count, $0.value.total,
+                       $0.value.total / Double($0.value.count), $0.value.max)
         }.joined(separator: "\n")
     }
 }
@@ -94,8 +105,8 @@ func simulateNativePan(steps: Int = 120, stepDelta: Double, interval: Duration =
         }
     }
     let before = workspace.scrollingOffset
-    runtime.workspaceBackend.nativeTiling.probeCounts = [:]
-    nativePanTiming.reset()
+    nativePanTiming.begin()
+    defer { nativePanTiming.end() }
     try? await Task.sleep(for: .milliseconds(50))
     // Where each window should be once the layout for this input has run.
     let base = Dictionary(windows.compactMap { w in w.lastAppliedLayoutPhysicalRect.map { (w.windowId, $0.minX) } }, uniquingKeysWith: { a, _ in a })
@@ -144,8 +155,7 @@ func simulateNativePan(steps: Int = 120, stepDelta: Double, interval: Duration =
         Window position updates: \(updates) across \(ids.count) windows (\(String(format: "%.0f", Double(updates) / max(inputEnd - 0.05, 0.01) / Double(max(ids.count, 1))))/s per window), \(samples.count) samples
         Windows settled \(settled.map { String(format: "%.0f ms", $0 * 1000) } ?? "not within 800 ms") after the last event
         \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)
-        Main-thread time:
+        Main-thread time and counts:
         \(nativePanTiming.report)
-        \(runtime.workspaceBackend.nativeTiling.probeCounts.sorted { $0.key < $1.key }.map { "  \($0.key): \($0.value)" }.joined(separator: "\n"))
         """
 }

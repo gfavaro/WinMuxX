@@ -72,3 +72,14 @@ final class WorkspaceBackendStateTest: WorkspaceTestCase {
         XCTAssertEqual(runtime.recovery.closedWindows.windowIds, saved)
     }
 }
+
+@MainActor
+final class NativeObservationChromeTest: XCTestCase {
+    func testABurstOfCompletedReadsRefreshesChromeOnce() async throws {
+        let chrome = NativeObservationChrome()
+        for _ in 0..<5 { chrome.schedule() }
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(chrome.requests, 5)
+        XCTAssertEqual(chrome.refreshes, 1)
+    }
+}

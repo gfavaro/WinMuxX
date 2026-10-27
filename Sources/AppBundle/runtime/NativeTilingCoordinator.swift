@@ -5,8 +5,13 @@ import NativeSpaces
 enum NativeTilingCommandScope {
     @TaskLocal static var active = false
     /// `move --boundaries all-monitors-outer-frame` past a display edge: the window
-    /// leaves the fenced desktop, so the native move runs after the command.
-    @MainActor static var pendingMonitorMove: MoveNodeToMonitorCmdArgs?
+    /// leaves the fenced desktop, so the native move runs after the command. Each
+    /// fenced run has its own sink, so overlapping commands never share it.
+    @TaskLocal static var monitorMoveSink: MonitorMoveSink?
+
+    @MainActor final class MonitorMoveSink {
+        var pending: MoveNodeToMonitorCmdArgs?
+    }
     @TaskLocal static var validateTarget: (@MainActor @Sendable () -> Bool)?
 }
 
@@ -23,11 +28,8 @@ final class NativeTilingCoordinator {
     private var shortcutsInstalled = false
     private var mouseMonitor: Any?
 
-    /// Invalidations and skipped scrolling layouts by reason, for the pan probe.
-    var probeCounts: [String: Int] = [:]
-
     func invalidate(_ reason: String = "other") {
-        probeCounts["invalidate: \(reason)", default: 0] += 1
+        nativePanTiming.count("invalidate: \(reason)")
         generation &+= 1
         ready = false
         hasManagedNativeFocus = false
@@ -149,9 +151,9 @@ final class NativeTilingCoordinator {
     /// visible scrolling desktops at once under the current write permits; waiting for
     /// an observation read would make panning lag. Requests coalesce into one pass.
     func relayoutVisibleScrolling() {
-        probeCounts["relayout requested", default: 0] += 1
+        nativePanTiming.count("relayout requested")
         guard ready else {
-            probeCounts["relayout skipped: not ready", default: 0] += 1
+            nativePanTiming.count("relayout skipped: not ready")
             // Every read starts by invalidating, so a read per scroll step would keep
             // tiling unready for the whole pan. Ask once; accept() lays out after it.
             if let asked = scrollingReadRequestedAt, asked.duration(to: .now) < .milliseconds(250) { return }
@@ -167,7 +169,7 @@ final class NativeTilingCoordinator {
                 for workspace in runtime.workspaceBackend.nativeLayouts.currentBySpaceID.values
                     where workspace.isVisible && workspace.arrangement == .scrolling {
                     guard ready, generation == version, !holdsForMouseRelease else {
-                        probeCounts["relayout aborted: \(!ready ? "not ready" : generation != version ? "generation" : "mouse")", default: 0] += 1
+                        nativePanTiming.count("relayout aborted: \(!ready ? "not ready" : generation != version ? "generation" : "mouse")")
                         break
                     }
                     let start = ContinuousClock.now
@@ -182,20 +184,26 @@ final class NativeTilingCoordinator {
 
     private var scrollingReadRequestedAt: ContinuousClock.Instant?
 
-    /// Layout timings of the current or last pan, for doctor.
-    private(set) var scrollingLayoutTiming = "none"
-    private var panLayouts: [Duration] = []
+    /// Layout timings of the current or last pan, for doctor: running totals only.
+    private var panLayouts = (count: 0, totalMs: 0.0, maxMs: 0.0)
     private var panStarted: ContinuousClock.Instant?
+    private var panLast: ContinuousClock.Instant?
+
+    var scrollingLayoutTiming: String {
+        guard panLayouts.count > 0, let panStarted, let panLast else { return "none" }
+        let span = panStarted.duration(to: panLast).components
+        let seconds = max(0.001, Double(span.seconds) + Double(span.attoseconds) / 1e18)
+        return String(format: "%d layouts, %.0f/s, avg %.1f ms, max %.1f ms", panLayouts.count,
+            Double(panLayouts.count) / seconds, panLayouts.totalMs / Double(panLayouts.count), panLayouts.maxMs)
+    }
 
     private func noteScrollingLayout(_ duration: Duration, during gesture: Bool) {
         guard gesture else { panStarted = nil; return }
-        if panStarted == nil { panStarted = .now; panLayouts = [] }
-        panLayouts.append(duration)
-        let ms = panLayouts.map { Double($0.components.attoseconds) / 1e15 + Double($0.components.seconds) * 1000 }
-        let elapsed = panStarted.map { $0.duration(to: .now) } ?? .zero
-        let seconds = max(0.001, Double(elapsed.components.attoseconds) / 1e18 + Double(elapsed.components.seconds))
-        scrollingLayoutTiming = String(format: "%d layouts, %.0f/s, avg %.1f ms, max %.1f ms", ms.count,
-            Double(ms.count) / seconds, ms.reduce(0, +) / Double(ms.count), ms.max() ?? 0)
+        let now = ContinuousClock.now
+        if panStarted == nil { panStarted = now; panLayouts = (0, 0, 0) }
+        panLast = now
+        let ms = Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15
+        panLayouts = (panLayouts.count + 1, panLayouts.totalMs + ms, max(panLayouts.maxMs, ms))
     }
 
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
@@ -276,13 +284,15 @@ final class NativeTilingCoordinator {
             target.matches(runtime.workspaceBackend.nativeLayouts,
                 defaultFocus: runtime.focus.requested.liveOrNil, allowDefaultFocusChanges: true)
         }
+        let sink = NativeTilingCommandScope.MonitorMoveSink()
         let result = try await NativeTilingCommandScope.$validateTarget.withValue(validate) {
-            try await NativeTilingCommandScope.$active.withValue(true) {
-                try await commands.runCmdSeq(env, io)
+            try await NativeTilingCommandScope.$monitorMoveSink.withValue(sink) {
+                try await NativeTilingCommandScope.$active.withValue(true) {
+                    try await commands.runCmdSeq(env, io)
+                }
             }
         }
-        let monitorMove = NativeTilingCommandScope.pendingMonitorMove
-        NativeTilingCommandScope.pendingMonitorMove = nil
+        let monitorMove = sink.pending
         if result {
             guard validate() else { return io.err("Native command target changed before completion") }
             if let monitorMove {
