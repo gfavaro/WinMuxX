@@ -27,7 +27,8 @@ func nativeWindowFrameDiagnostics(_ layouts: NativeSpaceLayouts) -> [NativeWindo
 func nativeSpacesDiagnosticReport() -> String {
     let tiling = runtime.workspaceBackend.nativeTilingEnabled
     var lines = ["WinMuxX — Native Spaces (experimental\(tiling ? " tiling" : " read-only"))",
-        "Space activation, relocation, projects and virtual recovery: unsupported.",
+        "Space switching: workspace N/next/prev via Dock swipe (macOS 27, Accessibility: \(NativeDockSwipe.canPostEvents ? "granted" : "missing")).",
+        "Space relocation, cross-Space moves, projects and virtual recovery: unsupported.",
         tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
