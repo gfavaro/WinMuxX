@@ -39,6 +39,7 @@ func nativeSpacesDiagnosticReport() -> String {
     let touch = RawWorkspaceTouchSource.shared
     lines.append("Scrolling pan: touch \(touch.status), \(touch.frameCount) frames, max \(touch.maximumFingerCount) fingers; " +
         "last: \(NativeScrollingTouchRouter.shared.lastDecision); fingers: \(NativeScrollingTouchRouter.shared.lastTrace)")
+    lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")
     for monitor in sortedMonitors {
         let shown = runtime.workspaces.visibleWorkspace(for: monitor)
         lines.append("  \(monitor.name): \(shown.map { "\(userFacingWorkspaceName($0)) \($0.arrangement)" } ?? "no desktop bound")")

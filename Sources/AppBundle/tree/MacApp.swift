@@ -23,6 +23,8 @@ final class MacApp: AbstractApp {
     // prevents a late/stale AXWindows response from resurrecting a closed node.
     private let destroyedWindows: ThreadGuardedValue<[UInt32: AXUIElement]> = .init([:])
     private let animatedSizes: ThreadGuardedValue<[UInt32: (session: UUID, size: CGSize)]> = .init([:])
+    /// Gesture sessions whose window already passed the full native ownership check.
+    private let validatedSessions: ThreadGuardedValue<[UInt32: UUID]> = .init([:])
     private var windowsCount = 0
     var lastNativeFocusedWindowId: UInt32? = nil
     private var thread: Thread?
@@ -300,6 +302,17 @@ final class MacApp: AbstractApp {
         }
     }
 
+    /// The permit alone, without AX reads: for gesture steps after a full check.
+    @MainActor
+    private func nativePermitCheck(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { _ in throw NativeSpaceWriteError.revoked }
+        }
+        return { _ in try permit.check() }
+    }
+
     @MainActor
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
@@ -315,11 +328,19 @@ final class MacApp: AbstractApp {
     func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect, session: UUID) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        let validate = nativeFrameValidation(windowId)
-        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
+        let full = nativeFrameValidation(windowId)
+        let permit = nativePermitCheck(windowId)
+        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes, validatedSessions] window, job in
             // Intermediate steps need no readback or minimum-size confirmation.
             // Finish both writes of a started step; cancellation drops queued steps.
-            try validate?(window)
+            // Native ownership is read once per gesture session; later steps only
+            // recheck the permit, which WindowServer lifecycle events revoke.
+            let validate: ((AXUIElement) throws -> Void)?
+            if let full, validatedSessions.threadGuarded[windowId] != session {
+                try full(window)
+                validatedSessions.threadGuarded[windowId] = session
+                validate = permit
+            } else { validate = permit }
             try disableAnimations(app: axApp.threadGuarded, job) {
                 if animatedSizes.threadGuarded[windowId]?.session != session || animatedSizes.threadGuarded[windowId]?.size != frame.size {
                     try validate?(window)

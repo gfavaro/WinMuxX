@@ -150,11 +150,29 @@ final class NativeTilingCoordinator {
                 for workspace in runtime.workspaceBackend.nativeLayouts.currentBySpaceID.values
                     where workspace.isVisible && workspace.arrangement == .scrolling {
                     guard ready, generation == version, !holdsForMouseRelease else { break }
+                    let start = ContinuousClock.now
                     do { try await workspace.layoutWorkspace() } catch { break }
+                    noteScrollingLayout(start.duration(to: .now), during: workspace.scrollingGestureMotionActive)
                 }
             } while scrollingLayoutPending
             scrollingLayoutTask = nil
         }
+    }
+
+    /// Layout timings of the current or last pan, for doctor.
+    private(set) var scrollingLayoutTiming = "none"
+    private var panLayouts: [Duration] = []
+    private var panStarted: ContinuousClock.Instant?
+
+    private func noteScrollingLayout(_ duration: Duration, during gesture: Bool) {
+        guard gesture else { panStarted = nil; return }
+        if panStarted == nil { panStarted = .now; panLayouts = [] }
+        panLayouts.append(duration)
+        let ms = panLayouts.map { Double($0.components.attoseconds) / 1e15 + Double($0.components.seconds) * 1000 }
+        let elapsed = panStarted.map { $0.duration(to: .now) } ?? .zero
+        let seconds = max(0.001, Double(elapsed.components.attoseconds) / 1e18 + Double(elapsed.components.seconds))
+        scrollingLayoutTiming = String(format: "%d layouts, %.0f/s, avg %.1f ms, max %.1f ms", ms.count,
+            Double(ms.count) / seconds, ms.reduce(0, +) / Double(ms.count), ms.max() ?? 0)
     }
 
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
