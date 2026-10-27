@@ -10,11 +10,14 @@ final class WorkspaceTouchMailbox: @unchecked Sendable {
         var scheduled = false
         var received = 0
         var lastContactByDevice: [UInt64: WorkspaceTouchFrame] = [:]
+        var motionFingers = 3
     }
     private let state = OSAllocatedUnfairLock(initialState: State())
 
-    func activate(_ generation: UInt64) {
-        state.withLock { $0 = State(generation: generation) }
+    /// Movement with fewer than `motionFingers` fingers belongs to apps and is not
+    /// delivered; native scrolling pans use two fingers, so they lower it to two.
+    func activate(_ generation: UInt64, motionFingers: Int = 3) {
+        state.withLock { $0 = State(generation: generation, motionFingers: motionFingers) }
     }
 
     func offer(_ frame: WorkspaceTouchFrame, generation: UInt64) -> Bool {
@@ -22,8 +25,8 @@ final class WorkspaceTouchMailbox: @unchecked Sendable {
             guard generation != 0, value.generation == generation else { return false }
             value.received += 1
             let previous = value.lastContactByDevice.updateValue(frame, forKey: frame.device)
-            // One/two-finger motion belongs to apps; avoid a main-queue hop per frame.
-            if (0..<3).contains(frame.fingers), let previous,
+            // Motion below the gesture's finger count belongs to apps; avoid a main-queue hop per frame.
+            if (0..<value.motionFingers).contains(frame.fingers), let previous,
                previous.fingers == frame.fingers, previous.contacts == frame.contacts { return false }
             let sameContact: (WorkspaceTouchFrame) -> Bool = {
                 $0.device == frame.device && $0.fingers == frame.fingers && $0.contacts == frame.contacts

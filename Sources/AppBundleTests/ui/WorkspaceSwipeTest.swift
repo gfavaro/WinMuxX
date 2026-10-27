@@ -167,6 +167,16 @@ final class WorkspaceSwipeTest: XCTestCase {
         XCTAssertTrue(mailbox.offer(frame(fingers: 0, time: 2), generation: 1))
     }
 
+    func testNativeTwoFingerPanMovementIsDelivered() {
+        let mailbox = WorkspaceTouchMailbox()
+        mailbox.activate(1, motionFingers: 2)
+        for i in 0..<5 { _ = mailbox.offer(frame(0.5 + Double(i) / 100, fingers: 2, time: 1 + Double(i) / 100), generation: 1) }
+        XCTAssertGreaterThanOrEqual(mailbox.take().frames.count, 2, "The pan sees movement, not only the touch-down")
+        XCTAssertTrue(mailbox.offer(frame(fingers: 1, time: 2), generation: 1))
+        _ = mailbox.take()
+        XCTAssertFalse(mailbox.offer(frame(0.6, fingers: 1, time: 2.1), generation: 1), "One finger still belongs to apps")
+    }
+
     func testMailboxOverflowCancelsRatherThanJoiningUnrelatedFrames() {
         let mailbox = WorkspaceTouchMailbox()
         mailbox.activate(1)

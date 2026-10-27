@@ -14,6 +14,10 @@ final class NativeScrollingTouchRouter {
     private(set) var ownsGesture = false
     /// Why the last two-finger touch did or did not become a pan, for doctor.
     private(set) var lastDecision = "none"
+    /// Finger counts of the last touch sequence, run-length encoded, for doctor.
+    private(set) var lastTrace = "none"
+    private var trace: [(fingers: Int, count: Int)] = []
+    private var traceAnchor: WorkspaceTouchFrame?
     private var device: UInt64?
     private weak var workspace: Workspace?
     private var monitorPoint: CGPoint?
@@ -25,6 +29,7 @@ final class NativeScrollingTouchRouter {
     var controller = WorkspaceScrollingGestureController.shared
 
     func handle(_ frame: WorkspaceTouchFrame) {
+        record(frame)
         defer { if frame.fingers == 0 { controller.contactsEnded(); clear() } }
         if !started, frame.fingers == 2 {
             started = true
@@ -34,7 +39,12 @@ final class NativeScrollingTouchRouter {
         guard ownsGesture else { return }
         if frame.device != device { controller.reset(); ownsGesture = false; return }
         guard let (axis, frames) = axes.route(frame) else {
-            if axes.isRejected { controller.reset(); ownsGesture = false; lastDecision = "rejected: finger count or contacts changed" }
+            if axes.isRejected {
+                controller.reset(); ownsGesture = false
+                let moved = traceAnchor.map { String(format: "dx %.3f dy %.3f", frame.x - $0.x, frame.y - $0.y) } ?? "no anchor"
+                lastDecision = "rejected at \(frame.fingers) fingers, contacts " +
+                    "\(frame.contacts == traceAnchor?.contacts ? "same" : "changed"), \(moved)"
+            }
             if frame.fingers == 0 { controller.reset(commit: true) }
             return
         }
@@ -66,6 +76,16 @@ final class NativeScrollingTouchRouter {
         topology = target.scrollingTopologySignature
         epoch = target.scrollingSessionEpoch
         ownsGesture = true
+    }
+
+    private func record(_ frame: WorkspaceTouchFrame) {
+        if traceAnchor == nil, frame.fingers == 2 { traceAnchor = frame }
+        if let last = trace.last, last.fingers == frame.fingers { trace[trace.count - 1].count += 1 }
+        else if trace.count < 40 { trace.append((frame.fingers, 1)) }
+        guard frame.fingers == 0 else { return }
+        lastTrace = trace.map { $0.count > 1 ? "\($0.fingers)x\($0.count)" : "\($0.fingers)" }.joined(separator: " ")
+        trace = []
+        traceAnchor = nil
     }
 
     private func clear() {

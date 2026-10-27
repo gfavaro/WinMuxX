@@ -68,7 +68,7 @@ final class RawWorkspaceTouchSource: ObservableObject {
     private func startDevices() {
         guard wantsTouch, !suspended else { return }
         generation &+= 1
-        Self.mailbox.activate(generation)
+        Self.mailbox.activate(generation, motionFingers: scrollingPanFingerCount())
         frameCount = 0
         maximumFingerCount = 0
         let count = winmux_touch_start(generation, workspaceTouchFrameCallback)
