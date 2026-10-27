@@ -43,7 +43,10 @@ import Foundation
             _serverArgs.isReadOnly = _serverArgs.isReadOnly || !config.nativeSpaces.tilingEnabled
             let owner = runtime
             WindowBorderController.shared.startMissionControlMonitoring()
-            if config.nativeSpaces.tilingEnabled { NativeScrollingPan.shared.start() }
+            if config.nativeSpaces.tilingEnabled {
+                NativeScrollingPan.shared.start()
+                RawWorkspaceTouchSource.shared.onFrame = { NativeScrollingTouchRouter.shared.handle($0) }
+            }
             owner.workspaceBackend.startObservation { [weak owner] _, _ in
                 owner?.withValue {
                     updateTrayText()

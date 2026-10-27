@@ -19,6 +19,10 @@ final class RawWorkspaceTouchSource: ObservableObject {
     private var wantsTouch: Bool {
         let scrollingWorkspaceVisible = config.scrolling.gestureEnabled &&
             sortedMonitors.contains { runtime.workspaces.visibleWorkspace(for: $0)?.arrangement == .scrolling }
+        // Native mode leaves workspace swipes and the overview to macOS; only scrolling pans read touches.
+        if runtime.workspaceBackend.kind == .native {
+            return scrollingWorkspaceVisible && runtime.workspaceBackend.nativeTilingEnabled && TrayMenuModel.shared.isEnabled
+        }
         return workspaceGesturesNeedRawTouch(horizontal: config.workspaceSwipe.enabled,
             overview: config.workspaceOverview.threeFingerUp,
             overviewOpen: WorkspaceOverviewController.shared.isOpen || scrollingWorkspaceVisible,

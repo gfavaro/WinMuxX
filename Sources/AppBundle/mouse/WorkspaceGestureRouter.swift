@@ -3,6 +3,9 @@ import AppKit
 /// Locks a contact sequence to one axis. The horizontal recognizer retains its existing thresholds.
 struct WorkspaceGestureAxisRouter {
     enum Axis { case horizontal, vertical }
+    /// Three for WinMuxX workspace gestures; native scrolling pans use two.
+    let fingers: Int
+    init(fingers: Int = 3) { self.fingers = fingers }
     private var anchor: WorkspaceTouchFrame?
     private(set) var axis: Axis?
     private var rejected = false
@@ -10,12 +13,12 @@ struct WorkspaceGestureAxisRouter {
 
     mutating func route(_ frame: WorkspaceTouchFrame) -> (Axis, [WorkspaceTouchFrame])? {
         if let anchor, anchor.device != frame.device { return nil }
-        defer { if frame.fingers == 0 { self = Self() } }
+        defer { if frame.fingers == 0 { self = Self(fingers: fingers) } }
         if let axis { return (axis, [frame]) }
         guard !rejected else { return nil }
-        guard frame.fingers == 3, frame.x.isFinite, frame.y.isFinite,
+        guard frame.fingers == fingers, frame.x.isFinite, frame.y.isFinite,
               frame.timestamp.isFinite, (0...1).contains(frame.x), (0...1).contains(frame.y) else {
-            if anchor != nil || frame.fingers > 3 || frame.fingers < 0 { rejected = true }
+            if anchor != nil || frame.fingers > fingers || frame.fingers < 0 { rejected = true }
             return nil
         }
         guard let anchor else { self.anchor = frame; return nil }
