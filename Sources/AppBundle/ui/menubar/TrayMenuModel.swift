@@ -32,6 +32,8 @@ public final class TrayMenuModel: ObservableObject {
     @Published var windowTabStrips: [WindowTabStripViewModel] = []
     @Published var isWorkspaceSidebarExpanded: Bool = false { didSet { if oldValue != isWorkspaceSidebarExpanded { MainActor.assumeIsolated { requestPublicStateUpdate() } } } }
     @Published var workspaceSidebarVisibleWidth: CGFloat = 0
+    /// Panel-local: whether the sidebar's view tree exists. See WorkspaceSidebarPanel.loadContent.
+    @Published var workspaceSidebarContentLoaded: Bool = true
     @Published var workspaceSidebarTopPadding: CGFloat = 12
     @Published var workspaceSidebarHoveredWorkspaceName: String? = nil
     @Published var menuBarConfiguration = MenuBarConfig()

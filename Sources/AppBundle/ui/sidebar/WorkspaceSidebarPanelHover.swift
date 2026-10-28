@@ -100,6 +100,8 @@ extension WorkspaceSidebarPanel {
 
 extension WorkspaceSidebarPanel {
     func handleHoverEnter(expandedWidth: CGFloat, collapsedWidth: CGFloat) {
+        // Built during the hover dwell, so the sidebar opens as quickly as before.
+        loadContent()
         if shouldSuppressHoverForPointerPress {
             cancelHoverReveal()
             updateMousePassthrough()

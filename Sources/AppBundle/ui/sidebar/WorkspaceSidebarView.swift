@@ -235,10 +235,16 @@ struct WorkspaceSidebarContainerView: View {
 
     var body: some View {
         let snapshot = workspaceSidebarSnapshot(from: viewModel)
-        WorkspaceSidebarView(
-            snapshot: snapshot,
-            actions: actions
-        )
+        Group {
+            if viewModel.workspaceSidebarContentLoaded {
+                WorkspaceSidebarView(
+                    snapshot: snapshot,
+                    actions: actions
+                )
+            } else {
+                Color.clear
+            }
+        }
         .modifier(WorkspaceSidebarWallpaperContrast(
             snapshot: snapshot,
             refreshGeneration: viewModel.workspaceSidebarWallpaperRefreshGeneration

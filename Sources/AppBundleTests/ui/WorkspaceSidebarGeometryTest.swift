@@ -131,6 +131,18 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
     }
 
+    func testOnlyAHiddenRestingSidebarDropsItsContent() {
+        var config = WorkspaceSidebarConfig()
+        XCTAssertFalse(workspaceSidebarUnloadsWhenResting(config), "A collapsed strip shows content")
+        config.autoHide = true
+        XCTAssertTrue(workspaceSidebarUnloadsWhenResting(config))
+        config.heightMode = .centered
+        XCTAssertFalse(workspaceSidebarUnloadsWhenResting(config), "Centered panels are sized from their content")
+        config.heightMode = .standard
+        config.alwaysExpanded = true
+        XCTAssertFalse(workspaceSidebarUnloadsWhenResting(config))
+    }
+
     func testIdleBackingShrinksAndTransitionsPreserveBrowsingCanvas() {
         var config = WorkspaceSidebarConfig()
         config.width = 240

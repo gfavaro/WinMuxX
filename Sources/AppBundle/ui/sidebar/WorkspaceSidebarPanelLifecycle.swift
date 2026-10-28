@@ -10,6 +10,7 @@ extension WorkspaceSidebarPanel {
 
     func refresh(on monitor: Monitor) {
         guard !isRetired else { return }
+        syncContentLoading()
         if WorkspacePresentationController.shared.suppressesChrome(on: monitor) {
             orderOut(nil)
             return
@@ -91,6 +92,60 @@ extension WorkspaceSidebarPanel {
         if isVisible {
             orderOut(nil)
         }
+    }
+}
+
+/// A resting auto-hide sidebar draws nothing, yet its view tree held several megabytes
+/// per display. It is built from the hover dwell, before the sidebar opens, and dropped
+/// once the sidebar has rested hidden for a while. Centered sidebars size the panel from
+/// their content, so they keep it.
+func workspaceSidebarUnloadsWhenResting(_ sidebarConfig: WorkspaceSidebarConfig) -> Bool {
+    sidebarConfig.autoHide && !sidebarConfig.alwaysExpanded && sidebarConfig.heightMode != .centered
+}
+
+let workspaceSidebarContentUnloadDelay: TimeInterval = 10
+
+extension WorkspaceSidebarPanel {
+    /// Call before anything reveals the sidebar, outside an animation, so the tree is not
+    /// inserted with a transition.
+    func loadContent() {
+        guard !isRetired else { return }
+        _ = viewModel.setIfChanged(\.workspaceSidebarContentLoaded, true)
+        scheduleContentUnload()
+    }
+
+    func syncContentLoading() {
+        if workspaceSidebarUnloadsWhenResting(config.workspaceSidebar) {
+            if viewModel.workspaceSidebarContentLoaded, pendingContentUnload == nil { scheduleContentUnload() }
+        } else {
+            pendingContentUnload?.cancel()
+            pendingContentUnload = nil
+            _ = viewModel.setIfChanged(\.workspaceSidebarContentLoaded, true)
+        }
+    }
+
+    private func scheduleContentUnload() {
+        pendingContentUnload?.cancel()
+        pendingContentUnload = nil
+        guard workspaceSidebarUnloadsWhenResting(config.workspaceSidebar) else { return }
+        let unload = DispatchWorkItem { [weak self] in
+            guard let self, !self.isRetired else { return }
+            self.pendingContentUnload = nil
+            if self.isRestingHidden {
+                _ = self.viewModel.setIfChanged(\.workspaceSidebarContentLoaded, false)
+            } else {
+                self.scheduleContentUnload()
+            }
+        }
+        pendingContentUnload = unload
+        DispatchQueue.main.asyncAfter(deadline: .now() + workspaceSidebarContentUnloadDelay, execute: unload)
+    }
+
+    private var isRestingHidden: Bool {
+        viewModel.workspaceSidebarVisibleWidth <= 0.5 && !viewModel.isWorkspaceSidebarExpanded &&
+            pendingExpand == nil && pendingCollapse == nil && pendingCollapseFinalize == nil &&
+            !inlineTextEditingActive && !commandExpansionLocksCollapse && menuTrackingDepth == 0 &&
+            !isMouseInsideHoverRegion() && !shouldLockExpansionForSidebarDrag()
     }
 }
 

@@ -15,6 +15,7 @@ func openWorkspaceSidebarFromCommand() {
         closeWorkspaceSidebarFromCommand(panel)
         return
     }
+    panel.loadContent()
     panel.commandExpansionLocksCollapse = true
     panel.shouldLockNextSidebarSearchExpansion = true
     panel.bufferedCommandSidebarSearchKeys = []
