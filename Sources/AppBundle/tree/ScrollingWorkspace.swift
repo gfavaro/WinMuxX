@@ -195,6 +195,25 @@ struct ScrollingWorkspaceMetrics {
     }
 }
 
+/// A strip moved aside to show the focused window's attached sheet (Open, Save,
+/// Upload), remembered so it settles back when the sheet closes.
+struct ScrollingSheetReveal: Equatable {
+    let windowId: UInt32
+    let before: CGFloat
+    let revealed: CGFloat
+
+    /// The offset for this layout and what to remember. `target` is where the open
+    /// sheets need the strip, nil once none are open. Anything else that moved the
+    /// strip in between (focus, a pan, the minimap) cancels the settle-back.
+    static func step(current: CGFloat, windowId: UInt32, target: CGFloat?,
+                     remembered: Self?) -> (offset: CGFloat, remembered: Self?) {
+        let ours = remembered.flatMap { $0.windowId == windowId && abs(current - $0.revealed) < 0.5 ? $0 : nil }
+        guard let target else { return (ours?.before ?? current, nil) }
+        guard abs(target - current) >= 0.5 else { return (current, ours) }
+        return (target, Self(windowId: windowId, before: ours?.before ?? current, revealed: target))
+    }
+}
+
 extension Workspace {
     /// The pinned column while it is still a column of this scrolling strip and others remain.
     @MainActor

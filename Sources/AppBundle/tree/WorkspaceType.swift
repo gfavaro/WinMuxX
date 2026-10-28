@@ -28,6 +28,8 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     weak var scrollingPinnedNode: TreeNode?
     var scrollingPinSide = ScrollingPinCmdArgs.Side.left
     var lastScrollingFocusWindowId: UInt32?
+    /// Where the strip was before an attached sheet pulled it aside, to settle back.
+    var scrollingSheetReveal: ScrollingSheetReveal?
     var scrollingAnchorWindowId: UInt32?
     var scrollingAnchorViewportPosition: CGFloat?
     var scrollingAnchorAreaWidth: CGFloat?

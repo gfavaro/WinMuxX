@@ -106,12 +106,17 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
             let epoch = workspace.scrollingSessionEpoch
             let offsets = (try? await window.scrollingSheetOffsets()) ?? []
             try checkCancellation()
-            if workspace.scrollingSessionEpoch == epoch, focus.windowOrNil === window,
-               let left = offsets.map(\.minX).min(), let right = offsets.map(\.maxX).max() {
+            if workspace.scrollingSessionEpoch == epoch, focus.windowOrNil === window {
                 let leafInset = (window.lastAppliedLayoutVirtualRect?.minX ?? 0) -
                     (column.node.lastAppliedLayoutVirtualRect?.minX ?? 0)
-                workspace.scrollingOffset = metrics.revealedOffset(start: column.start + leafInset + left,
-                    end: column.start + leafInset + right, current: workspace.scrollingOffset)
+                let target = offsets.map(\.minX).min().flatMap { left in offsets.map(\.maxX).max().map { right in
+                    metrics.revealedOffset(start: column.start + leafInset + left,
+                        end: column.start + leafInset + right, current: workspace.scrollingOffset)
+                } }
+                let step = ScrollingSheetReveal.step(current: workspace.scrollingOffset, windowId: window.windowId,
+                    target: target, remembered: workspace.scrollingSheetReveal)
+                workspace.scrollingOffset = metrics.clampedOffset(step.offset)
+                workspace.scrollingSheetReveal = step.remembered
             }
         }
     }

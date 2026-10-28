@@ -101,6 +101,25 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         XCTAssertNil(workspace.pinnedScrollingColumn, "The same command unpins")
     }
 
+    func testAStripMovedForASheetSettlesBackUnlessSomethingElseMovedIt() {
+        // A sheet opens: the strip moves to show it, remembering where it was.
+        var step = ScrollingSheetReveal.step(current: 100, windowId: 7, target: 260, remembered: nil)
+        XCTAssertEqual(step.offset, 260)
+        XCTAssertEqual(step.remembered, ScrollingSheetReveal(windowId: 7, before: 100, revealed: 260))
+        // Still open, dragged wider: it follows, still remembering the first place.
+        step = ScrollingSheetReveal.step(current: 260, windowId: 7, target: 300, remembered: step.remembered)
+        XCTAssertEqual(step.remembered?.before, 100)
+        // Closed: back where it was.
+        let closed = ScrollingSheetReveal.step(current: 300, windowId: 7, target: nil, remembered: step.remembered)
+        XCTAssertEqual(closed.offset, 100)
+        XCTAssertNil(closed.remembered)
+        // Panned meanwhile, or another window focused: the strip stays put.
+        XCTAssertEqual(ScrollingSheetReveal.step(current: 500, windowId: 7, target: nil, remembered: step.remembered).offset, 500)
+        XCTAssertEqual(ScrollingSheetReveal.step(current: 300, windowId: 8, target: nil, remembered: step.remembered).offset, 300)
+        // A sheet that already fits moves nothing and remembers nothing.
+        XCTAssertNil(ScrollingSheetReveal.step(current: 100, windowId: 7, target: 100, remembered: nil).remembered)
+    }
+
     func testMinimapDragReordersStripColumns() async throws {
         let (workspace, windows) = try await strip()
         workspace.moveScrollingColumn(ObjectIdentifier(windows[0]), toStripIndex: 3)
