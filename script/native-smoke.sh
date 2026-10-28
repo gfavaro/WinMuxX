@@ -101,7 +101,7 @@ probe=$(wm doctor --simulate-native-pan)
 if grep -q "No visible scrolling desktop" <<<"$probe"; then
     skip "scrolling pan (no scrolling desktop showing)"
 else
-    lag=$(grep -o 'p90 [0-9]* ms' <<<"$probe" | head -1 | grep -o '[0-9]*')
+    lag=$(grep -o 'p90 [0-9]* ms' <<<"$probe" | head -1 | awk '{ print $2 }')
     if grep -q "over 0 samples" <<<"$probe"; then
         skip "scrolling pan (every column fits on screen; nothing to pan)"
     else
