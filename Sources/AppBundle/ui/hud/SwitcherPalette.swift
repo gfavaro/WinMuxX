@@ -69,6 +69,9 @@ final class SwitcherPaletteModel: ObservableObject {
 final class SwitcherPalettePanel: NSPanelHud {
     static let shared = SwitcherPalettePanel()
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+    /// Building the view took ~35 ms of each open; it now outlives the palette being shown,
+    /// and only the rows go away with the items.
+    private var hasPaletteView = false
     private let model: SwitcherPaletteModel
     private(set) var isPaletteActive = false
     private var outsideClickMonitors: [Any] = []
@@ -121,6 +124,7 @@ final class SwitcherPalettePanel: NSPanelHud {
         // toggle may have dismissed the palette in the meantime.
         guard isPaletteActive, presentationGeneration == generation else { return }
         model.items = items
+        model.objectWillChange.send()
         model.groupByWorkspace = groupByWorkspace
         model.query = ""
         model.selection = 0
@@ -142,10 +146,15 @@ final class SwitcherPalettePanel: NSPanelHud {
             display: true,
             animate: false,
         )
-        hostingView.rootView = AnyView(SwitcherPaletteView(model: model, dismiss: { [weak self] in self?.dismiss() }))
+        if !hasPaletteView {
+            hasPaletteView = true
+            hostingView.rootView = AnyView(SwitcherPaletteView(model: model, dismiss: { [weak self] in self?.dismiss() }))
+        }
         orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         makeKey()
+        // A new field focuses itself once; a kept one is focused on every open.
+        if let field = hostingView.firstDescendant(ofType: NativeSearchField.self) { makeFirstResponder(field) }
         installOutsideClickMonitors()
     }
 
@@ -182,9 +191,9 @@ final class SwitcherPalettePanel: NSPanelHud {
             runtime.publicState.paletteVisible = false
             requestPublicStateUpdate()
             orderOut(nil)
-            hostingView.rootView = AnyView(EmptyView())
         }
         model.items = []
+        model.objectWillChange.send()
         model.onSelect = nil
         if !model.query.isEmpty { model.query = "" }
         if model.selection != 0 { model.selection = 0 }
@@ -476,5 +485,14 @@ private struct SwitcherPaletteRow: View {
         }
         .frame(minHeight: 26)
         .contentShape(Rectangle())
+    }
+}
+
+private extension NSView {
+    func firstDescendant<T: NSView>(ofType type: T.Type) -> T? {
+        for subview in subviews {
+            if let match = subview as? T ?? subview.firstDescendant(ofType: type) { return match }
+        }
+        return nil
     }
 }

@@ -38,7 +38,8 @@ final class HotkeyState {
     get { hotkeyState.sequenceBindingsPrefixKeys }
     set { hotkeyState.sequenceBindingsPrefixKeys = newValue }
 }
-private let tapBindingTriggerDelayNs: UInt64 = 75_000_000
+/// A key or modifier pressed this soon after the release cancels the tap.
+private let tapBindingTriggerDelayNs: UInt64 = 35_000_000
 /// Max time (ns) between prefix key and subsequent key for a sequence binding
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
