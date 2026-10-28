@@ -65,6 +65,11 @@ final class ActionMenuTest: XCTestCase {
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Toggle Floating" }).keyEquivalent, "t")
+        for arrangement in WorkspaceLayoutName.allCases {
+            let item = try XCTUnwrap(layout.items.first { $0.title == arrangement.rawValue.capitalized })
+            XCTAssertNotNil(item.image, "\(arrangement) shows its picture")
+            XCTAssertEqual(item.state, focus.workspace.arrangement == arrangement ? .on : .off)
+        }
         for title in ["Tiles", "Tabbed", "Accordion", "Horizontal", "Vertical"] {
             let item = try XCTUnwrap(layout.items.first { $0.title == title })
             XCTAssertEqual(item.title, title)

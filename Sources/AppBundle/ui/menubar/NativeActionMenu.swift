@@ -197,9 +197,11 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
-            addCommand("Dwindle", script: "workspace-layout dwindle", to: submenu)
-            addCommand("Master", script: "workspace-layout master", to: submenu)
-            addCommand("Scrolling", script: "workspace-layout scrolling", to: submenu)
+            for arrangement in [WorkspaceLayoutName.dwindle, .master, .scrolling] {
+                let item = addCommand(arrangement.rawValue.capitalized, script: "workspace-layout \(arrangement.rawValue)", to: submenu)
+                item?.image = MenuBarLayoutIcon.image(for: arrangement, monochrome: true)
+                item?.state = focus.workspace.arrangement == arrangement ? .on : .off
+            }
             submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)

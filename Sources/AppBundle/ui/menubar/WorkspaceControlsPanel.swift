@@ -424,10 +424,10 @@ struct WorkspaceControlsPanelView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Arrangement").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             HStack(spacing: 5) {
-                button("Dwindle", "workspace-layout dwindle")
-                button("Tiles", "workspace-layout tiles")
-                button("Master", "workspace-layout master")
-                button("Scroll", "workspace-layout scrolling")
+                arrangementButton("Dwindle", .dwindle)
+                button("Tiles", "layout tiles")
+                arrangementButton("Master", .master)
+                arrangementButton("Scroll", .scrolling)
             }
             HStack(spacing: 5) {
                 button("Balance", "balance-sizes")
@@ -475,6 +475,16 @@ struct WorkspaceControlsPanelView: View {
 
     private func button(_ title: String, _ script: String) -> some View {
         Button(title) { model.perform(script) }.buttonStyle(.bordered).controlSize(.small)
+    }
+
+    private func arrangementButton(_ title: String, _ arrangement: WorkspaceLayoutName) -> some View {
+        let current = model.snapshot.arrangement == arrangement
+        return Button { model.perform("workspace-layout \(arrangement.rawValue)") } label: {
+            Label { Text(title) } icon: { Image(nsImage: MenuBarLayoutIcon.image(for: arrangement, monochrome: true)) }
+        }
+        .buttonStyle(.bordered).controlSize(.small)
+        .tint(current ? .accentColor : nil)
+        .accessibilityAddTraits(current ? .isSelected : [])
     }
 
     private func button(_ title: String, action: @escaping () -> Void) -> some View {
