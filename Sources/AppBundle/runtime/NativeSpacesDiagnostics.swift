@@ -32,9 +32,10 @@ func nativeSpacesDiagnosticReport() -> String {
         "Moves to another display: move-node-to-monitor, and move-workspace-to-monitor moves a desktop's windows and layout (the macOS desktop stays). Projects and virtual recovery: unsupported.",
         nativeSkippedWindowRuleCommands.isEmpty ? "Window rules: floating/tiling applied natively."
             : "Window rules: floating/tiling applied; skipped unsupported: \(nativeSkippedWindowRuleCommands.sorted().joined(separator: "; "))",
-        tiling ? "Dwindle/Master tiling is explicitly enabled; no Space or system settings are changed." :
+        tiling ? "Dwindle/Master tiling is explicitly enabled; no system settings are changed. Desktops are only added, up to persistent-workspaces." :
             "No window positions, application focus or macOS settings are changed."]
     lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
+    lines.append("Desktop top-up: \(runtime.workspaceBackend.nativeDesktopTopUp.status) (creation \(NativeSpaceCreator.isAvailable ? "available" : "unavailable on this macOS"))")
     lines.append("Original frames: \(NativeOriginalFrames.shared.count) kept; last restore: \(NativeOriginalFrames.shared.lastRestore)")
     lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
     lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")

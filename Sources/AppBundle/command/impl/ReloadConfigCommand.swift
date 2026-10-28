@@ -122,6 +122,7 @@ struct ReloadConfigCommand: Command {
                         // As in virtual mode: disabled stays without shortcuts, and a mode the
                         // new config dropped falls back to main.
                         try await activateMode(activeMode.map { parsedConfig.modes[$0] == nil ? mainModeId : $0 }, runCallbacks: false)
+                        runtime.workspaceBackend.nativeDesktopTopUp.reset()
                         runtime.workspaceBackend.observation?.requestRead(event: "nativeConfigReload")
                     }
                     syncStartAtLogin()

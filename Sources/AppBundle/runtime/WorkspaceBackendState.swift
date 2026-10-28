@@ -53,6 +53,7 @@ final class WorkspaceBackendState {
     let nativeWindowMoves = NativeWindowSpaceMoves()
     let nativeActivity = NativeActivityTracker()
     let nativeFocusHold = NativeFocusHold()
+    let nativeDesktopTopUp = NativeDesktopTopUp()
     /// Every window WindowServer knew when native mode started, on any desktop. Rules
     /// that move windows apply only to windows opened later, even if a pre-existing
     /// window is first seen when its desktop is visited.
@@ -189,9 +190,23 @@ final class WorkspaceBackendState {
                 if let snapshot = inventory.currentSnapshot { self.nativeWindows.reconcile(snapshot) }
                 onChange(inventory, event)
                 self.nativeStateChanges.notify()
+                self.topUpNativeDesktops(inventory)
             }
         }
         observer.start()
+    }
+
+    /// Desktop creation is a write, so it waits for native tiling like window moves do.
+    private func topUpNativeDesktops(_ inventory: NativeWorkspaceInventory) {
+        guard nativeTilingEnabled, inventory.status != .reading, let snapshot = inventory.currentSnapshot else { return }
+        let changed = nativeDesktopTopUp.observed(snapshot.displays,
+            target: NativeDesktopTopUp.target(config.persistentWorkspaces), home: nativeDesktopHome) { [weak self] delay in
+            Task { @MainActor in
+                try? await Task.sleep(for: delay)
+                self?.observation?.requestRead(event: "desktopTopUp")
+            }
+        }
+        if changed { observation?.requestRead(event: "desktopTopUp") }
     }
 
     func stop() {
