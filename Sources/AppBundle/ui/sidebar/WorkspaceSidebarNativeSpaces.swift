@@ -154,7 +154,7 @@ private func runNativeSidebarCommands(_ commands: [String], then finished: @esca
     WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
     runWorkspaceSidebarSession {
         // The model is rebuilt either way, so a failed switch undoes its optimistic highlight.
-        let error = try await runNativeCommands(commands)
+        let error = try await runUserCommands(commands)
         finished()
         if let error { showWorkspaceSidebarError(error) }
         await updateWorkspaceSidebarModel()

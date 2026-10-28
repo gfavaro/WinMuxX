@@ -131,22 +131,25 @@ struct SettingsDisplaysView: View {
                     .disabled(layoutWorkspace.isEmpty || workspaceLayoutChoice == currentWorkspaceLayoutChoice)
                 SettingsDescription("Sets the workspace-wide arrangement. Each existing top-level group keeps its nested splits and tabs. A matching display override may take precedence.")
             }
-            SettingsSection("Move a workspace") {
-                Picker("Workspace", selection: $workspace) {
-                    Text("Choose workspace").tag("")
-                    ForEach(tray.workspaces, id: \.name) { row in Text(row.displayName).tag(row.name) }
+            // Native desktops stay on their display; the sidebar's Bring Here moves their windows.
+            if runtime.workspaceBackend.capabilities.relocatesWorkspaces {
+                SettingsSection("Move a workspace") {
+                    Picker("Workspace", selection: $workspace) {
+                        Text("Choose workspace").tag("")
+                        ForEach(tray.workspaces, id: \.name) { row in Text(row.displayName).tag(row.name) }
+                    }
+                    Picker("Destination", selection: $selectedDisplay) {
+                        Text("Choose display").tag(nil as String?)
+                        ForEach(displays.rows.filter { $0.uuid != nil }) { row in Text(row.name).tag(Optional(row.id)) }
+                    }
+                    Button("Bring Here…") {
+                        guard let selectedDisplay else { return }
+                        guard let row = displays.rows.first(where: { $0.id == selectedDisplay }) else { return }
+                        pendingMove = (workspace, selectedDisplay, row.activeWorkspace, row.name)
+                        confirmsMove = true
+                    }.disabled(workspace.isEmpty || selectedDisplay == nil)
+                    SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. Saved assignments are unchanged.")
                 }
-                Picker("Destination", selection: $selectedDisplay) {
-                    Text("Choose display").tag(nil as String?)
-                    ForEach(displays.rows.filter { $0.uuid != nil }) { row in Text(row.name).tag(Optional(row.id)) }
-                }
-                Button("Bring Here…") {
-                    guard let selectedDisplay else { return }
-                    guard let row = displays.rows.first(where: { $0.id == selectedDisplay }) else { return }
-                    pendingMove = (workspace, selectedDisplay, row.activeWorkspace, row.name)
-                    confirmsMove = true
-                }.disabled(workspace.isEmpty || selectedDisplay == nil)
-                SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. Saved assignments are unchanged.")
             }
             SettingsSection("Configured assignments") {
                 if config.workspaceToMonitorForceAssignment.isEmpty {

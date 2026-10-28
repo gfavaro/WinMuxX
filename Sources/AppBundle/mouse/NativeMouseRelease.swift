@@ -69,7 +69,7 @@ func applyNativeDragIntent() async -> Bool {
     if let name, let target = Workspace.existing(byName: name),
        Window.get(byId: intent.sourceWindowId)?.nodeWorkspace !== target {
         guard let number = nativeDesktopNumber(of: target) else { return true }
-        if let error = try? await runNativeCommands(["move-node-to-workspace --window-id \(intent.sourceWindowId) \(number)"]) {
+        if let error = try? await runUserCommands(["move-node-to-workspace --window-id \(intent.sourceWindowId) \(number)"]) {
             MessageModel.shared.message = Message(description: "Move window", body: error)
         }
         return true

@@ -96,10 +96,10 @@ nonisolated func nativeListedWindows(_ snapshot: NativeSpacesSnapshot) -> [Nativ
 func focusNativeWindow(_ windowId: UInt32) async throws -> String? {
     if Window.get(byId: windowId) == nil, let space = NativeUnvisitedWindows.shared.spaceID(of: windowId),
        let number = NativeSpaceNavigation.desktopNumber(of: space, in: nativeObservedDisplays() ?? []) {
-        if let error = try await runNativeCommands(["workspace \(number)"]) { return error }
+        if let error = try await runUserCommands(["workspace \(number)"]) { return error }
         _ = await runtime.workspaceBackend.nativeStateChanges.wait(timeout: .milliseconds(1500)) { Window.get(byId: windowId) != nil }
         try Task.checkCancellation()
         guard Window.get(byId: windowId) != nil else { return nil } // Shown, but not an adoptable window.
     }
-    return try await runNativeCommands(nativeFocusWindowCommands(windowId))
+    return try await runUserCommands(nativeFocusWindowCommands(windowId))
 }

@@ -4,7 +4,7 @@ func removeWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
     Task {
         try await runLightSession(.menuBarButton, token) {
             guard let window = Window.get(byId: windowId) else {
-                _ = Workspace.existing(byName: fallbackWorkspace)?.focusWorkspace()
+                _ = try await selectWorkspaceFromUi(fallbackWorkspace)
                 return
             }
             _ = removeWindowFromTabStack(window)

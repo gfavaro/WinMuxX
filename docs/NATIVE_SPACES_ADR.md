@@ -95,4 +95,9 @@ stable for a second, and stops on a failure until the config reloads or the disp
 change. It never removes a desktop or moves a window. The creation call is adapted
 from Dinky's bridged `SLSBridgedSpaceCreateOperation` and works with SIP enabled.
 
+UI actions that switch workspaces or focus run commands (`runUserCommands`,
+`selectWorkspaceFromUi`) so the command layer chooses each backend's path.
+`activateWorkspaceForUser` refuses with native Spaces and fails unit tests, so a UI
+path that bypasses the command layer shows up in `make check`.
+
 See [assessment and measured Phase 0 results](NATIVE_SPACES_ASSESSMENT.md).
