@@ -344,15 +344,16 @@ private func closeWindowsForProjectDeletion(_ windows: [Window]) async -> [Windo
 
 @MainActor
 private func waitForAppTermination(_ app: MacApp, timeout: TimeInterval = 2.0) async -> Bool {
-    let deadline = Date().addingTimeInterval(timeout)
-    while Date() < deadline {
+    let deadline = ContinuousClock.now + .seconds(timeout)
+    while ContinuousClock.now < deadline {
         if app.nsApp.isTerminated {
             return true
         }
         if (try? await app.getAxWindowsCount()) == 0 {
             return true
         }
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        // Woken by termination or a closed window; the backstop covers a missed notification.
+        await windowLifecycleChanges.nextChange(before: min(deadline, .now + .milliseconds(250)))
     }
     return false
 }

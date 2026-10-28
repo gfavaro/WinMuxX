@@ -29,6 +29,7 @@ enum GlobalObserver {
             ? (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier : nil
         Task { @MainActor in
             if let terminatedPid {
+                windowLifecycleChanges.notify()
                 MacApp.registrationRetries.cancel(pid: terminatedPid)
                 WindowDetectionOperations.shared.cancel(pid: terminatedPid)
             }

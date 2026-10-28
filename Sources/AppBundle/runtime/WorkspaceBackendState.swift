@@ -47,7 +47,7 @@ final class WorkspaceBackendState {
     let nativeWriteAuthority = NativeSpaceWriteAuthority()
     let nativeWindows = NativeWindowReconciler()
     let nativeTiling = NativeTilingCoordinator()
-    let nativeStateChanges = NativeStateSignal()
+    let nativeStateChanges = ChangeSignal()
     let nativePersistence = NativeLayoutPersistence()
     let nativeNavigation = NativeSpaceNavigator()
     let nativeWindowMoves = NativeWindowSpaceMoves()

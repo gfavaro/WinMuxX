@@ -1,9 +1,9 @@
 import Foundation
 
-/// Wakes native waiters when readiness or the observed desktops may have changed, so
-/// commands resume on the change itself instead of polling for it.
+/// Wakes waiters when the state they watch may have changed, so they resume on the change
+/// itself instead of polling for it. Waiters re-check their condition after each wake.
 @MainActor
-final class NativeStateSignal {
+final class ChangeSignal {
     private var waiters: [UUID: (CheckedContinuation<Void, Never>, Task<Void, Never>)] = [:]
 
     func notify() {
@@ -36,3 +36,6 @@ final class NativeStateSignal {
         }
     }
 }
+
+/// AX window destruction and app termination, for code waiting on a close or quit it asked for.
+@MainActor let windowLifecycleChanges = ChangeSignal()

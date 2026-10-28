@@ -166,6 +166,7 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
         window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
         try await applyNativeWindowDetectedRules(window) { layouts.accepts(registration) }
+        runtime.workspaceBackend.nativeStateChanges.notify() // Wakes a palette pick awaiting adoption.
         return window
     }
 
@@ -290,13 +291,14 @@ final class MacWindow: Window {
     @MainActor
     func requestCloseForProjectDeletion(timeout: TimeInterval = 1.5) async -> Bool {
         guard (try? await macApp.pressCloseButton(windowId)) == true else { return false }
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
+        let deadline = ContinuousClock.now + .seconds(timeout)
+        while ContinuousClock.now < deadline {
             if (try? await macApp.containsAxWindow(windowId)) == false {
                 garbageCollect(skipClosedWindowsCache: true)
                 return true
             }
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            // Woken by the window's destruction; the backstop covers a missed AX notification.
+            await windowLifecycleChanges.nextChange(before: min(deadline, .now + .milliseconds(250)))
         }
         return false
     }

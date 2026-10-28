@@ -2,9 +2,9 @@
 import XCTest
 
 @MainActor
-final class NativeStateSignalTest: XCTestCase {
+final class ChangeSignalTest: XCTestCase {
     func testWaitResumesOnTheChangeAndTimesOutWithoutOne() async {
-        let signal = NativeStateSignal()
+        let signal = ChangeSignal()
         var ready = false
         let started = ContinuousClock.now
         Task { @MainActor in
@@ -22,7 +22,7 @@ final class NativeStateSignalTest: XCTestCase {
     }
 
     func testNextChangeReturnsAtTheDeadlineWhenNothingChanges() async {
-        let signal = NativeStateSignal()
+        let signal = ChangeSignal()
         let started = ContinuousClock.now
         await signal.nextChange(before: .now + .milliseconds(30))
         XCTAssertGreaterThanOrEqual(started.duration(to: .now), .milliseconds(30))
