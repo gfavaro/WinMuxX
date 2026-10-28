@@ -28,7 +28,9 @@ enum NativeCommandPolicy {
                  // Starts a process; no window or Space is touched.
                  is ExecAndForgetCommand,
                  // Switches key bindings only; it must work while tiling is paused.
-                 is ModeCommand: true
+                 is ModeCommand,
+                 // Draws an overlay; no window or Space is touched.
+                 is NoPeekCommand: true
             default: false
         }
     }

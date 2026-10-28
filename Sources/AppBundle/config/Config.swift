@@ -89,6 +89,7 @@ struct Config: ConvenienceCopyable {
     var menuBar = MenuBarConfig()
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
+    var dimming = DimmingConfig()
     var animations = AnimationsConfig()
     var workspaceLayouts: [String: WorkspaceLayoutConfig] = [:]
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]

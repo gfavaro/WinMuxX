@@ -27,6 +27,8 @@ help documents an explicit target.
 
 **Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. In native mode it also renews the put-back budget for windows whose apps kept moving them. Available from Layout → Retile.
 
+**No peek:** `no-peek [on|off|toggle]` darkens and blurs everything except the focused window, on every display, so people beside you or on a call can't read your other windows. It follows focus, stays out of Mission Control and native fullscreen, and clicks still reach the windows behind it. Without an argument it toggles; also in the menu as No Peek.
+
 **Workspace and project:** `workspace` selects a workspace;
 `workspace-back-and-forth` returns to the previous one; `project` selects a
 project. `move-node-to-workspace`, `move-node-to-project` and

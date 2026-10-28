@@ -143,6 +143,18 @@ its wallpaper to meet the menu bar. Explicit themes override that adaptation.
 Custom solid surface colors retain a contrasting foreground. Reduce Transparency
 and Increase Contrast continue to apply in every theme.
 
+## Dimming inactive windows
+
+```toml
+[dimming]
+inactive-windows = 0.25 # 0 (off, the default) to 0.8
+```
+
+Everything except the focused window is darkened by this much, on every display.
+Clicks still reach the dimmed windows, and dimming steps aside for Mission Control,
+native fullscreen and presentation. The `no-peek` command goes further: it darkens
+and blurs everything but the focused window until you turn it off.
+
 ## Mode leaders and external state
 
 Binding modes support optional `timeout-ms = 1500`, `show-indicator = true`, and

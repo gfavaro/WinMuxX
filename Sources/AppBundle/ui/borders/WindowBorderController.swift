@@ -148,11 +148,19 @@ final class WindowBorderController {
     func refresh(nativeSnapshot: [[String: Any]]? = nil) {
         guard !isUnitTest else { return }
         synchronizeNativeWindowSubscriptions()
+        var chromeAllowed = false
+        defer { InactiveWindowDimmer.shared.refresh(chromeAllowed: chromeAllowed) }
+        // Dimming stays through a pan; only borders wait for it to settle.
+        chromeAllowed = !missionControlState.active && !shouldSuppressChromeForNativeFullscreenContent
         guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }
         let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
-        guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else { clear(); return }
+        guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else {
+            chromeAllowed = false
+            clear()
+            return
+        }
         var frames: [UInt32: CGRect] = [:]
         for entry in native {
             guard let number = entry[kCGWindowNumber as String] as? NSNumber,

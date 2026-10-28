@@ -48,6 +48,7 @@
     "menu-bar": {"type": "object", "properties": {"indicator": {"enum": ["icon", "workspace"]}, "icon-appearance": {"enum": ["color", "monochrome"]}}, "additionalProperties": false},
     "window-tabs": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "height": {"type": "integer", "exclusiveMinimum": 20}, "double-sided-windows": {"type": "boolean"}}, "additionalProperties": false},
     "borders": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "width": {"type": "number", "minimum": 0}, "active-color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"}, "inactive-color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"}, "order": {"enum": ["below", "above"]}, "exclude-apps": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
+    "dimming": {"type": "object", "properties": {"inactive-windows": {"type": "number", "minimum": 0, "maximum": 0.8}}, "additionalProperties": false},
     "modifiers": {"type": "object", "patternProperties": {"^(alt|ctrl|cmd|shift)$": {"enum": ["both", "left", "right"]}}, "additionalProperties": false},
     "animations": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "duration-ms": {"type": "integer", "minimum": 0, "maximum": 2000}}, "additionalProperties": false},
     "workspace": {"type": "object", "description": "Dynamic keys are internal workspace names.", "patternProperties": {"^.+$": {"$ref": "#/$defs/workspaceLayout"}}, "additionalProperties": false},
