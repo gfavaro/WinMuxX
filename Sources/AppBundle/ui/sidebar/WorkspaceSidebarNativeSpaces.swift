@@ -77,6 +77,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             }
         case .selectWorkspace(let name):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
+            optimisticallyMarkNativeDesktopShown(name)
             runNativeSidebarCommands(["workspace \(number)"])
         case .selectWindow(let windowId):
             WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
@@ -146,7 +147,35 @@ func renameNativeDesktop(_ number: Int, to displayName: String) {
 private func runNativeSidebarCommands(_ commands: [String]) {
     WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
     runWorkspaceSidebarSession {
-        if let error = try await runNativeCommands(commands) { return showWorkspaceSidebarError(error) }
+        // The model is rebuilt either way, so a failed switch undoes its optimistic highlight.
+        if let error = try await runNativeCommands(commands) { showWorkspaceSidebarError(error) }
         await updateWorkspaceSidebarModel()
     }
+}
+
+/// Highlights the clicked desktop as shown on its display on the click's frame, as virtual
+/// workspaces do; the swipe can take a few hundred ms to land. Desktops never change display.
+@MainActor
+private func optimisticallyMarkNativeDesktopShown(_ name: String) {
+    let workspaces = TrayMenuModel.shared.workspaceSidebarWorkspaces
+    guard let clicked = workspaces.first(where: { $0.name == name }), !clicked.isVisible else { return }
+    let display = clicked.monitorScopeId
+    let focusMoves = workspaces.contains { $0.monitorScopeId == display && $0.isFocused }
+    TrayMenuModel.shared.workspaceSidebarWorkspaces = workspaces.map { w in
+        guard w.monitorScopeId == display else { return w }
+        let shown = w.name == name
+        return WorkspaceSidebarWorkspaceViewModel(
+            name: w.name,
+            projectId: w.projectId,
+            displayName: w.displayName,
+            sidebarLabel: w.sidebarLabel,
+            isGeneratedName: w.isGeneratedName,
+            monitorScopeId: w.monitorScopeId,
+            monitorName: w.monitorName,
+            isFocused: shown && focusMoves,
+            isVisible: shown,
+            items: w.items,
+        )
+    }
+    WorkspaceSidebarPanel.syncVisiblePanelModelsFromShared()
 }

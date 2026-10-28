@@ -97,6 +97,39 @@ else
     wm doctor >/dev/null && pass "WinMuxX survives the test app quitting" || fail "WinMuxX survives the test app quitting"
 fi
 
+# The sidebar's main use: changing the desktop of a display the pointer is not on.
+# WinMuxX moves the pointer there for the swipe; it must come back.
+mouse=$(wm list-monitors --mouse --format '%{monitor-id}')
+layout=$(wm list-workspaces --all --format '%{workspace} %{monitor-id} %{workspace-is-visible}')
+away_shown=$(awk -v m="$mouse" '$2 != m && $3 == "true" { print $1 " " $2; exit }' <<<"$layout")
+away_display=${away_shown#* }
+away_shown=${away_shown% *}
+away_target=$(awk -v m="$mouse" -v d="$away_display" '$2 != m && $2 == d && $3 == "false" { print $1; exit }' <<<"$layout")
+shown() { wm list-workspaces --all --format '%{workspace} %{workspace-is-visible}' | awk -v w="$1" '$1 == w { print $2 }'; }
+if [ -z "$away_target" ]; then
+    skip "switch the other display's desktop (no display without the pointer has two desktops)"
+else
+    started=$(perl -MTime::HiRes=time -e 'printf "%d", time * 1000')
+    wm workspace "$away_target" >/dev/null
+    for _ in $(seq 1 30); do [ "$(shown "$away_target")" = true ] && break; sleep 0.1; done
+    landed=$(( $(perl -MTime::HiRes=time -e 'printf "%d", time * 1000') - started ))
+    [ "$(shown "$away_target")" = true ] && pass "switch the other display to desktop $away_target (${landed} ms)" ||
+        fail "switch the other display to desktop $away_target"
+    # The pointer comes back from the swipe, unless focus followed the switch and the
+    # config's on-focused-monitor-changed moves it to the focused display.
+    now_mouse=$(wm list-monitors --mouse --format '%{monitor-id}')
+    now_focused=$(wm list-monitors --focused --format '%{monitor-id}')
+    [ "$now_mouse" = "$mouse" ] && pass "pointer returned to its display" ||
+        { [ "$now_mouse" = "$now_focused" ] && pass "pointer followed focus to display $now_focused (config callback)" ||
+            fail "pointer left on display $now_mouse; focus is on display $now_focused"; }
+    # Two requests back to back, as rapid sidebar clicks send them: the last one wins.
+    wm workspace "$away_shown" >/dev/null & wm workspace "$away_target" >/dev/null; wait
+    wm workspace "$away_shown" >/dev/null
+    sleep 0.3
+    [ "$(shown "$away_shown")" = true ] && pass "rapid switches on the other display end on desktop $away_shown" ||
+        fail "rapid switches on the other display: desktop $away_shown not showing"
+fi
+
 probe=$(wm doctor --simulate-native-pan)
 if grep -q "No visible scrolling desktop" <<<"$probe"; then
     skip "scrolling pan (no scrolling desktop showing)"
