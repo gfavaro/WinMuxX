@@ -111,7 +111,9 @@ struct WorkspaceSidebarProjectSwipeScrollCapture: NSViewRepresentable {
             onChanged?(horizontalTranslation, verticalTranslation)
             if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
                 finishLockedSwipe()
-            } else {
+            } else if event.phase.isEmpty {
+                // Only devices without scroll phases need a pause to end the swipe; a
+                // trackpad's own end phase does, so a mid-swipe pause no longer ends it.
                 scheduleEndTimer()
             }
             return nil
