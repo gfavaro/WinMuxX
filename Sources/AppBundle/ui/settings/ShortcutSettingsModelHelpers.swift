@@ -75,6 +75,7 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "balance", title: "Balance Sizes", command: "balance-sizes"),
                 shortcutAction(id: "flatten", title: "Flatten Workspace Tree", command: "flatten-workspace-tree"),
                 shortcutAction(id: "undo-layout", title: "Undo Layout Change", command: "undo-layout"),
+                shortcutAction(id: "retile", title: "Retile", command: "retile"),
             ],
         ),
         .init(

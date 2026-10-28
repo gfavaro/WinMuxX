@@ -25,6 +25,8 @@ help documents an explicit target.
 
 **Undo:** `undo-layout` puts the focused workspace's layout back as it was before its last layout command (`layout`, `move`, `join-with`, `resize`, `balance-sizes`, `workspace-layout`, scrolling moves, widths and pins, and similar), one step at a time, up to 20 steps. It rearranges only windows still on that workspace, and a window opened since is tiled into the restored layout. Available from Layout → Undo Layout Change.
 
+**Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. In native mode it also renews the put-back budget for windows whose apps kept moving them. Available from Layout → Retile.
+
 **Workspace and project:** `workspace` selects a workspace;
 `workspace-back-and-forth` returns to the previous one; `project` selects a
 project. `move-node-to-workspace`, `move-node-to-project` and

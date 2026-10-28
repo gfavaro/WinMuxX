@@ -41,6 +41,7 @@ let subcommandDescriptions = [
     ["  resize", "Resize the focused window"],
     ["  scrolling-center", "Center the focused scrolling column"],
     ["  undo-layout", "Undo the focused workspace's last layout change"],
+    ["  retile", "Put every tiled window back on its tile"],
     ["  scrolling-focus", "Focus a scrolling column by place: 1-9, first or last"],
     ["  scrolling-minimap", "Toggle the scrolling workspace map"],
     ["  scrolling-move", "Move the focused scrolling column to a place: 1-9, first or last"],

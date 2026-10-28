@@ -269,7 +269,7 @@ final class NativeTilingCoordinator {
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand,
                  is ScrollingFocusCommand, is ScrollingMoveCommand, is ScrollingPinCommand,
-                 is UndoLayoutCommand: return true
+                 is UndoLayoutCommand, is RetileCommand: return true
             case is StackWithCommand, is FlattenWorkspaceTreeCommand: return true
             case is MoveCommand: return true
             case let command as FocusCommand:
@@ -304,7 +304,7 @@ final class NativeTilingCoordinator {
             return io.err("Native command cancelled because its target changed during reconciliation")
         }
         guard hasManagedNativeFocus || commands.allSatisfy({
-            $0 is DoctorCommand || $0 is ReloadConfigCommand || $0 is ModeCommand ||
+            $0 is DoctorCommand || $0 is ReloadConfigCommand || $0 is ModeCommand || $0 is RetileCommand ||
                 $0.args.windowId != nil || env.windowId != nil
         }) else { return io.err("The frontmost window is not managed by native tiling; use an eligible explicit --window-id") }
         let validate: @MainActor @Sendable () -> Bool = {

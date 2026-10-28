@@ -215,6 +215,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
             submenu.addItem(.separator())
             addCommand("Undo Layout Change", script: "undo-layout", to: submenu)
+            addCommand("Retile", script: "retile", to: submenu, requiresWindow: false)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
         if capturedRuleTarget != nil {

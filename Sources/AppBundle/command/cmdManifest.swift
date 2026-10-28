@@ -22,6 +22,7 @@ extension CmdArgs {
             case let args as WorkspaceLayoutCmdArgs: WorkspaceLayoutCommand(args: args)
             case let args as ScrollingCenterCmdArgs: ScrollingCenterCommand(args: args)
             case let args as UndoLayoutCmdArgs: UndoLayoutCommand(args: args)
+            case let args as RetileCmdArgs: RetileCommand(args: args)
             case let args as ScrollingWidthCmdArgs: ScrollingWidthCommand(args: args)
             case let args as ScrollingMinimapCmdArgs: ScrollingMinimapCommand(args: args)
             case let args as ScrollingFocusCmdArgs: ScrollingFocusCommand(args: args)

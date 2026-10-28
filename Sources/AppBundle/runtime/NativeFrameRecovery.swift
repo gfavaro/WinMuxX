@@ -38,6 +38,9 @@ final class NativeFrameRecovery {
     private var pending: [UInt32: Task<Void, Never>] = [:]
     private let settleDelay: Duration = .milliseconds(150)
 
+    /// `retile` renews every window's budget.
+    func reset() { budgets.removeAll() }
+
     func windowChanged(_ window: Window) {
         let id = window.windowId
         pending[id]?.cancel()
