@@ -97,6 +97,11 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         )
         return
     }
+    if nativeFocusHoldRejects(nativeFocused) {
+        runtime.nativeFocus.lastKnownWindowID = nil
+        debugFocusLog("updateFocusCache ignoredNativeFocusHold nativeFocused=\(nativeFocused?.windowId.description ?? "nil")")
+        return
+    }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
         if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
             _ = setFocus(to: live, origin: .native)

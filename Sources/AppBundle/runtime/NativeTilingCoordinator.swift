@@ -107,6 +107,7 @@ final class NativeTilingCoordinator {
                     guard let owner else { return }
                     owner.withValue {
                         MacApp.cancelPendingFocus()
+                        if !released { owner.workspaceBackend.nativeFocusHold.end() } // A click elsewhere is the user's.
                         let tiling = owner.workspaceBackend.nativeTiling
                         guard released else {
                             // A read queued by the drag's own move events must not lay the
@@ -241,7 +242,8 @@ final class NativeTilingCoordinator {
         if let front = NSWorkspace.shared.frontmostApplication,
            let app = try? await MacApp.getOrRegister(front),
            let window = try? await app.getFocusedWindow(), window.nativeLayoutEligible,
-           backend.nativeLayouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace {
+           backend.nativeLayouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace,
+           !nativeFocusHoldRejects(window) {
             _ = window.focusWindow()
             runtime.nativeFocus.lastKnownWindowID = window.windowId
             hasManagedNativeFocus = true

@@ -52,6 +52,7 @@ final class WorkspaceBackendState {
     let nativeNavigation = NativeSpaceNavigator()
     let nativeWindowMoves = NativeWindowSpaceMoves()
     let nativeActivity = NativeActivityTracker()
+    let nativeFocusHold = NativeFocusHold()
     /// Every window WindowServer knew when native mode started, on any desktop. Rules
     /// that move windows apply only to windows opened later, even if a pre-existing
     /// window is first seen when its desktop is visited.

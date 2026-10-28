@@ -77,8 +77,14 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             }
         case .selectWorkspace(let name):
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
+            let clickedDisplay = TrayMenuModel.shared.workspaceSidebarWorkspaces.first { $0.name == name }?.monitorScopeId
+            let home = focus.workspace.workspaceMonitor
+            let hold = runtime.workspaceBackend.nativeFocusHold
+            // Changing what another display shows keeps focus here; see NativeFocusHold.
+            let away = clickedDisplay != nil && clickedDisplay != workspaceSidebarMonitorScopeId(for: home)
             optimisticallyMarkNativeDesktopShown(name)
-            runNativeSidebarCommands(["workspace \(number)"])
+            if away, let homeDisplay = home.displayUUID { hold.begin(window: focus.windowOrNil, homeDisplay: homeDisplay) }
+            runNativeSidebarCommands(["workspace \(number)"]) { if away { hold.settle() } }
         case .selectWindow(let windowId):
             WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
             runWorkspaceSidebarSession {
@@ -144,11 +150,13 @@ func renameNativeDesktop(_ number: Int, to displayName: String) {
 
 /// Commands run one after another; a Space switch must land before focusing.
 @MainActor
-private func runNativeSidebarCommands(_ commands: [String]) {
+private func runNativeSidebarCommands(_ commands: [String], then finished: @escaping @MainActor () -> Void = {}) {
     WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
     runWorkspaceSidebarSession {
         // The model is rebuilt either way, so a failed switch undoes its optimistic highlight.
-        if let error = try await runNativeCommands(commands) { showWorkspaceSidebarError(error) }
+        let error = try await runNativeCommands(commands)
+        finished()
+        if let error { showWorkspaceSidebarError(error) }
         await updateWorkspaceSidebarModel()
     }
 }
