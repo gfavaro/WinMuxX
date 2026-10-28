@@ -12,7 +12,7 @@ public let shortcutSettingsWindowId = "\(winMuxAppName).shortcutSettings"
 @MainActor
 public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scene {
     SwiftUI.Window("WinMuxX Settings", id: shortcutSettingsWindowId) {
-        ShortcutSettingsView(model: model)
+        ShortcutSettingsWindowContent(model: model)
             .frame(minWidth: settingsWindowWidth,
                    minHeight: settingsWindowMinimumHeight, maxHeight: .infinity)
             .onAppear {
@@ -35,6 +35,8 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
 public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
     WorkspaceControlsPanelController.shared.dismiss()
     ShortcutSettingsModel.shared.reload()
+    ShortcutSettingsModel.shared.isWindowShown = true
+    _ = releaseSettingsPagesOnClose
     if let existingWindow = shortcutSettingsWindow() {
         presentShortcutSettingsWindow(existingWindow)
     } else {
@@ -43,6 +45,32 @@ public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
             if let createdWindow = shortcutSettingsWindow() {
                 presentShortcutSettingsWindow(createdWindow)
             }
+        }
+    }
+}
+
+/// SwiftUI keeps a closed Window scene, and it builds this one at launch even when
+/// Settings is never opened, so every page used to stay in memory for the app's life.
+@MainActor
+private let releaseSettingsPagesOnClose: Void = {
+    _ = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+        guard (note.object as? NSWindow)?.identifier?.rawValue == shortcutSettingsWindowId else { return }
+        MainActor.assumeIsolated { ShortcutSettingsModel.shared.isWindowShown = false }
+    }
+}()
+
+/// Holds the pages while the window is open. The rule and display editors live here so
+/// their unsaved edits outlast a close, like the other setting drafts.
+struct ShortcutSettingsWindowContent: View {
+    @ObservedObject var model: ShortcutSettingsModel
+    @StateObject private var displays = SettingsDisplaysModel()
+    @StateObject private var rules = SettingsWindowRulesModel()
+
+    var body: some View {
+        if model.isWindowShown {
+            ShortcutSettingsView(model: model, displays: displays, rules: rules)
+        } else {
+            Color.clear
         }
     }
 }
@@ -93,8 +121,8 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
 
 struct ShortcutSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @StateObject private var displays = SettingsDisplaysModel()
-    @StateObject private var rules = SettingsWindowRulesModel()
+    @ObservedObject var displays: SettingsDisplaysModel
+    @ObservedObject var rules: SettingsWindowRulesModel
     @AppStorage("settings.selectedPage") private var storedPage = SettingsSidebarItem.general.rawValue
     @State private var shortcutSearch = ""
 
