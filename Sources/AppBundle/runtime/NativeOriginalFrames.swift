@@ -44,11 +44,11 @@ final class NativeOriginalFrames {
         // Any AX event revokes grants until the next read; wait briefly for one.
         func granted(_ id: UInt32) -> Bool { MacWindow.allWindowsMap[id]?.macApp.hasNativeWriteGrant(id) == true }
         if !candidates.allSatisfy({ granted($0.id) }) {
-            runtime.workspaceBackend.observation?.requestRead(event: "nativeRestoreFrames")
+            runtime.workspaceBackend.native.observation?.requestRead(event: "nativeRestoreFrames")
             let deadline = ContinuousClock.now + .milliseconds(1500)
             // Grants arrive with a completed read; the backstop covers one without a change signal.
             while ContinuousClock.now < deadline, !candidates.allSatisfy({ granted($0.id) }) {
-                await runtime.workspaceBackend.nativeStateChanges.nextChange(before: min(deadline, .now + .milliseconds(100)))
+                await runtime.workspaceBackend.native.stateChanges.nextChange(before: min(deadline, .now + .milliseconds(100)))
             }
         }
         let leased = candidates.compactMap { candidate -> (id: UInt32, frame: CGRect, validate: @Sendable (AXUIElement) throws -> Void)? in

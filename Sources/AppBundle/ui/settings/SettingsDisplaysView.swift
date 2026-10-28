@@ -132,7 +132,7 @@ struct SettingsDisplaysView: View {
                 SettingsDescription("Sets the workspace-wide arrangement. Each existing top-level group keeps its nested splits and tabs. A matching display override may take precedence.")
             }
             // Native desktops stay on their display; the sidebar's Bring Here moves their windows.
-            if runtime.workspaceBackend.capabilities.relocatesWorkspaces {
+            if runtime.workspaceBackend.capabilities.relocatesVirtualWorkspaces {
                 SettingsSection("Move a workspace") {
                     Picker("Workspace", selection: $workspace) {
                         Text("Choose workspace").tag("")

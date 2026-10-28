@@ -136,8 +136,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let place = native ? nativeDesktopNumber(of: focus.workspace).map { nativeDesktopDisplayName($0) } ?? "Native Spaces"
             : "Workspace \(workspaceDisplayName(focus.workspace.name))"
         menu.addItem(NSMenuItem(title: "WinMuxX · \(place)", action: nil, keyEquivalent: ""))
-        if native, !runtime.workspaceBackend.nativeTiling.ready {
-            let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Tiling off (observation only)"
+        if native, !runtime.workspaceBackend.native.tiling.ready {
+            let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Tiling off (observation only)"
             menu.addItem(NSMenuItem(title: state, action: nil, keyEquivalent: ""))
         }
         if activeMode != mainModeId {
@@ -458,7 +458,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }
-    @objc private func refreshNativeSpaces() { runtime.workspaceBackend.observation?.requestRead() }
+    @objc private func refreshNativeSpaces() { runtime.workspaceBackend.native.observation?.requestRead() }
     @objc private func resetMinimumSizes() {
         let alert = NSAlert()
         alert.messageText = "Reset learned minimum window sizes?"

@@ -20,7 +20,7 @@ func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
         case .createWorkspace:
             return capabilities.ownsWorkspaceLifecycle
         case .sidebarHover:
-            return capabilities.activatesWorkspaces
+            return capabilities.activatesVirtualWorkspaces
         case .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone:
             return true
     }

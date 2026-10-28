@@ -67,10 +67,10 @@ struct LayoutCommand: Command {
                         return true // Nothing to do
                     case .workspace(let workspace):
                         let registration = runtime.workspaceBackend.kind == .native
-                            ? runtime.workspaceBackend.nativeLayouts.registration(for: window.windowId) : nil
+                            ? runtime.workspaceBackend.native.layouts.registration(for: window.windowId) : nil
                         let size = try await window.getAxSize()
                         if runtime.workspaceBackend.kind == .native {
-                            guard let registration, runtime.workspaceBackend.nativeLayouts.accepts(registration) else {
+                            guard let registration, runtime.workspaceBackend.native.layouts.accepts(registration) else {
                                 return io.err("Native layout target changed while reading its size")
                             }
                         }

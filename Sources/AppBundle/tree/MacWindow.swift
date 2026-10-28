@@ -128,7 +128,7 @@ final class MacWindow: Window {
 
     @MainActor
     private static func getOrRegisterNative(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         guard let registration = layouts.registration(for: windowId),
               !macApp.nsApp.isTerminated else { return nil }
         let workspace = registration.workspace
@@ -166,7 +166,7 @@ final class MacWindow: Window {
         allWindowsMap[windowId] = window
         window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
         try await applyNativeWindowDetectedRules(window) { layouts.accepts(registration) }
-        runtime.workspaceBackend.nativeStateChanges.notify() // Wakes a palette pick awaiting adoption.
+        runtime.workspaceBackend.native.stateChanges.notify() // Wakes a palette pick awaiting adoption.
         return window
     }
 
@@ -535,7 +535,7 @@ final class MacWindow: Window {
                 let oldMinimum = self.learnedMinimum.size
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
                 if runtime.workspaceBackend.kind == .native, self.learnedMinimum.size != oldMinimum {
-                    runtime.workspaceBackend.observation?.requestRead(event: "nativeMinimumChanged")
+                    runtime.workspaceBackend.native.observation?.requestRead(event: "nativeMinimumChanged")
                 }
                 if !isUnitTest { PersistedAppMinimums.shared.remember(self.learnedMinimum.size, for: self.macApp.rawAppBundleId) }
                 WindowMotion.shared.noteLanded(self.windowId,

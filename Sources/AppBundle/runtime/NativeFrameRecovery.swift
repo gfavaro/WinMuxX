@@ -56,11 +56,11 @@ final class NativeFrameRecovery {
               let workspace = window.nodeWorkspace, workspace.isVisible,
               let tile = window.lastAppliedLayoutPhysicalRect else { budgets[id] = nil; return }
         // Our own writes and pans, the user's drags and a layout in progress are not the app's doing.
-        guard backend.nativeTilingEnabled, backend.nativeTiling.ready, TrayMenuModel.shared.isEnabled,
+        guard backend.native.tilingEnabled, backend.native.tiling.ready, TrayMenuModel.shared.isEnabled,
               NSEvent.pressedMouseButtons == 0, !NativeScrollingPan.shared.isPanning,
               !WindowMotion.shared.isAnimating(id), let frame = windowServerFrame(id) else { return }
         guard budgets[id, default: FrameRecoveryBudget()].shouldReapply(tile: tile, resting: windowRestsOnTile(frame, tile: tile)) else { return }
-        backend.observation?.requestRead(event: "nativeAppMovedWindow")
+        backend.native.observation?.requestRead(event: "nativeAppMovedWindow")
     }
 }
 

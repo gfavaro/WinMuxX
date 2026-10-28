@@ -25,7 +25,7 @@ final class NativeTilingCoordinator {
     /// Tiling stays off until something outside WinMuxX changes; the tray marks it.
     private(set) var isStopped = false
     private(set) var ready = false {
-        didSet { if ready, !oldValue { runtime.workspaceBackend.nativeStateChanges.notify() } }
+        didSet { if ready, !oldValue { runtime.workspaceBackend.native.stateChanges.notify() } }
     }
     /// Set by the first completed layout; windows registered before it existed at startup.
     private(set) var hasCompletedInitialLayout = false
@@ -39,7 +39,7 @@ final class NativeTilingCoordinator {
         generation &+= 1
         ready = false
         hasManagedNativeFocus = false
-        if runtime.workspaceBackend.nativeTilingEnabled { status = "Waiting for native reconciliation" }
+        if runtime.workspaceBackend.native.tilingEnabled { status = "Waiting for native reconciliation" }
         for app in MacApp.allAppsMap.values { app.cancelPendingFrameWrites() }
     }
 
@@ -59,10 +59,10 @@ final class NativeTilingCoordinator {
     func accept(_ snapshot: NativeSpacesSnapshot, identities: [NativeWindowWriteIdentity]) async {
         let acceptStart = ContinuousClock.now
         defer { nativePanTiming.record("accept (after read)", acceptStart.duration(to: .now)) }
-        guard runtime.workspaceBackend.nativeTilingEnabled else { return }
+        guard runtime.workspaceBackend.native.tilingEnabled else { return }
         guard !serverArgs.isReadOnly else { stopTiling("Tiling suppressed by read-only startup"); return }
         guard TrayMenuModel.shared.isEnabled else { status = "Tiling disabled (enable on resumes it)"; return }
-        guard AXIsProcessTrusted(), runtime.workspaceBackend.observation?.windowEventsAvailable == true else {
+        guard AXIsProcessTrusted(), runtime.workspaceBackend.native.observation?.windowEventsAvailable == true else {
             stopTiling("Tiling suspended: Accessibility or native lifecycle events unavailable")
             return
         }
@@ -82,7 +82,7 @@ final class NativeTilingCoordinator {
             return
         }
         let backend = runtime.workspaceBackend
-        guard snapshot.displays.contains(where: { backend.nativeLayouts.activeWorkspace(on: $0.identifier) != nil }) else {
+        guard snapshot.displays.contains(where: { backend.native.layouts.activeWorkspace(on: $0.identifier) != nil }) else {
             // One shared set of desktops across displays is reported as "Main"; native
             // tiling lays out per display, so it says why instead of doing nothing.
             if snapshot.displays.contains(where: { $0.identifier == "Main" }) {
@@ -92,12 +92,12 @@ final class NativeTilingCoordinator {
             }
             return
         }
-        await backend.nativePersistence.reconcile(backend.nativeLayouts)
+        await backend.native.persistence.reconcile(backend.native.layouts)
         guard generation == version else { return }
-        backend.nativeWriteAuthority.replace(snapshot: snapshot, identities: identities)
+        backend.native.writeAuthority.replace(snapshot: snapshot, identities: identities)
         await synchronizeFocus()
         guard generation == version else { return }
-        backend.noteNativeActivity()
+        backend.native.noteNativeActivity()
         if mouseMonitor == nil && !isUnitTest {
             let owner = runtime
             mouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown, .leftMouseUp, .rightMouseUp]) { [weak owner] event in
@@ -107,18 +107,18 @@ final class NativeTilingCoordinator {
                     guard let owner else { return }
                     owner.withValue {
                         MacApp.cancelPendingFocus()
-                        if !released { owner.workspaceBackend.nativeFocusHold.end() } // A click elsewhere is the user's.
-                        let tiling = owner.workspaceBackend.nativeTiling
+                        if !released { owner.workspaceBackend.native.focusHold.end() } // A click elsewhere is the user's.
+                        let tiling = owner.workspaceBackend.native.tiling
                         guard released else {
                             // A read queued by the drag's own move events must not lay the
                             // window back out before its release is adopted.
                             if leftButton { tiling.holdsForMouseRelease = true }
-                            return owner.workspaceBackend.nativeWriteAuthority.invalidate()
+                            return owner.workspaceBackend.native.writeAuthority.invalidate()
                         }
                         owner.task {
                             if leftButton { await tiling.adoptMouseRelease() }
                             tiling.holdsForMouseRelease = false
-                            owner.workspaceBackend.observation?.requestRead(event: "nativeMouseReleased")
+                            owner.workspaceBackend.native.observation?.requestRead(event: "nativeMouseReleased")
                         }
                     }
                 }
@@ -132,13 +132,13 @@ final class NativeTilingCoordinator {
         let targets = Set(snapshot.reconciliationSpaceIDs ?? snapshot.displays.map(\.activeSpaceID))
         for display in snapshot.displays where targets.contains(display.activeSpaceID) {
             guard generation == version,
-                  let workspace = backend.nativeLayouts.activeWorkspace(on: display.identifier) else { continue }
+                  let workspace = backend.native.layouts.activeWorkspace(on: display.identifier) else { continue }
             do { try await workspace.layoutWorkspace() }
-            catch { stopTiling("Native layout suspended: \(error)"); backend.nativeWriteAuthority.invalidate(); ready = false; return }
+            catch { stopTiling("Native layout suspended: \(error)"); backend.native.writeAuthority.invalidate(); ready = false; return }
             guard generation == version else { return }
             await raiseCoveredNativeTabs(in: workspace, frontToBack: onScreenWindowOrder())
         }
-        await backend.nativePersistence.save(backend.nativeLayouts)
+        await backend.native.persistence.save(backend.native.layouts)
         guard generation == version else { return }
         ready = true
         hasCompletedInitialLayout = true
@@ -177,7 +177,7 @@ final class NativeTilingCoordinator {
             // tiling unready for the whole pan. Ask once; accept() lays out after it.
             if let asked = scrollingReadRequestedAt, asked.duration(to: .now) < .milliseconds(250) { return }
             scrollingReadRequestedAt = .now
-            return runtime.workspaceBackend.observation?.requestRead(event: "nativeScrolling") ?? ()
+            return runtime.workspaceBackend.native.observation?.requestRead(event: "nativeScrolling") ?? ()
         }
         if scrollingLayoutTask != nil { scrollingLayoutPending = true; return }
         scrollingLayoutTask = Task { @MainActor [weak self] in
@@ -185,7 +185,7 @@ final class NativeTilingCoordinator {
             repeat {
                 scrollingLayoutPending = false
                 let version = generation
-                for workspace in runtime.workspaceBackend.nativeLayouts.currentBySpaceID.values
+                for workspace in runtime.workspaceBackend.native.layouts.currentBySpaceID.values
                     where workspace.isVisible && workspace.arrangement == .scrolling {
                     guard ready, generation == version, !holdsForMouseRelease else {
                         nativePanTiming.count("relayout aborted: \(!ready ? "not ready" : generation != version ? "generation" : "mouse")")
@@ -227,7 +227,7 @@ final class NativeTilingCoordinator {
 
     /// Waits for the read in progress to be accepted and tiling to be ready again.
     func waitUntilReady(timeout: Duration = .milliseconds(1500)) async -> Bool {
-        await runtime.workspaceBackend.nativeStateChanges.wait(timeout: timeout) { ready }
+        await runtime.workspaceBackend.native.stateChanges.wait(timeout: timeout) { ready }
     }
 
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
@@ -242,7 +242,7 @@ final class NativeTilingCoordinator {
         if let front = NSWorkspace.shared.frontmostApplication,
            let app = try? await MacApp.getOrRegister(front),
            let window = try? await app.getFocusedWindow(), window.nativeLayoutEligible,
-           backend.nativeLayouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace,
+           backend.native.layouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace,
            !nativeFocusHoldRejects(window) {
             _ = window.focusWindow()
             runtime.nativeFocus.lastKnownWindowID = window.windowId
@@ -251,10 +251,10 @@ final class NativeTilingCoordinator {
         }
         // An empty desktop still has a layout target; it must not activate an app.
         if let workspace = runtime.focus.requested.liveOrNil?.workspace,
-           backend.nativeLayouts.currentBySpaceID.values.contains(where: { $0 === workspace }),
+           backend.native.layouts.currentBySpaceID.values.contains(where: { $0 === workspace }),
            workspace.isVisible { return }
-        if let display = backend.nativeLayouts.snapshot?.displays.first,
-           let workspace = backend.nativeLayouts.activeWorkspace(on: display.identifier) {
+        if let display = backend.native.layouts.snapshot?.displays.first,
+           let workspace = backend.native.layouts.activeWorkspace(on: display.identifier) {
             _ = setFocus(to: workspace.toLiveFocus(), origin: .native)
         }
     }
@@ -288,19 +288,19 @@ final class NativeTilingCoordinator {
     func run(_ commands: [any Command], env: CmdEnv, io: CmdIo) async throws -> Bool {
         guard commands.allSatisfy(Self.supports) else { return io.err("Operation unsupported by the native tiling MVP") }
         guard let target = NativeCommandTargetFence(commands, env: env,
-            defaultFocus: runtime.focus.requested.liveOrNil, layouts: runtime.workspaceBackend.nativeLayouts) else {
+            defaultFocus: runtime.focus.requested.liveOrNil, layouts: runtime.workspaceBackend.native.layouts) else {
             return io.err("Native command target is not an observed active desktop")
         }
-        runtime.workspaceBackend.observation?.requestRead(event: "nativeCommand")
+        runtime.workspaceBackend.native.observation?.requestRead(event: "nativeCommand")
         // Bounded readiness wait, with no additional native queries. Reconciliation
         // is owned by the event pipeline; newer events can supersede it safely.
-        _ = await runtime.workspaceBackend.nativeStateChanges.wait(timeout: .seconds(5)) {
-            if case .unavailable = runtime.workspaceBackend.observation?.inventory.status { return true }
+        _ = await runtime.workspaceBackend.native.stateChanges.wait(timeout: .seconds(5)) {
+            if case .unavailable = runtime.workspaceBackend.native.observation?.inventory.status { return true }
             return ready
         }
         try Task.checkCancellation()
         guard ready else { return io.err("Native tiling is not ready: \(status)") }
-        guard target.matches(runtime.workspaceBackend.nativeLayouts, defaultFocus: runtime.focus.requested.liveOrNil) else {
+        guard target.matches(runtime.workspaceBackend.native.layouts, defaultFocus: runtime.focus.requested.liveOrNil) else {
             return io.err("Native command cancelled because its target changed during reconciliation")
         }
         guard hasManagedNativeFocus || commands.allSatisfy({
@@ -308,7 +308,7 @@ final class NativeTilingCoordinator {
                 $0.args.windowId != nil || env.windowId != nil
         }) else { return io.err("The frontmost window is not managed by native tiling; use an eligible explicit --window-id") }
         let validate: @MainActor @Sendable () -> Bool = {
-            target.matches(runtime.workspaceBackend.nativeLayouts,
+            target.matches(runtime.workspaceBackend.native.layouts,
                 defaultFocus: runtime.focus.requested.liveOrNil, allowDefaultFocusChanges: true)
         }
         let sink = NativeTilingCommandScope.MonitorMoveSink()
@@ -325,12 +325,12 @@ final class NativeTilingCoordinator {
             let closesTarget = commands.allSatisfy { $0 is CloseCommand || $0 is CloseAllWindowsButCurrentCommand }
             guard closesTarget || validate() else { return io.err("Native command target changed before completion") }
             if let monitorMove {
-                return await runtime.workspaceBackend.nativeWindowMoves.run(monitorMove, env: env, io: io)
+                return await runtime.workspaceBackend.native.windowMoves.transferWindow(monitorMove, env: env, io: io)
             }
             if commands.contains(where: { $0 is FocusCommand || $0 is ScrollingFocusCommand }) {
                 focus.windowOrNil?.nativeFocus()
             } else {
-                runtime.workspaceBackend.observation?.requestRead(event: "nativeCommandCompleted")
+                runtime.workspaceBackend.native.observation?.requestRead(event: "nativeCommandCompleted")
             }
         }
         return result

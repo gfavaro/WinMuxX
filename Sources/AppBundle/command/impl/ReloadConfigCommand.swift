@@ -101,7 +101,7 @@ struct ReloadConfigCommand: Command {
         case .success(let (parsedConfig, url)):
             if !args.dryRun, (isWinMuxRuntimeReady || runtime.workspaceBackend.selectionLocked),
                (parsedConfig.workspaceBackend != runtime.workspaceBackend.kind ||
-                parsedConfig.nativeSpaces.tilingEnabled != runtime.workspaceBackend.nativeTilingEnabled) {
+                parsedConfig.nativeSpaces.tilingEnabled != runtime.workspaceBackend.native.tilingEnabled) {
                 let message = "Changing workspace-backend.type or native-spaces.tiling-enabled requires restarting WinMuxX; the running backend and configuration were retained."
                 lastConfigReloadError = message
                 stdout.append(message)
@@ -118,12 +118,13 @@ struct ReloadConfigCommand: Command {
                     runtime.workspaceBackend.selectForStartup(parsedConfig.workspaceBackend, nativeTilingEnabled: parsedConfig.nativeSpaces.tilingEnabled)
                 }
                 if runtime.workspaceBackend.kind == .native {
-                    if runtime.workspaceBackend.nativeTilingEnabled {
+                    if runtime.workspaceBackend.native.tilingEnabled {
                         // As in virtual mode: disabled stays without shortcuts, and a mode the
                         // new config dropped falls back to main.
                         try await activateMode(activeMode.map { parsedConfig.modes[$0] == nil ? mainModeId : $0 }, runCallbacks: false)
-                        runtime.workspaceBackend.nativeDesktopTopUp.reset()
-                        runtime.workspaceBackend.observation?.requestRead(event: "nativeConfigReload")
+                        runtime.workspaceBackend.native.cancelTopUpRead()
+                        runtime.workspaceBackend.native.desktopTopUp.reset()
+                        runtime.workspaceBackend.native.observation?.requestRead(event: "nativeConfigReload")
                     }
                     syncStartAtLogin()
                     applyReloadedConfigurationToRunningApp()

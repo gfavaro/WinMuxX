@@ -22,7 +22,7 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
         setMonitorsForTests([monitor])
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot(), for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [monitor])
     }
 
     private func snapshot() -> NativeSpacesSnapshot {
@@ -47,12 +47,12 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
     private func run(_ mover: NativeWindowSpaceMoves, _ command: String) async throws -> CmdResult {
         let args = try XCTUnwrap(parseCommand(command).cmdOrDie as? MoveNodeToWorkspaceCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await mover.run(args, env: .defaultEnv.copy(\.windowId, 70), io: io)
+        let ok = await mover.transferWindow(args, env: .defaultEnv.copy(\.windowId, 70), io: io)
         return CmdResult(stdout: io.stdout, stderr: io.stderr, exitCode: ok ? 0 : 1)
     }
 
     func testConfirmedMoveRehomesTheWindowIntoTheDestinationLayout() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let source = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let destination = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
         let window = TestWindow.new(id: 70, parent: source.rootTilingContainer)
@@ -64,7 +64,7 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
     }
 
     func testAWindowOnADesktopNotShowingCanBeMovedBack() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let hidden = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
         let showing = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let window = TestWindow.new(id: 70, parent: hidden.rootTilingContainer)
@@ -87,7 +87,7 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
     }
 
     func testUnconfirmedMoveIsReportedAndLeavesTheTree() async throws {
-        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-a"])
+        let source = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-a"])
         let window = TestWindow.new(id: 70, parent: source.rootTilingContainer)
         let result = try await run(mover(arrives: false), "move-node-to-workspace 2")
         XCTAssertEqual(result.exitCode, 1)
@@ -96,7 +96,7 @@ final class NativeWindowSpaceMovesTest: WorkspaceTestCase {
     }
 
     func testNoopAndMissingDesktopDoNotMove() async throws {
-        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-a"])
+        let source = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-a"])
         _ = TestWindow.new(id: 70, parent: source.rootTilingContainer)
         let mover = mover(arrives: true)
         var codes: [Int32] = []
@@ -136,7 +136,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         setMonitorsForTests(monitors)
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot(), for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: monitors)
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: monitors)
     }
 
     private var memberships: [UInt32: String] = [:]
@@ -152,7 +152,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
     }
 
     func testMoveWorkspaceToMonitorCarriesTheLayoutIntoTheOtherDisplaysDesktop() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let source = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let destination = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
         source.rootTilingContainer.layout = .tiles
@@ -171,7 +171,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         mover.move = { [unowned self] id, space in memberships[id] = String(space); return true }
         let args = try XCTUnwrap(parseCommand("move-workspace-to-monitor right").cmdOrDie as? MoveWorkspaceToMonitorCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await mover.run(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
+        let ok = await mover.transferDesktopContents(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
         XCTAssertTrue(ok, io.stderr.joined())
         XCTAssertEqual(Set(memberships.values), ["6"])
         XCTAssertTrue([a, b, c, floating].allSatisfy { $0.nodeWorkspace === destination })
@@ -182,7 +182,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
     }
 
     func testMoveNodeToMonitorJoinsTheDesktopThatDisplayShows() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let source = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let destination = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
         let window = TestWindow.new(id: 70, parent: source.rootTilingContainer)
@@ -194,14 +194,14 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         mover.move = { [unowned self] _, space in moves.append(space); membership = String(space); return true }
         let args = try XCTUnwrap(parseCommand("move-node-to-monitor right").cmdOrDie as? MoveNodeToMonitorCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await mover.run(args, env: .defaultEnv.copy(\.windowId, 70), io: io)
+        let ok = await mover.transferWindow(args, env: .defaultEnv.copy(\.windowId, 70), io: io)
         XCTAssertTrue(ok, io.stderr.joined())
         XCTAssertEqual(moves, [6], "The right display shows desktop 3 (Space 6)")
         XCTAssertTrue(window.nodeWorkspace === destination)
     }
 
     func testMoveWorkspaceToMonitorAlsoMovesWindowsOnlyListedForAnUnvisitedDesktop() async throws {
-        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-b"])
+        let source = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-b"])
         memberships[90] = "2"
         NativeUnvisitedWindows.shared.set([NativeListedWindow(windowId: 90, spaceID: "2", pid: getpid(), title: nil)])
         defer { NativeUnvisitedWindows.shared.set([]) }
@@ -213,13 +213,13 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         mover.move = { [unowned self] id, space in memberships[id] = String(space); return true }
         let args = try XCTUnwrap(parseCommand("move-workspace-to-monitor right").cmdOrDie as? MoveWorkspaceToMonitorCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await mover.run(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
+        let ok = await mover.transferDesktopContents(args, env: .defaultEnv.copy(\.workspaceName, source.name), io: io)
         XCTAssertTrue(ok, io.stderr.joined())
         XCTAssertEqual(memberships[90], "6", "Moved by ID; adopted once it arrives on the showing desktop")
     }
 
     func testBringHereFromASidebarMovesTheDesktopToThatSidebarsDisplay() throws {
-        let source = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-c"])
+        let source = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-c"])
         let left = workspaceSidebarMonitorScopeId(for: monitors[0])
         let (args, env) = try XCTUnwrap(nativeBringHere(source.name, targetMonitorScopeId: left))
         XCTAssertEqual(args.resolveTargetOrReportError(env, CmdIo(stdin: .emptyStdin))?.workspace, source)
@@ -230,7 +230,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
     }
 
     func testDirectionalFocusAndMoveCrossToTheNextDisplay() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let right = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
         let here = TestWindow.new(id: 71, parent: left.rootTilingContainer)
@@ -253,19 +253,19 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
     }
 
     func testFocusingAWindowOnAHiddenDesktopRunsAsNavigation() throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let hidden = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
         let shown = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         _ = TestWindow.new(id: 75, parent: hidden.rootTilingContainer)
         _ = TestWindow.new(id: 76, parent: shown.rootTilingContainer)
         let away = try XCTUnwrap(parseCommand("focus --window-id 75").cmdOrDie as? FocusCommand)
         let here = try XCTUnwrap(parseCommand("focus --window-id 76").cmdOrDie as? FocusCommand)
-        XCTAssertTrue(WorkspaceBackendState.isNativeNavigation(away), "Switches to its desktop first, outside the fence")
-        XCTAssertFalse(WorkspaceBackendState.isNativeNavigation(here), "A showing desktop's window stays a fenced tiling command")
+        XCTAssertTrue(NativeCommandPolicy.isNativeNavigation(away), "Switches to its desktop first, outside the fence")
+        XCTAssertFalse(NativeCommandPolicy.isNativeNavigation(here), "A showing desktop's window stays a fenced tiling command")
     }
 
     func testWorkspaceNShowingOnTheOtherDisplayFocusesItThere() async throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let here = TestWindow.new(id: 77, parent: try XCTUnwrap(layouts.retainedByUUID["desktop-a"]).rootTilingContainer)
         let there = TestWindow.new(id: 78, parent: try XCTUnwrap(layouts.retainedByUUID["desktop-c"]).rootTilingContainer)
         _ = here.focusWindow()
@@ -277,14 +277,14 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
         navigator.post = { _ in posted += 1; return true }
         let args = try XCTUnwrap(parseCommand("workspace --auto-back-and-forth 3").cmdOrDie as? WorkspaceCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await navigator.run(args, io: io)
+        let ok = await navigator.selectDesktop(args, io: io)
         XCTAssertTrue(ok, io.stderr.joined())
         XCTAssertEqual(posted, 0, "Nothing switches: desktop 3 is already showing")
         XCTAssertEqual(focus.windowOrNil?.windowId, there.windowId, "Focus moves to it on the other display")
     }
 
     func testTheTilingFenceAcceptsADesktopNumber() throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         _ = Workspace.get(byName: "1") // A leftover virtual workspace named like desktop 1 must not shadow it.
         let command = try XCTUnwrap(parseCommand("balance-sizes --workspace 1").unwrap().0)
         XCTAssertNotNil(NativeCommandTargetFence([command], env: .defaultEnv, defaultFocus: nil, layouts: layouts))
@@ -294,7 +294,7 @@ final class NativeMonitorCommandsTest: WorkspaceTestCase {
     }
 
     func testFocusMonitorFocusesTheOtherDisplaysRecentWindow() throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let left = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let right = try XCTUnwrap(layouts.retainedByUUID["desktop-c"])
         let here = TestWindow.new(id: 71, parent: left.rootTilingContainer)

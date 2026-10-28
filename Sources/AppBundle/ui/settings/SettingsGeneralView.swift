@@ -99,7 +99,7 @@ enum WorkspaceBackendChoice: Hashable {
     @MainActor static var running: Self {
         switch runtime.workspaceBackend.kind {
             case .virtual: .virtual
-            case .native: runtime.workspaceBackend.nativeTilingEnabled ? .nativeTiled : .native
+            case .native: runtime.workspaceBackend.native.tilingEnabled ? .nativeTiled : .native
         }
     }
 }

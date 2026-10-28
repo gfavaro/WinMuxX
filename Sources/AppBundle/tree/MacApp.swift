@@ -276,7 +276,7 @@ final class MacApp: AbstractApp {
     @MainActor
     func hasNativeWriteGrant(_ windowID: UInt32) -> Bool {
         guard let launched = nsApp.launchDate else { return false }
-        return runtime.workspaceBackend.nativeWriteAuthority.explicitFocusLease(windowID: windowID, pid: pid, processLaunchDate: launched) != nil
+        return runtime.workspaceBackend.native.writeAuthority.explicitFocusLease(windowID: windowID, pid: pid, processLaunchDate: launched) != nil
     }
 
     /// A short lease that keeps checking live ownership after tiling stops granting writes.
@@ -287,7 +287,7 @@ final class MacApp: AbstractApp {
     private func nativeFocusValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
         guard let launched = nsApp.launchDate,
-              let lease = runtime.workspaceBackend.nativeWriteAuthority.explicitFocusLease(
+              let lease = runtime.workspaceBackend.native.writeAuthority.explicitFocusLease(
                 windowID: windowID, pid: pid, processLaunchDate: launched) else {
             return { _ in throw NativeSpaceWriteError.revoked }
         }
@@ -304,7 +304,7 @@ final class MacApp: AbstractApp {
     private func nativeFrameValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
         guard let launched = nsApp.launchDate,
-              let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+              let permit = runtime.workspaceBackend.native.writeAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
             return { _ in throw NativeSpaceWriteError.revoked }
         }
         return { window in
@@ -321,7 +321,7 @@ final class MacApp: AbstractApp {
     private func nativePermitCheck(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
         guard runtime.workspaceBackend.kind == .native else { return nil }
         guard let launched = nsApp.launchDate,
-              let permit = runtime.workspaceBackend.nativeWriteAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+              let permit = runtime.workspaceBackend.native.writeAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
             return { _ in throw NativeSpaceWriteError.revoked }
         }
         return { _ in try permit.checkGranted() }

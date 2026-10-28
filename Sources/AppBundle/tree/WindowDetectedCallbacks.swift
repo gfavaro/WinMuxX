@@ -65,7 +65,7 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
             if let move = command as? MoveNodeToWorkspaceCommand, runtime.workspaceBackend.accepts(move) {
                 // Existing windows stay put, including ones first seen when their desktop is
                 // visited later; only windows opened after launch are moved.
-                if !runtime.workspaceBackend.windowsPresentAtLaunch.contains(window.windowId) {
+                if !runtime.workspaceBackend.native.windowsPresentAtLaunch.contains(window.windowId) {
                     nativeRuleMoveScheduler(move, window.windowId)
                 }
                 continue
@@ -86,9 +86,9 @@ func applyNativeWindowDetectedRules(_ window: Window, stillOwned: () -> Bool) as
 private func scheduleNativeRuleMove(_ move: MoveNodeToWorkspaceCommand, window id: UInt32) {
     let owner = runtime
     owner.task {
-        _ = await owner.workspaceBackend.nativeTiling.waitUntilReady(timeout: .seconds(2))
+        _ = await owner.workspaceBackend.native.tiling.waitUntilReady(timeout: .seconds(2))
         let io = CmdIo(stdin: .emptyStdin)
-        if !(await owner.workspaceBackend.nativeWindowMoves.run(move.args, env: .defaultEnv.copy(\.windowId, id), io: io)) {
+        if !(await owner.workspaceBackend.native.windowMoves.transferWindow(move.args, env: .defaultEnv.copy(\.windowId, id), io: io)) {
             // One entry per rule, keeping its latest failure, so the set stays bounded.
             let rule = "\(move.args)"
             nativeSkippedWindowRuleCommands = nativeSkippedWindowRuleCommands.filter { !$0.hasPrefix(rule + " (failed") }

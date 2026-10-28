@@ -8,13 +8,13 @@ import NativeSpaces
 @MainActor
 func nativeObservedDisplays() -> [NativeSpaceDisplay]? {
     let backend = runtime.workspaceBackend
-    return (backend.observation?.inventory.lastSnapshot ?? backend.nativeLayouts.snapshot)?.displays
+    return (backend.native.observation?.inventory.lastSnapshot ?? backend.native.layouts.snapshot)?.displays
 }
 
 /// Desktops in Control-N order with the workspace holding each one's layout.
 @MainActor
 func nativeDesktopWorkspaces() -> [(number: Int, workspace: Workspace)] {
-    let layouts = runtime.workspaceBackend.nativeLayouts
+    let layouts = runtime.workspaceBackend.native.layouts
     var result: [(number: Int, workspace: Workspace)] = []
     var number = 0
     for display in nativeObservedDisplays() ?? [] {
@@ -66,7 +66,7 @@ func nativeDisplay(_ display: NativeSpaceDisplay, isShownOn monitor: Monitor) ->
 @MainActor
 func nativeActiveDesktop(on monitor: Monitor) -> Workspace? {
     guard let display = nativeObservedDisplays()?.first(where: { nativeDisplay($0, isShownOn: monitor) }) else { return nil }
-    return runtime.workspaceBackend.nativeLayouts.activeWorkspace(on: display.identifier)
+    return runtime.workspaceBackend.native.layouts.activeWorkspace(on: display.identifier)
 }
 
 /// `focus-monitor`: focuses the most recent window of the desktop that display shows.
@@ -107,6 +107,6 @@ func nativeFocusWindowCommands(_ windowId: UInt32) -> [String] {
        let number = nativeDesktopNumber(of: workspace) {
         commands.append("workspace \(number)")
     }
-    if runtime.workspaceBackend.nativeTilingEnabled { commands.append("focus --window-id \(windowId)") }
+    if runtime.workspaceBackend.native.tilingEnabled { commands.append("focus --window-id \(windowId)") }
     return commands
 }

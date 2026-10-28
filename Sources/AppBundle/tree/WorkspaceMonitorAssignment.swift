@@ -38,7 +38,7 @@ func activateWorkspaceForUser(
     on targetMonitor: Monitor,
 ) -> Bool {
     // macOS shows native desktops; UI actions run `workspace` so each backend switches its own way.
-    guard runtime.workspaceBackend.capabilities.activatesWorkspaces else {
+    guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces else {
         check(!isUnitTest, "activateWorkspaceForUser with native Spaces; run the workspace command instead")
         print("WinMuxX: refused a virtual workspace activation with native Spaces")
         return false

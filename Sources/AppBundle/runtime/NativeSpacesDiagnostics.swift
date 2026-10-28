@@ -25,7 +25,7 @@ func nativeWindowFrameDiagnostics(_ layouts: NativeSpaceLayouts) -> [NativeWindo
 
 @MainActor
 func nativeSpacesDiagnosticReport() -> String {
-    let tiling = runtime.workspaceBackend.nativeTilingEnabled
+    let tiling = runtime.workspaceBackend.native.tilingEnabled
     var lines = ["WinMuxX — Native Spaces (experimental\(tiling ? " tiling" : " read-only"))",
         "Space switching: workspace N/next/prev via Dock swipe (macOS 27, Accessibility: \(NativeDockSwipe.canPostEvents ? "granted" : "missing")).",
         "Window moves: move-node-to-workspace N/next/prev via bridged SkyLight operation (\(NativeWindowSpaceMover.isAvailable ? "available" : "unavailable on this macOS")).",
@@ -34,10 +34,11 @@ func nativeSpacesDiagnosticReport() -> String {
             : "Window rules: floating/tiling applied; skipped unsupported: \(nativeSkippedWindowRuleCommands.sorted().joined(separator: "; "))",
         tiling ? "Dwindle/Master tiling is explicitly enabled; no system settings are changed. Desktops are only added, up to persistent-workspaces." :
             "No window positions, application focus or macOS settings are changed."]
-    lines.append("Tiling: \(runtime.workspaceBackend.nativeTiling.status)")
-    lines.append("Desktop top-up: \(runtime.workspaceBackend.nativeDesktopTopUp.status) (creation \(NativeSpaceCreator.isAvailable ? "available" : "unavailable on this macOS"))")
+    lines.append("Tiling: \(runtime.workspaceBackend.native.tiling.status)")
+    if let number = runtime.workspaceBackend.native.desktopTopUp.lastConfirmedCreation { lines.append("Last confirmed desktop creation: \(number)") }
+    lines.append("Desktop top-up: \(runtime.workspaceBackend.native.desktopTopUp.status) (creation \(NativeSpaceCreator.isAvailable ? "available" : "unavailable on this macOS"))")
     lines.append("Original frames: \(NativeOriginalFrames.shared.count) kept; last restore: \(NativeOriginalFrames.shared.lastRestore)")
-    lines.append("Last mouse release: \(runtime.workspaceBackend.nativeTiling.lastMouseRelease)")
+    lines.append("Last mouse release: \(runtime.workspaceBackend.native.tiling.lastMouseRelease)")
     lines.append("Scrolling pan: last \(NativeScrollingPan.shared.lastDecision)")
     let model = TrayMenuModel.shared
     lines.append("Sidebar: enabled \(config.workspaceSidebar.enabled), scopes \(model.workspaceSidebarMonitorScopes.map(\.id)), " +
@@ -54,29 +55,29 @@ func nativeSpacesDiagnosticReport() -> String {
     }
     lines.append("Chrome refreshes after observations: \(NativeObservationChrome.shared.refreshes) for \(NativeObservationChrome.shared.requests) completed reads")
     lines.append("Windows listed on desktops not showing: \(NativeUnvisitedWindows.shared.bySpaceID.values.map(\.count).reduce(0, +))")
-    lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)")
+    lines.append("Scrolling pan layouts: \(runtime.workspaceBackend.native.tiling.scrollingLayoutTiming)")
     for monitor in sortedMonitors {
         let shown = runtime.workspaces.visibleWorkspace(for: monitor)
         lines.append("  \(monitor.name): \(shown.map { "\(userFacingWorkspaceName($0)) \($0.arrangement)" } ?? "no desktop bound")")
     }
-    lines.append("Native saved layouts pending complete matching: \(runtime.workspaceBackend.nativePersistence.pendingCount)")
-    if let error = runtime.workspaceBackend.nativePersistence.lastError { lines.append(error) }
+    lines.append("Native saved layouts pending complete matching: \(runtime.workspaceBackend.native.persistence.pendingCount)")
+    if let error = runtime.workspaceBackend.native.persistence.lastError { lines.append(error) }
     lines.append("Accessibility permission for this development process: \(AXIsProcessTrusted() ? "available" : "not granted"). Observation does not request it.")
     if let error = lastConfigReloadError { lines.append("Configuration error: \(error)") }
-    guard let inventory = runtime.workspaceBackend.observation?.inventory else {
+    guard let inventory = runtime.workspaceBackend.native.observation?.inventory else {
         return (lines + ["Observation has not started."]).joined(separator: "\n")
     }
     lines.append("Status: \(inventory.status)")
     lines.append("AX-classified windows retained in native layout trees: \(MacWindow.allWindows.count)")
-    if let milliseconds = runtime.workspaceBackend.nativeWindows.lastDurationMilliseconds {
-        lines.append("Last AX reconciliation: \(milliseconds) ms; unclassified candidates: \(runtime.workspaceBackend.nativeWindows.pendingWindowCount); apps over read budget: \(runtime.workspaceBackend.nativeWindows.timedOutAppCount)")
+    if let milliseconds = runtime.workspaceBackend.native.windows.lastDurationMilliseconds {
+        lines.append("Last AX reconciliation: \(milliseconds) ms; unclassified candidates: \(runtime.workspaceBackend.native.windows.pendingWindowCount); apps over read budget: \(runtime.workspaceBackend.native.windows.timedOutAppCount)")
     }
-    if let error = runtime.workspaceBackend.nativeWindows.lastError { lines.append("AX reconciliation error: \(error)") }
-    if let preflight = runtime.workspaceBackend.nativeWindows.writePreflight {
+    if let error = runtime.workspaceBackend.native.windows.lastError { lines.append("AX reconciliation error: \(error)") }
+    if let preflight = runtime.workspaceBackend.native.windows.writePreflight {
         lines.append("Live ownership preflight: \(preflight.passed) passed, \(preflight.blocked) blocked; frame writes \(tiling && !serverArgs.isReadOnly ? "require per-write validation" : "remain disabled")")
     }
-    lines.append("WindowServer lifecycle events: \(runtime.workspaceBackend.observation?.windowEventsAvailable == true ? "available" : "unavailable; topology/public-event fallback only")")
-    if let observer = runtime.workspaceBackend.observation {
+    lines.append("WindowServer lifecycle events: \(runtime.workspaceBackend.native.observation?.windowEventsAvailable == true ? "available" : "unavailable; topology/public-event fallback only")")
+    if let observer = runtime.workspaceBackend.native.observation {
         lines.append("Reads: \(observer.snapshotReadCount) snapshots; \(observer.topologyAuditCount) topology audits; \(observer.windowEventCount) WindowServer events")
         if let milliseconds = observer.lastTopologyAuditMilliseconds { lines.append("Last topology-only audit: \(milliseconds) ms") }
     }
@@ -94,7 +95,7 @@ func nativeSpacesDiagnosticReport() -> String {
     lines.append("Window inventory: \(snapshot.windows.count); single-Space memberships: \(known). Inventory entries are not necessarily manageable AX windows.")
     let encoder = JSONEncoder()
     encoder.outputFormatting = .sortedKeys
-    for row in nativeWindowFrameDiagnostics(runtime.workspaceBackend.nativeLayouts) {
+    for row in nativeWindowFrameDiagnostics(runtime.workspaceBackend.native.layouts) {
         if let data = try? encoder.encode(row), let json = String(data: data, encoding: .utf8) {
             lines.append("Window frame: \(json)")
         }

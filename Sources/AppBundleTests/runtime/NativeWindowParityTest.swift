@@ -49,7 +49,7 @@ final class NativeWindowParityTest: WorkspaceTestCase {
         let original = nativeRuleMoveScheduler
         nativeRuleMoveScheduler = { _, id in scheduled.append(id) }
         defer { nativeRuleMoveScheduler = original }
-        runtime.workspaceBackend.windowsPresentAtLaunch = [50]
+        runtime.workspaceBackend.native.windowsPresentAtLaunch = [50]
         let workspace = Workspace.get(byName: "native-desktop")
         try await applyNativeWindowDetectedRules(TestWindow.new(id: 50, parent: workspace.rootTilingContainer)) { true }
         try await applyNativeWindowDetectedRules(TestWindow.new(id: 51, parent: workspace.rootTilingContainer)) { true }

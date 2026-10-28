@@ -67,7 +67,7 @@ extension ObservableObject {
 }
 
 @MainActor func updateTrayText() {
-    if runtime.workspaceBackend.current.updateTray() { return }
+    if runtime.workspaceBackend.ui.updateTray() { return }
     let focus = focus
     let workspace = focus.workspace
     let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)
@@ -109,10 +109,10 @@ extension ObservableObject {
     let display = displays.first { $0.identifier == focus.workspace.workspaceMonitor.displayUUID } ?? displays.first
     let number = display.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, number.map(String.init) ?? "Spaces")
-    let state = runtime.workspaceBackend.nativeTilingEnabled ? runtime.workspaceBackend.nativeTiling.status : "Observation only"
+    let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Observation only"
     let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
     TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
-    let tiling = runtime.workspaceBackend.nativeTiling
-    TrayMenuModel.shared.setIfChanged(\.menuBarTilingStoppedReason, runtime.workspaceBackend.nativeTilingEnabled && tiling.isStopped ? tiling.status : nil)
+    let tiling = runtime.workspaceBackend.native.tiling
+    TrayMenuModel.shared.setIfChanged(\.menuBarTilingStoppedReason, runtime.workspaceBackend.native.tilingEnabled && tiling.isStopped ? tiling.status : nil)
 }

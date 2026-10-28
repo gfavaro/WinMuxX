@@ -18,8 +18,8 @@ final class NativeTilingTest: WorkspaceTestCase {
             readMilliseconds: 0, capturedAt: .now)
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [display])
-        return runtime.workspaceBackend.nativeLayouts.activeWorkspace(on: "display-a")!
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [display])
+        return runtime.workspaceBackend.native.layouts.activeWorkspace(on: "display-a")!
     }
 
     func testNativeTilingNeverAcquiresVirtualLifecycleOrRecovery() {
@@ -27,8 +27,8 @@ final class NativeTilingTest: WorkspaceTestCase {
         let capabilities = runtime.workspaceBackend.capabilities
         XCTAssertTrue(capabilities.tilesWindows)
         XCTAssertFalse(capabilities.ownsWorkspaceLifecycle)
-        XCTAssertFalse(capabilities.activatesWorkspaces)
-        XCTAssertFalse(capabilities.relocatesWorkspaces)
+        XCTAssertFalse(capabilities.activatesVirtualWorkspaces)
+        XCTAssertFalse(capabilities.relocatesVirtualWorkspaces)
         XCTAssertFalse(capabilities.parksInactiveWindows)
         XCTAssertFalse(capabilities.usesVirtualRecovery)
     }
@@ -40,7 +40,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         concealed.nativeLayoutEligible = false
         TestWindow.new(id: 3, parent: workspace)
         try await workspace.layoutWorkspace()
-        let rows = nativeWindowFrameDiagnostics(runtime.workspaceBackend.nativeLayouts)
+        let rows = nativeWindowFrameDiagnostics(runtime.workspaceBackend.native.layouts)
         XCTAssertEqual(rows.map(\.windowID), [1, 2, 3])
         XCTAssertEqual(rows.map(\.spaceUUID), ["desktop-a", "desktop-a", "desktop-a"])
         XCTAssertEqual(rows.map(\.eligible), [true, false, true])
@@ -57,7 +57,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         let second = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
         _ = first.focusWindow()
         let command = try XCTUnwrap(parseCommand("resize width +20").unwrap().0)
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let initial = focus
         let target = try XCTUnwrap(NativeCommandTargetFence([command], env: .defaultEnv, defaultFocus: initial, layouts: layouts))
         XCTAssertTrue(target.matches(layouts, defaultFocus: initial))
@@ -83,7 +83,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         let workspace = nativeWorkspace()
         let window = TestWindow.new(id: 1, parent: workspace)
         _ = window.focusWindow()
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         defer { window.sizeReader = nil }
         window.sizeReader = {
             await Task.yield()
@@ -105,7 +105,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         let root = workspace.rootTilingContainer
         let window = TestWindow.new(id: 1, parent: root)
         _ = window.focusWindow()
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let command = try XCTUnwrap(parseCommand("resize width +20").unwrap().0)
         let target = try XCTUnwrap(NativeCommandTargetFence([command], env: .defaultEnv,
             defaultFocus: focus, layouts: layouts))
@@ -189,9 +189,9 @@ final class NativeTilingTest: WorkspaceTestCase {
         func publish(_ snapshot: NativeSpacesSnapshot) {
             var inventory = NativeWorkspaceInventory()
             XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
-            runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: displays)
+            runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: displays)
         }
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         publish(snapshot(active: "1", partial: false))
         let windows = try (1...4).map { id in
             TestWindow.new(id: UInt32(id), parent: try XCTUnwrap(layouts.currentBySpaceID["\(id)"]).rootTilingContainer)
@@ -347,7 +347,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         // Past a display edge the move runs after the fenced command; focus across displays
         // runs outside the fence as navigation.
         XCTAssertTrue(NativeTilingCoordinator.supports(try XCTUnwrap(parseCommand("move --boundaries all-monitors-outer-frame left").unwrap().0)))
-        XCTAssertTrue(WorkspaceBackendState.isNativeNavigation(try XCTUnwrap(parseCommand("focus --boundaries all-monitors-outer-frame left").unwrap().0)))
+        XCTAssertTrue(NativeCommandPolicy.isNativeNavigation(try XCTUnwrap(parseCommand("focus --boundaries all-monitors-outer-frame left").unwrap().0)))
         for text in ["workspace 2", "move-node-to-workspace 2",
                      "focus --boundaries all-monitors-outer-frame left"] {
             let command = try XCTUnwrap(parseCommand(text).unwrap().0)
@@ -422,7 +422,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("native.json")
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let first = NativeLayoutPersistence(url: url)
         await first.reconcile(layouts)
         await first.save(layouts)
@@ -456,7 +456,7 @@ final class NativeTilingTest: WorkspaceTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let url = directory.appendingPathComponent("native.json")
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let first = NativeLayoutPersistence(url: url)
         await first.reconcile(layouts)
         await first.save(layouts)
@@ -562,8 +562,8 @@ final class NativeTilingTest: WorkspaceTestCase {
         let original = Data("{invalid".utf8)
         try original.write(to: url)
         let store = NativeLayoutPersistence(url: url)
-        await store.reconcile(runtime.workspaceBackend.nativeLayouts)
-        await store.save(runtime.workspaceBackend.nativeLayouts)
+        await store.reconcile(runtime.workspaceBackend.native.layouts)
+        await store.save(runtime.workspaceBackend.native.layouts)
         XCTAssertNotNil(store.lastError)
         XCTAssertEqual(try Data(contentsOf: url), original)
     }

@@ -24,14 +24,14 @@ final class WorkspaceSidebarNativeSpacesTest: WorkspaceTestCase {
         ], windows: [], readMilliseconds: 0, capturedAt: .now)
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [monitor])
         return monitor
     }
 
     func testRowsListDesktopsInControlNumberOrderWithLabelsAndActiveState() async throws {
         let monitor = observe(active: "2")
-        let rows = await buildNativeWorkspaceSidebarWorkspaceViewModels(
-            currentFocus: focus, workspaceLabels: ["2": "Mail"], availableMonitors: [monitor])
+        let rows = await runtime.workspaceBackend.ui.sidebarWorkspaces(
+            currentFocus: focus, labels: ["2": "Mail"], monitors: [monitor])
         XCTAssertEqual(rows.map(\.displayName), ["Desktop 1", "Mail"], "Fullscreen Spaces are not desktops")
         XCTAssertEqual(rows.map(\.isVisible), [false, true])
         XCTAssertEqual(nativeDesktopNumber(forSidebarWorkspace: rows[1].name), 2)

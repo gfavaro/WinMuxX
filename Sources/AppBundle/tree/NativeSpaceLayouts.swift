@@ -42,7 +42,7 @@ final class NativeSpaceLayouts {
             let isNew = retainedByUUID[uuid] == nil
             let workspace = retainedByUUID[uuid] ?? Workspace.get(byName: "__native_space_\(uuid)")
             retainedByUUID[uuid] = workspace
-            if isNew, runtime.workspaceBackend.nativeTilingEnabled, config.defaultRootContainerLayout == .master {
+            if isNew, runtime.workspaceBackend.native.tilingEnabled, config.defaultRootContainerLayout == .master {
                 workspace.rootTilingContainer.layout = .tiles
                 workspace.transitionArrangement(to: .master)
             }

@@ -15,31 +15,15 @@ final class NativeDesktopTopUp {
     var confirmTimeout: Duration = .seconds(2)
     private(set) var status = "not run"
     private var pending: (spaceID: String, number: Int, since: ContinuousClock.Instant)?
+    private(set) var lastConfirmedCreation: Int?
     private var displaysKey: [String] = []
     private var displaysSince: ContinuousClock.Instant?
     /// The displays and target a failed attempt saw; nothing retries until either changes.
     private var stoppedAt: String?
 
-    /// The desktop count the config numbers: the highest numeric persistent workspace.
-    static func target(_ persistent: some Sequence<String>) -> Int {
-        persistent.compactMap { Int($0) }.filter { $0 > 0 }.max() ?? 0
-    }
-
-    /// The next desktop to create and its display, nil when there are enough.
-    static func next(_ displays: [NativeSpaceDisplay], target: Int,
-                     home: (Int) -> String?) -> (number: Int, display: String)? {
-        let count = displays.reduce(0) { $0 + $1.spaces.count(where: \.isDesktop) }
-        guard count < target else { return nil }
-        let number = count + 1
-        let identifiers = displays.map(\.identifier)
-        guard let display = home(number).flatMap({ identifiers.contains($0) ? $0 : nil }) ?? identifiers.first else { return nil }
-        return (number, display)
-    }
-
     /// A config reload retries what an earlier attempt gave up on.
     func reset() {
         stoppedAt = nil
-        pending = nil
         status = "not run"
     }
 
@@ -50,18 +34,21 @@ final class NativeDesktopTopUp {
         let key = displays.map(\.identifier).sorted()
         if key != displaysKey { displaysKey = key; displaysSince = now() }
         if let pending {
-            if displays.contains(where: { $0.spaces.contains { $0.id == pending.spaceID } }) {
+            let desktops = displays.flatMap { $0.spaces.filter(\.isDesktop) }
+            if let index = desktops.firstIndex(where: { $0.id == pending.spaceID }) {
                 self.pending = nil
-                status = "created desktop \(pending.number)"
+                lastConfirmedCreation = index + 1
+                status = "created desktop \(index + 1)"
             } else if pending.since.duration(to: now()) < confirmTimeout {
+                scheduleRead(confirmTimeout - pending.since.duration(to: now()))
                 return false
             } else {
                 self.pending = nil
                 return stop("desktop \(pending.number) did not appear", key, target)
             }
         }
-        guard let step = Self.next(displays, target: target, home: home) else {
-            if target > 0, stoppedAt == nil { status = "all \(target) configured desktops present" }
+        guard let step = NativeDesktopTopUpPlan.next(displays, target: target, home: home) else {
+            if target > 0, stoppedAt == nil, lastConfirmedCreation == nil { status = "all \(target) configured desktops present" }
             return false
         }
         guard stoppedAt != stopKey(key, target) else { return false }
@@ -75,7 +62,8 @@ final class NativeDesktopTopUp {
         }
         pending = (String(spaceID), step.number, now())
         status = "creating desktop \(step.number)"
-        print("WinMuxX: created native desktop \(step.number) (Space \(spaceID)) on \(step.display)")
+        scheduleRead(confirmTimeout)
+        print("WinMuxX: requested native desktop \(step.number) (Space \(spaceID)) on \(step.display)")
         return true
     }
 

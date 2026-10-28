@@ -17,7 +17,7 @@ func buildNativeWorkspaceSidebarWorkspaceViewModels(
     workspaceLabels: [String: String],
     availableMonitors: [Monitor],
 ) async -> [WorkspaceSidebarWorkspaceViewModel] {
-    let layouts = runtime.workspaceBackend.nativeLayouts
+    let layouts = runtime.workspaceBackend.native.layouts
     guard let displays = nativeObservedDisplays() else { return [] }
     var result: [WorkspaceSidebarWorkspaceViewModel] = []
     var number = 0
@@ -70,7 +70,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
             runWorkspaceSidebarSession {
                 let io = CmdIo(stdin: .emptyStdin)
-                if !(await runtime.workspaceBackend.nativeWindowMoves.run(args, env: env, io: io)) {
+                if !(await runtime.workspaceBackend.native.windowMoves.transferDesktopContents(args, env: env, io: io)) {
                     showWorkspaceSidebarError(io.stderr.last ?? "Bring Here failed")
                 }
                 await updateWorkspaceSidebarModel()
@@ -79,7 +79,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
             guard let number = nativeDesktopNumber(forSidebarWorkspace: name) else { return }
             let clickedDisplay = TrayMenuModel.shared.workspaceSidebarWorkspaces.first { $0.name == name }?.monitorScopeId
             let home = focus.workspace.workspaceMonitor
-            let hold = runtime.workspaceBackend.nativeFocusHold
+            let hold = runtime.workspaceBackend.native.focusHold
             // Changing what another display shows keeps focus here; see NativeFocusHold.
             let away = clickedDisplay != nil && clickedDisplay != workspaceSidebarMonitorScopeId(for: home)
             optimisticallyMarkNativeDesktopShown(name)
@@ -103,7 +103,7 @@ func handleNativeWorkspaceSidebarAction(_ action: WorkspaceSidebarAction, viewMo
                 // Listed only: no tree holds it yet, so it moves by ID.
                 runWorkspaceSidebarSession {
                     let io = CmdIo(stdin: .emptyStdin)
-                    if !(await runtime.workspaceBackend.nativeWindowMoves.moveListed(windowId, toDesktop: number, io: io)) {
+                    if !(await runtime.workspaceBackend.native.windowMoves.moveListed(windowId, toDesktop: number, io: io)) {
                         showWorkspaceSidebarError(io.stderr.last ?? "Move failed")
                     }
                     await updateWorkspaceSidebarModel()

@@ -88,9 +88,9 @@ native mode, whatever the config says: they activate workspaces through the virt
 model, and macOS already owns Space gestures. The Option scrolling pan is unaffected.
 
 With native tiling on, WinMuxX adds the desktops `persistent-workspaces` numbers
-when macOS has fewer (the highest numeric entry is the count). Each new desktop goes
-to the display `workspace-to-monitor-force-assignment` names for its number, else the
-main display. It creates one desktop per topology read, after the displays have been
+when macOS has fewer (the highest numeric entry is the count). Each creation requests the display `workspace-to-monitor-force-assignment` names for
+the next number, else the main display. macOS appends on that display, which can
+renumber desktops on later displays; creation does not enforce lasting ordinal ownership. It creates one desktop per topology read, after the displays have been
 stable for a second, and stops on a failure until the config reloads or the displays
 change. It never removes a desktop or moves a window. The creation call is adapted
 from Dinky's bridged `SLSBridgedSpaceCreateOperation` and works with SIP enabled.

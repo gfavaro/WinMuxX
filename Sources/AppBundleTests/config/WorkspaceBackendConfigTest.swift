@@ -65,7 +65,7 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
         XCTAssertFalse(result)
         XCTAssertTrue(output.contains("requires restarting"))
-        XCTAssertFalse(runtime.workspaceBackend.nativeTilingEnabled)
+        XCTAssertFalse(runtime.workspaceBackend.native.tilingEnabled)
         XCTAssertFalse(runtime.workspaceBackend.capabilities.tilesWindows)
     }
 
@@ -96,7 +96,7 @@ final class WorkspaceBackendConfigTest: WorkspaceTestCase {
         XCTAssertEqual(config.workspaceBackend, .native)
         XCTAssertNil(Workspace.existing(byName: "should-not-exist"))
         XCTAssertEqual(Workspace.all.count, count)
-        XCTAssertNil(runtime.workspaceBackend.observation)
+        XCTAssertNil(runtime.workspaceBackend.native.observation)
     }
 
     func testStartupHookCannotChangeBackendBeforeRuntimeIsReady() async throws {

@@ -21,7 +21,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         ], windows: [], readMilliseconds: 0, capturedAt: .now)
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [monitor])
     }
 
     func testNativeUsesTheVirtualMenuWithDesktopsAndUnavailableItemsDisabled() throws {
@@ -33,7 +33,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         [mode.main.binding]
         alt-2 = 'workspace 2'
         """).config.modes[mainModeId]
-        _ = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-b"]).focusWorkspace()
+        _ = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-b"]).focusWorkspace()
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)

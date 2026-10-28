@@ -21,7 +21,14 @@ func runUserCommands(_ commands: [String]) async throws -> String? {
 func selectWorkspaceFromUi(_ name: String) async throws -> String? {
     guard let workspace = Workspace.existing(byName: name),
           let target = runtime.workspaceBackend.current.commandTargets().first(where: { $0.workspace === workspace })?.target,
-          case .cmd(let command) = parseCommand(["workspace", target]) else { return nil }
+          case .cmd(let parsed) = parseCommand(["workspace", target]),
+          var command = parsed as? WorkspaceCommand else { return nil }
+    if runtime.workspaceBackend.kind == .native {
+        guard let uuid = runtime.workspaceBackend.native.layouts.retainedByUUID.first(where: { $0.value === workspace })?.key else {
+            return "The selected native desktop no longer exists"
+        }
+        command.nativeSpaceUUID = uuid
+    }
     let io = CmdIo(stdin: .emptyStdin)
     return try await [command].runCmdSeq(.defaultEnv, io) ? nil : io.stderr.last ?? "workspace \(name) failed"
 }

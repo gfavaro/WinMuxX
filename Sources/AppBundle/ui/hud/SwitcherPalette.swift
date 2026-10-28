@@ -293,7 +293,7 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
             items[index] = item
         }
     }
-    return items.compactMap { $0 } + runtime.workspaceBackend.current.extraPaletteItems()
+    return items.compactMap { $0 } + runtime.workspaceBackend.ui.extraPaletteItems()
 }
 
 /// Windows on desktops not showing yet; choosing one switches there first.
@@ -320,7 +320,7 @@ func makeSwitcherPaletteItem(
     let appName = window.app.name ?? window.app.rawAppBundleId ?? "Unknown"
     let backend = runtime.workspaceBackend.current
     let workspaceTitle = backend.title(ofWorkspaceNamed: workspaceName)
-    let projectName = backend.hasProjects ? Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) } : nil
+    let projectName = runtime.workspaceBackend.ui.hasProjects ? Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) } : nil
     // A cold cache previously indexed every Finder window as only "Finder" until some other
     // UI happened to fetch its title. Fetch first-sight titles before showing the palette so
     // folder names are searchable immediately; known stale titles still return instantly and

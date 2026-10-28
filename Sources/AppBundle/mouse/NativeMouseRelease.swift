@@ -37,7 +37,7 @@ func adoptNativeMouseRelease(_ window: Window, actual: Rect, pointer: CGPoint) -
 /// workspaces (swap, split, a desktop in the sidebar). Called for its move events.
 @MainActor
 func updateNativeDragOverlay(_ window: Window) {
-    guard runtime.workspaceBackend.nativeTilingEnabled, NSEvent.pressedMouseButtons & 1 != 0,
+    guard runtime.workspaceBackend.native.tilingEnabled, NSEvent.pressedMouseButtons & 1 != 0,
           window.parent is TilingContainer, window.nodeWorkspace?.isVisible == true else { return }
     let now = ContinuousClock.now
     if let last = lastNativeDragOverlayUpdate, now - last < .milliseconds(16) { return }

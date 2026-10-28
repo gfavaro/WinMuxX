@@ -135,7 +135,7 @@ func scheduleRefreshSession(
 ) {
     runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
     if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, nativeScrollingRelayoutEvents.contains(name) {
-        return runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
+        return runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling()
     }
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
@@ -214,7 +214,7 @@ let nativeScrollingRelayoutEvents: Set<String> = [
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
                                optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
     guard runtime.workspaceBackend.kind == .virtual else {
-        runtime.workspaceBackend.observation?.requestRead(event: "refresh")
+        runtime.workspaceBackend.native.observation?.requestRead(event: "refresh")
         return
     }
     let stateStore = runtime.publicState
@@ -605,8 +605,8 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
             // A pan's own window moves must not revoke the permits it is streaming
             // with; the pan reads once when it settles.
             if NativeScrollingPan.shared.isPanning, nativePanIgnoresNotification(notif) { return }
-            runtime.workspaceBackend.nativeWriteAuthority.invalidate()
-            runtime.workspaceBackend.observation?.requestRead(event: "axWindowChange")
+            runtime.workspaceBackend.native.writeAuthority.invalidate()
+            runtime.workspaceBackend.native.observation?.requestRead(event: "axWindowChange")
             return
         }
         if let destroyedWindowId {

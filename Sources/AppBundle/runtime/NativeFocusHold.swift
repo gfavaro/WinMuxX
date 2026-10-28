@@ -50,5 +50,5 @@ final class NativeFocusHold {
 
 @MainActor
 func nativeFocusHoldRejects(_ window: Window?) -> Bool {
-    runtime.workspaceBackend.nativeFocusHold.rejects(window) { $0.nodeWorkspace?.workspaceMonitor.displayUUID }
+    runtime.workspaceBackend.native.focusHold.rejects(window) { $0.nodeWorkspace?.workspaceMonitor.displayUUID }
 }

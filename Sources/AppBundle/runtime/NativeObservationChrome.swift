@@ -21,7 +21,7 @@ final class NativeObservationChrome {
             await owner.withValue {
                 updateTrayText()
                 WindowBorderController.shared.refresh()
-                owner.workspaceBackend.noteNativeActivity()
+                owner.workspaceBackend.native.noteNativeActivity()
                 NativeUnvisitedWindows.shared.refresh()
                 await updateWorkspaceSidebarModel()
             }

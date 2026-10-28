@@ -108,7 +108,7 @@ final class NativeSpaceLayoutsTest: WorkspaceTestCase {
 
     func testAXRegistrationCannotCommitAfterAnyNewObservationEvenWithSameTimestamp() throws {
         let monitor = display("display-a")
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let observed = inventory()
         layouts.reconcile(observed, displays: [monitor])
         let old = try XCTUnwrap(layouts.registration(for: 10))
@@ -128,7 +128,7 @@ final class NativeSpaceLayoutsTest: WorkspaceTestCase {
     func testSwitchOnOneDisplayPreservesOtherDisplaysHistoryAndTrees() throws {
         let displays = [display("a"), display("b", x: 1920), display("c", x: 3840)]
         setMonitorsForTests(displays)
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         func observed(a: String, b: String) -> NativeWorkspaceInventory {
             let rows: [(String, String, [String])] = [("a", a, ["1", "4"]), ("b", b, ["2", "5"]), ("c", "3", ["3"])]
             let snapshot = NativeSpacesSnapshot(displays: rows.map { uuid, active, ids in

@@ -17,8 +17,8 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
         _ = inventory.publish(NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "1",
             spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0)])], windows: [], readMilliseconds: 0, capturedAt: .now),
             for: inventory.invalidate())
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
-        return runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-a"]!
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [monitor])
+        return runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-a"]!
     }
 
     private func fixture() -> (Workspace, [TestWindow]) {
@@ -73,7 +73,7 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
         XCTAssertFalse(pan.handle(scroll(0, dy: -30, option: false, phase: 1, at: point)), "A new vertical scroll goes to the app")
         XCTAssertFalse(pan.isPanning)
         XCTAssertTrue(nativePanIgnoresNotification(kAXFocusedWindowChangedNotification as String), "Its own raises keep the permits")
-        XCTAssertTrue(WorkspaceBackendState.runsOutsideNativeTilingFence(try! XCTUnwrap(parseCommand("mode main").unwrap().0)),
+        XCTAssertTrue(NativeCommandPolicy.runsOutsideNativeTilingFence(try! XCTUnwrap(parseCommand("mode main").unwrap().0)),
             "mode switches bindings even while tiling is paused")
     }
 
@@ -89,7 +89,7 @@ final class NativeScrollingPanTest: WorkspaceTestCase {
         _ = inventory.publish(NativeSpacesSnapshot(displays: [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "9",
             spaces: [NativeSpace(id: "1", uuid: "desktop-a", type: 0), NativeSpace(id: "9", uuid: "full", type: 4)])],
             windows: [], readMilliseconds: 0, capturedAt: .now), for: inventory.invalidate())
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [desktop.workspaceMonitor])
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [desktop.workspaceMonitor])
         let before = Workspace.all.count
         XCTAssertNil(nativeActiveDesktop(on: desktop.workspaceMonitor))
         XCTAssertFalse(NativeScrollingPan().handle(scroll(-120, at: desktop.workspaceMonitor.rect.center)))

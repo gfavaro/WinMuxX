@@ -26,7 +26,7 @@ final class NativeWindowSpaceMoves {
         }
     }
 
-    func run(_ args: MoveNodeToWorkspaceCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
+    func transferWindow(_ args: MoveNodeToWorkspaceCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
         guard let window = movableWindow(args, env, io) else { return false }
         return await move(window, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop, io: io) {
             self.resolve(args, from: $0, on: $1, in: $2, io)
@@ -34,7 +34,7 @@ final class NativeWindowSpaceMoves {
     }
 
     /// `move-node-to-monitor`: the window joins the desktop that display shows.
-    func run(_ args: MoveNodeToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
+    func transferWindow(_ args: MoveNodeToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
         guard let window = movableWindow(args, env, io) else { return false }
         guard let current = window.nodeMonitor else { return io.err(windowIsntPartOfTree(window)) }
         let monitor: Monitor
@@ -56,7 +56,7 @@ final class NativeWindowSpaceMoves {
     /// without SIP changes, so the desktop's windows join the desktop that display
     /// shows, carrying their layout tree: into an empty desktop it arrives whole with
     /// its arrangement, otherwise as one group. The emptied desktop stays in place.
-    func run(_ args: MoveWorkspaceToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
+    func transferDesktopContents(_ args: MoveWorkspaceToMonitorCmdArgs, env: CmdEnv, io: CmdIo) async -> Bool {
         guard isAvailable() else { return io.err("Moving windows between native Spaces is unavailable on this macOS version") }
         // Any desktop may be the source, including one not showing: windows move by ID and
         // each arrival is confirmed, so the active-desktop fence of tiling commands is not needed.
@@ -72,7 +72,7 @@ final class NativeWindowSpaceMoves {
         let windows = source.allLeafWindowsRecursive
         // Windows of a desktop not visited yet are known only by ID; they move too and are
         // adopted on arrival, since the destination desktop is showing.
-        let sourceSpace = runtime.workspaceBackend.nativeLayouts.currentBySpaceID.first { $0.value === source }?.key
+        let sourceSpace = runtime.workspaceBackend.native.layouts.currentBySpaceID.first { $0.value === source }?.key
         let listed = sourceSpace.map { space in (NativeUnvisitedWindows.shared.bySpaceID[space] ?? []).map(\.windowId) } ?? []
         let ids = windows.map(\.windowId) + listed.filter { id in !windows.contains { $0.windowId == id } }
         guard !ids.isEmpty else { return io.err("\(userFacingDesktopName(source)) has no windows to move") }
@@ -100,7 +100,7 @@ final class NativeWindowSpaceMoves {
                 else { window.bind(to: destination.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST) }
             }
         }
-        runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
+        runtime.workspaceBackend.native.observation?.requestRead(event: "nativeWindowMoved")
         if let focused = windows.first(where: { $0.windowId == focus.windowOrNil?.windowId && arrived.contains($0.windowId) }) ??
             destination.mostRecentWindowRecursive {
             await focusWhenReady(focused)
@@ -134,7 +134,7 @@ final class NativeWindowSpaceMoves {
     /// since windows on desktops that are not showing are never eligible.
     private func movableWindow(_ args: some CmdArgs, _ env: CmdEnv, _ io: CmdIo) -> Window? {
         guard let window = args.resolveUncheckedTarget(env, io)?.windowOrNil else { _ = io.err(noWindowIsFocused); return nil }
-        guard runtime.workspaceBackend.nativeLayouts.retainedByUUID.values.contains(where: { $0 === window.nodeWorkspace }) else {
+        guard runtime.workspaceBackend.native.layouts.retainedByUUID.values.contains(where: { $0 === window.nodeWorkspace }) else {
             _ = io.err("Window \(window.windowId) is not on a native desktop WinMuxX manages"); return nil
         }
         return window
@@ -157,7 +157,7 @@ final class NativeWindowSpaceMoves {
         guard await awaitArrival(of: [id], at: plan.targetSpaceID).contains(id) else {
             return io.err("Window \(id) did not arrive on desktop \(number)")
         }
-        runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
+        runtime.workspaceBackend.native.observation?.requestRead(event: "nativeWindowMoved")
         NativeUnvisitedWindows.shared.refresh()
         return true
     }
@@ -180,7 +180,7 @@ final class NativeWindowSpaceMoves {
     /// A move or Space switch requests a read, which revokes write and focus permits;
     /// focus waits until that read has reissued them.
     private func focusWhenReady(_ window: Window) async {
-        _ = await runtime.workspaceBackend.nativeTiling.waitUntilReady()
+        _ = await runtime.workspaceBackend.native.tiling.waitUntilReady()
         guard window.focusWindow() else { return }
         window.nativeFocus()
     }
@@ -208,7 +208,7 @@ final class NativeWindowSpaceMoves {
             return io.err("Moving window \(id) to Space \(target.id) failed")
         }
         guard await awaitArrival(of: [id], at: target.id).contains(id) else { return io.err("Window \(id) did not arrive on Space \(target.id)") }
-        if let uuid = target.uuid, let destination = runtime.workspaceBackend.nativeLayouts.retainedByUUID[uuid],
+        if let uuid = target.uuid, let destination = runtime.workspaceBackend.native.layouts.retainedByUUID[uuid],
            window.nodeWorkspace !== destination {
             if window.parent is Workspace {
                 window.bindAsFloatingWindow(to: destination)
@@ -216,10 +216,10 @@ final class NativeWindowSpaceMoves {
                 window.bind(to: destination.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
             }
         }
-        runtime.workspaceBackend.observation?.requestRead(event: "nativeWindowMoved")
+        runtime.workspaceBackend.native.observation?.requestRead(event: "nativeWindowMoved")
         guard focusFollowsWindow, let number = NativeSpaceNavigation.desktopNumber(of: target.id, in: state.displays),
               case .cmd(let follow) = parseCommand("workspace \(number)"), let follow = follow as? WorkspaceCommand else { return true }
-        guard await runtime.workspaceBackend.nativeNavigation.run(follow.args, io: io) else { return false }
+        guard await runtime.workspaceBackend.native.navigation.selectDesktop(follow.args, io: io) else { return false }
         await focusWhenReady(window)
         return true
     }

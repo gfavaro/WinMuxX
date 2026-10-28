@@ -5,7 +5,7 @@ extension CmdArgs {
     func resolveTargetOrReportError(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
         guard let target = resolveUncheckedTarget(env, io) else { return nil }
         if runtime.workspaceBackend.kind == .native {
-            let layouts = runtime.workspaceBackend.nativeLayouts
+            let layouts = runtime.workspaceBackend.native.layouts
             guard let snapshot = layouts.snapshot,
                   snapshot.displays.contains(where: { layouts.activeWorkspace(on: $0.identifier) === target.workspace }),
                   target.windowOrNil?.nativeLayoutEligible != false else {

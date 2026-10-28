@@ -70,7 +70,7 @@ final class NativeScrollingPan {
             return true
         }
         guard scroll.optionOnly, scroll.isContinuous, scroll.momentumPhase == 0 else { return false }
-        guard config.scrolling.gestureEnabled, runtime.workspaceBackend.nativeTilingEnabled, TrayMenuModel.shared.isEnabled else {
+        guard config.scrolling.gestureEnabled, runtime.workspaceBackend.native.tilingEnabled, TrayMenuModel.shared.isEnabled else {
             lastDecision = "scrolling gestures, native tiling or WinMuxX are off"; return false
         }
         guard abs(scroll.deltaX) > abs(scroll.deltaY) else { lastDecision = "vertical: left to the app"; return false }
@@ -98,7 +98,7 @@ final class NativeScrollingPan {
         if next != current { lastDirection = next > current ? 1 : -1 }
         workspace.scrollingOffset = next
         nativePanTiming.measure("minimap show") { _ = WorkspaceScrollingMinimap.shared.show(workspace, duringGesture: true) }
-        nativePanTiming.measure("relayout request") { runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling() }
+        nativePanTiming.measure("relayout request") { runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling() }
     }
 
     /// Devices without scroll phases end a pan after a pause.
@@ -117,19 +117,19 @@ final class NativeScrollingPan {
         guard let workspace else { return }
         self.workspace = nil
         // Move notifications were ignored while panning; observe the result once.
-        defer { runtime.workspaceBackend.observation?.requestRead(event: "nativeScrollingSettled") }
+        defer { runtime.workspaceBackend.native.observation?.requestRead(event: "nativeScrollingSettled") }
         workspace.scrollingGestureMotionActive = false
         WorkspaceScrollingMinimap.shared.endGesture()
         let metrics = workspace.scrollingMetrics
         guard let column = nearestScrollingColumn(in: metrics, offset: workspace.scrollingOffset, direction: lastDirection) else {
-            return runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
+            return runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling()
         }
         workspace.scrollingOffset = metrics.focusedOffset(for: column, current: workspace.scrollingOffset)
         if let window = column.node.mostRecentWindowRecursive, window.focusWindow() {
             workspace.lastScrollingFocusWindowId = window.windowId
             window.nativeFocus()
         }
-        runtime.workspaceBackend.nativeTiling.relayoutVisibleScrolling()
+        runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling()
         _ = WorkspaceScrollingMinimap.shared.show(workspace)
     }
 }

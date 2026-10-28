@@ -100,11 +100,11 @@ extension [Command] {
 
     @MainActor
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
-        if runtime.workspaceBackend.kind == .native, runtime.workspaceBackend.nativeTilingEnabled,
+        if runtime.workspaceBackend.kind == .native, runtime.workspaceBackend.native.tilingEnabled,
            !NativeTilingCommandScope.active, contains(where: {
-               !WorkspaceBackendState.runsOutsideNativeTilingFence($0)
+               !NativeCommandPolicy.runsOutsideNativeTilingFence($0)
            }) {
-            return try await runtime.workspaceBackend.nativeTiling.run(self, env: env, io: io)
+            return try await runtime.workspaceBackend.native.tiling.run(self, env: env, io: io)
         }
         var isSucc = true
         for command in self {
@@ -120,8 +120,8 @@ extension [Command] {
             if NativeTilingCommandScope.validateTarget?() == false {
                 return io.err("Native command target changed during execution")
             }
-            if WorkspaceBackendState.isNativeNavigation(command), !NativeTilingCommandScope.active {
-                await runtime.workspaceBackend.awaitCurrentObservation()
+            if NativeCommandPolicy.isNativeNavigation(command), !NativeTilingCommandScope.active {
+                await runtime.workspaceBackend.native.awaitCurrentObservation()
             }
             let undoState = LayoutUndoHistory.shared.before(command)
             let commandSucc: Bool

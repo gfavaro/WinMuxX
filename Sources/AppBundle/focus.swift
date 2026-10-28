@@ -136,8 +136,8 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
 
 @MainActor func setFocus(to newFocus: LiveFocus, origin: FocusChangeOrigin = .explicit) -> Bool {
     if runtime.workspaceBackend.kind == .native {
-        guard let snapshot = runtime.workspaceBackend.nativeLayouts.snapshot,
-              snapshot.displays.contains(where: { runtime.workspaceBackend.nativeLayouts.activeWorkspace(on: $0.identifier) === newFocus.workspace }),
+        guard let snapshot = runtime.workspaceBackend.native.layouts.snapshot,
+              snapshot.displays.contains(where: { runtime.workspaceBackend.native.layouts.activeWorkspace(on: $0.identifier) === newFocus.workspace }),
               newFocus.windowOrNil?.nativeLayoutEligible != false else { return false }
         runtime.focus.requested = newFocus.frozen
         if origin == .native { runtime.focus.lastKnown = newFocus.frozen }

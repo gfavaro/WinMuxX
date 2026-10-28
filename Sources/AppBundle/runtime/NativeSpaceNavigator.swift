@@ -41,13 +41,13 @@ final class NativeSpaceNavigator {
         }
     }
 
-    func run(_ args: WorkspaceCmdArgs, io: CmdIo) async -> Bool {
+    func selectDesktop(_ args: WorkspaceCmdArgs, io: CmdIo) async -> Bool {
         guard let observed = await readyTopology(io) else { return false }
         // Next and previous count from where a switch in flight is going.
         let displays = observed.map { display in flights[display.identifier].map { display.showing($0.target) } ?? display }
         guard var plan = resolve(args, displays, io) else { return false }
         // Already showing on another display: focus it there, as virtual workspaces do.
-        if plan.isNoop, let shown = runtime.workspaceBackend.nativeLayouts.currentBySpaceID[plan.targetSpaceID],
+        if plan.isNoop, let shown = runtime.workspaceBackend.native.layouts.currentBySpaceID[plan.targetSpaceID],
            shown.isVisible, shown !== focus.workspace {
             guard let window = shown.mostRecentWindowRecursive, window.focusWindow() else {
                 return io.err("That desktop is showing on another display and has no window to focus")
@@ -57,19 +57,38 @@ final class NativeSpaceNavigator {
         }
         if plan.isNoop, args.autoBackAndForth,
            let display = displays.first(where: { $0.identifier == plan.displayIdentifier }),
-           let previous = runtime.workspaceBackend.nativeActivity.previousDesktop(on: display),
+           let previous = runtime.workspaceBackend.native.activity.previousDesktop(on: display),
            let back = NativeSpaceNavigation.toward(spaceID: previous, on: display) {
             plan = back
         }
         return await perform(plan, failIfNoop: args.failIfNoop, io: io)
     }
 
+    /// UI rows retain the Space identity while the command waits for a fresh read.
+    func selectDesktop(spaceUUID: String, io: CmdIo) async -> Bool {
+        guard let displays = await readyTopology(io) else { return false }
+        guard let display = displays.first(where: { $0.spaces.contains { $0.uuid == spaceUUID && $0.isDesktop } }),
+              let spaceID = display.spaces.first(where: { $0.uuid == spaceUUID && $0.isDesktop })?.id,
+              let plan = NativeSpaceNavigation.toward(spaceID: spaceID, on: display) else {
+            return io.err("The selected native desktop no longer exists")
+        }
+        if plan.isNoop, let shown = runtime.workspaceBackend.native.layouts.currentBySpaceID[spaceID],
+           shown.isVisible, shown !== focus.workspace {
+            guard let window = shown.mostRecentWindowRecursive, window.focusWindow() else {
+                return io.err("That desktop is showing on another display and has no window to focus")
+            }
+            window.nativeFocus()
+            return true
+        }
+        return await perform(plan, failIfNoop: false, io: io)
+    }
+
     /// `workspace-back-and-forth`: the focused display's previous desktop.
-    func runBackAndForth(io: CmdIo) async -> Bool {
+    func selectPreviousDesktop(io: CmdIo) async -> Bool {
         guard let displays = await readyTopology(io),
               let id = targetDisplay(monitor: nil, displays, io),
               let display = displays.first(where: { $0.identifier == id }) else { return false }
-        guard let previous = runtime.workspaceBackend.nativeActivity.previousDesktop(on: display),
+        guard let previous = runtime.workspaceBackend.native.activity.previousDesktop(on: display),
               let plan = NativeSpaceNavigation.toward(spaceID: previous, on: display) else {
             return io.err("No previous desktop on this display")
         }
@@ -98,7 +117,7 @@ final class NativeSpaceNavigator {
         let result = await fly(initial)
         let waiters = flights.removeValue(forKey: display)?.waiters ?? []
         waiters.forEach { $0.resume(returning: result == nil) }
-        if result == nil { runtime.workspaceBackend.observation?.requestRead(event: "nativeSpaceSwitch") }
+        if result == nil { runtime.workspaceBackend.native.observation?.requestRead(event: "nativeSpaceSwitch") }
         return result.map { io.err($0) } ?? true
     }
 
@@ -113,7 +132,7 @@ final class NativeSpaceNavigator {
             let deadline = ContinuousClock.now + landingTimeout
             var latest: NativeSpaceDisplay?
             while ContinuousClock.now < deadline {
-                await runtime.workspaceBackend.nativeStateChanges.nextChange(before: min(deadline, .now + pollInterval))
+                await runtime.workspaceBackend.native.stateChanges.nextChange(before: min(deadline, .now + pollInterval))
                 if Task.isCancelled { break }
                 latest = (try? await topology())?.first { $0.identifier == display }
                 if latest?.activeSpaceID == posted { break }
@@ -169,7 +188,7 @@ final class NativeSpaceNavigator {
             return uuid
         }
         if displays.count == 1 { return displays[0].identifier }
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let focused = focus.workspace
         let focusedDisplay = layouts.currentBySpaceID.values.contains { $0 === focused } ? focused.workspaceMonitor.displayUUID : nil
         if let uuid = focusedDisplay ?? mouseLocation.monitorApproximation.displayUUID, known.contains(uuid) { return uuid }

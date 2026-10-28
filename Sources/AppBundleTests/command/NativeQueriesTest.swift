@@ -21,7 +21,7 @@ final class NativeQueriesTest: WorkspaceTestCase {
         ], windows: [], readMilliseconds: 0, capturedAt: .now)
         var inventory = NativeWorkspaceInventory()
         XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
-        runtime.workspaceBackend.nativeLayouts.reconcile(inventory, displays: [monitor])
+        runtime.workspaceBackend.native.layouts.reconcile(inventory, displays: [monitor])
     }
 
     private func run(_ text: String) async throws -> CmdResult {
@@ -37,7 +37,7 @@ final class NativeQueriesTest: WorkspaceTestCase {
     }
 
     func testWindowsResolveWorkspacesByDesktopNumber() async throws {
-        let desktop2 = try XCTUnwrap(runtime.workspaceBackend.nativeLayouts.retainedByUUID["desktop-b"])
+        let desktop2 = try XCTUnwrap(runtime.workspaceBackend.native.layouts.retainedByUUID["desktop-b"])
         TestWindow.new(id: 80, parent: desktop2.rootTilingContainer)
         let listed = try await run("list-windows --workspace 2 --format %{window-id}|%{workspace}")
         XCTAssertEqual(listed.exitCode, 0, listed.stderr.joined())
@@ -47,7 +47,7 @@ final class NativeQueriesTest: WorkspaceTestCase {
     }
 
     func testSelectingAWindowOnAHiddenDesktopSwitchesThereFirst() throws {
-        let layouts = runtime.workspaceBackend.nativeLayouts
+        let layouts = runtime.workspaceBackend.native.layouts
         let hidden = try XCTUnwrap(layouts.retainedByUUID["desktop-a"])
         let shown = try XCTUnwrap(layouts.retainedByUUID["desktop-b"])
         TestWindow.new(id: 81, parent: hidden.rootTilingContainer)

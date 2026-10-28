@@ -33,7 +33,7 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
     private func run(_ navigator: NativeSpaceNavigator, _ command: String) async throws -> CmdResult {
         let args = try XCTUnwrap(parseCommand(command).cmdOrDie as? WorkspaceCommand).args
         let io = CmdIo(stdin: .emptyStdin)
-        let ok = await navigator.run(args, io: io)
+        let ok = await navigator.selectDesktop(args, io: io)
         return CmdResult(stdout: io.stdout, stderr: io.stderr, exitCode: ok ? 0 : 1)
     }
 
@@ -112,7 +112,7 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
 
     func testBackAndForthReturnsToTheDisplaysPreviousDesktop() async throws {
         let nav = navigator { $0.targetSpaceID }
-        let tracker = runtime.workspaceBackend.nativeActivity
+        let tracker = runtime.workspaceBackend.native.activity
         tracker.runHooks = { _, _ in }
         tracker.execWorkspaceChange = { _, _ in }
         tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
@@ -120,7 +120,7 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
         XCTAssertEqual(first.exitCode, 0)
         tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
         let io = CmdIo(stdin: .emptyStdin)
-        let back = await nav.runBackAndForth(io: io)
+        let back = await nav.selectPreviousDesktop(io: io)
         XCTAssertTrue(back, io.stderr.joined())
         XCTAssertEqual(active, "1")
         tracker.observe(topology(), focusedDisplay: "display-a", focusedWindow: nil)
@@ -138,4 +138,24 @@ final class NativeSpaceNavigatorTest: WorkspaceTestCase {
         XCTAssertFalse(try supported("workspace web"))
         XCTAssertTrue(try supported("workspace --auto-back-and-forth 2"))
     }
+    func testIdentityNavigationUsesFreshOrderAndReportsRemoval() async {
+        let nav = navigator { $0.targetSpaceID }
+        nav.topology = { [unowned self] in
+            [NativeSpaceDisplay(identifier: "display-a", activeSpaceID: active, spaces: [
+                NativeSpace(id: "1", uuid: "a", type: 0), NativeSpace(id: "3", uuid: "c", type: 0),
+                NativeSpace(id: "2", uuid: "b", type: 0),
+            ])]
+        }
+        let io = CmdIo(stdin: .emptyStdin)
+        let landed = await nav.selectDesktop(spaceUUID: "b", io: io)
+        XCTAssertTrue(landed)
+        XCTAssertEqual(posts.last?.targetSpaceID, "2")
+        XCTAssertEqual(posts.last?.toIndex, 2)
+        let missing = CmdIo(stdin: .emptyStdin)
+        let found = await nav.selectDesktop(spaceUUID: "removed", io: missing)
+        XCTAssertFalse(found)
+        XCTAssertTrue(missing.stderr.joined().contains("no longer exists"))
+        XCTAssertEqual(posts.count, 1)
+    }
+
 }

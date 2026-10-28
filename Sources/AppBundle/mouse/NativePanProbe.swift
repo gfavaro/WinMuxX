@@ -67,7 +67,7 @@ private final class PanSampler: @unchecked Sendable {
 
 @MainActor
 func simulateNativePan(steps: Int = 120, stepDelta: Double, interval: Duration = .milliseconds(8)) async -> String {
-    guard runtime.workspaceBackend.nativeTilingEnabled else { return "Native tiling is not active" }
+    guard runtime.workspaceBackend.native.tilingEnabled else { return "Native tiling is not active" }
     guard CGPreflightPostEventAccess() else { return "WinMuxX cannot post events (Accessibility)" }
     guard let monitor = sortedMonitors.first(where: { nativeActiveDesktop(on: $0)?.arrangement == .scrolling }),
           let workspace = nativeActiveDesktop(on: monitor) else {
@@ -154,7 +154,7 @@ func simulateNativePan(steps: Int = 120, stepDelta: Double, interval: Duration =
         Window lag behind input: median \(pct(0.5)), p90 \(pct(0.9)), max \(pct(1)) over \(lags.count) samples
         Window position updates: \(updates) across \(ids.count) windows (\(String(format: "%.0f", Double(updates) / max(inputEnd - 0.05, 0.01) / Double(max(ids.count, 1))))/s per window), \(samples.count) samples
         Windows settled \(settled.map { String(format: "%.0f ms", $0 * 1000) } ?? "not within 800 ms") after the last event
-        \(runtime.workspaceBackend.nativeTiling.scrollingLayoutTiming)
+        \(runtime.workspaceBackend.native.tiling.scrollingLayoutTiming)
         Main-thread time and counts:
         \(nativePanTiming.report)
         """

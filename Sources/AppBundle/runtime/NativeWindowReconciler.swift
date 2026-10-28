@@ -31,13 +31,13 @@ final class NativeWindowReconciler {
             let started = ContinuousClock.now
             do {
                 let eligible = Set(snapshot.windows.compactMap { membership in
-                    owner.workspaceBackend.nativeLayouts.registrationWorkspace(for: membership.windowID) == nil ? nil : membership.windowID
+                    owner.workspaceBackend.native.layouts.registrationWorkspace(for: membership.windowID) == nil ? nil : membership.windowID
                 })
                 let pids = await Task.detached { nativeWindowOwnerPIDs(eligible) }.value
                 try Task.checkCancellation()
                 guard self.generation == version else { return }
                 Self.updateEligibility(snapshot, windows: MacWindow.allWindows, ownerPIDs: pids,
-                    layouts: owner.workspaceBackend.nativeLayouts)
+                    layouts: owner.workspaceBackend.native.layouts)
                 for app in Array(MacApp.allAppsMap.values) where app.nsApp.isTerminated {
                     try Task.checkCancellation()
                     await app.destroy()
@@ -87,7 +87,7 @@ final class NativeWindowReconciler {
                 self.pendingWindowCount = eligible.filter { MacWindow.allWindowsMap[$0] == nil }.count
                 let identities = MacWindow.allWindows.compactMap { window -> NativeWindowWriteIdentity? in
                     guard window.nativeLayoutEligible, eligible.contains(window.windowId), let launched = window.macApp.nsApp.launchDate,
-                          owner.workspaceBackend.nativeLayouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace else { return nil }
+                          owner.workspaceBackend.native.layouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace else { return nil }
                     for display in snapshot.displays {
                         if case .desktop(let spaceID, let uuid?) = snapshot.eligibility(windowID: window.windowId, on: display.identifier) {
                             return NativeWindowWriteIdentity(windowID: window.windowId, pid: window.macApp.pid,
@@ -112,8 +112,8 @@ final class NativeWindowReconciler {
                 let result = await withTaskCancellationHandler { await preflight.value } onCancel: { preflight.cancel() }
                 guard self.generation == version else { return }
                 self.writePreflight = (result.0.count, result.1)
-                owner.workspaceBackend.observation?.watchManagedWindows(Set(MacWindow.allWindowsMap.keys))
-                await owner.workspaceBackend.nativeTiling.accept(snapshot, identities: identities.filter { result.0.contains($0.windowID) })
+                owner.workspaceBackend.native.observation?.watchManagedWindows(Set(MacWindow.allWindowsMap.keys))
+                await owner.workspaceBackend.native.tiling.accept(snapshot, identities: identities.filter { result.0.contains($0.windowID) })
                 self.lastError = nil
             } catch is CancellationError { return }
             catch { if self.generation == version { self.lastError = String(describing: error) } }
