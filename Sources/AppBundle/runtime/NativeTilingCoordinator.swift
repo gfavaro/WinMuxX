@@ -24,7 +24,9 @@ final class NativeTilingCoordinator {
     }
     /// Tiling stays off until something outside WinMuxX changes; the tray marks it.
     private(set) var isStopped = false
-    private(set) var ready = false
+    private(set) var ready = false {
+        didSet { if ready, !oldValue { runtime.workspaceBackend.nativeStateChanges.notify() } }
+    }
     /// Set by the first completed layout; windows registered before it existed at startup.
     private(set) var hasCompletedInitialLayout = false
     private var hasManagedNativeFocus = false
@@ -224,9 +226,7 @@ final class NativeTilingCoordinator {
 
     /// Waits for the read in progress to be accepted and tiling to be ready again.
     func waitUntilReady(timeout: Duration = .milliseconds(1500)) async -> Bool {
-        let deadline = ContinuousClock.now + timeout
-        while !ready, ContinuousClock.now < deadline { try? await Task.sleep(for: .milliseconds(5)) }
-        return ready
+        await runtime.workspaceBackend.nativeStateChanges.wait(timeout: timeout) { ready }
     }
 
     /// Set at left mouse-down; layout waits until that drag's release is adopted.
@@ -292,13 +292,11 @@ final class NativeTilingCoordinator {
         runtime.workspaceBackend.observation?.requestRead(event: "nativeCommand")
         // Bounded readiness wait, with no additional native queries. Reconciliation
         // is owned by the event pipeline; newer events can supersede it safely.
-        // A read takes a few to tens of milliseconds; poll finely so commands are not
-        // held a fixed 50 ms.
-        for _ in 0..<1000 {
-            try await Task.sleep(for: .milliseconds(5))
-            if ready { break }
-            if case .unavailable = runtime.workspaceBackend.observation?.inventory.status { break }
+        _ = await runtime.workspaceBackend.nativeStateChanges.wait(timeout: .seconds(5)) {
+            if case .unavailable = runtime.workspaceBackend.observation?.inventory.status { return true }
+            return ready
         }
+        try Task.checkCancellation()
         guard ready else { return io.err("Native tiling is not ready: \(status)") }
         guard target.matches(runtime.workspaceBackend.nativeLayouts, defaultFocus: runtime.focus.requested.liveOrNil) else {
             return io.err("Native command cancelled because its target changed during reconciliation")

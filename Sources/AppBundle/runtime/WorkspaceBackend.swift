@@ -171,7 +171,8 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
               let number = nativeDesktopNumber(of: desktop) else { return io.err("Window \(id ?? 0) is not on a native desktop") }
         guard case .cmd(let command) = parseCommand("workspace \(number)"), let switchTo = command as? WorkspaceCommand,
               await state.nativeNavigation.run(switchTo.args, io: io) else { return false }
-        for _ in 0..<80 where !(desktop.isVisible && state.nativeTiling.ready) { try await Task.sleep(for: .milliseconds(25)) }
+        _ = await state.nativeStateChanges.wait(timeout: .seconds(2)) { desktop.isVisible && state.nativeTiling.ready }
+        try Task.checkCancellation()
         guard desktop.isVisible, window.focusWindow() else { return io.err("Desktop \(number) did not show in time; try again") }
         window.nativeFocus()
         return true

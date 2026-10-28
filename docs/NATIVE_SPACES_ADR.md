@@ -20,7 +20,8 @@ reject superseded results, failures and completions after stopping. Read failure
 suspends native observation; it never enables virtual management as a fallback.
 
 Following the Dinky comparison, native observation also subscribes to WindowServer
-lifecycle events and audits topology every 500 ms. Unchanged audits perform no
+lifecycle events and audits topology every 500 ms (every 5 s after 10 s without input while
+WindowServer events are subscribed). Unchanged audits perform no
 window discovery. Reads target incoming Spaces for a Space-only switch; coalesced
 window/application work retains its broader current-Space scope. Optional scoped
 query failure falls back to the existing read-only inventory, never virtual parking.

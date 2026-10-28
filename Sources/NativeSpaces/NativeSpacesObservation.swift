@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 
 /// Event-driven read ownership shared by the diagnostic and the optional app
@@ -20,8 +21,9 @@ public final class NativeSpacesObservation {
     private var revision: UInt64 = 0
     private var auditFailures = 0
     private let auditInterval: Duration?
+    private let secondsSinceInput: @Sendable () -> Double
     private let observeSystemEvents: Bool
-    public private(set) var windowEventsAvailable = false
+    public internal(set) var windowEventsAvailable = false
     public private(set) var snapshotReadCount = 0
     public private(set) var topologyAuditCount = 0
     public private(set) var lastTopologyAuditMilliseconds: Double?
@@ -34,7 +36,11 @@ public final class NativeSpacesObservation {
         self.init(read: { previous, allCurrent in
             if let windowIDs { return try await reader.snapshot(windowIDs: windowIDs) }
             return try await reader.observationSnapshot(previous: previous?.displays, allCurrentSpaces: allCurrent)
-        }, topology: { try await reader.topology() }, auditInterval: .milliseconds(500), observeSystemEvents: true)
+        }, topology: { try await reader.topology() }, auditInterval: .milliseconds(500), observeSystemEvents: true,
+        secondsSinceInput: {
+            // kCGAnyInputEventType
+            CGEventType(rawValue: ~0).map { CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: $0) } ?? 0
+        })
     }
 
     convenience init(read: @escaping @Sendable () async throws -> NativeSpacesSnapshot) {
@@ -43,10 +49,11 @@ public final class NativeSpacesObservation {
 
     init(read: @escaping @Sendable (NativeSpacesSnapshot?, Bool) async throws -> NativeSpacesSnapshot,
          topology: (@Sendable () async throws -> [NativeSpaceDisplay])?, auditInterval: Duration? = nil,
-         observeSystemEvents: Bool = false) {
+         observeSystemEvents: Bool = false, secondsSinceInput: @escaping @Sendable () -> Double = { 0 }) {
         self.read = read
         self.topology = topology
         self.auditInterval = auditInterval
+        self.secondsSinceInput = secondsSinceInput
         self.observeSystemEvents = observeSystemEvents
     }
 
@@ -58,12 +65,22 @@ public final class NativeSpacesObservation {
         if topology != nil, let auditInterval {
             auditTask = Task { [weak self] in
                 while !Task.isCancelled {
-                    do { try await Task.sleep(for: auditInterval) } catch { return }
+                    guard let delay = self?.nextAuditDelay(active: auditInterval) else { return }
+                    do { try await Task.sleep(for: delay) } catch { return }
                     guard let self else { return }
                     await self.auditTopology()
                 }
             }
         }
+    }
+
+    /// The audit only catches switches that post no event, such as scripted swipes. With
+    /// WindowServer events available and no input for a while, it need not wake 2×/s.
+    static let idleAuditInterval: Duration = .seconds(5)
+    static let idleAuditAfterSeconds: Double = 10
+
+    func nextAuditDelay(active: Duration) -> Duration {
+        windowEventsAvailable && secondsSinceInput() >= Self.idleAuditAfterSeconds ? max(active, Self.idleAuditInterval) : active
     }
 
     /// While true, ordinary window events and app notifications are held instead of

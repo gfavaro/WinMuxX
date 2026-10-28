@@ -82,4 +82,14 @@ final class NativeSpacesAuditTests: XCTestCase {
         XCTAssertEqual(rearmed.1, 4)
         observer.stop()
     }
+
+    func testAuditSlowsOnlyWhenIdleAndWindowServerEventsCover() {
+        let idle = NativeSpacesObservation(read: { _, _ in throw CancellationError() }, topology: nil, secondsSinceInput: { 60 })
+        XCTAssertEqual(idle.nextAuditDelay(active: .milliseconds(500)), .milliseconds(500), "No events: keep polling")
+        idle.windowEventsAvailable = true
+        XCTAssertEqual(idle.nextAuditDelay(active: .milliseconds(500)), NativeSpacesObservation.idleAuditInterval)
+        let busy = NativeSpacesObservation(read: { _, _ in throw CancellationError() }, topology: nil, secondsSinceInput: { 2 })
+        busy.windowEventsAvailable = true
+        XCTAssertEqual(busy.nextAuditDelay(active: .milliseconds(500)), .milliseconds(500))
+    }
 }

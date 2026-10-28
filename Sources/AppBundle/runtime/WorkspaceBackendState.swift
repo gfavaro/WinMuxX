@@ -47,6 +47,7 @@ final class WorkspaceBackendState {
     let nativeWriteAuthority = NativeSpaceWriteAuthority()
     let nativeWindows = NativeWindowReconciler()
     let nativeTiling = NativeTilingCoordinator()
+    let nativeStateChanges = NativeStateSignal()
     let nativePersistence = NativeLayoutPersistence()
     let nativeNavigation = NativeSpaceNavigator()
     let nativeWindowMoves = NativeWindowSpaceMoves()
@@ -128,10 +129,7 @@ final class WorkspaceBackendState {
     /// fence waits for an in-flight read instead of failing on, or acting on, a stale map.
     func awaitCurrentObservation(timeout: Duration = .milliseconds(500)) async {
         guard kind == .native, let observation else { return }
-        let deadline = ContinuousClock.now + timeout
-        while observation.inventory.status == .reading, ContinuousClock.now < deadline {
-            try? await Task.sleep(for: .milliseconds(5))
-        }
+        _ = await nativeStateChanges.wait(timeout: timeout) { observation.inventory.status != .reading }
     }
 
     /// Feeds desktop history and native hooks; call after observations and focus sync.
@@ -189,6 +187,7 @@ final class WorkspaceBackendState {
                 self.nativeLayouts.reconcile(inventory, displays: owner.displays.all())
                 if let snapshot = inventory.currentSnapshot { self.nativeWindows.reconcile(snapshot) }
                 onChange(inventory, event)
+                self.nativeStateChanges.notify()
             }
         }
         observer.start()

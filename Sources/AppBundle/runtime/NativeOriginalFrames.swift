@@ -46,8 +46,9 @@ final class NativeOriginalFrames {
         if !candidates.allSatisfy({ granted($0.id) }) {
             runtime.workspaceBackend.observation?.requestRead(event: "nativeRestoreFrames")
             let deadline = ContinuousClock.now + .milliseconds(1500)
+            // Grants arrive with a completed read; the backstop covers one without a change signal.
             while ContinuousClock.now < deadline, !candidates.allSatisfy({ granted($0.id) }) {
-                try? await Task.sleep(for: .milliseconds(20))
+                await runtime.workspaceBackend.nativeStateChanges.nextChange(before: min(deadline, .now + .milliseconds(100)))
             }
         }
         let leased = candidates.compactMap { candidate -> (id: UInt32, frame: CGRect, validate: @Sendable (AXUIElement) throws -> Void)? in

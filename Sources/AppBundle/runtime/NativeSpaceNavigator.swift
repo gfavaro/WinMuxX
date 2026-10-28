@@ -2,7 +2,8 @@ import Common
 import NativeSpaces
 
 /// Explicit native Space navigation for `workspace`. macOS still owns Spaces; this
-/// only asks the Dock to swipe. Landing is confirmed from fresh topology reads, and a
+/// only asks the Dock to swipe. Landing is confirmed from fresh topology reads, taken as
+/// Space-change events arrive and at least every `pollInterval`, and a
 /// swipe that has not landed is posted once more from wherever the display is.
 /// One switch is in flight per display: a request meanwhile only changes its target,
 /// and the next swipe leaves once the posted one lands, so a burst of shortcuts never
@@ -23,7 +24,8 @@ final class NativeSpaceNavigator {
     var isSupported: () -> Bool = { NativeDockSwipe.isSupported }
     var canPostEvents: () -> Bool = { NativeDockSwipe.canPostEvents }
     var landingTimeout: Duration = .seconds(1)
-    var pollInterval: Duration = .milliseconds(20)
+    /// The backstop between reads when no Space-change event arrives.
+    var pollInterval: Duration = .milliseconds(50)
 
     init() {
         let reader = NativeSpacesReader()
@@ -111,7 +113,8 @@ final class NativeSpaceNavigator {
             let deadline = ContinuousClock.now + landingTimeout
             var latest: NativeSpaceDisplay?
             while ContinuousClock.now < deadline {
-                try? await Task.sleep(for: pollInterval)
+                await runtime.workspaceBackend.nativeStateChanges.nextChange(before: min(deadline, .now + pollInterval))
+                if Task.isCancelled { break }
                 latest = (try? await topology())?.first { $0.identifier == display }
                 if latest?.activeSpaceID == posted { break }
             }
