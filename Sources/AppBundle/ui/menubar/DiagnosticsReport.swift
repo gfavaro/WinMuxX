@@ -96,9 +96,7 @@ func buildDiagnosticsReport() async -> String {
         io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms (submission/layout, not screen presentation)", stage,
             sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
     }
-    io.out("Permissions:")
-    io.out("  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")")
-    io.out("  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")")
+    diagnosticsPermissionLines().forEach { io.out($0) }
     io.out("")
 
     io.out("Monitors (system window corner radius: \(systemWindowCornerRadius())pt):")
@@ -155,4 +153,12 @@ private func separateSpacesDiagnosticSetting() -> String {
         return "not explicitly set (macOS default)"
     }
     return spans ? "off" : "on"
+}
+
+/// Both backends' doctor reports print these; the fork installer checks them.
+@MainActor
+func diagnosticsPermissionLines() -> [String] {
+    ["Permissions:",
+     "  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")",
+     "  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")"]
 }

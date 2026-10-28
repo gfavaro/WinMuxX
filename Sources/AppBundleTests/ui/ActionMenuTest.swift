@@ -289,6 +289,17 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(report.contains("file is missing"))
     }
 
+    func testBothBackendsReportPermissionsForTheInstaller() async {
+        let virtual = await buildDiagnosticsReport()
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let native = await buildDiagnosticsReport()
+        XCTAssertTrue(native.contains("Native Spaces"))
+        for report in [virtual, native] {
+            XCTAssertTrue(report.contains("  accessibility: "))
+            XCTAssertTrue(report.contains("  screen capture: "))
+        }
+    }
+
     func testWorkspaceMenuIsScopedToActiveProject() {
         let project = createWorkspaceProject()
         let other = Workspace.get(byName: "other-project")

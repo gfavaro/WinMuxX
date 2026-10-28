@@ -262,6 +262,10 @@ class Installer:
             return self.status('needs_review', reason='window_assignments', differences=delta, after=current)
         if self.ops.locked():
             return self.status('installed_pending_validation', reason='session_locked')
+        before = self.report['before']
+        # Startup focus that settled back where it was is not a user's change.
+        if focus_changed and (current['focus'], current['focused_window']) == (before['focus'], before['focused_window']):
+            focus_changed = False
         if restore and not focus_changed:
             try:
                 self.ops.restore(self.report['before'], current)

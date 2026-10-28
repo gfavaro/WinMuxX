@@ -173,6 +173,17 @@ class InstallerTest(unittest.TestCase):
         self.assertEqual(self.install()['reason'], 'focus_changed_during_validation')
         self.assertNotIn('restore', self.ops.calls)
 
+    def testStartupFocusThatSettlesBackIsRestoredNormally(self):
+        original = self.ops.snapshot
+        def snapshot():
+            state = original()
+            if 'launch' in self.ops.calls and self.ops.calls.count('snapshot') == 3:
+                state['focus'] = [{'workspace': 'transient'}]
+            return state
+        self.ops.snapshot = snapshot
+        self.assertEqual(self.install()['status'], 'validated')
+        self.assertIn('restore', self.ops.calls)
+
     def testReportsCannotLiveInApplications(self):
         with self.assertRaises(ValueError): Installer(self.ops, Path('/Applications/report.json'))
 
