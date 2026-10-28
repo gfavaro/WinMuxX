@@ -259,7 +259,7 @@ final class WindowBorder {
     private let destroyNativeBorder: (OpaquePointer?) -> Void
 
     var windowIds: [UInt32] {
-        if let nativeID { return (0..<4).map { winmux_border_window_id(nativeID, Int32($0)) }.filter { $0 != 0 } }
+        if let nativeID { return (0..<Int(WINMUX_BORDER_PIECES)).map { winmux_border_window_id(nativeID, Int32($0)) }.filter { $0 != 0 } }
         return fallbackPanels.map { UInt32(max($0.windowNumber, 0)) }.filter { $0 != 0 }
     }
 
@@ -345,7 +345,7 @@ final class WindowBorder {
     }
 
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
-        if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
+        if fallbackPanels.isEmpty { fallbackPanels = (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() } }
         let alignedFrame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: scale)
         let outer = alignedFrame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = corners.maximum

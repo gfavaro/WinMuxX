@@ -1,5 +1,6 @@
 @testable import AppBundle
 import AppKit
+import PrivateApi
 import XCTest
 
 final class MissionControlBorderSuppressionTest: XCTestCase {
@@ -43,9 +44,10 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         let panel = try XCTUnwrap(NSApp.windows.first { $0.windowNumber == Int(border.windowId) })
         XCTAssertTrue(panel.ignoresMouseEvents)
         XCTAssertFalse(panel.canBecomeKey)
-        XCTAssertEqual(panel.frame.width, 104)
+        let pieces = border.windowIds.compactMap { id in NSApp.windows.first { $0.windowNumber == Int(id) }?.frame }
+        XCTAssertEqual(pieces.reduce(CGRect.null) { $0.union($1) }.width, 104)
         XCTAssertLessThan(panel.frame.height, 104)
-        XCTAssertEqual(border.windowIds.count, 4)
+        XCTAssertEqual(border.windowIds.count, Int(WINMUX_BORDER_PIECES))
         border.update(frame: frame.offsetBy(dx: 10, dy: 0), active: false, settings: settings)
         XCTAssertEqual(attempts, 1)
         XCTAssertEqual(panel.frame.minX, -19992)
@@ -63,7 +65,7 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         border.update(frame: frame, active: true, settings: settings)
         let outer = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
                            width: frame.width, height: frame.height).insetBy(dx: -4, dy: -4)
-        XCTAssertEqual(border.windowIds.count, 4)
+        XCTAssertEqual(border.windowIds.count, Int(WINMUX_BORDER_PIECES))
         for id in border.windowIds {
             let panel = try XCTUnwrap(NSApp.windows.first { $0.windowNumber == Int(id) })
             XCTAssertTrue(outer.contains(panel.frame))
@@ -88,7 +90,7 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         border.update(frame: frame, active: true, settings: settings)
         XCTAssertEqual(destructions, 1)
         let fallbackIds = border.windowIds
-        XCTAssertEqual(fallbackIds.count, 4)
+        XCTAssertEqual(fallbackIds.count, Int(WINMUX_BORDER_PIECES))
         border.update(frame: frame.offsetBy(dx: 10, dy: 0), active: false, settings: settings)
         XCTAssertEqual(creations, 1)
         XCTAssertEqual(border.windowIds, fallbackIds)

@@ -6,6 +6,9 @@
 #import <stdint.h>
 
 typedef struct WinMuxBorder *WinMuxBorderHandle;
+/// Separate WindowServer surfaces per border: four corners, two thin edges between
+/// them, and the two sides.
+#define WINMUX_BORDER_PIECES 8
 bool winmux_border_create(float scale, WinMuxBorderHandle *handle);
 bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect frame,
                          float radius, uint32_t rgba, float width, bool above, CGPathRef path);

@@ -190,10 +190,10 @@ static bool createWindow(float scale, uint32_t *identifier) {
     return true;
 }
 
-struct WinMuxBorder { uint32_t windows[4]; CGRect pieces[4]; float scale; };
+struct WinMuxBorder { uint32_t windows[WINMUX_BORDER_PIECES]; CGRect pieces[WINMUX_BORDER_PIECES]; float scale; };
 
 CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, int index) {
-    if (index < 0 || index >= 4 || size.width <= 0 || size.height <= 0 || width <= 0) return CGRectZero;
+    if (index < 0 || index >= WINMUX_BORDER_PIECES || size.width <= 0 || size.height <= 0 || width <= 0) return CGRectZero;
     scale = MAX(1, scale);
     // Include the final antialiased pixel rather than clipping at a fractional edge.
     size.width = ceil(size.width * scale) / scale;
@@ -210,10 +210,23 @@ CGRect winmux_border_piece(CGSize size, float radius, float width, float scale, 
     CGFloat requestedEdge = ceil(width + 1 / scale);
     CGFloat edge = MIN(requestedEdge, floor(size.width / 2));
     CGFloat rightStart = size.width <= requestedEdge * 2 ? edge : floor(size.width - edge);
+    // Only the corners need the full band. Between them the top and bottom bands are
+    // as thin as the sides: a full-width band was mostly transparent backing.
+    CGFloat corner = MIN(requestedBand, floor(size.width / 2));
+    CGFloat rightCorner = size.width <= requestedBand * 2 ? corner : floor(size.width - corner);
+    CGFloat span = MAX(0, rightCorner - corner);
+    CGFloat topEdge = MIN(requestedEdge, band);
+    // A fractional height puts the ring's inner edge exactly on floor(height - edge),
+    // where a clip there rounded that row differently; one more point keeps it inside.
+    CGFloat bottomEdgeStart = MAX(bottomStart, floor(size.height - requestedEdge - 1));
     switch (index) {
-        case 0: return CGRectMake(0, 0, size.width, band);
-        case 1: return CGRectMake(0, size.height - bottomBand, size.width, bottomBand);
-        case 2: return CGRectMake(0, band, edge, middle);
+        case 0: return CGRectMake(0, 0, corner, band);
+        case 1: return CGRectMake(corner, 0, span, topEdge);
+        case 2: return CGRectMake(rightCorner, 0, size.width - rightCorner, band);
+        case 3: return CGRectMake(0, bottomStart, corner, bottomBand);
+        case 4: return CGRectMake(corner, bottomEdgeStart, span, size.height - bottomEdgeStart);
+        case 5: return CGRectMake(rightCorner, bottomStart, size.width - rightCorner, bottomBand);
+        case 6: return CGRectMake(0, band, edge, middle);
         default: return CGRectMake(rightStart, band, size.width - rightStart, middle);
     }
 }
@@ -224,7 +237,7 @@ bool winmux_border_create(float scale, WinMuxBorderHandle *handle) {
     WinMuxBorderHandle result = calloc(1, sizeof(struct WinMuxBorder));
     if (!result) return false;
     result->scale = scale;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) {
         if (!createWindow(scale, &result->windows[i])) {
             winmux_border_destroy(result);
             return false;
@@ -235,7 +248,7 @@ bool winmux_border_create(float scale, WinMuxBorderHandle *handle) {
 }
 
 uint32_t winmux_border_window_id(WinMuxBorderHandle border, int index) {
-    return border && index >= 0 && index < 4 ? border->windows[index] : 0;
+    return border && index >= 0 && index < WINMUX_BORDER_PIECES ? border->windows[index] : 0;
 }
 
 static void placePiece(CFTypeRef transaction, uint32_t border, uint32_t target, CGPoint origin, bool above) {
@@ -303,15 +316,17 @@ static void syncBorderSpace(WinMuxBorderHandle border, uint32_t target) {
     if (list && CFArrayGetCount(list))
         CFNumberGetValue(CFArrayGetValueAtIndex(list, 0), kCFNumberSInt64Type, &space);
     if (list) CFRelease(list);
-    if (space) move(cid(), (__bridge CFArrayRef)@[@(border->windows[0]), @(border->windows[1]),
-                                              @(border->windows[2]), @(border->windows[3])], space);
+    if (!space) return;
+    NSMutableArray *windows = [NSMutableArray arrayWithCapacity:WINMUX_BORDER_PIECES];
+    for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) [windows addObject:@(border->windows[i])];
+    move(cid(), (__bridge CFArrayRef)windows, space);
 }
 
 static bool placeBorder(WinMuxBorderHandle border, uint32_t target, CGPoint origin, bool above, bool synchronous) {
     syncBorderSpace(border, target);
     CFTypeRef transaction = SYM("SLSTransactionCreate", Transaction)(cid());
     if (!transaction) return false;
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) {
         if (CGRectIsEmpty(border->pieces[i])) {
             SYM("SLSTransactionOrderWindow", Order)(transaction, border->windows[i], 0, 0);
         } else {
@@ -324,7 +339,7 @@ static bool placeBorder(WinMuxBorderHandle border, uint32_t target, CGPoint orig
     if (result != 0) return false;
     // Small edge windows can be constrained independently at display boundaries.
     // A successful transaction does not guarantee the requested placement.
-    for (int i = 0; i < 4; ++i) {
+    for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) {
         if (CGRectIsEmpty(border->pieces[i])) continue;
         CGRect actual;
         CGPoint expected = CGPointMake(origin.x + border->pieces[i].origin.x,
@@ -345,7 +360,7 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
     typedef int (*Flush)(int, uint32_t, void *);
     SYM("SLSDisableUpdate", Update)(cid());
     bool success = true;
-    for (int i = 0; i < 4 && success; ++i) {
+    for (int i = 0; i < WINMUX_BORDER_PIECES && success; ++i) {
         CGRect piece = winmux_border_piece(bounds.size, radius, width, border->scale, i);
         border->pieces[i] = piece;
         if (CGRectIsEmpty(piece)) continue;
@@ -378,7 +393,7 @@ void winmux_border_hide(WinMuxBorderHandle border) {
     if (!border) return;
     CFTypeRef transaction = SYM("SLSTransactionCreate", Transaction)(cid());
     if (!transaction) return;
-    for (int i = 0; i < 4; ++i)
+    for (int i = 0; i < WINMUX_BORDER_PIECES; ++i)
         if (border->windows[i]) SYM("SLSTransactionOrderWindow", Order)(transaction, border->windows[i], 0, 0);
     SYM("SLSTransactionCommit", Commit)(transaction, true);
     CFRelease(transaction);
@@ -387,6 +402,6 @@ void winmux_border_hide(WinMuxBorderHandle border) {
 void winmux_border_destroy(WinMuxBorderHandle border) {
     if (!border) return;
     Window release = sky() ? SYM("SLSReleaseWindow", Window) : NULL;
-    if (release) for (int i = 0; i < 4; ++i) if (border->windows[i]) release(cid(), border->windows[i]);
+    if (release) for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) if (border->windows[i]) release(cid(), border->windows[i]);
     free(border);
 }
