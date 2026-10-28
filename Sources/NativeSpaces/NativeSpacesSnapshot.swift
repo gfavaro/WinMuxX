@@ -35,6 +35,8 @@ public struct NativeWindowMembership: Codable, Equatable, Sendable {
     public let windowID: UInt32
     /// Empty and multiple memberships are deliberately retained, never guessed.
     public let spaceIDs: [String]?
+    /// On more than one Space, as "All Desktops" windows are.
+    public var isShared: Bool { (spaceIDs?.count ?? 0) > 1 }
     public var unambiguousSpaceID: String? {
         guard let spaceIDs, spaceIDs.count == 1 else { return nil }
         return spaceIDs[0]

@@ -34,8 +34,13 @@ final class NativeSpaceEligibilityTests: XCTestCase {
         XCTAssertEqual(snapshot(["1"]).eligibility(windowID: 11, on: "external"), .excluded(.unknownWindow))
     }
 
-    func testAllSpacesWindowsAndSharedDesktopsAreNotDuplicated() {
-        XCTAssertEqual(snapshot(["1", "2"]).eligibility(windowID: 10, on: "external"), .excluded(.sharedWindow))
+    func testAllSpacesWindowsJoinTheShowingDesktopAndSharedDesktopsAreNotSplit() {
+        XCTAssertEqual(snapshot(["1", "2"]).eligibility(windowID: 10, on: "external"), .desktop(spaceID: "1", spaceUUID: "a"),
+                       "A window on every desktop belongs to the one showing")
+        XCTAssertEqual(snapshot(["2", "3"]).eligibility(windowID: 10, on: "external"), .excluded(.sharedWindow),
+                       "Not on the showing desktop: nowhere to tile it")
+        XCTAssertTrue(NativeWindowMembership(windowID: 10, spaceIDs: ["1", "2"]).isShared)
+        XCTAssertNil(NativeWindowMembership(windowID: 10, spaceIDs: ["1", "2"]).unambiguousSpaceID, "Moves still refuse it")
         XCTAssertEqual(snapshot(["1"], sharedDesktop: true).eligibility(windowID: 10, on: "external"), .excluded(.sharedDesktop))
     }
 }

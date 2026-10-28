@@ -30,8 +30,10 @@ extension NativeSpacesSnapshot {
             return .excluded(.unknownWindow)
         }
         guard let ids = membership.spaceIDs, !ids.isEmpty else { return .excluded(.unknownMembership) }
-        guard ids.count == 1 else { return .excluded(.sharedWindow) }
-        let id = ids[0]
+        // A window on several Spaces ("All Desktops") belongs to the desktop showing on
+        // this display. More than one display can qualify; callers pick one by location.
+        guard ids.count == 1 || ids.contains(display.activeSpaceID) else { return .excluded(.sharedWindow) }
+        let id = ids.count == 1 ? ids[0] : display.activeSpaceID
         let owners = displays.filter { $0.spaces.contains(where: { $0.id == id }) }
         guard !owners.isEmpty else { return .excluded(.unknownSpace) }
         // A single Space spanning displays needs display-region layout ownership.

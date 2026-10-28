@@ -77,11 +77,19 @@ final class NativeSpaceLayouts {
     }
 
     func registrationWorkspace(for windowID: UInt32) -> Workspace? {
+        registrationDisplay(for: windowID).flatMap { workspace(for: windowID, on: $0) }
+    }
+
+    /// The one display whose showing desktop a window belongs to. A window on every
+    /// desktop can qualify on several; it belongs to the one under its centre.
+    func registrationDisplay(for windowID: UInt32, frame: (UInt32) -> CGRect? = windowServerFrame) -> String? {
         guard let snapshot else { return nil }
-        for display in snapshot.displays {
-            if let workspace = workspace(for: windowID, on: display.identifier) { return workspace }
-        }
-        return nil
+        let candidates = snapshot.displays.map(\.identifier).filter { workspace(for: windowID, on: $0) != nil }
+        guard candidates.count > 1 else { return candidates.first }
+        let center = frame(windowID).map { CGPoint(x: $0.midX, y: $0.midY) }
+        return candidates.first { id in
+            center.map { point in monitors.first { $0.displayUUID == id }?.rect.contains(point) == true } ?? false
+        } ?? candidates.first
     }
 
     func registration(for windowID: UInt32) -> NativeWindowRegistration? {

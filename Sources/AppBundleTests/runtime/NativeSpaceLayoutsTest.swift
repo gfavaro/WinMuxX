@@ -30,6 +30,22 @@ final class NativeSpaceLayoutsTest: WorkspaceTestCase {
         return inventory
     }
 
+    func testAWindowOnEveryDesktopBelongsToOneDisplayByItsLocation() throws {
+        let left = display("display-a"), right = display("display-b", x: 1920)
+        setMonitorsForTests([left, right])
+        let snapshot = NativeSpacesSnapshot(displays: [
+            NativeSpaceDisplay(identifier: "display-a", activeSpaceID: "1", spaces: [NativeSpace(id: "1", uuid: "a", type: 0)]),
+            NativeSpaceDisplay(identifier: "display-b", activeSpaceID: "2", spaces: [NativeSpace(id: "2", uuid: "b", type: 0)]),
+        ], windows: [NativeWindowMembership(windowID: 30, spaceIDs: ["1", "2"])], readMilliseconds: 0, capturedAt: .now)
+        var inventory = NativeWorkspaceInventory()
+        XCTAssertTrue(inventory.publish(snapshot, for: inventory.invalidate()))
+        let layouts = NativeSpaceLayouts()
+        layouts.reconcile(inventory, displays: [left, right])
+        XCTAssertEqual(layouts.registrationDisplay(for: 30) { _ in CGRect(x: 2200, y: 100, width: 600, height: 400) }, "display-b")
+        XCTAssertEqual(layouts.registrationDisplay(for: 30) { _ in CGRect(x: 100, y: 100, width: 600, height: 400) }, "display-a")
+        XCTAssertEqual(layouts.registrationDisplay(for: 30) { _ in nil }, "display-a", "Unknown location: the first display, never both")
+    }
+
     func testSpaceSwitchRetainsIndependentNestedTabsFloatingWindowsAndLayout() throws {
         let monitor = display("display-a")
         setMonitorsForTests([monitor])

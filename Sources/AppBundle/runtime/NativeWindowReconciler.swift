@@ -88,13 +88,10 @@ final class NativeWindowReconciler {
                 let identities = MacWindow.allWindows.compactMap { window -> NativeWindowWriteIdentity? in
                     guard window.nativeLayoutEligible, eligible.contains(window.windowId), let launched = window.macApp.nsApp.launchDate,
                           owner.workspaceBackend.native.layouts.registrationWorkspace(for: window.windowId) === window.nodeWorkspace else { return nil }
-                    for display in snapshot.displays {
-                        if case .desktop(let spaceID, let uuid?) = snapshot.eligibility(windowID: window.windowId, on: display.identifier) {
-                            return NativeWindowWriteIdentity(windowID: window.windowId, pid: window.macApp.pid,
-                                processLaunchDate: launched, displayIdentifier: display.identifier, spaceID: spaceID, spaceUUID: uuid)
-                        }
-                    }
-                    return nil
+                    guard let display = owner.workspaceBackend.native.layouts.registrationDisplay(for: window.windowId),
+                          case .desktop(let spaceID, let uuid?) = snapshot.eligibility(windowID: window.windowId, on: display) else { return nil }
+                    return NativeWindowWriteIdentity(windowID: window.windowId, pid: window.macApp.pid,
+                        processLaunchDate: launched, displayIdentifier: display, spaceID: spaceID, spaceUUID: uuid)
                 }
                 // A local, read-only probe. Never populate the runtime's write
                 // authority: observation mode remains physically read-only.

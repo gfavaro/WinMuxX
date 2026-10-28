@@ -373,3 +373,5 @@ and relaunches the installed app. Grant Accessibility to "WinMuxX Native Dev" on
   set `[workspace-backend] type = "virtual"` (or remove the table) and restart. Native layouts in `native-space-layouts-v1.json` are kept for next time.
 
 Desktop top-up creates enough desktops to reach the highest configured numeric persistent workspace. It requests the configured assignment for the next number, otherwise the main display. macOS appends on that display, so display-order numbering can shift existing desktops; creation does not guarantee lasting ordinal ownership or enforce assignments after numbering changes.
+
+A window assigned to all desktops (Options › Assign To › All Desktops) is tiled on the desktop showing on its display, and follows to whichever desktop shows next there. With several displays it belongs to the one under its centre, never to two at once. Moving it to a desktop or display is refused, since macOS already shows it everywhere.

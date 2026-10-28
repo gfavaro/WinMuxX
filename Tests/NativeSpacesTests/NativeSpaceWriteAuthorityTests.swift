@@ -29,11 +29,14 @@ final class NativeSpaceWriteAuthorityTests: XCTestCase {
     func testOnlyActiveUnambiguousDesktopIdentityReceivesPermit() throws {
         let gate = NativeSpaceWriteAuthority { _ in true }
         XCTAssertNil(permit(gate))
+        // A window on every desktop is written only as part of the one showing.
         for invalid in [snapshot(active: "2"), snapshot(memberships: nil), snapshot(memberships: []),
-                        snapshot(memberships: ["1", "2"]), snapshot(type: 4)] {
+                        snapshot(active: "2", memberships: ["1", "2"]), snapshot(type: 4)] {
             gate.replace(snapshot: invalid, identities: [identity])
             XCTAssertNil(permit(gate))
         }
+        gate.replace(snapshot: snapshot(memberships: ["1", "2"]), identities: [identity])
+        try XCTUnwrap(permit(gate)).check()
         gate.replace(snapshot: snapshot(), identities: [identity])
         try XCTUnwrap(permit(gate)).check()
         XCTAssertNil(gate.permit(windowID: 10, pid: 99, processLaunchDate: launched))
