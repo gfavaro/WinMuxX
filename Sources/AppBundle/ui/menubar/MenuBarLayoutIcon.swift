@@ -40,11 +40,11 @@ enum MenuBarLayoutIcon {
 
     private static func drawDwindle() {
         let path = NSBezierPath()
-        // Split in sequence: full-height right pane, then two progressively
-        // smaller panes in the left side. This reads differently from Master.
-        path.move(to: NSPoint(x: 9.1, y: 1.6)); path.line(to: NSPoint(x: 9.1, y: 16.4))
-        path.move(to: NSPoint(x: 1.6, y: 9.3)); path.line(to: NSPoint(x: 9.1, y: 9.3))
-        path.move(to: NSPoint(x: 5.3, y: 9.3)); path.line(to: NSPoint(x: 5.3, y: 16.4))
+        // Split in sequence: full-height left pane, then two progressively
+        // smaller panes in the right side. This reads differently from Master.
+        path.move(to: NSPoint(x: 8.9, y: 16.4)); path.line(to: NSPoint(x: 8.9, y: 1.6))
+        path.move(to: NSPoint(x: 16.4, y: 8.7)); path.line(to: NSPoint(x: 8.9, y: 8.7))
+        path.move(to: NSPoint(x: 12.7, y: 8.7)); path.line(to: NSPoint(x: 12.7, y: 1.6))
         path.lineWidth = 1.15
         path.lineJoinStyle = .round
         path.stroke()
