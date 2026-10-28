@@ -6,6 +6,8 @@ extension Workspace {
     func layoutWorkspace() async throws {
         await WorkspacePresentationController.shared.restorePendingFloatingFrames(in: self)
         if WorkspacePresentationController.shared.preservesLayout(for: self) { return }
+        var pinIndicatorShown = false
+        defer { if !pinIndicatorShown { ScrollingPinIndicator.shared.hide(self) } }
         applyConfiguredLayout()
         if runtime.workspaceBackend.kind == .native, !supportsNativeTiling {
             throw NativeTilingUnsupportedLayout()
@@ -48,6 +50,8 @@ extension Workspace {
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
             rootTilingContainer.lastAppliedLayoutVirtualRect = rect
             try await layoutWorkspaceGroups(in: rect, context)
+            ScrollingPinIndicator.shared.update(self, rect: rect, gaps: context.resolvedGaps)
+            pinIndicatorShown = true
             for window in children.filterIsInstance(of: Window.self) {
                 window.lastAppliedLayoutPhysicalRect = nil
                 window.lastAppliedLayoutVirtualRect = nil

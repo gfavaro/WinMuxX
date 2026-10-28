@@ -99,6 +99,28 @@ final class ScrollingMinimapTest: WorkspaceTestCase {
         XCTAssertEqual(scroll.contentView.bounds.minX, 0, accuracy: 0.01)
     }
 
+    func testPinnedColumnGetsItsOwnTileBesideTheStrip() throws {
+        let (workspace, windows) = fixture(count: 4)
+        let metrics = workspace.scrollingMetrics
+        let models = windows.dropFirst().map { ScrollingMinimapTile(id: ObjectIdentifier($0), title: "Window", applications: [], count: 1, tabs: false, horizontalSplit: false) }
+        var pinned = ScrollingMinimapTile(id: ObjectIdentifier(windows[0]), title: "Chat", applications: [], count: 1, tabs: false, horizontalSplit: false)
+        pinned.pinned = .left
+        let view = ScrollingMinimapView(frame: CGRect(x: 0, y: 0, width: 640, height: 120))
+        var selected: ObjectIdentifier?
+        view.selected = { selected = $0 }
+        view.update(workspaceName: workspace.name, models: models, pinned: pinned, icons: [:], metrics: metrics,
+                    offset: 0, focused: nil)
+        let scroll = try XCTUnwrap(minimapDescendants(of: view).compactMap { $0 as? NSScrollView }.first)
+        let pinButton = try XCTUnwrap(view.subviews.compactMap { $0 as? NSButton }.first)
+        XCTAssertEqual(scroll.documentView?.subviews.compactMap { $0 as? NSButton }.count, 3, "The strip keeps only its columns")
+        XCTAssertLessThan(pinButton.frame.maxX, scroll.frame.minX, "Pinned left sits left of the strip")
+        XCTAssertTrue(pinButton.accessibilityLabel()?.contains("pinned left") == true)
+        pinButton.performClick(nil)
+        XCTAssertEqual(selected, ObjectIdentifier(windows[0]))
+        view.update(workspaceName: workspace.name, models: models, icons: [:], metrics: metrics, offset: 0, focused: nil)
+        XCTAssertTrue(view.subviews.compactMap { $0 as? NSButton }.isEmpty, "Unpinning removes the tile")
+    }
+
     func testPausedPanAndHoverDoNotExpireAndExitGetsFullGracePeriod() throws {
         var lifetime = ScrollingMinimapLifetime()
         lifetime.activity(at: 0)

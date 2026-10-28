@@ -1,4 +1,5 @@
 import AppKit
+import Common
 
 struct ScrollingMinimapTile: Equatable {
     let id: ObjectIdentifier
@@ -7,6 +8,8 @@ struct ScrollingMinimapTile: Equatable {
     let count: Int
     let tabs: Bool
     let horizontalSplit: Bool
+    /// The edge a pinned column sits at; it stays outside the strip.
+    var pinned: ScrollingPinCmdArgs.Side? = nil
 }
 
 @MainActor
@@ -19,6 +22,7 @@ final class ScrollingMinimapView: NSView {
     var dismissRequested: (() -> Void)?
     private var tracking: NSTrackingArea?
     private var buttons: [ScrollingMinimapButton] = []
+    private var pinnedButton: ScrollingMinimapButton?
     private let scrollView = NSScrollView()
     private let tileCanvas = ScrollingMinimapTileCanvas()
     private let viewport = ScrollingMinimapViewport()
@@ -58,13 +62,21 @@ final class ScrollingMinimapView: NSView {
         if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
     }
 
-    func update(workspaceName: String, models: [ScrollingMinimapTile], icons: [Int32: NSImage],
-                metrics: ScrollingWorkspaceMetrics, offset: CGFloat, focused: ObjectIdentifier?) {
-        heading = "\(workspaceName) · \(models.count) \(models.count == 1 ? "group" : "groups")"
-        focusedTitle = models.first { $0.id == focused }?.title ?? "Click a group to reveal it"
+    func update(workspaceName: String, models: [ScrollingMinimapTile], pinned: ScrollingMinimapTile? = nil,
+                icons: [Int32: NSImage], metrics: ScrollingWorkspaceMetrics, offset: CGFloat, focused: ObjectIdentifier?) {
+        heading = "\(workspaceName) · \(models.count) \(models.count == 1 ? "group" : "groups")" +
+            (pinned.map { " · \($0.title) pinned \($0.pinned == .right ? "right" : "left")" } ?? "")
+        focusedTitle = (models + (pinned.map { [$0] } ?? [])).first { $0.id == focused }?.title ?? "Click a group to reveal it"
         let rowHeight = scrollingMinimapRowHeight(metrics: metrics)
-        let scrollFrame = CGRect(x: 16, y: 29, width: max(bounds.width - 32, 1), height: rowHeight + 6)
+        // A pinned column keeps its edge here too, beside the strip rather than on it.
+        let pinnedWidth: CGFloat = pinned == nil ? 0 : min(max(rowHeight * 0.75, 32), 96)
+        let pinnedOnLeft = pinned?.pinned != .right
+        let stripX: CGFloat = 16 + (pinnedOnLeft && pinned != nil ? pinnedWidth + 8 : 0)
+        let scrollFrame = CGRect(x: stripX, y: 29, width: max(bounds.width - 32 - (pinned == nil ? 0 : pinnedWidth + 8), 1),
+                                 height: rowHeight + 6)
         scrollView.frame = scrollFrame
+        updatePinnedButton(pinned, icons: icons, focused: focused, frame: CGRect(
+            x: pinnedOnLeft ? 16 : bounds.width - 16 - pinnedWidth, y: 29, width: pinnedWidth, height: rowHeight))
         let contentWidth = scrollingMinimapContentWidth(metrics: metrics, visibleWidth: scrollFrame.width)
         tileCanvas.frame = CGRect(x: 0, y: 0, width: contentWidth, height: rowHeight)
         focusedIndex = models.firstIndex { $0.id == focused } ?? 0
@@ -103,6 +115,22 @@ final class ScrollingMinimapView: NSView {
         viewport.needsDisplay = true
         needsDisplay = true
     }
+
+    private func updatePinnedButton(_ model: ScrollingMinimapTile?, icons: [Int32: NSImage], focused: ObjectIdentifier?, frame: CGRect) {
+        guard let model else { pinnedButton?.removeFromSuperview(); pinnedButton = nil; return }
+        let button = pinnedButton ?? {
+            let button = ScrollingMinimapButton(model: model)
+            button.target = self
+            button.action = #selector(selectPinned(_:))
+            addSubview(button)
+            pinnedButton = button
+            return button
+        }()
+        button.configure(model, icons: icons, focused: model.id == focused, keyboardSelected: false)
+        button.frame = frame
+    }
+
+    @objc private func selectPinned(_ sender: ScrollingMinimapButton) { selected?(sender.model.id) }
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
@@ -260,7 +288,8 @@ private final class ScrollingMinimapButton: NSButton {
         self.icons = model.applications.prefix(3).compactMap { icons[$0] }
         self.focused = focused
         self.keyboardSelected = keyboardSelected
-        let count = model.count > 1 ? ", \(model.count) \(model.tabs ? "tabs" : "windows")" : ""
+        let count = (model.count > 1 ? ", \(model.count) \(model.tabs ? "tabs" : "windows")" : "") +
+            (model.pinned.map { ", pinned \($0 == .right ? "right" : "left")" } ?? "")
         toolTip = model.title + count
         setAccessibilityLabel(model.title + count)
         setAccessibilityValue(focused ? "Focused group" : "")
@@ -303,6 +332,16 @@ private final class ScrollingMinimapButton: NSButton {
             } else { image = icon }
             image.draw(in: CGRect(x: x, y: 9, width: 16, height: 16), from: .zero, operation: .sourceOver,
                       fraction: 1, respectFlipped: true, hints: nil)
+        }
+        if model.pinned != nil, let pin = NSImage(systemSymbolName: "pin.fill", accessibilityDescription: "Pinned") {
+            let badge = NSImage(size: CGSize(width: 11, height: 11), flipped: false) { rect in
+                pin.draw(in: rect)
+                NSColor.controlAccentColor.setFill()
+                rect.fill(using: .sourceIn)
+                return true
+            }
+            badge.draw(in: CGRect(x: bounds.width - 16, y: 5, width: 11, height: 11), from: .zero, operation: .sourceOver,
+                       fraction: 1, respectFlipped: true, hints: nil)
         }
         if bounds.width >= 48 {
             drawMinimapText(model.title, in: CGRect(x: 8, y: 34, width: bounds.width - 16, height: 16),

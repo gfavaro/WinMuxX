@@ -83,6 +83,14 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         XCTAssertFalse(windows[1].isConcealedByScrolling)
         let stripStart = try XCTUnwrap(workspace.scrollingMetrics.geometry.area.minX as CGFloat?)
         XCTAssertGreaterThan(stripStart, pinned.maxX, "The strip starts beside it")
+        // The pin line sits in the gap between the pinned column and the strip.
+        let line = ScrollingPinIndicator.lineRect(pinned: pinned, side: .left, gap: stripStart - pinned.maxX)
+        XCTAssertGreaterThanOrEqual(line.minX, pinned.maxX)
+        XCTAssertLessThanOrEqual(line.maxX, stripStart)
+        XCTAssertGreaterThan(line.minY, pinned.minY)
+        XCTAssertLessThan(line.maxY, pinned.maxY)
+        let right = ScrollingPinIndicator.lineRect(pinned: pinned, side: .right, gap: 10)
+        XCTAssertEqual(right.maxX, pinned.minX - 5 + ScrollingPinIndicator.thickness / 2, accuracy: 0.01)
         // Scrolling far right keeps the pinned column in place.
         workspace.scrollingOffset = .greatestFiniteMagnitude
         try await workspace.layoutWorkspace()

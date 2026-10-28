@@ -156,8 +156,9 @@ final class WorkspaceScrollingMinimap: NSObject {
             self.modelDidChange()
         }
         let groups = workspace.scrollingStripUnits
-        let representatives = groups.compactMap(\.mostRecentWindowRecursive)
-        let models = groups.map { group -> ScrollingMinimapTile in
+        let pinnedColumn = workspace.pinnedScrollingColumn
+        let representatives = (groups + (pinnedColumn.map { [$0] } ?? [])).compactMap(\.mostRecentWindowRecursive)
+        func tile(_ group: TreeNode) -> ScrollingMinimapTile {
             let windows = group.allLeafWindowsRecursive
             let window = group.mostRecentWindowRecursive
             var pids: [Int32] = []
@@ -174,7 +175,10 @@ final class WorkspaceScrollingMinimap: NSObject {
                 tabs: (group as? TilingContainer)?.layout == .tabGroup,
                 horizontalSplit: (group as? TilingContainer)?.orientation == .h)
         }
-        view.update(workspaceName: workspaceDisplayName(workspace.name), models: models, icons: icons,
+        let models = groups.map(tile)
+        var pinned = pinnedColumn.map(tile)
+        pinned?.pinned = workspace.scrollingPinSide
+        view.update(workspaceName: workspaceDisplayName(workspace.name), models: models, pinned: pinned, icons: icons,
                     metrics: workspace.scrollingMetrics, offset: workspace.scrollingOffset,
                     focused: focus.windowOrNil.flatMap { $0.nodeWorkspace === workspace ? ObjectIdentifier($0.topLevelWorkspaceGroup) : nil })
         refreshTitles(representatives, in: workspace)
