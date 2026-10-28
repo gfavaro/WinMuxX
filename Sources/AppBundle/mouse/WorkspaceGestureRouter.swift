@@ -50,8 +50,8 @@ struct WorkspaceGestureRouterDependencies {
     var updateOverviewGesture: ((Double) -> Void)? = nil
     var endOverviewGesture: ((Bool, Double) -> Void)? = nil
     static var live: Self {
-        Self(horizontalEnabled: { config.workspaceSwipe.enabled },
-             overviewEnabled: { config.workspaceOverview.threeFingerUp },
+        Self(horizontalEnabled: { workspaceSwipeGestureEnabled },
+             overviewEnabled: { workspaceOverviewGestureEnabled },
              overviewIsOpen: { WorkspaceOverviewController.shared.isOpen },
              horizontal: { WorkspaceSwipeController.shared.handle($0) },
              show: { _ = WorkspaceOverviewController.shared.show() },

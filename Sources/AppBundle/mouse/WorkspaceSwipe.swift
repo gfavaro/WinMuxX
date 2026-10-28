@@ -30,7 +30,7 @@ struct WorkspaceSwipeDependencies {
     static var live: Self {
         Self(preview: WorkspaceSwipePreview.shared, monitors: { sortedMonitors }, pointer: { mouseLocation },
              canNavigate: {
-                 config.workspaceSwipe.enabled && isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
+                 workspaceSwipeGestureEnabled && isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
                      !WindowBorderController.shared.isMissionControlActive &&
                      !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress() && !WorkspaceOverviewController.shared.isOpen
              }, reversed: { config.workspaceSwipe.reverseDirection }, navigate: { activate in

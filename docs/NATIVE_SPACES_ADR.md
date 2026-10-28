@@ -83,4 +83,8 @@ only synthesized input, used only for explicit commands, confirmed by topology r
 and reported when it does not land. Bindings the backend cannot run are no longer
 registered.
 
+WinMuxX's own three-finger workspace swipe and upward overview gesture stay off in
+native mode, whatever the config says: they activate workspaces through the virtual
+model, and macOS already owns Space gestures. The Option scrolling pan is unaffected.
+
 See [assessment and measured Phase 0 results](NATIVE_SPACES_ASSESSMENT.md).
