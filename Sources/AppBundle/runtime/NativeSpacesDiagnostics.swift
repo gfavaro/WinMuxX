@@ -34,6 +34,7 @@ func nativeSpacesDiagnosticReport() -> String {
             : "Window rules: floating/tiling applied; skipped unsupported: \(nativeSkippedWindowRuleCommands.sorted().joined(separator: "; "))",
         tiling ? "Dwindle/Master tiling is explicitly enabled; no system settings are changed. Desktops are only added, up to persistent-workspaces." :
             "No window positions, application focus or macOS settings are changed."]
+    lines.append("Configuration loaded: \(configUrl.path)")
     lines += diagnosticsPermissionLines()
     lines.append("Tiling: \(runtime.workspaceBackend.native.tiling.status)")
     if let number = runtime.workspaceBackend.native.desktopTopUp.lastConfirmedCreation { lines.append("Last confirmed desktop creation: \(number)") }

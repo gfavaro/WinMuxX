@@ -289,7 +289,7 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertTrue(report.contains("file is missing"))
     }
 
-    func testBothBackendsReportPermissionsForTheInstaller() async {
+    func testBothBackendsReportWhatTheInstallerChecks() async {
         let virtual = await buildDiagnosticsReport()
         runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
         let native = await buildDiagnosticsReport()
@@ -297,6 +297,7 @@ final class ActionMenuTest: XCTestCase {
         for report in [virtual, native] {
             XCTAssertTrue(report.contains("  accessibility: "))
             XCTAssertTrue(report.contains("  screen capture: "))
+            XCTAssertTrue(report.contains("loaded: \(configUrl.path)"))
         }
     }
 

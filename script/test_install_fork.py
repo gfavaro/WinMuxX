@@ -2,7 +2,7 @@ import copy
 import tempfile
 import unittest
 from pathlib import Path
-from script.install_fork import APP, Installer, SessionLocked
+from script.install_fork import APP, Installer, NativeOperations, SessionLocked
 
 
 class Operations:
@@ -186,6 +186,17 @@ class InstallerTest(unittest.TestCase):
 
     def testReportsCannotLiveInApplications(self):
         with self.assertRaises(ValueError): Installer(self.ops, Path('/Applications/report.json'))
+
+
+class NativeOperationsTest(unittest.TestCase):
+    def testRelaunchKeepsTheRunningConfig(self):
+        ops = NativeOperations()
+        calls = []
+        ops.run = lambda *args: calls.append(args)
+        ops.launch()
+        ops.config_path = '/config/native.toml'
+        ops.launch()
+        self.assertEqual(calls, [('open', APP), ('open', APP, '--args', '--config-path', '/config/native.toml')])
 
 
 if __name__ == '__main__': unittest.main()
