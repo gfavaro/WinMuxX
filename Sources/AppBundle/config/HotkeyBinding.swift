@@ -11,9 +11,9 @@ final class HotkeyState {
     var activeTapBindings: [TapModifierKey: TapBinding] = [:]
     var pendingTapBindings: [TapModifierKey: TapBinding] = [:]
     var pressedTapModifiers: Set<TapModifierKey> = []
-    var pendingTapTriggerTasks: [TapModifierKey: Task<Void, Never>] = [:]
-    var pendingTapTriggerTokens: [TapModifierKey: Int] = [:]
-    var nextTapTriggerToken = 0
+    /// When each pending tap's modifier went down; a hold past `tapBindingMaxHold` is no tap.
+    var tapPressedAt: [TapModifierKey: ContinuousClock.Instant] = [:]
+    var tapTriggerCount = 0
     var hotkeysSuspended = false
     var sequenceBindingsByPrefix: [Key: [SequenceBinding]] = [:]
     var sequenceBindingsPrefixKeys: Set<Key> = []
@@ -28,7 +28,6 @@ final class HotkeyState {
     var unboundPassthroughGeneration: UInt64 = 0
 
     isolated deinit {
-        for task in pendingTapTriggerTasks.values { task.cancel() }
         for key in hotkeys.values { key.isEnabled = false }
     }
 }
@@ -38,8 +37,8 @@ final class HotkeyState {
     get { hotkeyState.sequenceBindingsPrefixKeys }
     set { hotkeyState.sequenceBindingsPrefixKeys = newValue }
 }
-/// A key or modifier pressed this soon after the release cancels the tap.
-private let tapBindingTriggerDelayNs: UInt64 = 35_000_000
+/// A tap fires on release, unless another key or modifier was involved or it was held this long.
+private let tapBindingMaxHold: Duration = .milliseconds(300)
 /// Max time (ns) between prefix key and subsequent key for a sequence binding
 private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
 
@@ -59,7 +58,6 @@ private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
     hotkeyState.sideFilteredBindings = [:]
     hotkeyState.pendingTapBindings = [:]
     hotkeyState.pressedTapModifiers = []
-    cancelPendingTapTriggers()
     hotkeyState.sequenceBindingsByPrefix = [:]
     sequenceBindingsPrefixKeys = []
     hotkeyState.lastSequencePrefixTime = nil
@@ -90,7 +88,7 @@ extension HotKey {
     if suspended {
         hotkeyState.pendingTapBindings = [:]
         hotkeyState.pressedTapModifiers = []
-        cancelPendingTapTriggers()
+        hotkeyState.tapPressedAt = [:]
     }
     applyHotkeyEnabledState()
     hotkeyState.modeSession.activate()
@@ -113,7 +111,6 @@ extension HotKey {
         .reduce(into: [:]) { $0[$1.trigger] = $1 } ?? [:]
     hotkeyState.pendingTapBindings = [:]
     hotkeyState.pressedTapModifiers = []
-    cancelPendingTapTriggers()
     for binding in targetBindings.values where !config.modifierSides.restricts(binding.modifiers) && !hotkeyState.hotkeys.keys.contains(binding.descriptionWithKeyCode) {
         hotkeyState.hotkeys[binding.descriptionWithKeyCode] = HotKey(key: binding.keyCode, modifiers: binding.modifiers, keyDownHandler: { [weak owner] in
             let generation = MainActor.assumeIsolated { owner?.hotkeys.modeSession.generation }
@@ -248,15 +245,13 @@ extension HotKey {
 
 @MainActor func noteTapBindingKeyDown() {
     if hotkeyState.hotkeysSuspended { return }
-    cancelPendingTapTriggers()
     hotkeyState.pendingTapBindings = [:]
 }
 
 @MainActor func noteTapBindingFlagsChanged(keyCode: UInt16, modifierFlags: NSEvent.ModifierFlags) {
     if hotkeyState.hotkeysSuspended || hotkeyState.pendingUnboundModeExit || hotkeyState.unboundPassthroughKeyCode != nil { return }
-    if hotkeyState.activeTapBindings.isEmpty && hotkeyState.pendingTapBindings.isEmpty && hotkeyState.pendingTapTriggerTasks.isEmpty { return }
+    if hotkeyState.activeTapBindings.isEmpty && hotkeyState.pendingTapBindings.isEmpty { return }
     guard let tapModifier = TapModifierKey(keyCode: keyCode) else { return }
-    cancelPendingTapTriggers()
 
     // Rebuild the pressed-modifier state from the event snapshot instead of only
     // applying the single changed key. macOS can occasionally drop a modifier
@@ -269,45 +264,22 @@ extension HotKey {
         hotkeyState.pendingTapBindings = [:]
         if !hadOtherPressedModifiers, let binding = hotkeyState.activeTapBindings[tapModifier] {
             hotkeyState.pendingTapBindings[tapModifier] = binding
+            hotkeyState.tapPressedAt[tapModifier] = .now
         }
         return
     }
 
-    if let binding = hotkeyState.pendingTapBindings.removeValue(forKey: tapModifier) {
-        scheduleTapBindingTrigger(binding)
+    let pressedAt = hotkeyState.tapPressedAt.removeValue(forKey: tapModifier)
+    if let binding = hotkeyState.pendingTapBindings.removeValue(forKey: tapModifier),
+       hotkeyState.pressedTapModifiers.isEmpty,
+       let pressedAt, pressedAt.duration(to: .now) <= tapBindingMaxHold {
+        hotkeyState.tapTriggerCount += 1
+        triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
     }
 }
 
 private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set<TapModifierKey> {
     Set(TapModifierKey.allCases.filter { $0.isPressed(in: modifierFlags) })
-}
-
-@MainActor private func scheduleTapBindingTrigger(_ binding: TapBinding) {
-    let trigger = binding.trigger
-    hotkeyState.nextTapTriggerToken += 1
-    let token = hotkeyState.nextTapTriggerToken
-    hotkeyState.pendingTapTriggerTokens[trigger] = token
-    let owner = runtime
-    let task = Task { @MainActor [weak owner] in
-        do { try await Task.sleep(nanoseconds: tapBindingTriggerDelayNs) } catch { return }
-        guard let owner else { return }
-        owner.withValue {
-            guard hotkeyState.pendingTapTriggerTokens[trigger] == token else { return }
-            hotkeyState.pendingTapTriggerTasks[trigger] = nil
-            hotkeyState.pendingTapTriggerTokens[trigger] = nil
-            guard hotkeyState.pressedTapModifiers.isEmpty else { return }
-            triggerBinding(binding.descriptionWithKeyNotation, binding.commands)
-        }
-    }
-    hotkeyState.pendingTapTriggerTasks[trigger] = task
-}
-
-@MainActor private func cancelPendingTapTriggers() {
-    for task in hotkeyState.pendingTapTriggerTasks.values {
-        task.cancel()
-    }
-    hotkeyState.pendingTapTriggerTasks = [:]
-    hotkeyState.pendingTapTriggerTokens = [:]
 }
 
 /// Bindings the current backend can run; the rest stay with macOS and the focused app.
@@ -326,8 +298,12 @@ private func tapModifiersPressed(in modifierFlags: NSEvent.ModifierFlags) -> Set
     hotkeyState.pressedTapModifiers
 }
 
+@MainActor func tapBindingTriggerCountForTests() -> Int {
+    hotkeyState.tapTriggerCount
+}
+
 @MainActor func hasPendingTapBindingForTests() -> Bool {
-    !hotkeyState.pendingTapBindings.isEmpty || !hotkeyState.pendingTapTriggerTasks.isEmpty
+    !hotkeyState.pendingTapBindings.isEmpty
 }
 
 @MainActor func sideFilteredBinding(keyCode: Int64, flags: NSEvent.ModifierFlags) -> HotkeyBinding? {
@@ -364,7 +340,6 @@ func exitModeForUnboundKey(keyCode: Int64, flags: NSEvent.ModifierFlags) -> Bool
     let generation = hotkeyState.modeSession.generation
     for key in hotkeyState.hotkeys.values { key.isEnabled = false }
     hotkeyState.pendingTapBindings = [:]
-    cancelPendingTapTriggers()
     owner.task {
         guard hotkeyState.modeSession.generation == generation, hotkeyState.pendingUnboundModeExit else { return }
         do { try await activateMode(mainModeId, preservingUnboundKey: true) }

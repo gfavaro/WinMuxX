@@ -69,9 +69,11 @@ final class SwitcherPaletteModel: ObservableObject {
 final class SwitcherPalettePanel: NSPanelHud {
     static let shared = SwitcherPalettePanel()
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
-    /// Building the view took ~35 ms of each open; it now outlives the palette being shown,
-    /// and only the rows go away with the items.
+    /// Building the view took ~35 ms of each open, so a closed palette keeps its view and
+    /// rows for `heldContentLifetime`; reopening within it only updates what changed.
     private var hasPaletteView = false
+    private let heldContentLifetime: Duration
+    private var pendingRelease: Task<Void, Never>?
     private let model: SwitcherPaletteModel
     private(set) var isPaletteActive = false
     private var outsideClickMonitors: [Any] = []
@@ -87,8 +89,10 @@ final class SwitcherPalettePanel: NSPanelHud {
          loadItems: (@MainActor () async -> [SwitcherPaletteItem])? = nil,
          nativePresentation: Bool = true,
          observeOutsideClicks: (@MainActor (@escaping @MainActor () -> Void) -> [Any])? = nil,
-         removeMonitor: @escaping @MainActor (Any) -> Void = { NSEvent.removeMonitor($0) }) {
+         removeMonitor: @escaping @MainActor (Any) -> Void = { NSEvent.removeMonitor($0) },
+         heldContentLifetime: Duration = .seconds(30)) {
         self.model = model
+        self.heldContentLifetime = heldContentLifetime
         self.loadItems = loadItems ?? { await buildSwitcherPaletteItems() }
         self.nativePresentation = nativePresentation
         self.observeOutsideClicks = observeOutsideClicks
@@ -113,6 +117,8 @@ final class SwitcherPalettePanel: NSPanelHud {
 
     func show(groupByWorkspace: Bool = false) async {
         guard !isPaletteActive else { return }
+        pendingRelease?.cancel()
+        pendingRelease = nil
         if nativePresentation { WorkspaceOverviewController.shared.dismiss(restoreFocus: false) }
         presentationGeneration &+= 1
         let generation = presentationGeneration
@@ -192,11 +198,26 @@ final class SwitcherPalettePanel: NSPanelHud {
             requestPublicStateUpdate()
             orderOut(nil)
         }
-        model.items = []
-        model.objectWillChange.send()
         model.onSelect = nil
         if !model.query.isEmpty { model.query = "" }
         if model.selection != 0 { model.selection = 0 }
+        guard pendingRelease == nil, hasPaletteView || !model.items.isEmpty else { return }
+        let lifetime = heldContentLifetime
+        pendingRelease = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: lifetime) } catch { return }
+            self?.releaseHeldContent()
+        }
+    }
+
+    /// Drops the rows, their icons and the view tree of a palette not reopened in time.
+    func releaseHeldContent() {
+        pendingRelease?.cancel()
+        pendingRelease = nil
+        guard !isPaletteActive else { return }
+        model.items = []
+        model.objectWillChange.send()
+        hostingView.rootView = AnyView(EmptyView())
+        hasPaletteView = false
     }
 
     private func select(_ windowId: UInt32) {
