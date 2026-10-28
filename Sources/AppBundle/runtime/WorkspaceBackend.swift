@@ -123,7 +123,10 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
             case let command as MoveWorkspaceToMonitorCommand: await state.nativeWindowMoves.run(command.args, env: env, io: io)
             case let command as FocusMonitorCommand: nativeFocusMonitor(command.args, env: env, io: io)
             case is FocusBackAndForthCommand: try await focusPreviousWindow(io)
-            case let command as FocusCommand where WorkspaceBackendState.focusesWindowOnHiddenDesktop(command):
+            // Classified as navigation before waiting for the read in flight, which can show the
+            // desktop meanwhile; re-checking here would fall through to an unfenced plain focus.
+            case let command as FocusCommand where command.args.windowId != nil && state.nativeTilingEnabled &&
+                !NativeTilingCommandScope.active:
                 try await focusWindowOnHiddenDesktop(command.args.windowId, io)
             case let command as EnableCommand: try await setEnabled(command.args, io)
             default: nil
@@ -164,13 +167,15 @@ final class NativeWorkspaceBackend: WorkspaceBackend {
         window?.nativeFocus()
     }
 
-    /// Switches to the window's desktop, waits for it to show and for tiling to be ready,
-    /// then focuses the window directly. Never re-dispatches `focus`, so it cannot recurse.
+    /// Switches to the window's desktop unless it already shows, waits for it to show and for
+    /// tiling to be ready, then focuses the window directly. Never re-dispatches `focus`.
     private func focusWindowOnHiddenDesktop(_ id: UInt32?, _ io: CmdIo) async throws -> Bool {
         guard let id, let window = Window.get(byId: id), let desktop = window.nodeWorkspace,
               let number = nativeDesktopNumber(of: desktop) else { return io.err("Window \(id ?? 0) is not on a native desktop") }
-        guard case .cmd(let command) = parseCommand("workspace \(number)"), let switchTo = command as? WorkspaceCommand,
-              await state.nativeNavigation.run(switchTo.args, io: io) else { return false }
+        if !desktop.isVisible {
+            guard case .cmd(let command) = parseCommand("workspace \(number)"), let switchTo = command as? WorkspaceCommand,
+                  await state.nativeNavigation.run(switchTo.args, io: io) else { return false }
+        }
         _ = await state.nativeStateChanges.wait(timeout: .seconds(2)) { desktop.isVisible && state.nativeTiling.ready }
         try Task.checkCancellation()
         guard desktop.isVisible, window.focusWindow() else { return io.err("Desktop \(number) did not show in time; try again") }
