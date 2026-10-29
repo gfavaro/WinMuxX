@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import Common
+import NativeSpaces
 
 @MainActor
 final class WorkspacePresentationController {
@@ -189,7 +190,7 @@ final class WorkspacePresentationController {
         self.session = session
         let presentationRect = workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
         do {
-            try await window.setAxFrameBlocking(presentationRect.topLeftCorner, presentationRect.size)
+            try await writePresentationFrame(window, presentationRect)
             guard isCurrent(epoch) else { await end(reason: .invalidated); return false }
             window.lastAppliedLayoutPhysicalRect = presentationRect
             window.lastAppliedLayoutVirtualRect = presentationRect
@@ -203,6 +204,19 @@ final class WorkspacePresentationController {
         } catch {
             await end(reason: .invalidated)
             return io.err("presentation could not resize the target window: \(error)")
+        }
+    }
+
+    /// Native writes need a permit from a completed read; focusing the window starts a
+    /// read, so wait for tiling, and once more if another event revokes the permit.
+    private func writePresentationFrame(_ window: MacWindow, _ rect: Rect) async throws {
+        guard runtime.workspaceBackend.kind == .native else {
+            return try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size)
+        }
+        for attempt in 0..<2 {
+            _ = await runtime.workspaceBackend.native.tiling.waitUntilReady()
+            do { return try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size) }
+            catch NativeSpaceWriteError.revoked where attempt == 0 { continue }
         }
     }
 

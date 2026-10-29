@@ -55,7 +55,11 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         for title in ["No Peek", "Clean Space"] {
             XCTAssertNotEqual(menu.items.first { $0.title.hasPrefix(title) }?.toolTip, "Not available with native Spaces", title)
         }
-        XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("presentation toggle").cmdOrNil)))
+        let present = try XCTUnwrap(parseCommand("presentation toggle").cmdOrNil)
+        XCTAssertTrue(runtime.workspaceBackend.accepts(present))
+        XCTAssertTrue(NativeCommandPolicy.runsOutsideNativeTilingFence(present),
+                      "Clean Space focuses first, which revokes permits inside the fence")
+        XCTAssertTrue(NativeCommandPolicy.runsOutsideNativeTilingFence(try XCTUnwrap(parseCommand("no-peek").cmdOrNil)))
         XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("no-peek").cmdOrNil)))
         XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("retile").cmdOrNil)))
     }

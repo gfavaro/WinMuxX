@@ -5,7 +5,7 @@ enum NativeCommandPolicy {
     static func accepts(_ command: any Command, tilingEnabled: Bool) -> Bool {
         isNativeDiagnosticOrQuery(command) ||
             (isNativeNavigation(command) && (tilingEnabled || command is WorkspaceCommand || command is WorkspaceBackAndForthCommand)) ||
-            (tilingEnabled && NativeTilingCoordinator.supports(command))
+            (tilingEnabled && (NativeTilingCoordinator.supports(command) || command is PresentationCommand))
     }
 
     static func acceptsSequence(_ commands: [any Command]) -> Bool {
@@ -14,8 +14,10 @@ enum NativeCommandPolicy {
         }
     }
 
+    /// Clean Space focuses its window first, and the read that focus starts revokes
+    /// write permits; it waits for tiling itself instead of failing inside the fence.
     static func runsOutsideNativeTilingFence(_ command: any Command) -> Bool {
-        isNativeNavigation(command) || isNativeDiagnosticOrQuery(command)
+        isNativeNavigation(command) || isNativeDiagnosticOrQuery(command) || command is PresentationCommand
     }
 
     /// Read-only commands that answer from config or native snapshots, the palette and
