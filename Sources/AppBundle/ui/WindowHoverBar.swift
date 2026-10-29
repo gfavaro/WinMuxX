@@ -25,15 +25,18 @@ final class WindowHoverBar {
         Rect(topLeftX: frame.minX + (frame.width - size.width) / 2, topLeftY: frame.minY + 4, width: size.width, height: size.height)
     }
 
-    /// Where the window is: a focused (fullscreen) window has no tile, only the screen it fills.
+    /// Where the window is: a focused (fullscreen) window has no tile, only the screen it
+    /// fills, and a floating one only the frame last seen.
     static func frame(of window: Window) -> Rect? {
-        window.isFullscreen ? window.lastAppliedLayoutVirtualRect : window.lastAppliedLayoutPhysicalRect
+        if window.parent is Workspace { return window.lastKnownActualRect }
+        return window.isFullscreen ? window.lastAppliedLayoutVirtualRect : window.lastAppliedLayoutPhysicalRect
     }
 
     /// The actions offered for a window, as titles and commands.
     static func actions(for window: Window) -> [(title: String, symbol: String, command: String)] {
         let id = window.windowId
         if window.isFullscreen { return [("Unfocus", "arrow.down.right.and.arrow.up.left", "fullscreen off --window-id \(id)")] }
+        if window.parent is Workspace { return [("Tile", "rectangle.split.2x1", "layout tiling --window-id \(id)")] }
         var actions: [(String, String, String)] = []
         if window.nodeWorkspace?.arrangement == .master { actions.append(("Main", "rectangle.lefthalf.inset.filled", "swap-with-master --window-id \(id)")) }
         actions.append(("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)"))
@@ -41,13 +44,14 @@ final class WindowHoverBar {
         return actions
     }
 
-    /// The tiled window whose top-edge zone holds the point, from cached layout frames.
-    /// A focused window covers its workspace, so it comes before the tiles beneath it.
+    /// The managed window whose top-edge zone holds the point, from cached frames.
+    /// Floating windows and a focused one cover the tiles beneath them, so they come first.
     static func candidate(at point: CGPoint) -> Window? {
         for workspace in Workspace.all where workspace.isVisible {
             let windows = workspace.allLeafWindowsRecursive
-            for window in windows.filter(\.isFullscreen) + windows.filter({ !$0.isFullscreen }) {
-                guard window.parent is TilingContainer, !window.isConcealedByScrolling,
+            let floating = workspace.floatingWindows.filter { $0.participatesInWorkspaceFocus && !$0.isHiddenInCorner }
+            for window in floating + windows.filter(\.isFullscreen) + windows.filter({ !$0.isFullscreen }) {
+                guard window.parent is TilingContainer || window.parent is Workspace, !window.isConcealedByScrolling,
                       !window.isInactiveWindowTab, let frame = frame(of: window),
                       triggerZone(for: frame).contains(point) else { continue }
                 return window
@@ -85,7 +89,11 @@ final class WindowHoverBar {
     }
 
     private func show(for window: Window) {
-        guard let frame = Self.frame(of: window) else { return }
+        // A floating window's cached frame can be stale; WindowServer has where it is now.
+        let live = window.parent is Workspace ? windowServerFrame(window.windowId).map {
+            Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height)
+        } : nil
+        guard let frame = live ?? Self.frame(of: window) else { return }
         let size = panel.configure(Self.actions(for: window)) { [weak self] command in
             self?.hide()
             guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command) else { return }

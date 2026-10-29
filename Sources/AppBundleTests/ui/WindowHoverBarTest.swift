@@ -26,6 +26,9 @@ final class WindowHoverBarTest: WorkspaceTestCase {
         XCTAssertEqual(WindowHoverBar.actions(for: a).map(\.command), ["fullscreen --window-id 9601", "layout floating tiling --window-id 9601"])
         workspace.arrangement = .master
         XCTAssertEqual(WindowHoverBar.actions(for: a).first?.command, "swap-with-master --window-id 9601")
+        let floating = TestWindow.new(id: 9603, parent: workspace)
+        XCTAssertEqual(WindowHoverBar.actions(for: floating).map(\.command), ["layout tiling --window-id 9603"],
+                       "A floated window offers Tile, so Float can be undone from the bar")
         for action in WindowHoverBar.actions(for: a) {
             guard case .cmd = parseCommand(action.command) else { return XCTFail(action.command) }
         }
