@@ -25,9 +25,15 @@ final class WindowHoverBar {
         Rect(topLeftX: frame.minX + (frame.width - size.width) / 2, topLeftY: frame.minY + 4, width: size.width, height: size.height)
     }
 
+    /// Where the window is: a focused (fullscreen) window has no tile, only the screen it fills.
+    static func frame(of window: Window) -> Rect? {
+        window.isFullscreen ? window.lastAppliedLayoutVirtualRect : window.lastAppliedLayoutPhysicalRect
+    }
+
     /// The actions offered for a window, as titles and commands.
     static func actions(for window: Window) -> [(title: String, symbol: String, command: String)] {
         let id = window.windowId
+        if window.isFullscreen { return [("Unfocus", "arrow.down.right.and.arrow.up.left", "fullscreen off --window-id \(id)")] }
         var actions: [(String, String, String)] = []
         if window.nodeWorkspace?.arrangement == .master { actions.append(("Main", "rectangle.lefthalf.inset.filled", "swap-with-master --window-id \(id)")) }
         actions.append(("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)"))
@@ -36,11 +42,13 @@ final class WindowHoverBar {
     }
 
     /// The tiled window whose top-edge zone holds the point, from cached layout frames.
+    /// A focused window covers its workspace, so it comes before the tiles beneath it.
     static func candidate(at point: CGPoint) -> Window? {
         for workspace in Workspace.all where workspace.isVisible {
-            for window in workspace.allLeafWindowsRecursive {
-                guard window.parent is TilingContainer, !window.isFullscreen, !window.isConcealedByScrolling,
-                      !window.isInactiveWindowTab, let frame = window.lastAppliedLayoutPhysicalRect,
+            let windows = workspace.allLeafWindowsRecursive
+            for window in windows.filter(\.isFullscreen) + windows.filter({ !$0.isFullscreen }) {
+                guard window.parent is TilingContainer, !window.isConcealedByScrolling,
+                      !window.isInactiveWindowTab, let frame = frame(of: window),
                       triggerZone(for: frame).contains(point) else { continue }
                 return window
             }
@@ -76,7 +84,7 @@ final class WindowHoverBar {
     }
 
     private func show(for window: Window) {
-        guard let frame = window.lastAppliedLayoutPhysicalRect else { return }
+        guard let frame = Self.frame(of: window) else { return }
         let size = panel.configure(Self.actions(for: window)) { [weak self] command in
             self?.hide()
             guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command) else { return }
