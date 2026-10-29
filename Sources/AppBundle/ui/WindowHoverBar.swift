@@ -94,12 +94,16 @@ final class WindowHoverBar {
             Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height)
         } : nil
         guard let frame = live ?? Self.frame(of: window) else { return }
+        let id = window.windowId
         let size = panel.configure(Self.actions(for: window)) { [weak self] command in
             self?.hide()
-            guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command) else { return }
+            // Act as a click on the window would: focus (and raise) it first, so a window
+            // floated from the bar is not left behind the tiles it came from.
+            guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command),
+                  case .cmd(let raise) = parseCommand(["focus", "--window-id", String(id)]) else { return }
             Task { @MainActor in
                 _ = try? await runLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
-                    let result = try await [parsed].runCmdSeq(.defaultEnv, .emptyStdin)
+                    let result = try await [raise, parsed].runCmdSeq(.defaultEnv, .emptyStdin)
                     showShortcutFailure("Hover bar", result)
                 }
             }
