@@ -70,10 +70,11 @@ final class WindowHoverBar {
             try? await Task.sleep(for: Self.dwell)
             guard let self, !Task.isCancelled else { return }
             let now = normalizeAppKitScreenPoint(NSEvent.mouseLocation)
-            guard Self.candidate(at: now)?.windowId == id,
-                  await PointerFocusNativeHitTester.shared.windowId(at: now) == id,
-                  !Task.isCancelled, let window = Window.get(byId: id) else { return }
+            let onTop = Self.candidate(at: now)?.windowId == id ? await PointerFocusNativeHitTester.shared.windowId(at: now) == id : false
+            guard !Task.isCancelled else { return }
+            // A failed check must not stay pending, or resting there again would never retry.
             self.pending = nil
+            guard onTop, let window = Window.get(byId: id) else { return }
             self.show(for: window)
         })
     }

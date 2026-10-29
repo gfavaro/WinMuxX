@@ -20,6 +20,7 @@ final class ScrollingPinIndicator {
 
     func update(_ workspace: Workspace, rect: Rect, gaps: ResolvedGaps) {
         guard !isUnitTest else { return }
+        guard TrayMenuModel.shared.isEnabled else { return hideAll() }
         let id = ObjectIdentifier(workspace)
         for (other, panel) in lines where other != id && !Workspace.all.contains(where: { ObjectIdentifier($0) == other && $0.isVisible }) {
             panel.close()
@@ -35,6 +36,11 @@ final class ScrollingPinIndicator {
 
     func hide(_ workspace: Workspace) {
         lines.removeValue(forKey: ObjectIdentifier(workspace))?.close()
+    }
+
+    func hideAll() {
+        lines.values.forEach { $0.close() }
+        lines.removeAll()
     }
 }
 

@@ -52,7 +52,9 @@ extension Workspace {
                 let mainFrames = TileLayoutGeometry.calculate(TileLayoutInput(
                     origin: rect.topLeftCorner, size: rect.size, horizontal: axis == .h,
                     innerGap: CGFloat(gaps.inner.get(axis)), weights: [ratio, 1 - ratio],
-                    minimumExtents: [groups[primary].minimumLayoutExtent(along: axis, gaps: gaps, rect: rect),
+                    // Two mains share the main area, so it must fit both and the gap between.
+                    minimumExtents: [groups[primary].minimumLayoutExtent(along: axis, gaps: gaps, rect: rect)
+                        + (secondMain.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) + CGFloat(gaps.inner.get(axis)) } ?? 0),
                         stack.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }.max() ?? 0],
                     master: true, reversed: config.master.side.isReversed))
                 guard mainFrames.count == 2 else { return [] }

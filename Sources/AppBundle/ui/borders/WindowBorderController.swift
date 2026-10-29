@@ -33,6 +33,9 @@ final class WindowBorderController {
         } else {
             missionControlState = MissionControlBorderState()
             clear()
+            ScrollingPinIndicator.shared.hideAll()
+            InactiveWindowDimmer.shared.hide()
+            WindowHoverBar.shared.hide()
         }
     }
 

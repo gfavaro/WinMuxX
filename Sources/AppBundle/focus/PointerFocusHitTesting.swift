@@ -29,7 +29,10 @@ actor PointerFocusNativeHitTester {
         guard !Task.isCancelled,
               let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
                 as? [[String: Any]] else { return nil }
+        let ownPid = Int(ProcessInfo.processInfo.processIdentifier)
         for info in windows {
+            // WinMuxX's own panels (dimming, borders, the pin line) sit over other windows.
+            if (info[kCGWindowOwnerPID as String] as? NSNumber)?.intValue == ownPid { continue }
             guard let bounds = info[kCGWindowBounds as String] as? NSDictionary,
                   let frame = CGRect(dictionaryRepresentation: bounds), frame.contains(point),
                   ((info[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1) > 0 else { continue }
