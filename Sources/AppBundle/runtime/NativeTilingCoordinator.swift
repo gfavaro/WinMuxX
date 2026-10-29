@@ -269,7 +269,9 @@ final class NativeTilingCoordinator {
                  is BalanceSizesCommand, is SplitCommand, is SwapWithMasterCommand, is JoinWithCommand,
                  is ScrollingCenterCommand, is ScrollingWidthCommand, is ScrollingMinimapCommand,
                  is ScrollingFocusCommand, is ScrollingMoveCommand, is ScrollingPinCommand,
-                 is UndoLayoutCommand, is RetileCommand: return true
+                 is UndoLayoutCommand, is RetileCommand,
+                 // Clean Space: the window fills its display over a backdrop; ending lays it back out.
+                 is PresentationCommand: return true
             case is StackWithCommand, is FlattenWorkspaceTreeCommand: return true
             case is MoveCommand: return true
             case let command as FocusCommand:

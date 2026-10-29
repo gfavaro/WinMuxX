@@ -219,6 +219,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
         addCommand("No Peek", script: "no-peek", to: menu, requiresWindow: false)?.state = InactiveWindowDimmer.shared.noPeek ? .on : .off
+        addCommand("Clean Space", script: "presentation toggle", to: menu)?.state = WorkspacePresentationController.shared.isActive ? .on : .off
         if capturedRuleTarget != nil {
             menu.addItem(callbackItem("Always Float This App…", #selector(alwaysFloatApp)))
             menu.addItem(callbackItem("Create Floating Rule for This Window…", #selector(floatThisWindow)))

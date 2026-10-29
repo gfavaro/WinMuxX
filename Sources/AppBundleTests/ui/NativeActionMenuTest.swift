@@ -52,5 +52,11 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertNil(menu.items.first { $0.title == "Enabled" }?.toolTip.flatMap { $0 == "Not available with native Spaces" ? $0 : nil },
             "enable pauses and resumes native tiling")
         XCTAssertEqual(menu.items.first { $0.title == "Workspace Controls…" }?.isEnabled, false)
+        for title in ["No Peek", "Clean Space"] {
+            XCTAssertNotEqual(menu.items.first { $0.title.hasPrefix(title) }?.toolTip, "Not available with native Spaces", title)
+        }
+        XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("presentation toggle").cmdOrNil)))
+        XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("no-peek").cmdOrNil)))
+        XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("retile").cmdOrNil)))
     }
 }

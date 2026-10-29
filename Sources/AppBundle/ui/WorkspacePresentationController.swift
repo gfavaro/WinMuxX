@@ -233,7 +233,12 @@ final class WorkspacePresentationController {
             if session.tiled {
                 session.window.lastAppliedLayoutPhysicalRect = nil
                 session.window.lastAppliedLayoutVirtualRect = nil
-                scheduleRefreshSession(.globalObserver("presentationEnd"))
+                // Native desktops are laid out after a topology read rather than a refresh.
+                if runtime.workspaceBackend.kind == .native {
+                    runtime.workspaceBackend.native.observation?.requestRead(event: "presentationEnd")
+                } else {
+                    scheduleRefreshSession(.globalObserver("presentationEnd"))
+                }
             } else if let parent = session.window.parent,
                       isOrdinaryManagedParent(parent, child: session.window),
                       session.workspace.isVisible,
