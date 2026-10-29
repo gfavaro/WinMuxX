@@ -129,6 +129,35 @@ final class WorkspaceArrangementRegressionTest: WorkspaceTestCase {
         XCTAssertEqual(overflow.columns.count, 4)
     }
 
+    func testAnOpenSheetStretchesTheScrollRangePastTheStripStart() throws {
+        func geometry(offset: CGFloat, sheet: CGFloat?) -> ScrollingWorkspaceGeometry {
+            calculateScrollingWorkspaceGeometry(.init(
+                bounds: CGRect(x: 0, y: 0, width: 1000, height: 700), parkingBounds: CGRect(x: 0, y: 0, width: 1000, height: 700),
+                offset: offset, columns: Array(repeating: .init(preferredWidth: 0.7, minimumWidth: 0), count: 3),
+                horizontalGap: 20, outerLeft: 0, outerRight: 0, leftWall: false, rightWall: false, preview: 25, sheetOffset: sheet))
+        }
+        // Without a sheet the strip stops at its first column.
+        XCTAssertEqual(geometry(offset: -180, sheet: nil).clampedOffset, 0)
+        // A sheet sticking out left of the first column moves the whole strip right.
+        let open = geometry(offset: -180, sheet: -180)
+        XCTAssertEqual(open.clampedOffset, -180)
+        XCTAssertEqual(open.offsetRange.lowerBound, -180)
+        XCTAssertGreaterThan(try XCTUnwrap(open.columns.first).logicalFrame.minX, 150, "Room left of the first column for the sheet")
+        // Past the last column too.
+        let end = geometry(offset: 0, sheet: 0).offsetRange.upperBound
+        XCTAssertEqual(geometry(offset: end + 120, sheet: end + 120).clampedOffset, end + 120, accuracy: 0.5)
+    }
+
+    func testSheetRevealIsNotCappedAtTheStripEnds() throws {
+        let workspace = focus.workspace
+        workspace.arrangement = .scrolling
+        (0..<3).forEach { _ = TestWindow.new(id: UInt32(97300 + $0), parent: workspace.rootTilingContainer) }
+        let metrics = workspace.scrollingMetrics
+        let lower = metrics.offsetRange.lowerBound
+        XCTAssertEqual(metrics.sheetRevealedOffset(start: lower - 150, end: lower + 300, current: lower), lower - 150)
+        XCTAssertEqual(metrics.revealedOffset(start: lower - 150, end: lower + 300, current: lower), lower, "The ordinary reveal stays capped")
+    }
+
     func testPureScrollingGeometryContainsParkedColumnsAtAdjacentDisplayWalls() {
         let geometry = calculateScrollingWorkspaceGeometry(.init(
             bounds: CGRect(x: 0, y: 0, width: 1000, height: 700), parkingBounds: CGRect(x: 0, y: 0, width: 1000, height: 700), offset: 800,

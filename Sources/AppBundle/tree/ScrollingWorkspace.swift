@@ -53,6 +53,8 @@ struct ScrollingWorkspaceGeometryInput {
     let rightWall: Bool
     let preview: CGFloat
     var focusedColumnIndex: Int? = nil
+    /// Where an open sheet needs the strip, even past either end; the range stretches to it.
+    var sheetOffset: CGFloat? = nil
 }
 
 /// Pure strip geometry. It only describes logical and physical frames; it does
@@ -82,18 +84,23 @@ func calculateScrollingWorkspaceGeometry(_ input: ScrollingWorkspaceGeometryInpu
     let total = spans.last.map { $0.start + $0.width } ?? 0
     // When the strip fits, a negative offset centres it. Overflowing strips start
     // at zero and stop when the final column reaches the right edge.
-    let lower: CGFloat
-    let upper: CGFloat
+    let stripLower: CGFloat
+    let stripUpper: CGFloat
     if input.columns.isEmpty {
-        lower = 0
-        upper = 0
+        stripLower = 0
+        stripUpper = 0
     } else if total <= area.width {
-        lower = (total - area.width) / 2
-        upper = lower
+        stripLower = (total - area.width) / 2
+        stripUpper = stripLower
     } else {
-        lower = 0
-        upper = total - area.width
+        stripLower = 0
+        stripUpper = total - area.width
     }
+    // A sheet wider than a column at either end of the strip can only be shown by
+    // scrolling past that end, until the sheet closes.
+    let sheet = input.sheetOffset.flatMap { $0.isFinite ? $0 : nil }
+    let lower = min(stripLower, sheet ?? stripLower)
+    let upper = max(stripUpper, sheet ?? stripUpper)
     let requested = input.offset.isFinite ? input.offset : 0
     let offset = min(max(requested, lower), upper)
     let viewport = area
@@ -182,6 +189,14 @@ struct ScrollingWorkspaceMetrics {
 
     func revealedOffset(for column: ScrollingColumnMetric, current: CGFloat) -> CGFloat {
         revealedOffset(start: column.start, end: column.start + column.width, current: current)
+    }
+
+    /// Like `revealedOffset`, but free to go past the strip's ends: a sheet stretches the range.
+    func sheetRevealedOffset(start: CGFloat, end: CGFloat, current: CGFloat) -> CGFloat {
+        if end - start > areaWidth { return (start + end) / 2 - areaWidth / 2 }
+        if start < current { return start }
+        if end > current + areaWidth { return end - areaWidth }
+        return current
     }
 
     func revealedOffset(start: CGFloat, end: CGFloat, current: CGFloat) -> CGFloat {
@@ -275,7 +290,8 @@ extension Workspace {
             },
             horizontalGap: CGFloat(gaps.inner.horizontal),
             outerLeft: CGFloat(gaps.outer.left), outerRight: CGFloat(gaps.outer.right),
-            leftWall: leftWall, rightWall: rightWall, preview: 25, focusedColumnIndex: focusedIndex))
+            leftWall: leftWall, rightWall: rightWall, preview: 25, focusedColumnIndex: focusedIndex,
+            sheetOffset: scrollingSheetReveal?.revealed))
     }
 
     @MainActor

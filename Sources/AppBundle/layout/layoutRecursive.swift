@@ -110,13 +110,14 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
                 let leafInset = (window.lastAppliedLayoutVirtualRect?.minX ?? 0) -
                     (column.node.lastAppliedLayoutVirtualRect?.minX ?? 0)
                 let target = offsets.map(\.minX).min().flatMap { left in offsets.map(\.maxX).max().map { right in
-                    metrics.revealedOffset(start: column.start + leafInset + left,
+                    metrics.sheetRevealedOffset(start: column.start + leafInset + left,
                         end: column.start + leafInset + right, current: workspace.scrollingOffset)
                 } }
                 let step = ScrollingSheetReveal.step(current: workspace.scrollingOffset, windowId: window.windowId,
                     target: target, remembered: workspace.scrollingSheetReveal)
-                workspace.scrollingOffset = metrics.clampedOffset(step.offset)
+                // Stored before the offset so the geometry's range already reaches it.
                 workspace.scrollingSheetReveal = step.remembered
+                workspace.scrollingOffset = step.remembered == nil ? metrics.clampedOffset(step.offset) : step.offset
             }
         }
     }
