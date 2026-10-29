@@ -4,6 +4,16 @@ import SwiftUI
 /// Separate edge surfaces must share a backing-pixel phase on screen, too.
 /// Local pixel-aligned partitions alone still acquire seams when the compositor
 /// samples each surface at a fractional screen origin. Preserve the path's size.
+/// The window frame to draw a border around so the whole border stays on `display`
+/// (top-left coordinates). A border edge that crossed a display edge was invisible
+/// past it, and macOS could move that edge's window somewhere else entirely.
+func windowBorderFrame(_ frame: CGRect, width: CGFloat, within display: CGRect?) -> CGRect {
+    guard let display else { return frame }
+    let outer = frame.insetBy(dx: -width, dy: -width).intersection(display)
+    guard !outer.isNull, outer.width > width * 2, outer.height > width * 2 else { return frame }
+    return outer.insetBy(dx: width, dy: width)
+}
+
 func pixelAlignedWindowBorderFrame(_ frame: CGRect, width: CGFloat, scale: CGFloat) -> CGRect {
     let scale = max(1, scale)
     let outer = frame.insetBy(dx: -width, dy: -width)

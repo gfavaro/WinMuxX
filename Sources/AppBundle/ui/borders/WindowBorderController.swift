@@ -295,12 +295,15 @@ final class WindowBorder {
     }
 
     func update(frame: CGRect, active: Bool, settings: WindowBordersConfig, corners: WindowBorderCornerRadii? = nil) {
+        let display = monitors.first { $0.rect.contains(CGPoint(x: frame.midX, y: frame.midY)) }
+            .map { CGRect(x: $0.rect.minX, y: $0.rect.minY, width: $0.rect.width, height: $0.rect.height) }
+        let onDisplay = windowBorderFrame(frame, width: CGFloat(settings.width), within: display)
         let nextCorners = corners ?? .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius())
-        var cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
-                                width: frame.width, height: frame.height)
+        var cocoaFrame = CGRect(x: onDisplay.minX, y: mainMonitor.height - onDisplay.maxY,
+                                width: onDisplay.width, height: onDisplay.height)
         let center = CGPoint(x: cocoaFrame.midX, y: cocoaFrame.midY)
         let nextScale = NSScreen.screens.first(where: { $0.frame.contains(center) })?.backingScaleFactor ?? 2
-        let frame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: nextScale)
+        let frame = pixelAlignedWindowBorderFrame(onDisplay, width: CGFloat(settings.width), scale: nextScale)
         cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
             width: frame.width, height: frame.height)
         if !fallbackPanels.isEmpty {
