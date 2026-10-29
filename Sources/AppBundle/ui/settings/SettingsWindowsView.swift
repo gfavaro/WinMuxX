@@ -18,6 +18,15 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("scrolling.gesture-enabled", load: { config.scrolling.gestureEnabled }) private var scrollingGestureEnabled: Bool
     @SettingsDraft("scrolling.gesture-sensitivity", load: { String(config.scrolling.gestureSensitivity) }) private var scrollingSensitivity: String
     @SettingsDraft("scrolling.minimap-enabled", load: { config.scrolling.minimapEnabled }) private var scrollingMinimapEnabled: Bool
+    @SettingsDraft("scrolling.center-focused-column", load: { config.scrolling.centerFocusedColumn }) private var scrollingCenterMode: ScrollingCenterMode
+    @SettingsDraft("scrolling.minimap-hold-modifiers", load: { minimapHoldModifierNames(config.scrolling.minimapHoldModifiers) }) private var minimapHoldModifiers: String
+    @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
+    @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
+    @SettingsDraft("master.stack-layout", load: { config.master.stackLayout }) private var masterStackLayout: Layout
+    @SettingsDraft("master.ultrawide-mains", load: { config.master.ultrawideMains }) private var masterUltrawideMains: Int
+    @SettingsDraft("hover-bar.enabled", load: { config.hoverBar.enabled }) private var hoverBarEnabled: Bool
+    @SettingsDraft("follow-app-activation.enabled", load: { config.followAppActivation.enabled }) private var followAppActivation: Bool
+    @SettingsDraft("follow-app-activation.exclude-apps", load: { config.followAppActivation.excludeApps.joined(separator: ", ") }) private var followAppActivationExcluded: String
     @SettingsDraft("window-tabs.double-sided-windows", load: { config.windowTabs.doubleSidedWindows }) private var doubleSidedWindows: Bool
     @SettingsDraft("automatically-tile-new-windows", load: { config.automaticallyTileNewWindows }) private var automaticallyTileNewWindows: Bool
     @SettingsDraft("auto-add-new-windows-to-tab-group", load: { config.autoAddNewWindowsToTabGroup }) private var autoAddNewWindowsToTabGroup: Bool
@@ -124,7 +133,14 @@ struct ShortcutBehaviorSettingsView: View {
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }
+            masterSettingsSection
             scrollingSettingsSection
+            SettingsSection("Hover bar") {
+                SettingsToggle("Show quick actions above windows", id: "hover-bar.enabled", isOn: $hoverBarEnabled,
+                    help: "Rest the pointer on the middle of a tiled window's top edge for Main (Master), Focus and Float; a focused window offers Unfocus.") {
+                    persistConfig(section: "hover-bar", key: "enabled", value: hoverBarEnabled ? "true" : "false")
+                }
+            }
             SettingsSection("Pointer focus") {
                 SettingsToggle("Focus windows under the pointer", id: "focus-follows-mouse", isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
@@ -135,6 +151,15 @@ struct ShortcutBehaviorSettingsView: View {
                 .disabled(!focusFollowsMouse)
                 Text("A delay of 0 focuses immediately. Mouse clicks and window manipulation always take priority.")
                     .font(.callout).foregroundStyle(.secondary)
+                SettingsToggle("Follow app activation", id: "follow-app-activation.enabled", isOn: $followAppActivation,
+                    help: "When another app comes to the front (Dock, Cmd-Tab, a notification), focus follows it to its workspace.") {
+                    persistConfig(section: "follow-app-activation", key: "enabled", value: followAppActivation ? "true" : "false")
+                }
+                SettingsTextField("Apps not followed", id: "follow-app-activation.exclude-apps", text: $followAppActivationExcluded,
+                    help: "Comma-separated bundle IDs whose activation leaves focus where it is, for example com.apple.finder.") {
+                    persistConfig(section: "follow-app-activation", key: "exclude-apps", value: tomlCommaSeparatedStringArray(followAppActivationExcluded))
+                }
+                .disabled(!followAppActivation)
             }
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
@@ -263,6 +288,43 @@ struct ShortcutBehaviorSettingsView: View {
                 help: "Show the workspace map while panning and allow it to be opened from Layout or a shortcut.") {
                 persistConfig(section: "scrolling", key: "minimap-enabled", value: scrollingMinimapEnabled ? "true" : "false")
             }
+            SettingsTextField("Hold to keep the minimap up", id: "scrolling.minimap-hold-modifiers", text: $minimapHoldModifiers,
+                help: "Comma-separated keys from ctrl, alt, cmd and shift; while they are held the minimap stays open. Empty turns this off.",
+                validate: minimapHoldModifierError) {
+                if minimapHoldModifierError(minimapHoldModifiers) == nil {
+                    persistConfig(section: "scrolling", key: "minimap-hold-modifiers", value: tomlCommaSeparatedStringArray(minimapHoldModifiers))
+                }
+            }
+            SettingsPicker("Centre the focused column", id: "scrolling.center-focused-column", selection: $scrollingCenterMode,
+                help: "Where focusing a column scrolls the strip.") {
+                Text("Never: just bring it into view").tag(ScrollingCenterMode.never)
+                Text("Only when the strip overflows").tag(ScrollingCenterMode.onOverflow)
+                Text("Always").tag(ScrollingCenterMode.always)
+            } onChange: { persistConfig(section: "scrolling", key: "center-focused-column", value: "'\(scrollingCenterMode.rawValue)'") }
+        }
+    }
+
+    private var masterSettingsSection: some View {
+        SettingsSection("Master workspaces") {
+            SettingsStepper("Main window size", id: "master.size", value: $masterSize, range: 10...90,
+                help: "Share of the display the main window takes. Dragging the split changes it per workspace.", unit: "%") {
+                persistConfig(section: "master", key: "size", value: String(Double(masterSize) / 100))
+            }
+            SettingsPicker("Main window side", id: "master.side", selection: $masterSide, help: "Where the main window sits; the stack takes the other side.") {
+                Text("Left").tag(MasterSide.left)
+                Text("Right").tag(MasterSide.right)
+                Text("Top").tag(MasterSide.top)
+                Text("Bottom").tag(MasterSide.bottom)
+            } onChange: { persistConfig(section: "master", key: "side", value: "'\(masterSide.rawValue)'") }
+            SettingsPicker("Stack layout", id: "master.stack-layout", selection: $masterStackLayout, help: "How the windows beside the main one share their space.") {
+                Text("Tiles").tag(Layout.tiles)
+                Text("Accordion").tag(Layout.stacked)
+            } onChange: { persistConfig(section: "master", key: "stack-layout", value: "'\(masterStackLayout.rawValue)'") }
+            SettingsPicker("Main windows on ultrawide displays", id: "master.ultrawide-mains", selection: $masterUltrawideMains,
+                help: "On a display at least twice as wide as tall, two puts the next window beside the main one and stacks the rest in a narrow column. Left or right side only.") {
+                Text("One").tag(1)
+                Text("Two, side by side").tag(2)
+            } onChange: { persistConfig(section: "master", key: "ultrawide-mains", value: String(masterUltrawideMains)) }
         }
     }
 
@@ -275,6 +337,18 @@ struct ShortcutBehaviorSettingsView: View {
     private func persistConfig(section: String?, key: String, value: String) {
         persistSettingsConfig(section: section, key: key, renderedValue: value, model: model)
     }
+}
+
+private let minimapHoldModifierFlags: [(String, NSEvent.ModifierFlags)] = [("ctrl", .control), ("alt", .option), ("cmd", .command), ("shift", .shift)]
+
+func minimapHoldModifierNames(_ flags: NSEvent.ModifierFlags) -> String {
+    minimapHoldModifierFlags.filter { flags.contains($0.1) }.map(\.0).joined(separator: ", ")
+}
+
+func minimapHoldModifierError(_ text: String) -> String? {
+    let names = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    let unknown = names.filter { name in !minimapHoldModifierFlags.contains { $0.0 == name } }
+    return unknown.isEmpty ? nil : "Unknown key: \(unknown.joined(separator: ", ")). Use ctrl, alt, cmd or shift."
 }
 
 private func minimumAppName(_ bundleId: String) -> String {

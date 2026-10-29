@@ -9,6 +9,7 @@ struct ShortcutAppearanceSettingsView: View {
     @SettingsDraft("workspace-sidebar.solid-chrome-color", load: { config.workspaceSidebar.solidChromeColor }) private var solidChromeColor: ChromeSolidColor
     @SettingsDraft("workspace-sidebar.solid-chrome-custom-color", load: { config.workspaceSidebar.solidChromeCustomColor }) private var solidChromeCustomColor: String
     @SettingsDraft("animations.enabled", load: { config.animations.enabled }) private var glideEnabled: Bool
+    @SettingsDraft("dimming.inactive-windows", load: { Int((config.dimming.inactiveWindows * 100).rounded()) }) private var dimInactive: Int
     @SettingsDraft("animations.duration-ms", load: { min(max(config.animations.durationMs, 50), 1000) }) private var glideDurationMs: Int
     @SettingsDraft("gaps.inner.horizontal", load: { settingsConstantValue(config.gaps.inner.horizontal) }) private var innerHorizontalGap: Int
     @SettingsDraft("gaps.inner.vertical", load: { settingsConstantValue(config.gaps.inner.vertical) }) private var innerVerticalGap: Int
@@ -148,6 +149,12 @@ struct ShortcutAppearanceSettingsView: View {
                     SettingsTextField("Excluded app bundle IDs", id: "borders.exclude-apps", text: $excludedBorderApps, help: "Comma-separated bundle IDs, for example com.apple.finder.") {
                         persist("borders", "exclude-apps", tomlCommaSeparatedStringArray(excludedBorderApps))
                     }
+                }
+            }
+            SettingsSection("Dimming") {
+                SettingsStepper("Dim inactive windows", id: "dimming.inactive-windows", value: $dimInactive, range: 0...80,
+                    help: "Darken every window except the focused one by this much. 0 turns it off. No Peek, in the menu, darkens and blurs them fully.", unit: "%") {
+                    persist("dimming", "inactive-windows", String(Double(dimInactive) / 100))
                 }
             }
         }

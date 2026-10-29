@@ -77,6 +77,8 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "undo-layout", title: "Undo Layout Change", command: "undo-layout"),
                 shortcutAction(id: "retile", title: "Retile", command: "retile"),
                 shortcutAction(id: "no-peek", title: "No Peek", command: "no-peek"),
+                shortcutAction(id: "clean-space", title: "Clean Space", command: "presentation toggle"),
+                shortcutAction(id: "swap-with-master", title: "Swap with Master", command: "swap-with-master"),
             ],
         ),
         .init(

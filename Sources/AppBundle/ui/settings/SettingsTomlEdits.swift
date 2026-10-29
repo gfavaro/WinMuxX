@@ -18,7 +18,21 @@ func removeSettingsConfigValue(in text: String, section: String?, key: String) -
 
 private func editSettingsConfig(in text: String, section: String?, key: String, renderedValue: String?) -> String {
     var lines = text.components(separatedBy: "\n")
-    let statements = settingsTomlStatements(lines)
+    var statements = settingsTomlStatements(lines)
+    // A table some keys also accept as a bare value (`follow-app-activation = false`)
+    // becomes a table before one of its keys is written, keeping that value as `enabled`.
+    if let section, renderedValue != nil, let shorthand = statements.first(where: { $0.keyPath == settingsTomlPath(section) }),
+       let equals = settingsTomlEquals(lines[shorthand.start]) {
+        let value = lines[shorthand.start][lines[shorthand.start].index(after: equals)...]
+            .split(separator: "#", maxSplits: 1).first.map { $0.trimmingCharacters(in: .whitespaces) } ?? ""
+        lines.removeSubrange(shorthand.start...shorthand.end)
+        var converted = lines.joined(separator: "\n")
+        if key != "enabled", !value.isEmpty {
+            converted = editSettingsConfig(in: converted, section: section, key: "enabled", renderedValue: value)
+        }
+        lines = converted.components(separatedBy: "\n")
+        statements = settingsTomlStatements(lines)
+    }
     let target = (section.map(settingsTomlPath) ?? []) + settingsTomlPath(key)
     if let existing = statements.first(where: { $0.keyPath == target }) {
         let indent = String(lines[existing.start].prefix(while: \.isWhitespace))
