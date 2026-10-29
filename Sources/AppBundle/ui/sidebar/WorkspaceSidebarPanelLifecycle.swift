@@ -76,11 +76,6 @@ extension WorkspaceSidebarPanel {
         scheduleHoverRecheckSoon()
     }
 
-    func refreshForCurrentDragIfNeeded() {
-        guard isMouseWindowDragInProgress() else { return }
-        WorkspaceSidebarPanel.refreshAll()
-    }
-
     func resetHiddenSidebarState() {
         defer { requestPublicStateUpdate() }
         // Runs for every inactive panel on every refreshAll — guard the shared-model writes so

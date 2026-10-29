@@ -52,10 +52,6 @@ func automaticWorkspaceDisplayIndices(in projectId: WorkspaceProjectId, focusedW
     return indices
 }
 
-func automaticWorkspaceDisplayIndexFallback(_ workspaceName: String) -> Int? {
-    sidebarDraftWorkspaceIndex(workspaceName) ?? automaticWorkspaceIndex(workspaceName)
-}
-
 @MainActor
 func scopedAutomaticDisplayWorkspaces(current: Workspace) -> [Workspace] {
     orderedWorkspacesForPresentation()

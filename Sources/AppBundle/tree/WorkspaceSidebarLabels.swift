@@ -31,12 +31,6 @@ func clearWorkspaceSidebarLabelIfNeeded(_ workspaceName: String) {
 }
 
 @MainActor
-func clearSidebarDraftWorkspaceLabelIfNeeded(_ workspaceName: String) {
-    guard isSidebarDraftWorkspaceName(workspaceName) else { return }
-    clearWorkspaceSidebarLabelIfNeeded(workspaceName)
-}
-
-@MainActor
 func clearOrphanedWorkspaceSidebarLabels() {
     for workspaceName in config.workspaceSidebar.workspaceLabels.keys
     where runtime.workspaces.workspace(named: workspaceName) == nil

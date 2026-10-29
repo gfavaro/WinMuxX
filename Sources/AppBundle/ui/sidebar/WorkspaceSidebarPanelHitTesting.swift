@@ -4,10 +4,6 @@ import CoreGraphics
 import SwiftUI
 
 extension WorkspaceSidebarPanel {
-    func updateDropTargets(_ targets: [WorkspaceSidebarDropTargetFrame]) {
-        workspaceSidebarDropTargets = convertDropTargets(targets)
-    }
-
     func convertDropTargets(_ targets: [WorkspaceSidebarDropTargetFrame]) -> [WorkspaceSidebarDropTarget] {
         targets.compactMap { target in
             let windowRect = hostingView.convert(target.frame, to: nil)

@@ -31,7 +31,6 @@ enum GlassToken {
     static let textPrimary: Double = 0.92
     static let textSecondary: Double = 0.74
     static let textTertiary: Double = 0.58
-    static let textQuaternary: Double = 0.48
 }
 
 enum RadiusToken {

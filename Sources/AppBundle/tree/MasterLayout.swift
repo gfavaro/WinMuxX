@@ -34,14 +34,6 @@ extension Workspace {
     }
 
     @MainActor
-    func configureMasterLayout(focused window: Window?) {
-        transitionArrangement(to: .master, focused: window)
-        if let window, let index = workspaceLayoutUnits.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) {
-            masterGroupIndex = index
-        }
-    }
-
-    @MainActor
     func normalizeMasterLayout() {
         // `default-root-container-layout = 'master'` still creates a master root, as it did
         // before arrangements: turn it into the Master arrangement once.
@@ -79,18 +71,6 @@ extension Workspace {
         let isPrimary = workspaceLayoutUnits[masterGroupIndex] === frame.node
         let ratio = masterRatio ?? CGFloat(config.master.size)
         masterRatio = min(max(ratio + (isPrimary ? delta : -delta) / extent, 0.1), 0.9)
-        return true
-    }
-
-    @MainActor
-    func changeMasterStackLayout(between layouts: [Layout]) -> Bool {
-        // Stack presentation is a workspace policy. The nested layout of each
-        // member group is never rewritten.
-        guard !layouts.isEmpty, layouts.allSatisfy({ $0 == .tiles || $0 == .stacked }) else { return false }
-        let current = masterStackLayout
-        let target = nextLayout(in: layouts, matching: { $0 == current })
-        guard target != current else { return false }
-        masterStackLayout = target
         return true
     }
 

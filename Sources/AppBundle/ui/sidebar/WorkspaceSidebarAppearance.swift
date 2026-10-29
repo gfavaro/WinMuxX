@@ -190,30 +190,6 @@ enum WorkspaceSidebarSystemBackground {
     }
 }
 
-struct WorkspaceSidebarSystemSurface: View {
-    var expanded = false
-    var menuBarBackground = false
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
-    @Environment(\.workspaceSidebarPreviewAccessibility) var previewAccessibility
-
-    var body: some View {
-        switch WorkspaceSidebarSystemBackground.resolve(
-            showBackground: menuBarBackground,
-            reduceTransparency: reduceTransparency || previewAccessibility.reduceTransparency,
-            expanded: expanded
-        ) {
-        case .opaque:
-            Color(nsColor: .windowBackgroundColor)
-        case .clear:
-            Color.clear
-        case .frosted:
-            WorkspaceSidebarFrostedSurface()
-        case .glass:
-            WorkspaceSidebarGlassSurface()
-        }
-    }
-}
-
 /// The expanded sidebar and the Background toggle share one translucent backing.
 struct WorkspaceSidebarGlassSurface: View {
     var body: some View {
@@ -272,29 +248,6 @@ struct WorkspaceSidebarVisualEffect: NSViewRepresentable {
         view.state = .active
         view.isEmphasized = false
         view.appearance = frosted ? NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua) : nil
-    }
-}
-
-struct WorkspaceSidebarFrostedSurface: View {
-    var tint: WorkspaceSidebarFrostedTint = .automatic
-    @Environment(\.workspaceSidebarWallpaperSample) var wallpaperSample
-    @Environment(\.colorScheme) var colorScheme
-    @Environment(\.accessibilityReduceTransparency) var reduceTransparency
-    @Environment(\.workspaceSidebarPreviewAccessibility) var previewAccessibility
-
-    var body: some View {
-        if reduceTransparency || previewAccessibility.reduceTransparency {
-            Color(nsColor: .windowBackgroundColor)
-        } else {
-            ZStack {
-                WorkspaceSidebarGlassSurface()
-                WorkspaceSidebarFrostedVeil(tint: tint)
-            }
-        }
-    }
-
-    var resolvedColors: [Color] {
-        tint.colors(colorScheme: colorScheme, wallpaperSample: wallpaperSample)
     }
 }
 

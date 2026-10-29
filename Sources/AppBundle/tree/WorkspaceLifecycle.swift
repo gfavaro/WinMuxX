@@ -24,14 +24,6 @@ func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor
 }
 
 @MainActor
-func preferredWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace? {
-    projectWorkspaces(projectId: projectId)
-        .filter { !$0.isArchived }
-        .filter { isValidAssignment(workspace: $0, screen: monitor.rect.topLeftCorner) }
-        .first
-}
-
-@MainActor
 func createBlankWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace {
     let workspace = Workspace.get(byName: nextAutomaticWorkspaceName(projectId: projectId, monitor: monitor))
     workspace.markAsTransientBlank()

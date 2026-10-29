@@ -154,10 +154,6 @@ extension CGPoint {
         return CGPoint(x: x.coerce(in: xRange), y: y.coerce(in: yRange))
     }
 
-    func addingXOffset(_ offset: CGFloat) -> CGPoint { CGPoint(x: x + offset, y: y) }
-    func addingYOffset(_ offset: CGFloat) -> CGPoint { CGPoint(x: x, y: y + offset) }
-    func addingOffset(_ orientation: Orientation, _ offset: CGFloat) -> CGPoint { orientation == .h ? addingXOffset(offset) : addingYOffset(offset) }
-
     func getProjection(_ orientation: Orientation) -> Double { orientation == .h ? x : y }
 
     var vectorLength: CGFloat { sqrt(x * x + y * y) }

@@ -48,7 +48,6 @@ struct WorkspaceSidebarProjectPager: View {
         return isCompact ? compactProjectControlsHeight : expandedProjectControlsHeight
     }
 
-    var footerSpacing: CGFloat { isCompact ? 2 : 8 }
     var projectCreateButtonWidth: CGFloat { workspaceSidebarDropdownHeight }
     var projectMenuWidth: CGFloat {
         let selectedProjectName = selectedProject?.displayName ?? "Project"

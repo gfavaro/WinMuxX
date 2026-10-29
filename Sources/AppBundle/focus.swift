@@ -49,12 +49,6 @@ struct FrozenFocus: WinMuxAny, Equatable, Sendable {
     }
 
     @MainActor var live: LiveFocus { liveOrNil ?? mainMonitor.activeWorkspace.toLiveFocus() }
-
-    func replacingWorkspaceName(_ oldName: String, with newName: String) -> FrozenFocus {
-        workspaceName == oldName
-            ? FrozenFocus(windowId: windowId, workspaceName: newName, monitorId_oneBased: monitorId_oneBased)
-            : self
-    }
 }
 
 struct RefreshSessionFocusSnapshot: Sendable {
@@ -110,17 +104,6 @@ final class WorkspaceFocusState {
     }
     var previousWorkspaceDate: Date = .distantPast
     var runningCallbacks = false
-}
-
-@MainActor
-func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
-    runtime.focus.requested = runtime.focus.requested.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.lastKnown = runtime.focus.lastKnown.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.previous = runtime.focus.previous?.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.previousPrevious = runtime.focus.previousPrevious?.replacingWorkspaceName(oldName, with: newName)
-    if _prevFocusedWorkspaceName == oldName {
-        _prevFocusedWorkspaceName = newName
-    }
 }
 
 /// Global focus.

@@ -153,30 +153,6 @@ struct WinMuxWorkspaceState {
         insertWorkspace(workspace.id, intoProject: projectId)
     }
 
-    /// Publish both viewport assignments together, including each display's local history.
-    mutating func swapActiveWorkspaces(between first: MonitorViewportId, and second: MonitorViewportId) -> Bool {
-        guard first != second,
-              var a = monitorViewportsById[first], var b = monitorViewportsById[second],
-              let aId = a.activeWorkspaceId, let bId = b.activeWorkspaceId,
-              let aWorkspace = workspaceById[aId], let bWorkspace = workspaceById[bId],
-              isValidAssignment(workspace: aWorkspace, screen: second.topLeftCorner),
-              isValidAssignment(workspace: bWorkspace, screen: first.topLeftCorner)
-        else { return false }
-        a.previousWorkspaceId = aId
-        b.previousWorkspaceId = bId
-        a.activeWorkspaceId = bId
-        b.activeWorkspaceId = aId
-        a.lastActiveWorkspaceByProject[bWorkspace.projectId] = bId
-        b.lastActiveWorkspaceByProject[aWorkspace.projectId] = aId
-        var updated = monitorViewportsById
-        updated[first] = a
-        updated[second] = b
-        monitorViewportsById = updated
-        aWorkspace.preferredMonitorPoint = second.topLeftCorner
-        bWorkspace.preferredMonitorPoint = first.topLeftCorner
-        return true
-    }
-
     mutating func pruneProjectWorkspaceIndexes() {
         for workspace in workspaceById.values {
             ensureProjectExists(workspace.projectId)
