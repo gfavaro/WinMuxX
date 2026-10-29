@@ -310,6 +310,13 @@ and inactive-window membership preservation. It lists untested hardware/OS and
 lifecycle scenarios separately. The [decision record](NATIVE_SPACES_ADR.md) explains
 the ownership boundary and rejected alternatives.
 
+After installing a build, `script/native-smoke.sh` checks the running app in native
+mode: desktop and display listing, moving its own TextEdit window between desktops
+and displays and back, focus following, survival of the app quitting, pan lag and
+new crash reports. It touches only its own windows and prints PASS, FAIL or SKIP per
+check (`--dev` targets WinMuxX Native Dev). It does not cover gestures or anything
+that needs a physical trackpad or mouse.
+
 The [interactive validation record](NATIVE_SPACES_NATIVE_VALIDATION.md) separates
 executed physical checks from unverified behavior. Commands retain their original
 Space/display across a reconciliation wait; default targets also retain their
