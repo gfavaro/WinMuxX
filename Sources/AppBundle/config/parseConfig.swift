@@ -112,6 +112,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
     "dimming": Parser(\.dimming, parseDimming),
+    "hover-bar": Parser(\.hoverBar, parseHoverBar),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
     "animations": Parser(\.animations, parseAnimations),
     "workspace": Parser(\.workspaceLayouts, parseWorkspaceLayouts),

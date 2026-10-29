@@ -155,6 +155,18 @@ Clicks still reach the dimmed windows, and dimming steps aside for Mission Contr
 native fullscreen and presentation. The `no-peek` command goes further: it darkens
 and blurs everything but the focused window until you turn it off.
 
+## Hover bar
+
+Rest the pointer on the middle of a tiled window's top edge and a small bar offers
+**Main** (Master layout: swap it into the main pane), **Focus** (`fullscreen`) and
+**Float** (`layout floating tiling`) for that window. It appears only after a short
+rest, and only for the window actually on top there. Turn it off with:
+
+```toml
+[hover-bar]
+enabled = false
+```
+
 ## Mode leaders and external state
 
 Binding modes support optional `timeout-ms = 1500`, `show-indicator = true`, and
