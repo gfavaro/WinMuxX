@@ -66,7 +66,7 @@
     "orientation": {"enum": ["horizontal", "vertical", "auto"]},
     "commands": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
     "dynamicNumber": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}}]},
-    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}, "stack-layout": {"enum": ["tiles", "accordion"]}}, "additionalProperties": false},
+    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}, "stack-layout": {"enum": ["tiles", "accordion"]}, "ultrawide-mains": {"enum": [1, 2]}}, "additionalProperties": false},
     "scrolling": {"type": "object", "properties": {"column-width": {"type": "number", "minimum": 0.1, "maximum": 1.0}, "width-presets": {"type": "array", "minItems": 1, "items": {"type": "number", "minimum": 0.1, "maximum": 1.0}}, "gesture-enabled": {"type": "boolean"}, "gesture-sensitivity": {"type": "number", "exclusiveMinimum": 0}, "minimap-enabled": {"type": "boolean"}}, "additionalProperties": false},
     "followAppActivation": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "exclude-apps": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
     "dynamicInt": {"oneOf": [{"type": "integer"}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "integer"}}}]},

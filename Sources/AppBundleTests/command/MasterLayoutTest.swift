@@ -42,6 +42,45 @@ final class MasterLayoutTest: WorkspaceTestCase {
         XCTAssertTrue([a, b, c, d].allSatisfy { $0.nodeWorkspace === workspace })
     }
 
+    func testUltrawideMainsSitSideBySideWithANarrowStack() async throws {
+        let previous = config.master
+        defer { config.master = previous }
+        let workspace = focus.workspace
+        let windows = (0..<4).map { TestWindow.new(id: UInt32(74100 + $0), parent: workspace.rootTilingContainer) }
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout master")
+        let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+        let ultrawide = Rect(topLeftX: 0, topLeftY: 0, width: 3440, height: 1440)
+        func frames(_ rect: Rect) -> [UInt32: Rect] {
+            Dictionary(uniqueKeysWithValues: workspace.arrangementGroupFrames(in: rect, gaps: gaps).map {
+                (($0.node as? Window)?.windowId ?? 0, $0.physical)
+            })
+        }
+        let single = frames(ultrawide)
+        XCTAssertEqual(single[74101]?.minX, single[74102]?.minX, "One main: the rest stack in one column")
+
+        config.master.ultrawideMains = 2
+        let two = frames(ultrawide)
+        let main = try XCTUnwrap(two[74100]), second = try XCTUnwrap(two[74101]), stack = try XCTUnwrap(two[74102])
+        XCTAssertEqual(main.height, ultrawide.height, accuracy: 1)
+        XCTAssertEqual(second.height, ultrawide.height, accuracy: 1, "The second main is full height too")
+        XCTAssertEqual(main.width, second.width, accuracy: 2)
+        XCTAssertLessThan(main.maxX, second.minX + 1)
+        XCTAssertGreaterThan(stack.minX, second.maxX - 1, "The stack is the narrow column on the far side")
+        XCTAssertLessThan(stack.width, main.width)
+        XCTAssertEqual(two[74103]?.minX, stack.minX)
+
+        let ordinary = frames(Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080))
+        XCTAssertEqual(ordinary[74101]?.minX, ordinary[74102]?.minX, "A 16:9 display keeps one main")
+
+        windows[2].unbindFromParent()
+        windows[3].unbindFromParent()
+        let pair = frames(ultrawide)
+        XCTAssertEqual(try XCTUnwrap(pair[74100]).width, try XCTUnwrap(pair[74101]).width, accuracy: 2, "Two windows share the screen")
+        XCTAssertFalse(parseConfig("[master]\nultrawide-mains = 3").errors.isEmpty)
+        XCTAssertEqual(parseConfig("[master]\nultrawide-mains = 2").config.master.ultrawideMains, 2)
+    }
+
     func testMasterPromotionChangesWorkspaceSelectionWithoutMovingNodes() async throws {
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
