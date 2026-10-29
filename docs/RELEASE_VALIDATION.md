@@ -398,13 +398,17 @@ python3 script/install_fork.py --resume .release/local-install.json
 ```
 
 Preflight verifies both bundles, signing certificate equality, configuration and
-permissions. Installation archives the previous bundle outside Applications,
+permissions; both backends' `doctor` reports print the loaded config path and the
+permission lines it reads, and relaunch keeps that `--config-path`, so an app running
+in native mode is upgraded in place and comes back native. Installation archives the previous bundle outside Applications,
 rechecks desktop state, stops the old process, stages the complete new bundle,
 verifies its signature and launches it. Startup compares surviving window IDs
 and workspace assignments; opened and closed windows are recorded separately.
 A failed replacement/startup attempts rollback only while unlocked with unchanged
 display topology. The report records rollback failure instead of hiding it.
 
+Focus that moves during startup but settles back where it was before the install
+is not a review reason; focus left somewhere else is, and is never overridden.
 A locked session remains pending; resume verifies the installed build and current
 state without replaying old focus commands. Changed config, topology or surviving
 window assignments require review. Reports contain local window IDs and config

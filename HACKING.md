@@ -103,6 +103,13 @@ tests, create a fresh ShortcutSettingsModel with injected SettingsConfigAccess a
 SettingsDraftStore; production uses the shared instance with native access. The
 workspace/config state has an explicit runtime owner as described below.
 
+Every user-facing config key has a Settings control (a `@SettingsDraft("section.key")`
+written with `persistConfig`), and every user command has a Shortcuts entry, and a
+menu item when it is an action. Add the key to `docs/schemas/winmuxx.schema.json`
+(`make check` rejects parser keys missing from it) and to `SettingsNewKeysTest`,
+which writes each key the way Settings does and parses the result back. Deprecated
+keys, hooks and `config-version` stay config-only.
+
 `runtime/WinMuxRuntime.swift` is the composition point for configuration, workspace /
 project / viewport registry, focus history and native focus holds, monitor caches,
 hotkeys and recovery snapshots/tasks. Production uses one process-lifetime owner.
