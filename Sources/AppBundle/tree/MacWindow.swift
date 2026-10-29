@@ -167,6 +167,7 @@ final class MacWindow: Window {
         window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
         try await applyNativeWindowDetectedRules(window) { layouts.accepts(registration) }
         runtime.workspaceBackend.native.stateChanges.notify() // Wakes a palette pick awaiting adoption.
+        runtime.workspaceBackend.native.tiling.windowAdopted(window)
         return window
     }
 

@@ -236,6 +236,13 @@ final class NativeTilingCoordinator {
     /// The last release decision, for doctor.
     private(set) var lastMouseRelease = "none"
 
+    /// The first read after launch can come before the frontmost app's windows are
+    /// adopted, leaving no focus until an unrelated event; adopting its window syncs then.
+    func windowAdopted(_ window: Window) {
+        guard ready, !hasManagedNativeFocus, NSWorkspace.shared.frontmostApplication?.processIdentifier == window.app.pid else { return }
+        Task { @MainActor in await synchronizeFocus() }
+    }
+
     func synchronizeFocus() async {
         hasManagedNativeFocus = false
         let backend = runtime.workspaceBackend
