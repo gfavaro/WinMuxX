@@ -26,9 +26,11 @@ final class WindowHoverBar {
     }
 
     /// Where the window is: a focused (fullscreen) window has no tile, only the screen it
-    /// fills, and a floating one only the frame last seen.
-    static func frame(of window: Window) -> Rect? {
-        if window.parent is Workspace { return window.lastKnownActualRect }
+    /// fills, and a floating one only where WindowServer has it (no cached frame follows it).
+    static func frame(of window: Window, liveFrame: (UInt32) -> CGRect? = windowServerFrame) -> Rect? {
+        if window.parent is Workspace {
+            return liveFrame(window.windowId).map { Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height) }
+        }
         return window.isFullscreen ? window.lastAppliedLayoutVirtualRect : window.lastAppliedLayoutPhysicalRect
     }
 
@@ -89,11 +91,7 @@ final class WindowHoverBar {
     }
 
     private func show(for window: Window) {
-        // A floating window's cached frame can be stale; WindowServer has where it is now.
-        let live = window.parent is Workspace ? windowServerFrame(window.windowId).map {
-            Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height)
-        } : nil
-        guard let frame = live ?? Self.frame(of: window) else { return }
+        guard let frame = Self.frame(of: window) else { return }
         let id = window.windowId
         let size = panel.configure(Self.actions(for: window)) { [weak self] command in
             self?.hide()
