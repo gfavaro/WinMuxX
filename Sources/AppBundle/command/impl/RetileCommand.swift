@@ -8,9 +8,14 @@ import Common
 struct RetileCommand: Command {
     let args: RetileCmdArgs
     let shouldResetClosedWindowsCache = false
+    /// Where WindowServer has a window; tests replace it.
+    @MainActor static var frame: (UInt32) -> CGRect? = windowServerFrame
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
-        let moved = retileCandidates(frame: windowServerFrame).count
+        let candidates = retileCandidates(frame: Self.frame)
+        // A command's layout pass skips windows whose tile did not change; these are off it.
+        for window in candidates { window.lastAppliedLayoutPhysicalRect = nil }
+        let moved = candidates.count
         NativeFrameRecovery.shared.reset()
         VirtualFrameRecovery.shared.reset()
         let message = moved == 0 ? "Nothing had moved" : "Put \(moved) \(moved == 1 ? "window" : "windows") back"

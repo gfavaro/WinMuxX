@@ -21,6 +21,22 @@ final class RetileCommandTest: WorkspaceTestCase {
                        "A moved or shrunk window counts; one larger than its tile (an app that cannot shrink) does not")
     }
 
+    func testForgetsTheTilesOfMovedWindowsSoTheLayoutPassWritesThem() async throws {
+        let workspace = focus.workspace
+        let moved = TestWindow.new(id: 9720, parent: workspace.rootTilingContainer)
+        let resting = TestWindow.new(id: 9721, parent: workspace.rootTilingContainer)
+        try await workspace.layoutWorkspace()
+        let tile = try XCTUnwrap(resting.lastAppliedLayoutPhysicalRect)
+        let restingFrame = CGRect(x: tile.topLeftX, y: tile.topLeftY, width: tile.width, height: tile.height)
+        RetileCommand.frame = { $0 == moved.windowId ? CGRect(x: 5000, y: 5000, width: 10, height: 10) : restingFrame }
+        defer { RetileCommand.frame = windowServerFrame }
+        let result = try await XCTUnwrap(parseCommand("retile").unwrap().0).run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.stdout, ["Put 1 window back"])
+        // A command's layout pass reuses an unchanged tile without writing; a forgotten one is written.
+        XCTAssertNil(moved.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(resting.lastAppliedLayoutPhysicalRect, tile)
+    }
+
     func testReportsTheCountAndShowsANotice() async throws {
         let result = try await XCTUnwrap(parseCommand("retile").unwrap().0).run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0)
