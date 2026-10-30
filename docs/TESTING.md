@@ -69,7 +69,18 @@ test discovery and explicit skips in the output. A zero-test filtered run is not
 validation. Run additional isolation/order checks when shared fixtures change.
 
 The current suite does not certify physical gesture feel or all third-party app
-behavior. Record manual checks separately from automated results. Changes confined
+behavior. Record manual checks separately from automated results.
+
+After installing a build, `script/smoke.sh` checks the running app with real windows
+in whichever mode it runs, read from `doctor`. Using only its own TextEdit window, it
+checks adoption, put-back after the app moves the window, the three-try limit against
+an app that keeps moving it, `retile`, moves between workspaces and displays and back
+(in virtual mode, that a window on a hidden workspace is out of sight and shown again),
+focus following, switching another display's workspace, return of focus, survival of
+the app quitting and new crash reports; native mode adds its permissions and pan lag.
+It prints PASS, FAIL or SKIP per check and exits with the failure count. It skips the
+window checks when TextEdit is already open, and does not cover gestures, the
+sidebar's own click path or quitting WinMuxX. Changes confined
 to tests and CI do not require rebuilding or restarting the installed app.
 
 References: Apple's [test setup and teardown](https://developer.apple.com/documentation/xctest/set-up-and-tear-down-state-in-your-tests)
