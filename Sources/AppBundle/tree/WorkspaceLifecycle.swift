@@ -61,7 +61,7 @@ func deleteWorkspace(_ workspace: Workspace) throws {
     if focus.workspace == workspace {
         _ = setFocus(to: fallback.toLiveFocus())
     }
-    removeWorkspaceFromRegistry(workspace)
+    removeWorkspaceFromRegistry(workspace, forgetLabel: true)
     checkWorkspaceHierarchyInvariants()
 }
 
@@ -90,6 +90,9 @@ func closestWorkspaceForDeletion(
         focusedWorkspace: focus.workspace,
     )
         .filter { isValidAssignment(workspace: $0, screen: monitor.rect.topLeftCorner) }
+        // A workspace showing on another display cannot take this one's place: activating
+        // it here is refused, which crashed deletion (WinMux issue #45).
+        .filter { $0 === workspace || !runtime.workspaces.isWorkspaceActive($0.id, outside: MonitorViewportId(monitor)) }
     let automaticCandidates = scopedCandidates.filter(\.usesAutomaticDisplayName)
     let candidates = workspace.usesAutomaticDisplayName && automaticCandidates.contains(workspace)
         ? automaticCandidates
@@ -139,9 +142,11 @@ func moveWorkspaceContents(from source: Workspace, to target: Workspace) {
 }
 
 @MainActor
-func removeWorkspaceFromRegistry(_ workspace: Workspace) {
+/// `forgetLabel` is for the user deleting the workspace; an automatic prune keeps a
+/// configured label for when the workspace comes back.
+func removeWorkspaceFromRegistry(_ workspace: Workspace, forgetLabel: Bool) {
     discardPendingRestartWindows(forWorkspace: workspace.name)
-    clearWorkspaceSidebarLabelIfNeeded(workspace.name)
+    if forgetLabel || isSidebarDraftWorkspaceName(workspace.name) { clearWorkspaceSidebarLabelIfNeeded(workspace.name) }
     _ = runtime.workspaces.removeWorkspace(workspace)
     // Restored numbers preserve the session while its workspaces are rebuilt.
     // Once a slot disappears, presentation must follow the live project order.
@@ -174,7 +179,7 @@ func pruneEmptyWorkspaces() {
         if workspace == focusedWorkspaceBeforePrune {
             focusedReplacement = focusReplacementForPrunedWorkspace(workspace) ?? replacement
         }
-        removeWorkspaceFromRegistry(workspace)
+        removeWorkspaceFromRegistry(workspace, forgetLabel: false)
     }
 
     if let focusedReplacement, focus.workspace != focusedReplacement {

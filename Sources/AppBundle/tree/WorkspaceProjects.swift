@@ -226,7 +226,7 @@ private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: Workspac
             monitor: workspace.workspaceMonitor,
         )
         moveWorkspaceContents(from: workspace, to: fallback)
-        removeWorkspaceFromRegistry(workspace)
+        removeWorkspaceFromRegistry(workspace, forgetLabel: true)
     }
 
     runtime.workspaces.projectsById.removeValue(forKey: projectId)
@@ -265,7 +265,7 @@ private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProject
     }
 
     for workspace in Workspace.all.filter({ $0.projectId == projectId }) {
-        removeWorkspaceFromRegistry(workspace)
+        removeWorkspaceFromRegistry(workspace, forgetLabel: true)
     }
 
     runtime.workspaces.projectsById.removeValue(forKey: projectId)

@@ -30,10 +30,13 @@ func clearWorkspaceSidebarLabelIfNeeded(_ workspaceName: String) {
     }
 }
 
+/// Only internal sidebar draft names are recycled, so only their stale labels go. A label
+/// the user wrote for a workspace that does not exist yet (one a rule or a window will
+/// create) stays in the config (WinMux issue #27).
 @MainActor
 func clearOrphanedWorkspaceSidebarLabels() {
     for workspaceName in config.workspaceSidebar.workspaceLabels.keys
-    where runtime.workspaces.workspace(named: workspaceName) == nil
+    where isSidebarDraftWorkspaceName(workspaceName) && runtime.workspaces.workspace(named: workspaceName) == nil
     {
         clearWorkspaceSidebarLabelIfNeeded(workspaceName)
     }

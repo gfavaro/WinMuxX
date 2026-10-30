@@ -53,7 +53,7 @@ final class WorkspacePresentationOrderTest: WorkspaceTestCase {
         }
         let spare = Workspace.get(byName: "empty-spare")
         spare.assignProject(project.id)
-        removeWorkspaceFromRegistry(spare)
+        removeWorkspaceFromRegistry(spare, forgetLabel: true)
         XCTAssertTrue(spaces.allSatisfy { $0.restoredDisplayIndex == nil })
         let ids = Set(spaces.map(\.id))
         let expected = [spaces[0], spaces[3], spaces[1], spaces[2], spaces[4]].map(\.id)

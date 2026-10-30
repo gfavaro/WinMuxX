@@ -385,14 +385,37 @@ final class TreeNodeTest: XCTestCase {
         XCTAssertEqual(workspaceDisplayName("__sidebar_draft_workspace_1"), "Workspace 1")
     }
 
-    func testReconcileWorkspaceStateClearsCollectedWorkspaceLabel() {
+    func testReconcileWorkspaceStateKeepsTheLabelOfACollectedWorkspace() {
+        // WinMux issue #27: the label is the user's config; the workspace comes back later.
         config.workspaceSidebar.workspaceLabels["ghost"] = "Ghost Name"
         _ = Workspace.get(byName: "ghost")
 
         Workspace.reconcileWorkspaceState()
 
-        XCTAssertNil(config.workspaceSidebar.workspaceLabels["ghost"])
-        XCTAssertEqual(workspaceDisplayName("ghost"), "ghost")
+        XCTAssertNil(Workspace.existing(byName: "ghost"), "The empty workspace is still collected")
+        XCTAssertEqual(config.workspaceSidebar.workspaceLabels["ghost"], "Ghost Name")
+        XCTAssertEqual(workspaceDisplayName("ghost"), "Ghost Name", "It is labelled again when it returns")
+    }
+
+    func testStartupKeepsLabelsForWorkspacesThatDoNotExistYet() {
+        // WinMux issue #27: labels for workspaces a rule or window creates later.
+        config.workspaceSidebar.workspaceLabels["chat"] = "id/c"
+
+        Workspace.reconcileWorkspaceState()
+
+        XCTAssertEqual(config.workspaceSidebar.workspaceLabels["chat"], "id/c")
+        XCTAssertNil(Workspace.existing(byName: "chat"), "A label creates no workspace")
+        XCTAssertNil(Workspace.existing(byName: "id/c"))
+    }
+
+    func testDeletingAWorkspaceForgetsItsLabel() throws {
+        config.workspaceSidebar.workspaceLabels["gone"] = "Gone"
+        let gone = Workspace.get(byName: "gone")
+        _ = TestWindow.new(id: 3901, parent: gone.rootTilingContainer)
+
+        try deleteWorkspace(gone)
+
+        XCTAssertNil(config.workspaceSidebar.workspaceLabels["gone"])
     }
 
     func testReconcileWorkspaceStateClearsOrphanedDraftWorkspaceLabel() {
@@ -404,15 +427,6 @@ final class TreeNodeTest: XCTestCase {
         XCTAssertEqual(workspaceDisplayName("__sidebar_draft_workspace_7"), "Workspace 7")
     }
 
-    func testReconcileWorkspaceStateClearsOrphanedWorkspaceLabel() {
-        config.workspaceSidebar.workspaceLabels["ghost"] = "Ghost Name"
-
-        Workspace.reconcileWorkspaceState()
-
-        XCTAssertNil(config.workspaceSidebar.workspaceLabels["ghost"])
-        XCTAssertEqual(workspaceDisplayName("ghost"), "ghost")
-        XCTAssertNil(Workspace.existing(byName: "Ghost Name"))
-    }
 
     func testWorkspaceDisplayNameUsesSidebarDraftFallback() {
         XCTAssertEqual(workspaceDisplayName("__sidebar_draft_workspace_4"), "Workspace 4")
