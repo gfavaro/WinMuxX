@@ -17,6 +17,9 @@ struct FrameRecoveryBudget {
         attempts += 1
         return true
     }
+
+    /// Whether the attempts on this tile are used up.
+    func isExhausted(on tile: Rect) -> Bool { self.tile == tile && attempts >= Self.limit }
 }
 
 /// Whether a window sits on its tile. Apps that cannot shrink to it stay larger, and
