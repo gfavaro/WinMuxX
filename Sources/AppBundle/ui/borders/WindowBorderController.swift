@@ -154,10 +154,10 @@ final class WindowBorderController {
         var chromeAllowed = false
         defer { InactiveWindowDimmer.shared.refresh(chromeAllowed: chromeAllowed) }
         // Dimming stays through a pan; only borders wait for it to settle.
-        chromeAllowed = !missionControlState.active && !shouldSuppressChromeForNativeFullscreenContent
+        chromeAllowed = !missionControlState.active
         guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
         let settings = config.windowBorders
-        guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }
+        guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0 else { clear(); return }
         let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
         guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else {
             chromeAllowed = false
@@ -172,7 +172,7 @@ final class WindowBorderController {
             frames[number.uint32Value] = frame
         }
         var visible = Set<UInt32>()
-        for workspace in Workspace.all where workspace.isVisible {
+        for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
             for window in workspace.allLeafWindowsRecursive {
                 if WorkspacePresentationController.shared.suppressesChrome(for: window) { continue }
                 if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }

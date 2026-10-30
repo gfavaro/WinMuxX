@@ -2,6 +2,9 @@ import Common
 
 @MainActor
 final class VirtualWorkspaceBackend: WorkspaceBackend {
+    func fullscreenDisplayIDs() -> Set<String> {
+        fullscreenWindowDisplays(onScreen: onScreenWindowFrames())
+    }
     func run(_ command: any Command, env: CmdEnv, io: CmdIo) async throws -> Bool? { nil }
 
     func listedWorkspaces(_ scope: WorkspaceListScope) -> [Workspace] {

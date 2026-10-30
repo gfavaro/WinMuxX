@@ -261,6 +261,43 @@ final class NativeBackendIntegrationTest: WorkspaceTestCase {
             windows: [], readMilliseconds: 0, capturedAt: .now)
     }
 
+    func testFullscreenSuppressionPersistsDuringObservationReadAndClearsOnDesktop() async {
+        let firstRead = expectation(description: "initial read")
+        let nextRead = expectation(description: "next read")
+        let firstPublished = expectation(description: "fullscreen published")
+        let nextPublished = expectation(description: "desktop published")
+        let gate = BackendReadGate { index in
+            if index == 1 { firstRead.fulfill() } else if index == 2 { nextRead.fulfill() }
+        }
+        let observer = NativeSpacesObservation(read: { _, _ in try await gate.read() }, topology: nil)
+        let backend = runtime.workspaceBackend
+        backend.selectForStartup(.native)
+        defer { backend.stop(); fullscreenContentDisplays = [] }
+        let desktop = NativeSpace(id: "1", uuid: "desktop", type: 0)
+        let fullscreen = NativeSpace(id: "2", uuid: "fullscreen", type: 4)
+        let display = NativeSpaceDisplay(identifier: "Main", activeSpaceID: "2", spaces: [desktop, fullscreen])
+        func snapshot(_ display: NativeSpaceDisplay) -> NativeSpacesSnapshot {
+            NativeSpacesSnapshot(displays: [display], windows: [], readMilliseconds: 0, capturedAt: .now)
+        }
+        backend.native.startObservation(observer: observer) { inventory, event in
+            if inventory.currentSnapshot != nil {
+                if event == "initial" { firstPublished.fulfill() } else { nextPublished.fulfill() }
+            }
+        }
+        await fulfillment(of: [firstRead], timeout: 2)
+        await gate.finish(0, snapshot(display))
+        await fulfillment(of: [firstPublished], timeout: 2)
+        XCTAssertEqual(fullscreenContentDisplays, ["Main"])
+
+        observer.requestRead(event: "activeSpaceDidChange")
+        await fulfillment(of: [nextRead], timeout: 2)
+        XCTAssertNil(backend.native.layouts.snapshot, "The observation is not yet authoritative")
+        XCTAssertEqual(fullscreenContentDisplays, ["Main"], "Do not flash chrome during the read")
+        await gate.finish(1, snapshot(display.showing("1")))
+        await fulfillment(of: [nextPublished], timeout: 2)
+        XCTAssertTrue(fullscreenContentDisplays.isEmpty)
+    }
+
     func testUISelectionRetainsIdentityAcrossAnInFlightRenumberOrRemoval() async throws {
         for removed in [false, true] {
             let initialRead = expectation(description: "initial read")

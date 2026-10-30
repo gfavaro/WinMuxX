@@ -33,6 +33,11 @@ final class InactiveWindowDimmer {
         let live = Set(screens.map(ObjectIdentifier.init))
         for (id, panel) in panels where !live.contains(id) { panel.close(); panels[id] = nil }
         for screen in screens {
+            // A display showing fullscreen content keeps it undimmed.
+            if let uuid = screen.displayUUID, fullscreenContentDisplays.contains(uuid) {
+                panels[ObjectIdentifier(screen)]?.orderOut(nil)
+                continue
+            }
             let panel = panels[ObjectIdentifier(screen)] ?? DimmingPanel()
             panels[ObjectIdentifier(screen)] = panel
             panel.apply(style)

@@ -1,5 +1,6 @@
 import AppKit
 @testable import AppBundle
+@testable import NativeSpaces
 import XCTest
 
 struct WorkspaceSidebarDragTestMonitor: Monitor {
@@ -909,18 +910,41 @@ final class WorkspaceSidebarDragTest: XCTestCase {
         let window = TestWindow.new(id: 7010, parent: focus.workspace.rootTilingContainer)
         window.isFullscreen = true
 
+        updateNativeFullscreenChromeSuppression()
         XCTAssertFalse(shouldSuppressChromeForFullscreenContent(on: mainMonitor))
-        XCTAssertFalse(shouldSuppressWorkspaceSidebarForFullscreenContent())
+        XCTAssertFalse(shouldSuppressWorkspaceSidebarForFullscreenContent(on: mainMonitor))
+    }
+
+    func testNativeFullscreenDisplayDetectionUsesEachDisplaysActiveSpace() {
+        let desktop = NativeSpace(id: "1", uuid: "desktop", type: 0)
+        let fullscreen = NativeSpace(id: "2", uuid: "fullscreen", type: 4)
+        let left = NativeSpaceDisplay(identifier: "left", activeSpaceID: "1", spaces: [desktop, fullscreen])
+        let right = NativeSpaceDisplay(identifier: "right", activeSpaceID: "2", spaces: [desktop, fullscreen])
+        XCTAssertEqual(fullscreenNativeSpaceDisplays([left, right]), ["right"])
+        XCTAssertEqual(fullscreenNativeSpaceDisplays([left.showing("2"), right.showing("1")]), ["left"])
+        XCTAssertEqual(fullscreenNativeSpaceDisplays([left, right.showing("1")]), [])
     }
 
     @MainActor
-    func testChromeIsSuppressedForNativeFullscreen() {
+    func testChromeIsSuppressedOnlyOnTheDisplayShowingNativeFullscreen() {
         setUpWorkspacesForTests()
-        shouldSuppressChromeForNativeFullscreenContent = true
-        defer { shouldSuppressChromeForNativeFullscreenContent = false }
-
-        XCTAssertTrue(shouldSuppressChromeForFullscreenContent(on: mainMonitor))
-        XCTAssertTrue(shouldSuppressWorkspaceSidebarForFullscreenContent())
+        let left = TestMonitor(displayUUID: "left", monitorAppKitNsScreenScreensId: 1, name: "left",
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 800),
+            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 800), isMain: true)
+        let right = TestMonitor(displayUUID: "right", monitorAppKitNsScreenScreensId: 2, name: "right",
+            rect: Rect(topLeftX: 1000, topLeftY: 0, width: 1000, height: 800),
+            visibleRect: Rect(topLeftX: 1000, topLeftY: 0, width: 1000, height: 800), isMain: false)
+        setMonitorsForTests([left, right])
+        // A fullscreen video on the right display keeps covering it whatever is focused
+        // (WinMux PR #31); the left display keeps its chrome.
+        let video = TestWindow.new(id: 7020, parent: focus.workspace.macOsNativeFullscreenWindowsContainer)
+        XCTAssertEqual(fullscreenWindowDisplays(onScreen: [video.windowId: CGRect(x: 1100, y: 0, width: 900, height: 800)]), ["right"])
+        XCTAssertEqual(fullscreenWindowDisplays(onScreen: [:]), [], "Not on screen: nothing to keep clear")
+        fullscreenContentDisplays = ["right"]
+        defer { fullscreenContentDisplays = [] }
+        XCTAssertTrue(shouldSuppressChromeForFullscreenContent(on: right))
+        XCTAssertFalse(shouldSuppressChromeForFullscreenContent(on: left))
+        XCTAssertTrue(shouldSuppressWorkspaceSidebarForFullscreenContent(on: right))
     }
 
     func testWorkspaceHoverExitDoesNotClearNewerHoveredWorkspace() {

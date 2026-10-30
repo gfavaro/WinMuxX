@@ -13,6 +13,12 @@ workspace queries, focus and geometry behavior. It still uses concrete AppBundle
 grouping, palette extras and tray behavior. It uses AppBundle UI types and the same
 runtime binding, and is not an independent module.
 
+Fullscreen chrome suppression also asks the selected backend for covered display
+IDs. The native backend uses the observed active Space on each display; the virtual
+backend uses on-screen frames of its known fullscreen windows. Native observation
+keeps the last suppression state during a read and updates it when that read finishes.
+Sidebar, borders, tab chrome and dimming use the resulting display-specific state.
+
 The similarly named operations have different effects:
 
 | Operation | Implementation and effect |

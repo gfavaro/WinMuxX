@@ -76,6 +76,10 @@ final class NativeWorkspaceLifecycle {
                 self.windows.invalidate()
                 for window in MacWindow.allWindows { window.suspendMinimumObservationForMotion() }
                 self.layouts.reconcile(inventory, displays: owner.displays.all())
+                // A read temporarily revokes layouts.snapshot. Keep the last
+                // fullscreen display set until the observation has a result;
+                // clearing it here could briefly expose chrome over fullscreen.
+                if inventory.status != .reading { updateNativeFullscreenChromeSuppression() }
                 if let snapshot = inventory.currentSnapshot { self.windows.reconcile(snapshot) }
                 onChange(inventory, event)
                 self.stateChanges.notify()

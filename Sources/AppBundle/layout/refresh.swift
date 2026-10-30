@@ -122,7 +122,11 @@ private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessio
     if case .onWindowParkingDrift = new { return old }
     if case .onWindowParkingDrift = old { return new }
     func score(_ e: RefreshSessionEvent) -> Int {
-        (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
+        // Re-parking hidden windows after a wake has no other trigger, and it used to tie
+        // with (and lose to) the Space and mouse events that arrive right after a wake.
+        // From WinMux PR #30 by Ilya Kudravets.
+        (e.requiresHiddenWindowsReassertion ? 4 : 0) +
+            (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
     }
     return score(new) >= score(old) ? new : old
 }
@@ -291,7 +295,7 @@ private func performRefreshSession(
                 try checkCancellation()
                 if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
                 if observation.known {
-                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+                    updateNativeFullscreenChromeSuppression()
                     updateFocusCache(nativeFocused)
                 }
                 try checkCancellation()
@@ -413,7 +417,7 @@ private func performLightSession<T>(
                 try checkCancellation()
                 if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
                 if observation.known {
-                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+                    updateNativeFullscreenChromeSuppression()
                     updateFocusCache(nativeFocused)
                 }
                 try checkCancellation()

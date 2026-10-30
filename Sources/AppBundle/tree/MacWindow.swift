@@ -238,6 +238,9 @@ final class MacWindow: Window {
         WindowRecoveryController.shared.forget(self)
         resetLearnedMinimum()
         if !skipClosedWindowsCache { cacheClosedWindowIfNeeded() }
+        // Read before unbinding, which drops this window out of `focus`. A refresh session's
+        // snapshot predates macOS' own post-close focus change, so it wins when there is one.
+        let focusedWindowIdBeforeClosure = refreshSessionFocusSnapshot?.focus.windowId ?? focus.windowOrNil?.windowId
         let parent = unbindFromParent().parent
         let deadWindowWorkspace = parent.nodeWorkspace
         let currentFocus = focus
@@ -252,6 +255,7 @@ final class MacWindow: Window {
         )
         if let replacementFocus = focusAfterWindowClosure(
             closingWindow: self,
+            focusedWindowIdBeforeClosure: focusedWindowIdBeforeClosure,
             deadWindowWorkspace: deadWindowWorkspace,
             currentFocus: currentFocus,
             previousFocus: previousFocus,

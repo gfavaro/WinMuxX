@@ -85,6 +85,54 @@ final class RefreshFocusSyncTest: XCTestCase {
     }
 
     @MainActor
+    func testWakeReassertionSurvivesCoalescingWithEventsThatFollowIt() async throws {
+        setUpWorkspacesForTests()
+        TrayMenuModel.shared.isEnabled = true
+        var events: [RefreshSessionEvent] = []
+        let started = expectation(description: "initial refresh started")
+        let finished = expectation(description: "coalesced refresh finished")
+        var release: CheckedContinuation<Void, Never>?
+        setScheduledRefreshOverrideForTests { event, _ in
+            events.append(event)
+            if events.count == 1 { await withCheckedContinuation { release = $0; started.fulfill() } }
+            else { finished.fulfill() }
+        }
+        defer { release?.resume(); setScheduledRefreshOverrideForTests(nil) }
+        scheduleRefreshSession(.hotkeyBinding)
+        await fulfillment(of: [started], timeout: 2)
+        let wake = RefreshSessionEvent.globalObserver(NSWorkspace.didWakeNotification.rawValue)
+        scheduleRefreshSession(wake)
+        scheduleRefreshSession(.globalObserver(NSWorkspace.activeSpaceDidChangeNotification.rawValue))
+        release?.resume(); release = nil
+        await fulfillment(of: [finished], timeout: 2)
+        XCTAssertEqual(events.last?.requiresHiddenWindowsReassertion, true, "The wake's re-parking pass still runs")
+    }
+
+    @MainActor
+    func testInterruptedWakeIsRetriedEvenWhenLightSessionSkipsItsOwnRefresh() async throws {
+        setUpWorkspacesForTests()
+        TrayMenuModel.shared.isEnabled = true
+        let wake = RefreshSessionEvent.globalObserver(NSWorkspace.didWakeNotification.rawValue)
+        let started = expectation(description: "wake refresh started")
+        var events: [RefreshSessionEvent] = []
+        setScheduledRefreshOverrideForTests { event, _ in
+            events.append(event)
+            if events.count == 1 {
+                started.fulfill()
+                try await Task.sleep(nanoseconds: 10_000_000_000)
+            }
+        }
+        defer { setScheduledRefreshOverrideForTests(nil) }
+        scheduleRefreshSession(wake)
+        await fulfillment(of: [started], timeout: 2)
+        scheduleRefreshSession(.globalObserver(NSWorkspace.activeSpaceDidChangeNotification.rawValue))
+        try await runLightSession(.hotkeyBinding, .forceRun, shouldSchedulePostRefresh: false) { }
+        try await waitForScheduledRefreshForTests()
+        XCTAssertEqual(events.map(\.description), [wake.description, wake.description])
+        XCTAssertEqual(events.last?.requiresHiddenWindowsReassertion, true)
+    }
+
+    @MainActor
     func testParkingRecoveryDoesNotAdoptAnInactiveNativeFocusedWindow() async throws {
         setUpWorkspacesForTests()
         TrayMenuModel.shared.isEnabled = true

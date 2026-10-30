@@ -7,6 +7,9 @@ import Common
 final class NativeWorkspaceBackend: WorkspaceBackend {
     private unowned let state: NativeWorkspaceLifecycle
     init(_ state: NativeWorkspaceLifecycle) { self.state = state }
+    func fullscreenDisplayIDs() -> Set<String> {
+        fullscreenNativeSpaceDisplays(state.layouts.snapshot?.displays ?? [])
+    }
 
     func run(_ command: any Command, env: CmdEnv, io: CmdIo) async throws -> Bool? {
         switch command {

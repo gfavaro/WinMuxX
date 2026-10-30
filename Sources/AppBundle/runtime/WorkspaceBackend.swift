@@ -33,6 +33,8 @@ protocol WorkspaceBackend: AnyObject {
     func bringForward(_ windowId: UInt32) async throws -> String?
     /// The workspace a display shows; native desktops never fall back to virtual rearrangement.
     func shownWorkspace(on monitor: Monitor) -> Workspace?
+    /// Displays currently covered by native fullscreen content.
+    func fullscreenDisplayIDs() -> Set<String>
     /// After a command outside native tiling's fence moved focus.
     func focusDidMove(to window: Window?)
 
