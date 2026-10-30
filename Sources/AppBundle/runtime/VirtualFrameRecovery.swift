@@ -1,10 +1,9 @@
 import AppKit
 
 /// Virtual mode's counterpart of `NativeFrameRecovery`. An app's own move or resize of a
-/// tiled window triggers the refresh that puts it back; an app that keeps moving it is
-/// left alone after `FrameRecoveryBudget.limit` tries, until its tile changes, it comes
-/// to rest there or `retile` runs. Each burst of events is one try, counted once the
-/// window has been still for a moment.
+/// tiled window is put back once the window has been still for a moment, within the
+/// window's `FrameRecoveryBudget`. Deciding only once the window is still is what lets a
+/// fight be counted: putting it back at once kept the events coming forever.
 @MainActor
 final class VirtualFrameRecovery {
     static let shared = VirtualFrameRecovery()
@@ -16,10 +15,12 @@ final class VirtualFrameRecovery {
     /// `retile` renews every window's budget.
     func reset() { budgets.removeAll() }
 
-    /// Called for a geometry change the user did not make; false when the app has used up
-    /// this tile's tries, so the caller skips the refresh.
-    func shouldPutBack(_ window: Window) -> Bool {
-        guard let tile = Self.tile(of: window) else { return true }
+    func leavesAlone(_ id: UInt32, tile: Rect) -> Bool { budgets[id]?.isExhausted(on: tile) == true }
+
+    /// A geometry change the user did not make. Windows without a tile refresh at once, as
+    /// before; a tiled one is checked once it is still.
+    func windowChanged(_ window: Window, putBack: @escaping @MainActor () -> Void) {
+        guard Self.tile(of: window) != nil else { return putBack() }
         let id = window.windowId
         pending[id]?.cancel()
         pending[id] = Task { @MainActor [weak self] in
@@ -27,15 +28,19 @@ final class VirtualFrameRecovery {
             try? await Task.sleep(for: settleDelay)
             guard !Task.isCancelled else { return }
             pending[id] = nil
-            settled(id)
+            settled(id, putBack: putBack)
         }
-        return budgets[id]?.isExhausted(on: tile) != true
     }
 
-    func settled(_ id: UInt32) {
-        guard let window = Window.get(byId: id), let tile = Self.tile(of: window) else { budgets[id] = nil; return }
-        guard !WindowMotion.shared.isAnimating(id), let frame = frame(id) else { return }
-        _ = budgets[id, default: FrameRecoveryBudget()].shouldReapply(tile: tile, resting: windowRestsOnTile(frame, tile: tile))
+    func settled(_ id: UInt32, putBack: () -> Void) {
+        guard let window = Window.get(byId: id), let tile = Self.tile(of: window) else {
+            budgets[id] = nil
+            return putBack()
+        }
+        // An animation ends on the tile by itself.
+        guard !WindowMotion.shared.isAnimating(id) else { return }
+        guard let frame = frame(id) else { return putBack() }
+        if budgets[id, default: FrameRecoveryBudget()].shouldReapply(tile: tile, resting: windowRestsOnTile(frame, tile: tile)) { putBack() }
     }
 
     private static func tile(of window: Window) -> Rect? {

@@ -12,16 +12,22 @@ final class NativeFrameRecoveryTest: XCTestCase {
         XCTAssertFalse(windowRestsOnTile(CGRect(x: 100, y: 50, width: 500, height: 600), tile: tile), "Shrunk")
     }
 
-    func testBudgetStopsAFightAndRefillsOnRestOrANewTile() {
+    func testBudgetStopsAFightAndRefillsWithTimeOrANewTile() {
         var budget = FrameRecoveryBudget()
-        XCTAssertEqual((0..<5).map { _ in budget.shouldReapply(tile: tile, resting: false) }, [true, true, true, false, false],
+        let start = ContinuousClock.now
+        XCTAssertEqual((0..<5).map { budget.shouldReapply(tile: tile, resting: false, now: start + .seconds($0)) }, [true, true, true, false, false],
                        "An app that keeps moving its window is left alone after three tries")
-        XCTAssertFalse(budget.shouldReapply(tile: tile, resting: true))
-        XCTAssertTrue(budget.shouldReapply(tile: tile, resting: false), "Resting refills it")
+        XCTAssertFalse(budget.shouldReapply(tile: tile, resting: true, now: start + .seconds(5)), "Resting needs no put-back")
+        XCTAssertFalse(budget.shouldReapply(tile: tile, resting: false, now: start + .seconds(6)), "and does not refill it")
+        XCTAssertTrue(budget.shouldReapply(tile: tile, resting: false, now: start + .seconds(10)), "A try older than the window expires")
         var moved = tile
         moved.topLeftX += 400
-        _ = budget.shouldReapply(tile: tile, resting: false)
-        _ = budget.shouldReapply(tile: tile, resting: false)
-        XCTAssertTrue(budget.shouldReapply(tile: moved, resting: false), "A new tile refills it")
+        XCTAssertTrue(budget.shouldReapply(tile: moved, resting: false, now: start + .seconds(11)), "A new tile refills it")
+    }
+
+    func testAnAppThatMovesItsWindowNowAndThenIsAlwaysPutBack() {
+        var budget = FrameRecoveryBudget()
+        let start = ContinuousClock.now
+        XCTAssertTrue((0..<10).allSatisfy { budget.shouldReapply(tile: tile, resting: false, now: start + .seconds(4 * $0)) })
     }
 }

@@ -136,8 +136,9 @@ tiling first moved it, if it is still on that desktop and the desktop is showing
 window on a hidden desktop stays where it is, since reaching it would take a desktop
 switch. The original frames are kept in memory only. Set `restore-frames-on-quit = false`
 to leave windows where tiling put them. A tiled window its app moves or resizes on its
-own is put back on its tile once it has been still for 150 ms, up to three times per
-tile, so an app that keeps fighting is left alone.
+own is put back on its tile once it has been still for 150 ms, up to three times in
+10 seconds per tile, so an app that keeps fighting is left alone. Virtual mode does the
+same.
 
 If startup configuration is invalid, shipped defaults remain available for error
 display but the process stays read-only until restart. This prevents an invalid
@@ -310,12 +311,11 @@ and inactive-window membership preservation. It lists untested hardware/OS and
 lifecycle scenarios separately. The [decision record](NATIVE_SPACES_ADR.md) explains
 the ownership boundary and rejected alternatives.
 
-After installing a build, `script/native-smoke.sh` checks the running app in native
-mode: desktop and display listing, moving its own TextEdit window between desktops
-and displays and back, focus following, survival of the app quitting, pan lag and
-new crash reports. It touches only its own windows and prints PASS, FAIL or SKIP per
-check (`--dev` targets WinMuxX Native Dev). It does not cover gestures or anything
-that needs a physical trackpad or mouse.
+After installing a build, `script/smoke.sh` checks the running app in either mode;
+in native mode it adds the Space switching and window-move permissions and pan lag
+(`--dev` targets WinMuxX Native Dev). See [Testing](TESTING.md#review-and-verification)
+for what it covers. It does not cover gestures or anything that needs a physical
+trackpad or mouse.
 
 The [interactive validation record](NATIVE_SPACES_NATIVE_VALIDATION.md) separates
 executed physical checks from unverified behavior. Commands retain their original

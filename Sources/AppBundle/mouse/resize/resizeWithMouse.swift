@@ -29,7 +29,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
         }
         if isContinuingManagedDragSessionForResizedEvent(windowId) { return }
         guard try await isManipulatedWithMouse(window) else {
-            if VirtualFrameRecovery.shared.shouldPutBack(window) { scheduleRefreshSession(.ax(notif)) }
+            VirtualFrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
             return
         }
         guard window.parent is TilingContainer else {

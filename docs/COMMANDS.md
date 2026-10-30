@@ -25,7 +25,7 @@ help documents an explicit target.
 
 **Undo:** `undo-layout` puts the focused workspace's layout back as it was before its last layout command (`layout`, `move`, `join-with`, `resize`, `balance-sizes`, `workspace-layout`, scrolling moves, widths and pins, and similar), one step at a time, up to 20 steps. It rearranges only windows still on that workspace, and a window opened since is tiled into the restored layout. Available from Layout → Undo Layout Change.
 
-**Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. It also renews the put-back budget for windows whose apps kept moving them: an app that moves its tiled window off its tile again and again is left alone after three tries, until the tile changes or the window rests on it. Available from Layout → Retile.
+**Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. It also renews the put-back budget for windows whose apps kept moving them: an app that moves its tiled window off its tile again and again is put back at most three times in 10 seconds per tile, then left alone until that time passes or the tile changes. Available from Layout → Retile.
 
 **No peek:** `no-peek [on|off|toggle]` darkens and blurs everything except the focused window, on every display, so people beside you or on a call can't read your other windows. It follows focus, stays out of Mission Control and native fullscreen, and clicks still reach the windows behind it. Without an argument it toggles; also in the menu as No Peek.
 

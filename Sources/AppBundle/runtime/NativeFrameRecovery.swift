@@ -1,25 +1,39 @@
 import AppKit
 
-/// How often a window that will not stay on its tile is put back. Each new tile, or the
-/// window coming to rest on it, starts over; ineligible moves (drags, our own writes and
-/// animations) neither spend nor refill it. After Dinky's FrameRecovery.
+/// How often a window that will not stay on its tile is put back: at most `limit` times
+/// within `window` on the same tile, so an app that keeps moving its window is left alone
+/// instead of fought forever, however quickly or slowly it moves it back, while one that
+/// moves it now and then is always put back. A new tile starts over; ineligible moves
+/// (drags, our own writes and animations) are never counted. After Dinky's FrameRecovery,
+/// which refilled on rest: an app slower than the settle delay then never ran out.
 struct FrameRecoveryBudget {
     private var tile: Rect?
-    private var attempts = 0
+    private var attempts: [ContinuousClock.Instant] = []
     static let limit = 3
+    static let window: Duration = .seconds(10)
 
-    mutating func shouldReapply(tile: Rect, resting: Bool) -> Bool {
-        if self.tile != tile || resting {
+    mutating func shouldReapply(tile: Rect, resting: Bool, now: ContinuousClock.Instant = .now) -> Bool {
+        if self.tile != tile {
             self.tile = tile
-            attempts = 0
+            attempts = []
         }
-        guard !resting, attempts < Self.limit else { return false }
-        attempts += 1
+        attempts.removeAll { now - $0 >= Self.window }
+        guard !resting, attempts.count < Self.limit else { return false }
+        attempts.append(now)
         return true
     }
 
-    /// Whether the attempts on this tile are used up.
-    func isExhausted(on tile: Rect) -> Bool { self.tile == tile && attempts >= Self.limit }
+    /// Whether this tile's tries are used up, so layout leaves the window where its app put it.
+    func isExhausted(on tile: Rect, now: ContinuousClock.Instant = .now) -> Bool {
+        self.tile == tile && attempts.count(where: { now - $0 < Self.window }) >= Self.limit
+    }
+}
+
+/// A window whose app keeps moving it off this tile stays where its app put it: without
+/// this, any other refresh's layout pass put it back and the fight went on.
+@MainActor
+func frameRecoveryLeavesAlone(_ window: Window, tile: Rect) -> Bool {
+    NativeFrameRecovery.shared.leavesAlone(window.windowId, tile: tile) || VirtualFrameRecovery.shared.leavesAlone(window.windowId, tile: tile)
 }
 
 /// Whether a window sits on its tile. Apps that cannot shrink to it stay larger, and
@@ -43,6 +57,8 @@ final class NativeFrameRecovery {
 
     /// `retile` renews every window's budget.
     func reset() { budgets.removeAll() }
+
+    func leavesAlone(_ id: UInt32, tile: Rect) -> Bool { budgets[id]?.isExhausted(on: tile) == true }
 
     func windowChanged(_ window: Window) {
         let id = window.windowId

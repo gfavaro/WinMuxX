@@ -165,7 +165,8 @@ extension TreeNode {
                         if !isFullscreenTab {
                             window.isFullscreen = false
                         }
-                        if window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
+                        let leftAlone = !window.isHiddenInCorner && frameRecoveryLeavesAlone(window, tile: physicalRect)
+                        if !leftAlone, window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
                             try await WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
                         }
                     }
