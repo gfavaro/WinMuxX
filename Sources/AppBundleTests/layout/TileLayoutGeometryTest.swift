@@ -23,6 +23,24 @@ final class TileLayoutGeometryTest: XCTestCase {
         XCTAssertEqual(reversed[0].weight, normal[0].weight)
     }
 
+    func testTilesScaleInProportionSoAddedWindowsAndDisplayChangesRoundTrip() {
+        func sizes(_ weights: [CGFloat], _ width: CGFloat, minimums: [CGFloat]? = nil) -> [CGFloat] {
+            TileLayoutGeometry.calculate(TileLayoutInput(origin: .zero, size: CGSize(width: width, height: 800), horizontal: true,
+                innerGap: 0, weights: weights, minimumExtents: minimums ?? weights.map { _ in 0 }, master: false, reversed: false)).map(\.weight)
+        }
+        let added = sizes([400, 1520, 960], 1920)
+        XCTAssertEqual(added[0], 400 * 1920 / 2880, accuracy: 0.001, "A new window takes from each tile in proportion")
+        let removed = sizes(Array(added.prefix(2)), 1920)
+        XCTAssertEqual(removed[0], 400, accuracy: 0.001, "Closing it gives back exactly what it took")
+        XCTAssertEqual(removed[1], 1520, accuracy: 0.001)
+        let smaller = sizes([100, 1820], 1000)
+        XCTAssertGreaterThan(smaller[0], 0, "A shrinking display never squeezes a narrow tile to nothing")
+        let restored = sizes(smaller, 1920)
+        XCTAssertEqual(restored[0], 100, accuracy: 0.001)
+        let fitted = sizes([400, 1520], 1000, minimums: [50, 50])
+        XCTAssertEqual(fitted.reduce(0, +), 1000, accuracy: 0.001, "Tiles with known minimums fill the space too")
+    }
+
     func testMinimumsFitAndImpossibleFitKeepsRequestedSizes() {
         XCTAssertEqual(TileLayoutGeometry.fit([30, 70], minimums: [50, 20], total: 100), [50, 50])
         XCTAssertEqual(TileLayoutGeometry.fit([30, 70], minimums: [80, 40], total: 100), [30, 70])
