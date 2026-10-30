@@ -614,8 +614,9 @@ The `show` and `hide` arguments are idempotent.
     three-finger-up = false # opt in after adjusting macOS Mission Control
 ```
 
-The optional three-finger upward gesture opens the overview. A three-finger
-downward gesture closes it whenever it is open, including when opened by command
+The optional three-finger upward gesture opens the overview. All three fingers must
+move in the same direction to start it, reducing accidental triggers while a finger
+is resting. A three-finger downward gesture closes it whenever it is open, including when opened by command
 with the upward shortcut disabled. The overview follows your fingers while swiping
 up or down; reversing a short swipe returns it to its starting state. Release
 settles with your swipe velocity. Hidden overview surfaces are reused between openings;

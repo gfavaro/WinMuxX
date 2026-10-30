@@ -129,7 +129,7 @@ struct ShortcutBehaviorSettingsView: View {
                     SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
                         persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
                     }
-                    Text("Use workspace-overview from a shortcut or the CLI. For the gesture, assign macOS Mission Control to four fingers or turn its gesture off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                    Text("Use workspace-overview from a shortcut or the CLI. For the gesture, move all three fingers together and assign macOS Mission Control to four fingers or turn it off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }

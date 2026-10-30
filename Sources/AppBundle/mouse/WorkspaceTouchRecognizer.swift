@@ -1,6 +1,26 @@
 import Foundation
 import QuartzCore
 
+struct WorkspaceTouchContact: Equatable, Sendable {
+    let identifier: Int32
+    let y: Double
+}
+
+/// Three inline values, avoiding an array allocation on each high-frequency frame.
+struct WorkspaceTouchContacts: Equatable, Sendable {
+    let first: WorkspaceTouchContact
+    let second: WorkspaceTouchContact
+    let third: WorkspaceTouchContact
+
+    func movedTogether(from start: Self, direction: Double, minimum: Double) -> Bool {
+        func moved(_ current: WorkspaceTouchContact, _ initial: WorkspaceTouchContact) -> Bool {
+            current.identifier == initial.identifier && current.y.isFinite && initial.y.isFinite &&
+                (current.y - initial.y) * direction >= minimum
+        }
+        return moved(first, start.first) && moved(second, start.second) && moved(third, start.third)
+    }
+}
+
 struct WorkspaceTouchFrame: Equatable, Sendable {
     let device: UInt64
     let fingers: Int
@@ -8,12 +28,14 @@ struct WorkspaceTouchFrame: Equatable, Sendable {
     let y: Double
     let timestamp: Double
     let contacts: UInt64
+    var touchContacts: WorkspaceTouchContacts? = nil
     // Receipt uses our monotonic clock; the private device timestamp is only for deltas.
     var receivedAt: Double = CACurrentMediaTime()
 
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.device == rhs.device && lhs.fingers == rhs.fingers && lhs.x == rhs.x &&
-            lhs.y == rhs.y && lhs.timestamp == rhs.timestamp && lhs.contacts == rhs.contacts
+            lhs.y == rhs.y && lhs.timestamp == rhs.timestamp && lhs.contacts == rhs.contacts &&
+            lhs.touchContacts == rhs.touchContacts
     }
 }
 

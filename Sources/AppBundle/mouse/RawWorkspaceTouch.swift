@@ -123,9 +123,18 @@ final class RawWorkspaceTouchSource: ObservableObject {
 // calls this function on its own thread; only copied data and the locked mailbox
 // are touched until an explicit hop to the main queue.
 nonisolated func workspaceTouchFrameCallback(_ generation: UInt64, _ device: UInt64, _ fingers: Int32,
-                                             _ x: Double, _ y: Double, _ timestamp: Double, _ contacts: UInt64) {
+                                             _ x: Double, _ y: Double, _ timestamp: Double, _ contacts: UInt64,
+                                             _ points: UnsafePointer<WinMuxTouchContact>?) {
+    let copied: WorkspaceTouchContacts?
+    if fingers == 3, let points {
+        func contact(_ index: Int) -> WorkspaceTouchContact {
+            let point = points[index]
+            return WorkspaceTouchContact(identifier: point.identifier, y: point.y)
+        }
+        copied = WorkspaceTouchContacts(first: contact(0), second: contact(1), third: contact(2))
+    } else { copied = nil }
     let frame = WorkspaceTouchFrame(device: device, fingers: Int(fingers), x: x, y: y,
-                                   timestamp: timestamp, contacts: contacts)
+                                   timestamp: timestamp, contacts: contacts, touchContacts: copied)
     guard RawWorkspaceTouchSource.mailbox.offer(frame, generation: generation) else { return }
     DispatchQueue.main.async { RawWorkspaceTouchSource.shared.drain() }
 }

@@ -65,6 +65,9 @@ Shift-Tab retain the workspace/window navigation behavior.
 `workspace-overview [show|hide|toggle]` defaults to toggle. The optional
 `workspace-overview.three-finger-up` setting defaults to false. Both gesture
 features use one raw-touch callback/router, with axis locking before dispatch.
+An overview swipe starts only after each of the three contacts moves in the same
+vertical direction; a resting finger plus two moving fingers does not trigger it.
+Once recognized, progress remains continuous and can reverse before release.
 The private raw-touch source runs if either feature is enabled. With motion enabled,
 vertical gestures present the overview during the swipe: upward motion reveals it,
 and downward motion withdraws it. Progress updates only existing panel layers;

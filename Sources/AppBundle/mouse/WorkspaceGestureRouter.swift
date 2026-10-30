@@ -23,7 +23,11 @@ struct WorkspaceGestureAxisRouter {
               frame.timestamp - anchor.timestamp <= 10 else { rejected = true; return nil }
         let dx = abs(frame.x - anchor.x), dy = abs(frame.y - anchor.y)
         if dx >= 0.02, dx >= dy * 1.5 { axis = .horizontal }
-        else if dy >= 0.04, dy >= dx * 1.5 { axis = .vertical }
+        else if dy >= 0.04, dy >= dx * 1.5,
+                let start = anchor.touchContacts, let current = frame.touchContacts,
+                current.movedTogether(from: start, direction: frame.y > anchor.y ? 1 : -1, minimum: 0.012) {
+            axis = .vertical
+        }
         guard let axis else { return nil }
         return (axis, [anchor, frame])
     }

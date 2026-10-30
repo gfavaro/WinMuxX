@@ -183,12 +183,28 @@ final class WorkspaceSwipeTest: XCTestCase {
         let completed = expectation(description: "background driver callback completed")
         DispatchQueue.global().async {
             XCTAssertFalse(Thread.isMainThread)
-            callback(12345, 1, 3, 0.5, 0.5, 1, 123)
-            callback(12345, 1, 3, 0.3, 0.5, 1.1, 123)
-            callback(12345, 1, 0, 0, 0, 1.2, 0)
+            callback(12345, 1, 3, 0.5, 0.5, 1, 123, nil)
+            callback(12345, 1, 3, 0.3, 0.5, 1.1, 123, nil)
+            callback(12345, 1, 0, 0, 0, 1.2, 0, nil)
             completed.fulfill()
         }
         await fulfillment(of: [completed], timeout: 2)
+    }
+
+    @MainActor
+    func testDriverCopiesIndividualContactsBeforeReturning() {
+        RawWorkspaceTouchSource.mailbox.activate(12345)
+        defer { RawWorkspaceTouchSource.mailbox.activate(0) }
+        var points = [WinMuxTouchContact(identifier: 1, y: 0.2), WinMuxTouchContact(identifier: 2, y: 0.3),
+                      WinMuxTouchContact(identifier: 3, y: 0.4)]
+        points.withUnsafeMutableBufferPointer { buffer in
+            workspaceTouchFrameCallback(12345, 1, 3, 0.5, 0.3, 1, 123, buffer.baseAddress)
+            buffer[0].y = 0.9
+        }
+        let captured = RawWorkspaceTouchSource.mailbox.take().frames.first?.touchContacts
+        XCTAssertEqual(captured?.first.identifier, 1)
+        XCTAssertEqual(captured?.first.y, 0.2)
+        XCTAssertEqual(captured?.third.y, 0.4)
     }
 
     @MainActor
