@@ -274,18 +274,14 @@ extension TilingContainer {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = tileChildFrames(in: rect, gaps: context.resolvedGaps)
         let selected = frameLayoutChildren
-        if runtime.workspaceBackend.kind == .native {
-            let total = selected.reduce(CGFloat.zero) { $0 + $1.getWeight(orientation) }
-            let factor = total > 0 ? frames.reduce(CGFloat.zero) { $0 + $1.weight } / total : 1
-            for child in children where !selected.contains(child) {
-                child.setWeight(orientation, child.getWeight(orientation) * factor)
-            }
-        }
-        if layout == .master, frames.count == 2, width > 0, height > 0 {
+        // While native Spaces hides a child, the frames are a projection: the stored weights
+        // still describe every child and stay as they are until all are shown again.
+        let complete = selected.count == children.count
+        if complete, layout == .master, frames.count == 2, width > 0, height > 0 {
             masterRatio = frames[0].weight / rect.getDimension(orientation)
         }
         for (child, frame) in zip(selected, frames) {
-            child.setWeight(orientation, frame.weight)
+            if complete { child.setWeight(orientation, frame.weight) }
             let childVirtual = Rect(
                 topLeftX: frame.virtual.topLeftX + virtual.topLeftX - point.x,
                 topLeftY: frame.virtual.topLeftY + virtual.topLeftY - point.y,

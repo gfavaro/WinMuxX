@@ -233,6 +233,31 @@ final class NativeTilingTest: WorkspaceTestCase {
         XCTAssertEqual(root.frameDwindleShares, [0.2, 0.3, 0.5])
     }
 
+    func testHidingAndShowingATileNeverMovesWidthBetweenTiles() async throws {
+        let workspace = nativeWorkspace()
+        let root = workspace.rootTilingContainer
+        let narrow = TestWindow.new(id: 1, parent: root)
+        let hidden = TestWindow.new(id: 2, parent: root)
+        let wide = TestWindow.new(id: 3, parent: root)
+        try await workspace.layoutWorkspace()
+        let total = root.children.reduce(CGFloat.zero) { $0 + $1.getWeight(.h) }
+        for (window, share) in zip([narrow, hidden, wide], [0.15, 0.45, 0.4]) { window.setWeight(.h, total * share) }
+        try await workspace.layoutWorkspace()
+        let weights = root.children.map { $0.getWeight(.h) }
+        for _ in 0..<6 {
+            hidden.nativeLayoutEligible = false
+            try await workspace.layoutWorkspace()
+            let shown = try XCTUnwrap(narrow.lastAppliedLayoutVirtualRect).width / XCTUnwrap(wide.lastAppliedLayoutVirtualRect).width
+            XCTAssertEqual(shown, 0.15 / 0.4, accuracy: 0.01, "The visible tiles keep their proportions")
+            XCTAssertEqual(root.children.map { $0.getWeight(.h) }, weights, "A hidden tile changes no stored weight")
+            hidden.nativeLayoutEligible = true
+            try await workspace.layoutWorkspace()
+        }
+        for (now, before) in zip(root.children.map { $0.getWeight(.h) }, weights) {
+            XCTAssertEqual(now, before, accuracy: 0.5, "Repeated hiding does not squeeze the narrow tile")
+        }
+    }
+
     func testNavigationGeometryMapsVisibleFramesToTheirActualWindows() async throws {
         let workspace = nativeWorkspace()
         let root = workspace.rootTilingContainer
