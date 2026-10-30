@@ -614,7 +614,15 @@ The `show` and `hide` arguments are idempotent.
     three-finger-up = false # opt in after adjusting macOS Mission Control
 ```
 
-The optional three-finger upward gesture opens the overview. All three fingers must
+The optional three-finger upward gesture opens the overview. With **System Settings →
+Trackpad → More Gestures → Mission Control** on three fingers, macOS recognizes the
+swipe and WinMuxX opens its overview in place of Mission Control, so the gesture starts,
+ignores resting fingers and settles exactly as Mission Control's does. Mission Control
+stays on its keyboard shortcut and its own swipes still work while it is open. Three
+fingers down closes the overview; with the overview closed, down stays with macOS (App
+Exposé when enabled), as does the whole gesture when the overview gesture is off.
+Natural scrolling is read for each swipe. With Mission Control on four fingers or off,
+WinMuxX recognizes raw touches itself: all three fingers must
 move in the same direction to start it, reducing accidental triggers while a finger
 is resting. A three-finger downward gesture closes it whenever it is open, including when opened by command
 with the upward shortcut disabled. The overview follows your fingers while swiping
@@ -624,8 +632,7 @@ images and selection state are cleared on dismissal. Opening and closing share t
 spring and `workspace-swipe.animation-duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
-animations skip motion. Assign macOS Mission Control to four fingers or disable its trackpad
-gesture first; WinMuxX does not change macOS settings. Horizontal workspace swipes
+animations skip motion. WinMuxX does not change macOS settings. Horizontal workspace swipes
 and the overview gesture can be enabled independently.
 
 Minimized windows, hidden apps, native full-screen windows and popups are excluded.

@@ -53,6 +53,8 @@ struct WorkspaceGestureRouterDependencies {
     var beginOverviewGesture: ((Bool, Double) -> Bool)? = nil
     var updateOverviewGesture: ((Double) -> Void)? = nil
     var endOverviewGesture: ((Bool, Double) -> Void)? = nil
+    /// False while macOS's own vertical swipe drives the overview instead.
+    var verticalFromRawTouch: () -> Bool = { true }
     static var live: Self {
         Self(horizontalEnabled: { rawWorkspaceSwipeEnabled },
              overviewEnabled: { workspaceOverviewGestureEnabled },
@@ -62,7 +64,8 @@ struct WorkspaceGestureRouterDependencies {
              hide: { WorkspaceOverviewController.shared.dismiss() },
              beginOverviewGesture: { WorkspaceOverviewController.shared.beginGesture(opening: $0, progress: $1) },
              updateOverviewGesture: { WorkspaceOverviewController.shared.updateGesture(progress: $0) },
-             endOverviewGesture: { WorkspaceOverviewController.shared.endGesture(commit: $0, velocity: $1) })
+             endOverviewGesture: { WorkspaceOverviewController.shared.endGesture(commit: $0, velocity: $1) },
+             verticalFromRawTouch: { !DockWorkspaceSwipeSource.shared.readsVertical })
     }
 }
 
@@ -173,7 +176,7 @@ final class WorkspaceGestureRouter {
             guard dependencies.horizontalEnabled(), !dependencies.overviewIsOpen() else { return }
             for item in frames { dependencies.horizontal(item) }
         case .vertical:
-            for item in frames {
+            for item in frames where dependencies.verticalFromRawTouch() {
                 let transformed = WorkspaceTouchFrame(device: item.device, fingers: item.fingers,
                     x: 1 - item.y, y: item.x, timestamp: item.timestamp, contacts: item.contacts)
                 guard let event = vertical.receive(transformed, displayPoint: .zero, reversed: false) else { continue }

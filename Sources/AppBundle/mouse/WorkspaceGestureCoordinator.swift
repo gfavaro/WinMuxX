@@ -10,7 +10,11 @@ func workspaceGesturesNeedRawTouch(horizontal: Bool, overview: Bool, overviewOpe
 }
 /// Horizontal swipes recognized from raw touch, when macOS's own swipe is not read instead.
 @MainActor var rawWorkspaceSwipeEnabled: Bool {
-    workspaceSwipeGestureEnabled && !DockWorkspaceSwipeSource.shared.isActive
+    workspaceSwipeGestureEnabled && !DockWorkspaceSwipeSource.shared.readsHorizontal
+}
+/// The overview gesture recognized from raw touch, when macOS's own swipe is not read instead.
+@MainActor var rawWorkspaceOverviewGestureEnabled: Bool {
+    workspaceOverviewGestureEnabled && !DockWorkspaceSwipeSource.shared.readsVertical
 }
 @MainActor var workspaceOverviewGestureEnabled: Bool {
     config.workspaceOverview.threeFingerUp && runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces

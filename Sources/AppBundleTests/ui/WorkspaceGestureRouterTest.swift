@@ -184,6 +184,14 @@ final class WorkspaceGestureIntegrationTest: XCTestCase {
         XCTAssertEqual(endings, [false, false])
     }
 
+    func testRawTouchLeavesTheOverviewAloneWhileMacOSSwipesDriveIt() {
+        let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },
+            overviewIsOpen: { false }, horizontal: { _ in }, show: { XCTFail() }, hide: { XCTFail() },
+            beginOverviewGesture: { _, _ in XCTFail(); return true }, endOverviewGesture: { _, _ in XCTFail() },
+            verticalFromRawTouch: { false }))
+        for item in [frame(), frame(0.5, 0.56, time: 1.05), frame(0.5, 0.7, time: 1.1), frame(fingers: 0, time: 1.2)] { router.handle(item) }
+    }
+
     func testMotionDisabledFallbackStillCommitsOnRelease() {
         var open = false
         let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },

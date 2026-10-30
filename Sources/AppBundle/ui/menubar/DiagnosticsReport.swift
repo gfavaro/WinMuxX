@@ -64,10 +64,11 @@ func buildDiagnosticsReport() async -> String {
 
     let touch = RawWorkspaceTouchSource.shared
     let dock = DockWorkspaceSwipeSource.shared
-    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) backend=\(dock.isActive ? "macos-swipe" : "raw-touch") macOS=\(dock.status) raw=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
-    let swipe = dock.summary
-    io.out(String(format: "Last macOS swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
-                  swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "raw-touch") overview=\(dock.readsVertical ? "macos-swipe" : "raw-touch") macOS=\(dock.status) raw=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
+    for (axis, swipe) in [("left/right", dock.horizontalSummary), ("up/down", dock.verticalSummary)] {
+        io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
+                      axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
+    }
     let preview = WorkspaceSwipePreview.shared
     if let timing = preview.timings.last {
         let submission = timing.submissionMs.map { String(format: "%.1fms", $0) } ?? "not submitted"

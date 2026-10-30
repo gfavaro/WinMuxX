@@ -120,7 +120,7 @@ struct ShortcutBehaviorSettingsView: View {
                         persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
                     }
                     .disabled(!workspaceSwipes)
-                    Text(DockWorkspaceSwipeSource.shared.isActive ? DockWorkspaceSwipeSource.shared.status
+                    Text(DockWorkspaceSwipeSource.shared.readsHorizontal ? DockWorkspaceSwipeSource.shared.status
                         : workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
                         .font(.callout).foregroundStyle(.secondary)
                     Text("With Swipe between full-screen apps on three fingers in macOS Trackpad settings, macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Otherwise WinMuxX reads exactly three fingers through the private raw-touch API. Normal two-finger scrolling stays with your apps.")
@@ -130,7 +130,7 @@ struct ShortcutBehaviorSettingsView: View {
                     SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
                         persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
                     }
-                    Text("Use workspace-overview from a shortcut or the CLI. For the gesture, move all three fingers together and assign macOS Mission Control to four fingers or turn it off in Trackpad settings. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                    Text("Use workspace-overview from a shortcut or the CLI. With Mission Control on three fingers in macOS Trackpad settings, macOS recognizes the swipe and it opens the overview instead; Mission Control stays on its keyboard shortcut. Otherwise move all three fingers together, with Mission Control on four fingers or off. Minimized windows, hidden apps and native full-screen windows are excluded.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
             }

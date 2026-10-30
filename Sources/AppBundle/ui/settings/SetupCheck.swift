@@ -70,11 +70,12 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
                         : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Swipe between full-screen applications to three fingers.",
                     fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
             }
-            let overviewClash = input.overviewThreeFingerUp && input.macThreeFingerVerticalSwipe
             if input.overviewThreeFingerUp {
-                items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up is free", ok: !overviewClash,
-                    detail: overviewClash ? "macOS also opens Mission Control with three fingers up. Set Trackpad › More Gestures › Mission Control to four fingers." : "No clash.",
-                    fixURL: overviewClash ? trackpadSettings : nil))
+                items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: true,
+                    detail: input.macThreeFingerVerticalSwipe
+                        ? "Three fingers up opens the overview with macOS's own recognition, in place of Mission Control. Mission Control stays on its keyboard shortcut."
+                        : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
+                    fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
             }
     }
     return items

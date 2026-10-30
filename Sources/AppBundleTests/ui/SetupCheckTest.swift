@@ -20,9 +20,7 @@ final class SetupCheckTest: XCTestCase {
         var input = healthy
         input.accessibilityGranted = false
         input.otherWindowManagers = ["yabai"]
-        input.overviewThreeFingerUp = true
-        input.macThreeFingerVerticalSwipe = true
-        XCTAssertEqual(failing(input), ["accessibility", "other-window-managers", "three-finger-up"])
+        XCTAssertEqual(failing(input), ["accessibility", "other-window-managers"])
         XCTAssertTrue(setupCheckItems(input).first { $0.id == "other-window-managers" }!.detail.contains("yabai"))
         XCTAssertNotNil(setupCheckItems(input).first { $0.id == "accessibility" }?.fixURL)
     }
@@ -48,5 +46,17 @@ final class SetupCheckTest: XCTestCase {
         XCTAssertNil(item()?.fixURL, "WinMuxX reads macOS's swipe instead of clashing with it")
         input.workspaceSwipe = false
         XCTAssertNil(item())
+    }
+
+    func testEitherSwipeUpSettingWorksAndMacOSRecognitionIsSuggested() {
+        var input = healthy
+        let item = { setupCheckItems(input).first { $0.id == "three-finger-up" } }
+        XCTAssertNil(item())
+        input.overviewThreeFingerUp = true
+        XCTAssertEqual(item()?.ok, true)
+        XCTAssertNotNil(item()?.fixURL)
+        input.macThreeFingerVerticalSwipe = true
+        XCTAssertEqual(item()?.ok, true)
+        XCTAssertNil(item()?.fixURL, "WinMuxX reads macOS's swipe up instead of clashing with Mission Control")
     }
 }
