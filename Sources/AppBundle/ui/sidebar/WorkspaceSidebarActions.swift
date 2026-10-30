@@ -24,14 +24,15 @@ private func optimisticallyMarkWorkspaceFocusedInSidebar(_ workspaceName: String
     let requestedMonitor = targetMonitorScopeId.flatMap(workspaceSidebarMonitor(forScopeId:)) ?? focus.workspace.workspaceMonitor
     let monitor = workspaceMonitorForUserActivation(workspace, on: requestedMonitor)
     guard isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) else { return }
+    let keepsFocus = sidebarSelectionKeepsFocus(workspace, on: requestedMonitor)
     let outgoing = monitor.activeWorkspace
     var visibleNames = Set(monitors.map { $0.activeWorkspace.name })
     if !workspace.isVisible { visibleNames.remove(outgoing.name) }
     visibleNames.insert(workspaceName)
     TrayMenuModel.shared.workspaceSidebarWorkspaces = workspaces.map { w in
-        let isFocused = w.name == workspaceName
+        let isFocused = keepsFocus ? w.isFocused : w.name == workspaceName
         let isVisible = visibleNames.contains(w.name)
-        let destination: Monitor? = isFocused ? monitor : nil
+        let destination: Monitor? = w.name == workspaceName ? monitor : nil
         return WorkspaceSidebarWorkspaceViewModel(
             name: w.name,
             projectId: w.projectId,
@@ -55,7 +56,7 @@ func focusWorkspaceFromSidebar(_ workspace: Workspace, targetMonitorScopeId: Str
         guard let monitor = workspaceSidebarMonitor(forScopeId: targetMonitorScopeId) else { return false }
         targetMonitor = monitor
     } else { targetMonitor = focus.workspace.workspaceMonitor }
-    return activateWorkspaceForUser(workspace, on: targetMonitor)
+    return activateWorkspaceForUser(workspace, on: targetMonitor, focusing: !sidebarSelectionKeepsFocus(workspace, on: targetMonitor))
 }
 
 @MainActor

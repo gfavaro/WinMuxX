@@ -36,6 +36,7 @@ func workspaceMonitorForUserActivation(_ workspace: Workspace, on requested: Mon
 func activateWorkspaceForUser(
     _ workspace: Workspace,
     on targetMonitor: Monitor,
+    focusing: Bool = true,
 ) -> Bool {
     // macOS shows native desktops; UI actions run `workspace` so each backend switches its own way.
     guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces else {
@@ -57,9 +58,21 @@ func activateWorkspaceForUser(
 
     guard monitor.setActiveWorkspace(workspace) else { return false }
     WorkspaceMotionDiagnostics.selected(workspace)
+    guard focusing else {
+        recordUserWorkspaceSelectionForRestoration()
+        return true
+    }
     let focused = workspace.focusWorkspace()
     if focused { recordUserWorkspaceSelectionForRestoration() }
     return focused
+}
+
+/// A sidebar selection that changes what another display shows leaves focus on the
+/// display in use, as with native Spaces. One already showing elsewhere is focused there.
+@MainActor
+func sidebarSelectionKeepsFocus(_ workspace: Workspace, on targetMonitor: Monitor) -> Bool {
+    !workspace.isVisible && workspaceMonitorForUserActivation(workspace, on: targetMonitor).rect.topLeftCorner !=
+        focus.workspace.workspaceMonitor.rect.topLeftCorner
 }
 
 @MainActor

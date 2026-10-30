@@ -271,6 +271,27 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace.workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
     }
 
+    func testSidebarSwitchOfAnotherDisplayKeepsFocusOnTheDisplayInUse() {
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[3], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[1])))
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[3])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(focus.workspace, spaces[0])
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+    }
+
+    func testSidebarSwitchOfTheFocusedDisplayFocusesTheWorkspace() {
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[3], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[0])))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[3])
+        XCTAssertEqual(focus.workspace, spaces[3])
+    }
+
+    func testSidebarFocusesAWorkspaceAlreadyShowingOnAnotherDisplay() {
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[1], targetMonitorScopeId: workspaceSidebarMonitorScopeId(for: displays[0])))
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(focus.workspace, spaces[1])
+    }
+
     func testForcedDestinationAssignmentAllowsFocusOnItsExistingMonitor() async throws {
         config.workspaceToMonitorForceAssignment = ["2": [.sequenceNumber(2)]]
         let result = try await parseCommand("workspace --name 2").cmdOrDie.run(.defaultEnv, .emptyStdin)

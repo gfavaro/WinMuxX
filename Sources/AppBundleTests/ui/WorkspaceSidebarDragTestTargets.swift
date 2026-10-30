@@ -190,7 +190,7 @@ extension WorkspaceSidebarDragTest {
         ))
         XCTAssertEqual(main.activeWorkspace, mainWorkspace)
         XCTAssertEqual(secondary.activeWorkspace, hiddenWorkspace)
-        XCTAssertEqual(focus.workspace, hiddenWorkspace)
+        XCTAssertEqual(focus.workspace, mainWorkspace, "Changing another display keeps focus on the one in use")
     }
 
     @MainActor
