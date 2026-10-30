@@ -700,8 +700,8 @@ Tabbed for new groups created by dragging (`drag-stack-layout = 'accordion'` or
 
 ### Experimental workspace swipes
 
-**Settings → Windows → Workspace swipes — experimental** enables raw trackpad
-recognition. It is off by default:
+**Settings → Windows → Workspace swipes — experimental** enables three-finger
+workspace swipes. It is off by default:
 
 ```toml
 [workspace-swipe]
@@ -710,7 +710,18 @@ reverse-direction = false
 animation-duration-ms = 220
 ```
 
-Exactly three touching fingers moving horizontally select the next/previous existing
+When **System Settings → Trackpad → More Gestures → Swipe between full-screen
+applications** uses three fingers, macOS recognizes the swipe and WinMuxX acts on it,
+so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
+as in macOS. WinMuxX keeps the swipe from the Dock only when it switches a workspace:
+with no workspace that way, over a native full-screen app, while Mission Control is
+open or while WinMuxX is not taking swipes, macOS gets the swipe as usual. Natural
+scrolling sets the direction as it does for Spaces. An event tap reads macOS's
+private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
+the Accessibility permission WinMuxX already has.
+
+With that setting on four fingers or off, WinMuxX recognizes raw touches itself:
+exactly three touching fingers moving horizontally select the next/previous existing
 workspace on the display under the pointer. Left means next, right means previous;
 reverse direction is optional. Navigation stays within that display and project,
 stops at either end, and never creates, moves or swaps workspaces.
@@ -742,8 +753,6 @@ the callback. Wake and device topology changes re-register the devices. Disable 
 feature to unregister the callbacks. The binding and recognizer are independently
 implemented; OmniWM's raw-touch architecture was reviewed as a reference.
 
-Set **System Settings → Trackpad → More Gestures → Swipe between full-screen apps**
-to four fingers or off so the native gesture does not run alongside WinMuxX. This
-backend does not change system preferences or suppress macOS gestures. Test in Safari,
-Ghostty and another app before keeping it enabled. Settings shows backend registration
-and the highest finger count detected; `winmuxx doctor` also reports received frames.
+Neither backend changes system preferences. Settings shows which backend is in use,
+its registration and the highest finger count detected; `winmuxx doctor` also reports
+received frames and the last macOS swipe's progress, velocity and outcome.

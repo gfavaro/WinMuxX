@@ -120,9 +120,10 @@ struct ShortcutBehaviorSettingsView: View {
                         persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
                     }
                     .disabled(!workspaceSwipes)
-                    Text(workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
+                    Text(DockWorkspaceSwipeSource.shared.isActive ? DockWorkspaceSwipeSource.shared.status
+                        : workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
                         .font(.callout).foregroundStyle(.secondary)
-                    Text("Uses the private macOS raw-touch API. Exactly three fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Set Swipe between full-screen apps to four fingers or off in macOS Trackpad settings to avoid conflicts. Normal two-finger scrolling stays with your apps.")
+                    Text("With Swipe between full-screen apps on three fingers in macOS Trackpad settings, macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Otherwise WinMuxX reads exactly three fingers through the private raw-touch API. Normal two-finger scrolling stays with your apps.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
                 SettingsSection("Workspace overview") {

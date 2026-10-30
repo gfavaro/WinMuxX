@@ -20,10 +20,9 @@ final class SetupCheckTest: XCTestCase {
         var input = healthy
         input.accessibilityGranted = false
         input.otherWindowManagers = ["yabai"]
-        input.macThreeFingerHorizontalSwipe = true
         input.overviewThreeFingerUp = true
         input.macThreeFingerVerticalSwipe = true
-        XCTAssertEqual(failing(input), ["accessibility", "other-window-managers", "three-finger-swipe", "three-finger-up"])
+        XCTAssertEqual(failing(input), ["accessibility", "other-window-managers", "three-finger-up"])
         XCTAssertTrue(setupCheckItems(input).first { $0.id == "other-window-managers" }!.detail.contains("yabai"))
         XCTAssertNotNil(setupCheckItems(input).first { $0.id == "accessibility" }?.fixURL)
     }
@@ -36,8 +35,18 @@ final class SetupCheckTest: XCTestCase {
         input.macThreeFingerHorizontalSwipe = true // macOS owns desktop swipes in native mode.
         XCTAssertEqual(failing(input), ["separate-spaces", "rearrange-spaces"])
         input.backend = .virtual
-        XCTAssertEqual(failing(input), ["three-finger-swipe"], "Spaces settings do not matter to WinMuxX workspaces")
+        XCTAssertEqual(failing(input), [], "Spaces settings do not matter to WinMuxX workspaces")
+    }
+
+    func testEitherThreeFingerSwipeSettingWorksAndMacOSRecognitionIsSuggested() {
+        var input = healthy
+        let item = { setupCheckItems(input).first { $0.id == "three-finger-swipe" } }
+        XCTAssertEqual(item()?.ok, true)
+        XCTAssertNotNil(item()?.fixURL, "Raw touch works; macOS's recognition is offered")
+        input.macThreeFingerHorizontalSwipe = true
+        XCTAssertEqual(item()?.ok, true)
+        XCTAssertNil(item()?.fixURL, "WinMuxX reads macOS's swipe instead of clashing with it")
         input.workspaceSwipe = false
-        XCTAssertEqual(failing(input), [], "No clash when WinMuxX does not swipe")
+        XCTAssertNil(item())
     }
 }

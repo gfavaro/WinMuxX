@@ -116,6 +116,33 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         await fulfillment(of: [completed], timeout: 2)
     }
 
+    func testMacOSSwipeSwitchesAndAnEdgeIsLeftToMacOS() async throws {
+        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: false, progress: 0.1, timestamp: 1), .unavailable,
+                       "No previous workspace: the swipe goes back to macOS")
+        XCTAssertFalse(preview.isActive)
+        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        controller.updateDockSwipe(0.6, timestamp: 1.1)
+        let started = expectation(description: "Navigation entered session")
+        gate.started = started
+        controller.endDockSwipe(commit: true, timestamp: 1.2)
+        let task = try XCTUnwrap(controller.pending)
+        await fulfillment(of: [started], timeout: 2)
+        await finish(task)
+        XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
+        XCTAssertEqual(preview.releases, [true])
+    }
+
+    func testMacOSSwipeIsIgnoredWhileTheLastSwitchIsPendingAndUnavailableWhenNavigationIsOff() async throws {
+        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        let started = expectation(description: "Navigation entered session")
+        gate.started = started
+        controller.endDockSwipe(commit: true, timestamp: 1.2)
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1.3), .ignored)
+        navigationAllowed = false
+        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1.4), .unavailable)
+    }
+
     func testResetDuringNavigationCannotActivateOrRevealOldWorkspace() async throws {
         begin()
         let task = try await commit()

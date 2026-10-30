@@ -32,7 +32,9 @@ static int contactFrame(void *device, const void *bytes, int count, double times
         int32_t state, identifier;
         float px, py;
         memcpy(&state, contact + 20, sizeof(state));
-        if (state != 4) continue;
+        // Making (3), touching (4) and breaking (5) contacts are all on the pad: a finger
+        // still landing or already lifting must not read as two fingers mid-swipe.
+        if (state < 3 || state > 5) continue;
         memcpy(&identifier, contact + 16, sizeof(identifier));
         memcpy(&px, contact + 32, sizeof(px));
         memcpy(&py, contact + 36, sizeof(py));

@@ -27,10 +27,6 @@ struct SetupCheckInput {
     var macThreeFingerVerticalSwipe: Bool
 
     @MainActor static var current: Self {
-        func trackpad(_ key: String) -> Int {
-            ["com.apple.AppleMultitouchTrackpad", "com.apple.driver.AppleBluetoothMultitouch.trackpad"]
-                .compactMap { CFPreferencesCopyAppValue(key as CFString, $0 as CFString) as? Int }.max() ?? 0
-        }
         return Self(
             backend: runtime.workspaceBackend.kind,
             accessibilityGranted: AXIsProcessTrusted(),
@@ -39,8 +35,8 @@ struct SetupCheckInput {
             rearrangesSpaces: CFPreferencesCopyAppValue("mru-spaces" as CFString, "com.apple.dock" as CFString) as? Bool ?? true,
             workspaceSwipe: config.workspaceSwipe.enabled,
             overviewThreeFingerUp: config.workspaceOverview.threeFingerUp,
-            macThreeFingerHorizontalSwipe: trackpad("TrackpadThreeFingerHorizSwipeGesture") == 2,
-            macThreeFingerVerticalSwipe: trackpad("TrackpadThreeFingerVertSwipeGesture") == 2,
+            macThreeFingerHorizontalSwipe: macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2,
+            macThreeFingerVerticalSwipe: macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2,
         )
     }
 }
@@ -66,10 +62,14 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
                 detail: input.rearrangesSpaces ? "macOS reorders desktops by recent use, so desktop numbers and shortcuts change. Turn off Automatically rearrange Spaces based on most recent use in Desktop & Dock." : "Off.",
                 fixURL: input.rearrangesSpaces ? desktopSettings : nil))
         case .virtual:
-            let swipeClash = input.workspaceSwipe && input.macThreeFingerHorizontalSwipe
-            items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe is free", ok: !swipeClash,
-                detail: swipeClash ? "macOS also swipes between full-screen apps with three fingers. Set Trackpad › More Gestures › Swipe between full-screen applications to four fingers." : "No clash.",
-                fixURL: swipeClash ? trackpadSettings : nil))
+            // Either works: macOS's swipe is read when it uses three fingers, raw touch otherwise.
+            if input.workspaceSwipe {
+                items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: true,
+                    detail: input.macThreeFingerHorizontalSwipe
+                        ? "WinMuxX switches workspaces with macOS's own three-finger swipe recognition."
+                        : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Swipe between full-screen applications to three fingers.",
+                    fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
+            }
             let overviewClash = input.overviewThreeFingerUp && input.macThreeFingerVerticalSwipe
             if input.overviewThreeFingerUp {
                 items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up is free", ok: !overviewClash,

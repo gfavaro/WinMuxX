@@ -135,6 +135,11 @@ invalidate recovery state and replace secondary slots, returning displaced owner
 to main without activating them. Startup/restoration only seed ownership.
 
 `WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
+`DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events instead of
+raw touch for horizontal swipes when macOS assigns that gesture to three fingers;
+`DockSwipeTracker` decides which swipes WinMuxX keeps from the Dock and replays the
+rest. On macOS 27 the Dock must still receive the physical Ended event (motion
+zeroed), or its gesture state stays open.
 Recognizer policy, the bounded mailbox, native device ownership and the shared
 spring each have separate modules. The overview presentation owns panel-only
 motion; the horizontal controller owns horizontal navigation. Keep new gesture
