@@ -8,13 +8,7 @@ extension TilingContainer {
         guard !children.isEmpty else { return [] }
         let axis = orientation
         let horizontal = axis == .h
-        var weights = children.map { weightAt?($0) ?? $0.getWeight(axis) }
-        // Native Spaces leaves hidden children out; the rest share the space in proportion
-        // to their stored weights, as Dwindle shares do, so hiding one resizes none.
-        if weightAt == nil, children.count < self.children.count {
-            let total = weights.reduce(0, +)
-            if total > 0 { weights = weights.map { $0 / total * (horizontal ? rect.width : rect.height) } }
-        }
+        let weights = children.map { weightAt?($0) ?? $0.getWeight(axis) }
         let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
         let calculated = TileLayoutGeometry.calculate(TileLayoutInput(
             origin: rect.topLeftCorner, size: rect.size, horizontal: horizontal,
