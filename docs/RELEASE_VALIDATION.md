@@ -697,3 +697,25 @@ replaying focus. All seven window IDs and their workspace assignments, both
 display identities, and the active configuration hash matched the pre-install
 snapshot. The installer retained build 131 as a rollback archive. Interactive
 multi-display animation behavior was not manually exercised.
+
+## Overview swipe contact participation (build 230)
+
+Signed build 230 is installed with source `4e27b98b360c802a16bd6fa4f7afdf0ea979929f`.
+Installer dry-run and config validation passed. The initial install check reported
+`focus_changed_during_validation`; a read-only resume validated the installation
+with no moved, opened or closed managed windows. Client and server versions match.
+The app reports its raw touch source is registered; registration alone does not
+prove a physical gesture works.
+
+`make check` passed 1,587 Swift tests, 53 Python tests and 19 schema fixtures.
+The overview recognizer checks each contact's vertical displacement before locking
+its axis. Synthetic tests cover a stationary contact in each position, both swipe
+directions, direction changes after recognition, contact replacement, continued
+progress and copying transient driver contact data before returning. Horizontal
+workspace navigation keeps its previous recognition policy.
+
+Physical trackpad validation of an ordinary three-finger overview swipe and a
+two-finger scroll with a resting third contact remains pending user feedback. The
+threshold is a normalized distance, so actual comfort and device variation need
+physical checking. macOS Mission Control was changed with user consent to four
+fingers; System Settings also changed App Exposé to four fingers.
