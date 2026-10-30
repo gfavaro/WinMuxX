@@ -207,7 +207,7 @@ keeps Validate and Save and apply, including stale-file conflict protection.
 
 ## Workspace-wide arrangement
 
-Set `layout` in a workspace section to `dwindle`, `master` or `scrolling`. This chooses how the workspace's existing top-level groups are arranged; it does not flatten nested splits or tab groups. Master arranges one selected group beside a stack of the others. Scrolling arranges groups in horizontal columns.
+Set `layout` in a workspace section to `dwindle`, `master` or `scrolling`. This chooses how the workspace's existing top-level groups are arranged; it does not flatten nested splits or tab groups. Master arranges one selected group beside a stack of the others; when the whole workspace is a single row or column split (made in Dwindle), Master arranges that split's tiles as the groups, without changing the tree. Scrolling arranges groups in horizontal columns and keeps such a split as one column.
 
 After using Master or Scrolling, switching back to Dwindle retains those group boundaries, including across restarts. Master selection follows the group when other groups are inserted or removed. Keyboard resizing adjusts nested splits first; when there is no matching split inside the focused group, resizing along the Master axis adjusts the workspace divider. Its proportion is saved with the workspace.
 

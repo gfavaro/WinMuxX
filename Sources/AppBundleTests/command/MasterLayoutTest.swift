@@ -42,6 +42,42 @@ final class MasterLayoutTest: WorkspaceTestCase {
         XCTAssertTrue([a, b, c, d].allSatisfy { $0.nodeWorkspace === workspace })
     }
 
+    func testARowMadeInDwindleBecomesTheMasterGroupsWithoutChangingTheTree() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        let row = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tiles, index: 0)
+        let tabs = TilingContainer(parent: row, adaptiveWeight: 6, .v, .tabGroup, index: 0)
+        let helium = TestWindow.new(id: 74201, parent: tabs)
+        let excel = TestWindow.new(id: 74202, parent: tabs)
+        let remote = TestWindow.new(id: 74203, parent: row, adaptiveWeight: 2272)
+        let chat = TestWindow.new(id: 74204, parent: row, adaptiveWeight: 1140)
+        _ = remote.focusWindow()
+
+        let master = try await run("workspace-layout master")
+        XCTAssertEqual(master.exitCode, 0)
+        XCTAssertEqual(root.children, [row] as [TreeNode], "The tree is kept")
+        XCTAssertEqual(workspace.workspaceLayoutUnits, [tabs, remote, chat] as [TreeNode], "The row's tiles are the groups")
+        XCTAssertTrue(excel.topLevelWorkspaceGroup === tabs)
+        XCTAssertEqual(workspace.masterGroupIndex, 1, "The focused window is the main one")
+        let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+        let display = Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080)
+        let frames = workspace.arrangementGroupFrames(in: display, gaps: gaps)
+        XCTAssertEqual(frames.count, 3)
+        for frame in frames {
+            XCTAssertGreaterThan(frame.physical.width, 300, "No group is squeezed: \(frame.physical)")
+            XCTAssertLessThanOrEqual(frame.physical.maxX, display.maxX + 1, "No group leaves the display")
+        }
+
+        let added = bindingDataForNewTilingWindow(workspace, window: nil)
+        XCTAssertTrue(added.parent === row, "A new window joins the groups, not a second root group")
+        XCTAssertEqual(added.index, 2)
+
+        let scrolling = try await run("workspace-layout scrolling")
+        XCTAssertEqual(scrolling.exitCode, 0)
+        XCTAssertEqual(workspace.workspaceLayoutUnits, [row] as [TreeNode], "Scrolling keeps the split as one column")
+        XCTAssertEqual(helium.nodeWorkspace, workspace)
+    }
+
     func testUltrawideMainsSitSideBySideWithANarrowStack() async throws {
         let previous = config.master
         defer { config.master = previous }

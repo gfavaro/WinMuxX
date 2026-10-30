@@ -38,7 +38,8 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> B
         return tabGroupBinding
     }
     if workspace.arrangement == .scrolling || workspace.arrangement == .master {
-        let root = ensureScrollingRootSupportsColumns(workspace)
+        let root = workspace.arrangement == .master && workspace.arrangementGroupParent !== workspace.rootTilingContainer
+            ? workspace.arrangementGroupParent : ensureScrollingRootSupportsColumns(workspace)
         let focused = focus.windowOrNil?.topLevelWorkspaceGroup
         let index = focused.flatMap { root.children.firstIndex(of: $0) }.map { $0 + 1 } ?? root.children.count
         return BindingData(parent: root, adaptiveWeight: WEIGHT_AUTO, index: index)

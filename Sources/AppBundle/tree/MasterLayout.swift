@@ -92,8 +92,9 @@ extension TreeNode {
            workspace.rootTilingContainer.layout == .tabGroup || workspace.rootTilingContainer.layout == .stacked {
             return workspace.rootTilingContainer
         }
+        let groups = nodeWorkspace?.arrangementGroupParent
         var node: TreeNode = self
-        while let parent = node.parent as? TilingContainer, !(parent.parent is Workspace) {
+        while let parent = node.parent as? TilingContainer, parent !== groups, !(parent.parent is Workspace) {
             node = parent
         }
         return node
@@ -101,9 +102,22 @@ extension TreeNode {
 }
 
 extension Workspace {
+    /// The container whose children Master and Scrolling arrange: the root, except that
+    /// Master looks inside a root holding a single split (a row or column made in Dwindle),
+    /// which would otherwise be one group shown whole. The tree is not changed; Scrolling
+    /// keeps such a split as one column, a real choice there.
+    @MainActor
+    var arrangementGroupParent: TilingContainer {
+        let root = rootTilingContainer
+        guard arrangement == .master, root.layout != .tabGroup, root.layout != .stacked,
+              let split = root.children.singleOrNil() as? TilingContainer,
+              split.layout != .tabGroup, split.layout != .stacked, split.children.count > 1 else { return root }
+        return split
+    }
+
     @MainActor
     var workspaceLayoutUnits: [TreeNode] {
-        let root = rootTilingContainer
+        let root = arrangementGroupParent
         let units = root.layout == .tabGroup || root.layout == .stacked ? [root] : root.children
         return runtime.workspaceBackend.kind == .native ? units.filter(\.hasNativeLayoutWindow) : units
     }
