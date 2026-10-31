@@ -225,7 +225,9 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
         let start = WorkspaceSwipeController.shared.dockSwipeMayStart()
         guard start == .started else { return start }
         // Option with three fingers pans a scrolling workspace through raw touch; it never switches.
-        return NSEvent.modifierFlags.contains(.option) ? .ignored : .started
+        if NSEvent.modifierFlags.contains(.option) { return .ignored }
+        WorkspaceSwipeController.shared.dockSwipeTouchedDown()
+        return .started
     }
 
     /// Positive progress heads for the next Space, following Natural scrolling already.

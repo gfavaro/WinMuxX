@@ -20,6 +20,7 @@ private final class SwipePreviewSpy: WorkspaceSwipePreviewing {
     func update(_ progress: Double, timestamp: Double) {}
     func settle(commit: Bool, timestamp: Double) { releases.append(commit) }
     func revealWorkspace() { reveals += 1; isActive = false }
+    func prepareFront(on monitor: Monitor) {}
     func cancel() { cancels += 1; isActive = false; validity = nil }
     func invalidate() { cancel() }
 }

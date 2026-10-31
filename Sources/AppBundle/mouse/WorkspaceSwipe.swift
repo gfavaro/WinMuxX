@@ -10,6 +10,7 @@ protocol WorkspaceSwipePreviewing: AnyObject {
     func update(_ progress: Double, timestamp: Double)
     func settle(commit: Bool, timestamp: Double)
     func revealWorkspace()
+    func prepareFront(on monitor: Monitor)
     func cancel()
     func invalidate()
 }
@@ -124,6 +125,14 @@ final class WorkspaceSwipeController {
     /// Whether a macOS swipe may start here, before its direction is known.
     func dockSwipeMayStart() -> DockSwipeStart {
         canNavigate ? .started : dependencies.keepsSwipe() ? .ignored : .unavailable
+    }
+
+    /// macOS has started a swipe WinMuxX may take: the screen is grabbed now, while the
+    /// direction is still unknown, so the preview can follow the first movement.
+    func dockSwipeTouchedDown() {
+        let point = dependencies.pointer()
+        guard pending == nil, let monitor = dependencies.monitors().first(where: { $0.rect.contains(point) }) else { return }
+        dependencies.preview.prepareFront(on: monitor)
     }
 
     func beginDockSwipe(slidesLeft: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
