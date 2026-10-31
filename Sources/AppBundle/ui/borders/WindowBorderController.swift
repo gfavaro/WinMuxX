@@ -185,6 +185,10 @@ final class WindowBorderController {
             frames[number.uint32Value] = frame
         }
         var visible = Set<UInt32>()
+        // A border whose window left the screen moves to the next window that needs one: creating
+        // a border makes new WindowServer windows, and a workspace switch replaces every border.
+        let onVisibleWorkspaces = Set(Workspace.all.filter(\.isVisible).flatMap { $0.allLeafWindowsRecursive.map(\.windowId) })
+        var reusable = borders.keys.filter { !onVisibleWorkspaces.contains($0) }
         for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
             for window in workspace.allLeafWindowsRecursive {
                 if WorkspacePresentationController.shared.suppressesChrome(for: window) { continue }
@@ -199,7 +203,9 @@ final class WindowBorderController {
                 let frame = resolvedWindowBorderFrame(snapshot: snapshot, nativeFrame: hasNativeFrame ? nativeFrame : nil)
                 guard let target = windowBorderTarget(for: window, nativeFrame: frame) else { continue }
                 visible.insert(window.windowId)
-                let border = borders[window.windowId] ?? WindowBorder(target: window.windowId)
+                let border = borders[window.windowId]
+                    ?? reusable.popLast().flatMap { borders.removeValue(forKey: $0) }.map { $0.retarget(window.windowId) }
+                    ?? WindowBorder(target: window.windowId)
                 borders[window.windowId] = border
                 border.update(frame: target.frame, active: focus.windowOrNil?.windowId == window.windowId,
                     settings: settings, corners: target.corners)
@@ -270,7 +276,9 @@ func resolvedWindowBorderFrame(snapshot: CGRect, nativeFrame: CGRect?) -> CGRect
 
 @MainActor
 final class WindowBorder {
-    let target: UInt32
+    private(set) var target: UInt32
+    /// The window the native pieces were last ordered against.
+    private var placedTarget: UInt32?
     private var nativeID: OpaquePointer?
     private var frame: CGRect?
     private var geometry: WindowBorderGeometry?
@@ -292,6 +300,11 @@ final class WindowBorder {
     }
 
     var windowId: UInt32 { windowIds.first ?? 0 }
+
+    func retarget(_ target: UInt32) -> WindowBorder {
+        self.target = target
+        return self
+    }
     var usesNativeBackend: Bool { nativeID != nil }
 
     init(
@@ -341,7 +354,7 @@ final class WindowBorder {
             appearance = nil
         }
         let nextAppearance = Appearance(settings: settings, active: active)
-        if appearance == nextAppearance, self.frame == frame, self.corners == nextCorners { return }
+        if appearance == nextAppearance, self.frame == frame, self.corners == nextCorners, placedTarget == target { return }
         if appearance != nextAppearance || self.frame?.size != frame.size || self.corners != nextCorners {
             let radius = nextCorners.maximum
             let outerSize = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width)).size
@@ -364,6 +377,7 @@ final class WindowBorder {
         }
         self.frame = frame
         self.corners = nextCorners
+        placedTarget = target
     }
 
     private func borderGeometry(size: CGSize, corners: WindowBorderCornerRadii, width: CGFloat, scale: CGFloat) -> WindowBorderGeometry {

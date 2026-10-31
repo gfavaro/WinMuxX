@@ -74,6 +74,28 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
     }
 
     @MainActor
+    func testRetargetedBorderKeepsItsNativeWindowsAndDrawsAgainstTheNewTarget() {
+        var creations = 0
+        var targets: [UInt32] = []
+        let border = WindowBorder(target: 1, createNativeBorder: { _, handle in
+            creations += 1
+            handle = OpaquePointer(bitPattern: 1)
+            return true
+        }, updateNativeBorder: { _, target, _, _, _, _, _, _ in
+            targets.append(target)
+            return true
+        }, destroyNativeBorder: { _ in })
+        var settings = WindowBordersConfig()
+        settings.width = 2
+        let frame = CGRect(x: -20000, y: -20000, width: 100, height: 100)
+        border.update(frame: frame, active: true, settings: settings)
+        border.retarget(2).update(frame: frame.insetBy(dx: 10, dy: 10), active: true, settings: settings)
+        XCTAssertEqual(creations, 1)
+        XCTAssertEqual(targets, [1, 2])
+        XCTAssertEqual(border.target, 2)
+    }
+
+    @MainActor
     func testFocusChangeReusesTheDestroyedBordersPanelsInsteadOfCreatingNewOnes() {
         var settings = WindowBordersConfig()
         settings.width = 2

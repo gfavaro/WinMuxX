@@ -9,7 +9,9 @@ static void *sky(void) {
     if (!handle) handle = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY);
     return handle;
 }
-#define SYM(name, type) ((type)dlsym(sky(), name))
+// Each call site resolves its symbol once: dlsym searches the export trie every time, and
+// border and window-frame calls run for every window event.
+#define SYM(name, type) ({ static void *symbol; if (!symbol) symbol = dlsym(sky(), name); (type)symbol; })
 typedef int (*Connection)(void);
 typedef int (*Region)(CGRect *, CFTypeRef *);
 typedef int (*NewWindow)(int, int, float, float, CFTypeRef, uint32_t *);
