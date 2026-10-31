@@ -201,7 +201,7 @@ func schedulePersistedFrozenWorldSave() {
     guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly,
           TrayMenuModel.shared.isEnabled,
-          NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId else { return }
+          !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
     // Capture current titles without adding AX round trips to every focus/layout event.
     guard recovery.pendingRestartSave == nil else { return }
     recovery.pendingRestartSave = runtime.task {
@@ -217,7 +217,7 @@ func schedulePersistedFrozenWorldSave() {
             }
         }
         guard !Task.isCancelled,
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId else {
+              !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else {
             recovery.pendingRestartSave = nil
             return
         }
@@ -330,7 +330,7 @@ func trackPendingRestartWindow(_ window: Window) {
             recovery.restartWindowAttempts = recovery.restartWindowAttempts.filter { Date.now.timeIntervalSince($0.value.started) < 30 }
             guard !Task.isCancelled else { return }
             if !recovery.restartWindowAttempts.isEmpty, isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled,
-               NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId {
+               !isLockScreenApp(NSWorkspace.shared.frontmostApplication) {
                 scheduleRefreshSession(.workspaceRestoration)
             }
         }

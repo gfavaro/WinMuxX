@@ -31,7 +31,9 @@ final class MacApp: AbstractApp {
     private var setFrameJobs: [UInt32: RunLoopJob] = [:]
     @MainActor private static var focusJob: RunLoopJob? = nil
 
-    /*conforms*/ var name: String? { nsApp.localizedName }
+    /// Read once: after every app activation AppKit drops its cached answer and asks
+    /// LaunchServices again, and the menu bar and sidebar read every window's app name.
+    /*conforms*/ let name: String?
     /*conforms*/ var execPath: String? { nsApp.executableURL?.path }
     /*conforms*/ var bundlePath: String? { nsApp.bundleURL?.path }
 
@@ -48,6 +50,7 @@ final class MacApp: AbstractApp {
         self.axAppFastTimeout = .init(axAppFastTimeout)
         self.pid = nsApp.processIdentifier
         self.rawAppBundleId = nsApp.bundleIdentifier
+        self.name = nsApp.localizedName
         self.appId = nsApp.bundleIdentifier.flatMap { KnownBundleId.init(rawValue: $0) }
         assert(!axSubscriptions.isEmpty)
         self.appAxSubscriptions = .init(axSubscriptions)
@@ -59,15 +62,16 @@ final class MacApp: AbstractApp {
     static func getOrRegister(_ nsApp: NSRunningApplication) async throws -> MacApp? {
         // Don't perceive any of the lock screen windows as real windows
         // Otherwise, false positive ax notifications might trigger that lead to gcWindows
-        if nsApp.bundleIdentifier == lockScreenAppBundleId { return nil }
         let pid = nsApp.processIdentifier
         // AX requests crash if you send them to yourself
         if pid == myPid { return nil }
 
+        // A registered app was checked when it registered; only new ones need the lock screen check.
         if let existing = allAppsMap[pid] {
-            if !existing.nsApp.isTerminated, existing.nsApp.launchDate == nsApp.launchDate { return existing }
+            if !existing.nsApp.isTerminated, existing.nsApp === nsApp || existing.nsApp.launchDate == nsApp.launchDate { return existing }
             await existing.destroy()
         }
+        if isLockScreenApp(nsApp) { return nil }
         try checkCancellation()
         if let wip = wipPids[pid] {
             try await wip.await()

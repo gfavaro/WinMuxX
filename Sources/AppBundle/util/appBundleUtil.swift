@@ -7,6 +7,17 @@ let signposter = OSSignposter(subsystem: winMuxAppId, category: .pointsOfInteres
 
 let myPid = NSRunningApplication.current.processIdentifier
 let lockScreenAppBundleId = "com.apple.loginwindow"
+private let lockScreenExecutablePath = "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"
+
+/// Answered from the process's executable path. `bundleIdentifier` is a synchronous
+/// LaunchServices request whenever AppKit has dropped its cached answer, which it does after
+/// every app activation, and these checks run on every refresh and app notification.
+func isLockScreenApp(_ app: NSRunningApplication?) -> Bool {
+    guard let app else { return false }
+    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard proc_pidpath(app.processIdentifier, &path, UInt32(path.count)) > 0 else { return false }
+    return String(cString: path) == lockScreenExecutablePath
+}
 
 @MainActor
 private let terminationCoordinator = WindowTerminationCoordinator()
