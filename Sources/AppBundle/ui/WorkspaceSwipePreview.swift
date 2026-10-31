@@ -203,14 +203,12 @@ final class WorkspaceSwipePreview {
             switch result {
                 case .success(let snapshot):
                     self.updateTiming { $0.workerMs = snapshot.renderMs }
+                    // A slide already showing the cached image keeps it: replacing a full-screen
+                    // image mid-slide stalls the next frames while it uploads, and the fresh one
+                    // is cached for the next swipe. The fade at the end covers the difference.
                     if self.phase == .preparing {
                         self.phase.imageReady()
                         self.show(front: front, back: snapshot.image, rect: rect, started: started)
-                    } else {
-                        CATransaction.begin()
-                        CATransaction.setDisableActions(true)
-                        self.incoming?.contents = snapshot.image
-                        CATransaction.commit()
                     }
                 case .failure:
                     if self.phase == .preparing { self.cancel() }

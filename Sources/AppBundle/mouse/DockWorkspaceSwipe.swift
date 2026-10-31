@@ -441,6 +441,8 @@ final class DockWorkspaceSwipeSource {
         let phase = event.getIntegerValueField(Self.field(Self.phase))
         let progress = event.getDoubleValueField(Self.field(Self.progress))
         let time = Double(event.timestamp) / 1_000_000_000
+        // A late event means WinMuxX's main thread was busy: the preview stalls, then jumps.
+        WorkspaceMotionDiagnostics.record("macOS swipe event to WinMuxX", milliseconds: (CACurrentMediaTime() - time) * 1000)
         let verdict: DockSwipeTracker.Verdict
         switch event.getIntegerValueField(Self.field(Self.swipeMotion)) {
             case Self.motionHorizontal where readsHorizontal:

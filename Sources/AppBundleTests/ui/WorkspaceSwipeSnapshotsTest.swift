@@ -177,7 +177,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(snapshots.cache.count, 0)
     }
 
-    func testFreshWarmImageReplacesCacheWithoutResubmittingTheOverlay() async throws {
+    func testFreshWarmImageIsCachedForTheNextSwipeWithoutChangingTheSlide() async throws {
         let started = expectation(description: "refresh started")
         let delivered = expectation(description: "refresh delivered")
         let gate = controlledRenderer { _ in started.fulfill() }
@@ -201,6 +201,9 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(preview.timings.last?.submissionMs, firstSubmission)
         XCTAssertEqual(preview.timings.last?.workerMs, 120)
         XCTAssertTrue(snapshots.cache.image(for: request().key) === freshImage)
+        let panel = try XCTUnwrap(NSApplication.shared.windows.first { $0.isVisible && $0.level == .screenSaver })
+        let incoming = try XCTUnwrap(panel.contentView?.layer?.sublayers?.last)
+        XCTAssertTrue((incoming.contents as AnyObject?) === oldImage, "The slide keeps the image it started with")
     }
 
     func testColdFailureFallsBackAndWarmFailureKeepsItsPreview() async throws {
