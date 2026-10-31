@@ -722,7 +722,12 @@ applications** uses three fingers, macOS recognizes the swipe and WinMuxX acts o
 so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
 as in macOS. WinMuxX keeps the swipe from the Dock only when it switches a workspace:
 with no workspace that way, over a native full-screen app, while Mission Control is
-open or while WinMuxX is not taking swipes, macOS gets the swipe as usual. Natural
+open or while WinMuxX is not taking swipes, macOS gets the swipe as usual. While a
+window drag or the workspace overview is in progress, the swipe does nothing, so
+macOS does not switch Spaces underneath. macOS's own release speed decides a flick: a
+quick flick switches after a little travel, and flicking back cancels even past
+halfway. Quick swipes chain: a swipe begun while the previous switch is still landing
+waits for it, then continues from the workspace it reached. Natural
 scrolling sets the direction as it does for Spaces. An event tap reads macOS's
 private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
 the Accessibility permission WinMuxX already has.

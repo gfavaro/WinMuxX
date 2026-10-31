@@ -82,6 +82,26 @@ final class DockSwipeTrackerTest: XCTestCase {
         XCTAssertEqual(receiver.ended, [true, false, false], "Fingers that rested before lifting are not a flick")
     }
 
+    func testMacOSReleaseVelocityDecidesFlicksBothWays() {
+        _ = send(.began, at: 0)
+        _ = send(.changed, -0.1, at: 0.02)
+        _ = send(.changed, -0.23, at: 0.4)
+        _ = send(.ended, -0.23, velocity: -1.8, at: 0.41)
+        XCTAssertEqual(receiver.ended, [true], "A short flick switches by macOS's own speed, whichever way")
+
+        _ = send(.began, at: 1)
+        _ = send(.changed, 0.1, at: 1.02)
+        _ = send(.changed, 0.65, at: 1.3)
+        _ = send(.ended, 0.65, velocity: -2, at: 1.31)
+        XCTAssertEqual(receiver.ended, [true, false], "Flicking back cancels even past halfway")
+
+        _ = send(.began, at: 2)
+        _ = send(.changed, 0.1, at: 2.02)
+        _ = send(.changed, 0.3, at: 2.05)
+        _ = send(.ended, 0.3, velocity: 0.2, at: 2.06)
+        XCTAssertEqual(receiver.ended, [true, false, false], "macOS reads fingers that rested as slow")
+    }
+
     func testAFlickThatEndsBeforeAnyTravelUsesTheEndVelocity() {
         _ = send(.began, at: 0)
         XCTAssertEqual(send(.ended, velocity: 3, at: 0.02), .passWithoutMotion)

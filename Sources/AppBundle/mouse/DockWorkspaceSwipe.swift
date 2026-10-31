@@ -71,10 +71,13 @@ struct DockSwipeTracker {
     /// Not yet known whose the swipe is: its generic gesture events wait with it.
     var isUndecided: Bool { state == .undecided }
 
-    /// The same release rule as raw touch: past halfway, or a quick flick that has travelled.
+    /// Past halfway unless flicked back, or a flick forward that has travelled a little.
+    /// `velocity` is in progress per second toward the target; negative heads back.
     static func shouldCommit(progress: Double, velocity: Double) -> Bool {
-        progress >= 0.5 || (progress >= 0.16 && velocity >= 2.5)
+        progress >= 0.5 ? velocity > -flickSpeed : progress >= 0.16 && velocity >= flickSpeed
     }
+    /// A flick, in macOS's own release velocity (progress per second).
+    static let flickSpeed = 1.5
 
     /// Ends a swipe WinMuxX owns without completing it, when its events stop arriving.
     mutating func abandon(_ receiver: some DockSwipeReceiver) {
@@ -138,9 +141,12 @@ struct DockSwipeTracker {
                         guard verdict == .swallow else { return verdict }
                         if case .claimed = state { finish(commit: true, velocity: 0, timestamp: timestamp, receiver) }
                         return close
-                    case .claimed:
-                        // A velocity from a sample long before the lift is not a flick.
-                        let velocity = timestamp - sampleTime < 0.08 ? velocity : 0
+                    case .claimed(let sign):
+                        // macOS measures the release itself, signed like its progress, and it
+                        // already reads near zero when the fingers rested before lifting. Without
+                        // it, a velocity from a sample long before the lift is not a flick.
+                        let velocity = endVelocity != 0 ? endVelocity * sign
+                            : timestamp - sampleTime < 0.08 ? velocity : 0
                         finish(commit: Self.shouldCommit(progress: progress, velocity: velocity),
                                velocity: velocity, timestamp: timestamp, receiver)
                         return close

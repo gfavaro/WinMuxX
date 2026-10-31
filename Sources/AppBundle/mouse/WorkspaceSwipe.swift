@@ -26,6 +26,9 @@ struct WorkspaceSwipeDependencies {
     let reversed: () -> Bool
     let navigate: (@escaping @MainActor () -> Bool) async throws -> Bool
     let navigationFailed: (any Error) -> Void
+    /// While WinMuxX cannot switch, whether a macOS swipe is still WinMuxX's to keep
+    /// (a drag, the overview) rather than macOS's to act on.
+    var keepsSwipe: () -> Bool = { false }
 
     static var live: Self {
         Self(preview: WorkspaceSwipePreview.shared, monitors: { sortedMonitors }, pointer: { mouseLocation },
@@ -39,6 +42,9 @@ struct WorkspaceSwipeDependencies {
              }, navigationFailed: { error in
                  if TrayMenuModel.shared.isEnabled { scheduleRefreshSession(.globalObserver("workspaceSwipeInterrupted")) }
                  if !(error is CancellationError) { debugFocusLog("workspaceSwipe navigation failed: \(error)") }
+             }, keepsSwipe: {
+                 isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled && !WindowBorderController.shared.isMissionControlActive &&
+                     (isMouseManipulationActive || isLeftMouseButtonDown || isWorkspaceSidebarDragInProgress() || WorkspaceOverviewController.shared.isOpen)
              })
     }
 }
@@ -55,6 +61,17 @@ final class WorkspaceSwipeController {
         let source: Workspace
         let target: Workspace
     }
+    /// A macOS swipe begun while the previous switch was still landing. It waits, then
+    /// continues from the workspace that switch reached, as macOS chains quick swipes.
+    private struct FollowUp {
+        let displayPoint: CGPoint
+        let slidesLeft: Bool
+        var progress: Double
+        var timestamp: Double
+        /// Set when the fingers lift: whether the swipe completes.
+        var commit: Bool?
+    }
+    private var followUps: [FollowUp] = []
     private var recognizer = WorkspaceTouchRecognizer()
     private var gesture: Gesture?
     private(set) var pending: Task<Void, Never>?
@@ -68,6 +85,7 @@ final class WorkspaceSwipeController {
         generation += 1
         pending?.cancel()
         pending = nil
+        followUps.removeAll()
     }
 
     func cancelVisualInteraction() {
@@ -104,9 +122,14 @@ final class WorkspaceSwipeController {
     /// macOS recognized a three-finger swipe moving toward the next Space (`slidesLeft`) or
     /// the previous one. With no workspace that way it belongs to macOS.
     func beginDockSwipe(slidesLeft: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
-        guard canNavigate else { return .unavailable }
+        guard canNavigate else { return dependencies.keepsSwipe() ? .ignored : .unavailable }
         let point = dependencies.pointer()
         guard let monitor = dependencies.monitors().first(where: { $0.rect.contains(point) }) else { return .unavailable }
+        if pending != nil {
+            followUps.append(FollowUp(displayPoint: monitor.rect.topLeftCorner, slidesLeft: slidesLeft,
+                                      progress: progress, timestamp: timestamp))
+            return .started
+        }
         let isNext = slidesLeft != dependencies.reversed()
         guard workspaceSwipeTarget(on: monitor, isNext: isNext) != nil else { return .unavailable }
         let request = WorkspaceTouchRecognizer.Request(displayPoint: monitor.rect.topLeftCorner, isNext: isNext,
@@ -115,16 +138,42 @@ final class WorkspaceSwipeController {
     }
 
     func updateDockSwipe(_ progress: Double, timestamp: Double) {
+        if let last = followUps.indices.last, followUps[last].commit == nil {
+            followUps[last].progress = progress
+            followUps[last].timestamp = timestamp
+            return
+        }
         guard canNavigate else { return cancelVisualInteraction() }
         update(progress, timestamp: timestamp, receivedAt: CACurrentMediaTime())
     }
 
     func endDockSwipe(commit: Bool, timestamp: Double) {
+        if let last = followUps.indices.last, followUps[last].commit == nil {
+            followUps[last].commit = commit
+            return
+        }
         finish(commit: commit && canNavigate, timestamp: timestamp)
     }
 
+    /// The previous switch landed: the next waiting swipe starts from where it arrived,
+    /// tracking the fingers if they are still down, or completing as it was released.
+    private func resumeFollowUp() {
+        while !followUps.isEmpty {
+            let next = followUps.removeFirst()
+            guard next.commit != false, canNavigate,
+                  let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == next.displayPoint }) else { continue }
+            let request = WorkspaceTouchRecognizer.Request(displayPoint: next.displayPoint,
+                isNext: next.slidesLeft != dependencies.reversed(), progress: next.progress, slidesLeft: next.slidesLeft)
+            guard workspaceSwipeTarget(on: monitor, isNext: request.isNext) != nil,
+                  begin(request, timestamp: next.timestamp) else { continue }
+            if next.commit == true { finish(commit: true, timestamp: next.timestamp) }
+            return
+        }
+    }
+
     private func begin(_ request: WorkspaceTouchRecognizer.Request, timestamp: Double) -> Bool {
-        guard pending == nil, !dependencies.preview.isSettling,
+        // A settling preview gives way: the new swipe takes the panel over from it.
+        guard pending == nil,
               let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == request.displayPoint }),
               let target = workspaceSwipeTarget(on: monitor, isNext: request.isNext) else { return false }
         gesture = Gesture(displayPoint: request.displayPoint, source: monitor.activeWorkspace, target: target)
@@ -157,7 +206,12 @@ final class WorkspaceSwipeController {
         let released = CACurrentMediaTime()
         let currentGeneration = generation
         pending = Task { @MainActor in
-            defer { if generation == currentGeneration { pending = nil } }
+            defer {
+                if generation == currentGeneration {
+                    pending = nil
+                    resumeFollowUp()
+                }
+            }
             guard generation == currentGeneration else { return }
             guard !Task.isCancelled, canNavigate else {
                 dependencies.preview.cancel()
