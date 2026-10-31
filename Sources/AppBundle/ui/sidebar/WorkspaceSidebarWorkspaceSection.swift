@@ -344,7 +344,7 @@ extension WorkspaceSidebarWorkspaceSection {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isCompact ? workspaceBadgeText : workspace.displayName)
+        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -443,6 +443,7 @@ extension WorkspaceSidebarWorkspaceSection {
                     .contentShape(sectionShape)
             }
             .buttonStyle(.plain)
+            .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
             .frame(maxWidth: .infinity, alignment: .center)
             .contentShape(sectionShape)
         } else {
@@ -455,7 +456,7 @@ extension WorkspaceSidebarWorkspaceSection {
             Color.clear.contentShape(sectionShape)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(workspace.displayName)
+        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
     }
 
     var sectionContent: some View {
@@ -488,7 +489,7 @@ extension WorkspaceSidebarWorkspaceSection {
             tabGroupTabs(group, isDragging: isDragging)
         }
         .padding(.vertical, 1)
-        .animation(.spring(response: 0.2, dampingFraction: 0.78), value: isDragging)
+        .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.78), value: isDragging)
     }
 
     func tabGroupTabs(_ group: WorkspaceSidebarTabGroupViewModel, isDragging: Bool) -> some View {
@@ -514,7 +515,7 @@ extension WorkspaceSidebarWorkspaceSection {
             actions.send(.selectWindow(group.representativeWindowId))
         } label: {
             WorkspaceSidebarWindowRow(
-                title: group.title.isEmpty ? "Tab Group" : group.title,
+                title: workspaceSidebarTabGroupTitle(group.title),
                 badge: group.windowCount > 1 ? "\(group.windowCount)" : nil,
                 isFocused: group.isFocused,
                 suppressFocusedStyle: isSearchFiltering,
@@ -528,6 +529,8 @@ extension WorkspaceSidebarWorkspaceSection {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(workspaceSidebarTabGroupAccessibilityLabel(title: group.title, windowCount: group.windowCount))
+        .accessibilityAddTraits(group.isFocused ? .isSelected : [])
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .modifier(WorkspaceSidebarOptionalDragModifier(
@@ -574,6 +577,7 @@ extension WorkspaceSidebarWorkspaceSection {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(window.isFocused ? .isSelected : [])
         .id(WorkspaceSidebarSearchSelection.window(window.windowId))
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
@@ -605,6 +609,23 @@ extension WorkspaceSidebarWorkspaceSection {
             )
         }
         .opacity(1)
-        .animation(.spring(response: 0.2, dampingFraction: 0.78), value: activeSidebarDragSourceWindowId == window.windowId)
+        .animation(reduceMotion ? nil : .spring(response: 0.2, dampingFraction: 0.78), value: activeSidebarDragSourceWindowId == window.windowId)
+    }
+}
+
+func workspaceSidebarTabGroupTitle(_ title: String) -> String {
+    title.isEmpty ? "Tab Group" : title
+}
+
+/// Spoken form of the row, which shows the tab count only as a bare badge.
+func workspaceSidebarTabGroupAccessibilityLabel(title: String, windowCount: Int) -> String {
+    let title = workspaceSidebarTabGroupTitle(title)
+    return windowCount > 1 ? "\(title), \(windowCount) tabs" : title
+}
+
+private extension View {
+    /// Every button that activates a workspace speaks its full name and focus, in compact and expanded layouts.
+    func workspaceAccessibility(name: String, isFocused: Bool) -> some View {
+        accessibilityLabel(name).accessibilityAddTraits(isFocused ? .isSelected : [])
     }
 }

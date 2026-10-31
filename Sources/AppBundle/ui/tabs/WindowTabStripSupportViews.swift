@@ -43,7 +43,13 @@ struct WindowTabGroupHandleView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Focus Tab Group")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction {
+            guard let windowId else { return }
+            focusWindowFromTabStripClick(windowId, fallbackWorkspace: workspaceName)
+        }
         .frame(width: windowTabStripReservedGroupHandleWidth())
         .contentShape(Rectangle())
         .onTapGesture {

@@ -268,7 +268,7 @@ extension WindowTabStripView {
                 targetIndex: tgtIdx,
                 orderBeforeDrop: context.tabOrder,
             )
-            reorderTabInStrip(tab.windowId, toIndex: tgtIdx)
+            reorderTabInStrip(tab.windowId, stripId: strip.id, toIndex: tgtIdx)
             return
         }
         clearTabDragState()
@@ -437,6 +437,10 @@ extension WindowTabStripView {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(tab.title.isEmpty ? tab.appName : tab.title)
+        .accessibilityAddTraits(tab.isActive ? .isSelected : [])
+        .accessibilityAction(named: "Move Tab Left") { moveTab(tab, by: -1) }
+        .accessibilityAction(named: "Move Tab Right") { moveTab(tab, by: 1) }
         .offset(x: tabVisualOffset(for: tab, context: context))
         .zIndex(draggingTabId == tab.windowId ? 1 : 0)
         .shadow(
@@ -444,8 +448,8 @@ extension WindowTabStripView {
             radius: draggingTabId == tab.windowId ? 7 : 0,
             y: draggingTabId == tab.windowId ? 2 : 0,
         )
-        .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reorderTargetIndex(context: context))
-        .animation(.interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reentryPreviewModel.value?.targetIndex)
+        .animation(reduceMotion ? nil : .interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reorderTargetIndex(context: context))
+        .animation(reduceMotion ? nil : .interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reentryPreviewModel.value?.targetIndex)
         .animation(nil, value: reentryPreviewModel.value?.sourceVisualOffset)
         .highPriorityGesture(tabDragGesture(for: tab, context: context))
         .workspaceSidebarDrag(enabled: true) {
@@ -455,9 +459,22 @@ extension WindowTabStripView {
             updateHoveredTab(tab.windowId, hovering: hovering)
         }
         .contextMenu {
+            Button("Move Tab Left") { moveTab(tab, by: -1) }
+                .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: -1, in: strip.tabs) == nil)
+            Button("Move Tab Right") { moveTab(tab, by: 1) }
+                .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: 1, in: strip.tabs) == nil)
+            Divider()
             Button("Remove Tab From Stack") {
                 removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
             }
         }
+    }
+}
+
+extension WindowTabStripView {
+    /// Keyboard and VoiceOver alternative to drag reordering.
+    func moveTab(_ tab: WindowTabItemViewModel, by offset: Int) {
+        guard let target = windowTabStripMoveTargetIndex(tab.windowId, by: offset, in: strip.tabs) else { return }
+        reorderTabInStrip(tab.windowId, stripId: strip.id, toIndex: target)
     }
 }

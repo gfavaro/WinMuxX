@@ -61,16 +61,24 @@ struct SecureInputView: View {
         }
         .foregroundStyle(Color.white.opacity(GlassToken.textPrimary))
         .clipShape(RoundedRectangle(cornerRadius: RadiusToken.section, style: .continuous))
-        .onTapGesture {
-            if !isMinimized {
-                SecureInputPanel.shared.refresh()
-            }
-            isMinimized.toggle()
-            SecureInputPanel.shared.updateFrame(isMinimized: isMinimized)
-        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Secure Input is active")
+        .accessibilityValue(isMinimized ? "" : "WinMux cannot respond to keyboard shortcuts while Secure Input is active. Secure Input is a macOS security feature that prevents applications from reading keyboard events.")
+        .accessibilityHint(isMinimized ? "Shows why keyboard shortcuts are unavailable" : "Collapses this message")
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { toggle() }
+        .onTapGesture(perform: toggle)
         .frame(
             width: isMinimized ? iconSize.width : textSize.width,
             height: isMinimized ? iconSize.height : textSize.height,
         )
+    }
+
+    private func toggle() {
+        if !isMinimized {
+            SecureInputPanel.shared.refresh()
+        }
+        isMinimized.toggle()
+        SecureInputPanel.shared.updateFrame(isMinimized: isMinimized)
     }
 }

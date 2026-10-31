@@ -18,6 +18,7 @@ struct WorkspaceSidebarCreateWorkspaceSection: View {
 
     @State private var isDropTargeted = false
     @State private var isDropSettling = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var compactMetrics: WorkspaceSidebarCompactMetrics { WorkspaceSidebarCompactMetrics(width: layout.collapsedWidth) }
     private var sectionWidth: CGFloat { workspaceSidebarSectionWidth(expansionProgress, layout: layout) }
@@ -44,7 +45,7 @@ struct WorkspaceSidebarCreateWorkspaceSection: View {
                     preview: dragPreview,
                     rowHeight: workspaceSidebarWorkspaceRowHeight,
                 )
-                .transition(.asymmetric(
+                .transition(reduceMotion ? .opacity : .asymmetric(
                     insertion: .move(edge: .top).combined(with: .scale(scale: 0.96, anchor: .top)).combined(with: .opacity),
                     removal: .opacity,
                 ))
@@ -56,7 +57,7 @@ struct WorkspaceSidebarCreateWorkspaceSection: View {
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .clipped()
         .zIndex(showsDropTarget ? 1 : 0)
-        .animation(.spring(response: 0.28, dampingFraction: 0.82), value: showsDropTarget)
+        .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.82), value: showsDropTarget)
         .background {
             GeometryReader { geometry in
                 Color.clear.preference(
