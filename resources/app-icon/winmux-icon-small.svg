@@ -1,0 +1,27 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#46536B"/><stop offset="1" stop-color="#181D29"/></linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(330 200) scale(620)">
+      <stop offset="0" stop-color="#FFF" stop-opacity="0.12"/><stop offset="1" stop-color="#FFF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="rim" x1="512" y1="100" x2="512" y2="924" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF" stop-opacity="0.42"/><stop offset="0.5" stop-color="#FFF" stop-opacity="0.14"/><stop offset="1" stop-color="#FFF" stop-opacity="0.10"/></linearGradient>
+    <filter id="icon" x="40" y="60" width="944" height="944" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#000" flood-opacity="0.32"/></filter>
+    <filter id="lift" x="-20%" y="-20%" width="140%" height="150%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#05070A" flood-opacity="0.35"/></filter>
+    <clipPath id="body"><rect x="100" y="100" width="824" height="824" rx="185"/></clipPath>
+    <clipPath id="w0"><rect x="26" y="26" width="181" height="418" rx="30"/></clipPath><clipPath id="w1"><rect x="233" y="26" width="164" height="196" rx="30"/></clipPath><clipPath id="w2"><rect x="233" y="248" width="164" height="196" rx="30"/></clipPath><clipPath id="w3"><rect x="423" y="26" width="151" height="216" rx="30"/></clipPath><clipPath id="w4"><rect x="423" y="268" width="151" height="176" rx="30"/></clipPath>
+  </defs>
+  <g filter="url(#icon)"><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/></g>
+  <g clip-path="url(#body)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+    <rect x="172" y="334" width="600" height="470" rx="64" transform="rotate(0 472.0 569.0)" fill="#FFFFFF" fill-opacity="0.2" stroke="#FFFFFF" stroke-opacity="0.28" stroke-width="10"/>
+    <g transform="translate(252 226) rotate(0 300.0 235.0)" filter="url(#lift)">
+      <rect width="600" height="470" rx="64" fill="#151A1D"/>
+      <g clip-path="url(#w0)"><rect x="26" y="26" width="181" height="418" fill="#4CC9F0"/></g><g clip-path="url(#w1)"><rect x="233" y="26" width="164" height="196" fill="#FFB703"/></g><g clip-path="url(#w2)"><rect x="233" y="248" width="164" height="196" fill="#80ED99"/></g><g clip-path="url(#w3)"><rect x="423" y="26" width="151" height="216" fill="#F72585"/></g><g clip-path="url(#w4)"><rect x="423" y="268" width="151" height="176" fill="#C77DFF"/></g>
+    </g>
+  </g>
+  <!-- Rim stroke kept inside the body: inset by half the stroke width. -->
+  <rect x="104.0" y="104.0" width="816" height="816" rx="181.0" stroke="url(#rim)" stroke-width="8"/>
+</svg>
