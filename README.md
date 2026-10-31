@@ -628,8 +628,8 @@ is resting. A three-finger downward gesture closes it whenever it is open, inclu
 with the upward shortcut disabled. The overview follows your fingers while swiping
 up or down; reversing a short swipe returns it to its starting state. Release
 settles with your swipe velocity. Hidden overview surfaces are reused between openings;
-images and selection state are cleared on dismissal. Opening and closing share the workspace-swipe
-spring and `workspace-swipe.animation-duration-ms`. The overview uses the expanded
+images and selection state are cleared on dismissal. Opening and closing use a spring
+timed by `workspace-swipe.animation-duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
 animations skip motion. WinMuxX does not change macOS settings. Horizontal workspace swipes
@@ -747,11 +747,12 @@ extra/replaced contacts and invalid frames cancel it. Window dragging/resizing b
 Only snapshots move during the gesture; real workspace activation waits for release.
 The preview is clipped to the target display and leaves its sidebar fixed. Snapshot
 images are cached in memory (up to four images / 64 MiB), while fresh incoming
-images are prepared off the main thread. Cached content refreshes while dragging
-and freezes on release. A cold preview appears only if ready before release;
-otherwise navigation proceeds without a delayed animation. Incoming previews use
-windows' last visible positions. Perceptual settling defaults to 220 ms and follows
-the remaining distance; the spring can take longer to settle completely. Global animations,
+images are prepared off the main thread. A slide keeps the incoming image it started
+with; a fresh one is cached for the next swipe. A cold preview appears only if ready
+before release; otherwise navigation proceeds without a delayed animation. Incoming
+previews use windows' last visible positions. After release the slide carries on at
+your fingers' speed and slows to a stop, taking at most 220 ms scaled by the remaining
+distance (never less than 120 ms), then fades over 80 ms into the real windows. Global animations,
 Reduce Motion, a zero settle duration or missing Screen Recording access disable the
 visual preview while retaining release-to-switch navigation. Keyboard/mouse actions,
 disabling, sleep and display changes clear the preview. No screen images are saved.

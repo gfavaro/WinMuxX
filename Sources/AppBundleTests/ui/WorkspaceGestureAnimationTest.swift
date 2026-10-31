@@ -23,26 +23,36 @@ final class WorkspaceGestureAnimationTest: XCTestCase {
         let resting = WorkspaceGestureAnimation.settlingAnimation(keyPath: "opacity", from: 1, to: 1, speed: 20, duration: 0.22)
         XCTAssertEqual(resting.initialVelocity, 0)
     }
-    func testOverviewAndHorizontalNavigationShareTheSpringCurve() {
-        let horizontal = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 500, speed: 0, duration: 0.22)
+    func testOverviewSpringIsBounded() {
         let overview = WorkspaceGestureAnimation.settlingAnimation(keyPath: "opacity", from: 0, to: 1, speed: 0, duration: 0.22)
-        XCTAssertEqual(horizontal.mass, overview.mass)
-        XCTAssertEqual(horizontal.stiffness, overview.stiffness)
-        XCTAssertEqual(horizontal.damping, overview.damping)
-        XCTAssertEqual(horizontal.duration, overview.duration)
         XCTAssertEqual(overview.keyPath, "opacity")
         XCTAssertGreaterThan(overview.duration, 0)
         XCTAssertLessThan(overview.duration, 5)
     }
-    func testASlideEndsWhenItVisiblyStopsNotAfterTheSpringsInvisibleTail() {
-        let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: -600, to: -1728, speed: 0, duration: 0.177)
-        let spring = WorkspaceGestureScalarSpring(from: -600, to: -1728, animation: animation)
-        let visible = spring.visibleDuration(within: 1, limit: animation.duration)
-        XCTAssertLessThan(visible, animation.duration - 0.03, "The last point of travel is not worth a frozen wait")
-        XCTAssertLessThanOrEqual(abs(spring.value(at: visible) - -1728), 1)
-        XCTAssertGreaterThan(abs(spring.value(at: visible - 0.01) - -1728), 1, "It ends no earlier than that")
-        XCTAssertEqual(spring.visibleDuration(within: 1, limit: 0), 0)
+
+    func testReleaseCarriesOnAtTheFingersSpeedWithoutALurch() throws {
+        // 1200 pt left, the finger moving 5500 pt/s toward the target.
+        let release = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 5500, duration: 0.22)
+        let duration = release.duration
+        XCTAssertEqual(duration, 1200 / 5500, accuracy: 0.001, "Ends when the finger's speed would have")
+        let timing = try XCTUnwrap(release.timingFunction)
+        func point(_ index: Int) -> (Double, Double) {
+            var values: [Float] = [0, 0]
+            timing.getControlPoint(at: index, values: &values)
+            return (Double(values[0]), Double(values[1]))
+        }
+        let (x1, y1) = point(1), (_, y2) = point(2)
+        XCTAssertEqual(y1 / x1 * 1200 / duration, 5500, accuracy: 1, "Starts at the finger's speed")
+        XCTAssertEqual(y2, 1, "Comes to rest at the end")
+
+        let slow = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 300, duration: 0.22)
+        XCTAssertEqual(slow.duration, 0.22, "A slow finger takes the configured time")
+        let away = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: -3000, duration: 0.22)
+        XCTAssertEqual(away.duration, 0.22)
+        let quick = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 50000, duration: 0.22)
+        XCTAssertEqual(quick.duration, 0.12, "Never shorter than 120 ms")
     }
+
     func testConfiguredDurationAndAccessibilityDisableMotion() {
         XCTAssertEqual(WorkspaceGestureAnimation.duration(milliseconds: 350, enabled: true, reduceMotion: false), 0.35)
         XCTAssertNil(WorkspaceGestureAnimation.duration(milliseconds: 0, enabled: true, reduceMotion: false))

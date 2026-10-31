@@ -7,7 +7,7 @@ import XCTest
 /// Hardware-backed integration test; does not capture or manipulate the desktop.
 final class WorkspaceSwipeRenderingTest: XCTestCase {
     @MainActor
-    func testRenderedSpringStaysBoundedAndFinishesInBothDirections() throws {
+    func testRenderedReleaseStaysBoundedAndFinishesInBothDirections() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw XCTSkip("Offscreen Core Animation rendering requires a Metal device")
         }
@@ -57,7 +57,7 @@ final class WorkspaceSwipeRenderingTest: XCTestCase {
                     texture.getBytes($0.baseAddress!, bytesPerRow: 1024 * 4, from: MTLRegionMake2D(0, 0, 1024, 16), mipmapLevel: 0)
                 }
                 let red = (0..<1024).filter { pixels[(8 * 1024 + $0) * 4 + 2] > 128 && pixels[(8 * 1024 + $0) * 4] < 40 }
-                XCTAssertFalse(red.isEmpty, "Spring left the render target at frame \(frame)")
+                XCTAssertFalse(red.isEmpty, "Release motion left the render target at frame \(frame)")
                 guard !red.isEmpty else { continue }
                 let position = red.map { Double($0) + 0.5 }.reduce(0, +) / Double(red.count)
                 XCTAssertGreaterThanOrEqual(position, min(from, to) - 0.5)

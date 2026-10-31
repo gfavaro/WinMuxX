@@ -8,8 +8,24 @@ struct WorkspaceSwipePreviewGeometry {
         progress.isFinite ? min(1, max(0, progress)) : 0
     }
 
-    static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration: Double) -> CASpringAnimation {
-        WorkspaceGestureAnimation.settlingAnimation(keyPath: "transform.translation.x", from: from, to: to, speed: speed, duration: duration)
+    /// The motion after release: it carries on at the finger's speed and slows to a stop,
+    /// ending exactly on time. A spring started at that speed accelerates hard in its first
+    /// frames (up to five times the finger's speed), which shows as a lurch at release.
+    /// `speed` is in points per second; `duration` is the longest the motion may take.
+    static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration maximum: Double) -> CABasicAnimation {
+        let distance = to - from
+        // The finger's speed as a share of the distance left per second, toward the target.
+        let towards = abs(distance) > 0.5 ? Double(speed / distance) : 0
+        let duration = towards > 0 ? min(maximum, max(0.12, 1 / towards)) : maximum
+        // A cubic from the finger's speed to rest; its peak stays within about a third above
+        // the average speed, and a slower finger accelerates gradually instead of at once.
+        let slope = min(3, max(0, towards * duration))
+        let animation = CABasicAnimation(keyPath: "transform.translation.x")
+        animation.fromValue = from
+        animation.toValue = to
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(controlPoints: 1 / 3, Float(slope / 3), 2 / 3, 1)
+        return animation
     }
 
     static func offsets(width: CGFloat, progress: Double, slidesLeft: Bool) -> (outgoing: CGFloat, incoming: CGFloat) {
@@ -317,8 +333,7 @@ final class WorkspaceSwipePreview {
             layer.transform = CATransform3DMakeTranslation(to, 0, 0)
             let speed = releaseVelocity * panel.frame.width * (slidesLeft ? -1 : 1)
             let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: visible, to: to, speed: speed, duration: duration)
-            let spring = WorkspaceGestureScalarSpring(from: visible, to: to, animation: animation)
-            settlingDuration = max(settlingDuration, spring.visibleDuration(within: 1, limit: animation.duration))
+            settlingDuration = max(settlingDuration, animation.duration)
             layer.add(animation, forKey: "workspaceSwipe")
         }
         CATransaction.commit()

@@ -34,10 +34,12 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
             XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
             if stationary { preview.update(0.4, timestamp: 10.06) }
             preview.settle(commit: false, timestamp: 10.07)
-            let spring = try XCTUnwrap(layer.animation(forKey: "workspaceSwipe") as? CASpringAnimation)
-            XCTAssertEqual(spring.toValue as? CGFloat, 0)
-            if stationary { XCTAssertEqual(spring.initialVelocity, 0) }
-            else { XCTAssertGreaterThan(spring.initialVelocity, 0, "Reversal velocity must survive main-thread delivery timing") }
+            let release = try XCTUnwrap(layer.animation(forKey: "workspaceSwipe") as? CABasicAnimation)
+            XCTAssertEqual(release.toValue as? CGFloat, 0)
+            var start: [Float] = [0, 0]
+            release.timingFunction?.getControlPoint(at: 1, values: &start)
+            if stationary { XCTAssertEqual(start[1], 0, "A resting finger starts the release from rest") }
+            else { XCTAssertGreaterThan(start[1], 0, "Reversal velocity must survive main-thread delivery timing") }
             preview.cancel()
         }
     }
