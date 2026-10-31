@@ -12,6 +12,9 @@ final class WindowBorderController {
     /// and the incoming ones reuse these instead of creating new WindowServer windows.
     private var spareBorders: [WindowBorder] = []
     private let spareBorderLimit = 4
+    /// Set once a border fell back to AppKit: the native renderer then fails for every border,
+    /// and each attempt created and drew WindowServer windows before failing.
+    private var nativeBordersUnavailable = false
     private var documentWindowCache: [UInt32: Bool] = [:]
     private var borderWindowIds = Set<UInt32>()
     private var watchedWindowIds = Set<UInt32>()
@@ -209,10 +212,11 @@ final class WindowBorderController {
                 visible.insert(window.windowId)
                 let border = borders[window.windowId]
                     ?? (reusable.popLast().flatMap { borders.removeValue(forKey: $0) } ?? spareBorders.popLast())?.retarget(window.windowId)
-                    ?? WindowBorder(target: window.windowId)
+                    ?? (nativeBordersUnavailable ? WindowBorder(target: window.windowId, createNativeBorder: { _, _ in false }) : WindowBorder(target: window.windowId))
                 borders[window.windowId] = border
                 border.update(frame: target.frame, active: focus.windowOrNil?.windowId == window.windowId,
                     settings: settings, corners: target.corners)
+                if !border.usesNativeBackend { nativeBordersUnavailable = true }
             }
         }
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
