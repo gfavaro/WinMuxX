@@ -21,6 +21,8 @@ final class WindowBorderController {
     private let nativeRefresh = NativeWindowRefreshScheduler()
     private var nativeBorderRefreshRequested = false
     private var nativeRefreshTrigger: String?
+    /// False while every coalesced event only moved or reordered a managed window.
+    private var nativeRefreshNeedsScan = false
     private var movingBorders = WindowBorderMotionTracking()
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
@@ -73,6 +75,8 @@ final class WindowBorderController {
                 if MacWindow.allWindowsMap[windowId] != nil,
                    [UInt32(723), 806, 807, 808].contains(event) {
                     controller.nativeBorderRefreshRequested = true
+                } else {
+                    controller.nativeRefreshNeedsScan = true
                 }
                 if controller.nativeRefreshTrigger == nil {
                     controller.nativeRefreshTrigger = windowId == 0 ? "space"
@@ -83,11 +87,21 @@ final class WindowBorderController {
                     guard let controller, TrayMenuModel.shared.isEnabled else { return }
                     let refreshBorders = controller.nativeBorderRefreshRequested
                     let trigger = controller.nativeRefreshTrigger ?? "other window"
+                    let scan = controller.nativeRefreshNeedsScan
                     controller.nativeBorderRefreshRequested = false
                     controller.nativeRefreshTrigger = nil
+                    controller.nativeRefreshNeedsScan = false
                     let start = CACurrentMediaTime()
-                    controller.missionControlChanged(refreshBorders: refreshBorders)
-                    WorkspaceMotionDiagnostics.record("Window scan after \(trigger) event", milliseconds: (CACurrentMediaTime() - start) * 1000)
+                    if scan || controller.missionControlState.active {
+                        controller.missionControlChanged(refreshBorders: refreshBorders)
+                        WorkspaceMotionDiagnostics.record("Window scan after \(trigger) event", milliseconds: (CACurrentMediaTime() - start) * 1000)
+                    } else {
+                        // Moving a managed window cannot open Mission Control: only its border needs
+                        // the new frames. Every switch moves the parked and revealed windows, and
+                        // listing every window waited for WindowServer through each slide.
+                        controller.refresh(onScreenFrames: onScreenWindowFrames(controller.borderCandidateWindowIds))
+                        WorkspaceMotionDiagnostics.record("Border refresh after managed window event", milliseconds: (CACurrentMediaTime() - start) * 1000)
+                    }
                 }
             }
         }) {
@@ -168,7 +182,13 @@ final class WindowBorderController {
         border.update(frame: target.frame, active: focus.windowOrNil?.windowId == windowId,
             settings: config.windowBorders, corners: target.corners)
     }
-    func refresh(nativeSnapshot: [[String: Any]]? = nil) {
+    private var borderCandidateWindowIds: [UInt32] {
+        Workspace.all.filter(\.isVisible).flatMap { $0.allLeafWindowsRecursive.map(\.windowId) }
+    }
+
+    /// `onScreenFrames` holds the on-screen frames of the visible workspaces' windows, read without
+    /// listing every window; Mission Control is then known not to be showing.
+    func refresh(nativeSnapshot: [[String: Any]]? = nil, onScreenFrames: [UInt32: CGRect]? = nil) {
         guard !isUnitTest else { return }
         synchronizeNativeWindowSubscriptions()
         var chromeAllowed = false
@@ -178,23 +198,26 @@ final class WindowBorderController {
         guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0 else { clear(); return }
-        let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
-        guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else {
-            chromeAllowed = false
-            clear()
-            return
-        }
-        var frames: [UInt32: CGRect] = [:]
-        for entry in native {
-            guard let number = entry[kCGWindowNumber as String] as? NSNumber,
-                  let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
-            frames[number.uint32Value] = frame
+        var frames = onScreenFrames ?? [:]
+        if onScreenFrames == nil {
+            let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+            guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size },
+                bundleIdentifierForPID: NativeSpaceTransitionGuard.windowManagerBundleIdentifier) else {
+                chromeAllowed = false
+                clear()
+                return
+            }
+            for entry in native {
+                guard let number = entry[kCGWindowNumber as String] as? NSNumber,
+                      let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+                      let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
+                frames[number.uint32Value] = frame
+            }
         }
         var visible = Set<UInt32>()
         // A border whose window left the screen moves to the next window that needs one: creating
         // a border makes new WindowServer windows, and a workspace switch replaces every border.
-        let onVisibleWorkspaces = Set(Workspace.all.filter(\.isVisible).flatMap { $0.allLeafWindowsRecursive.map(\.windowId) })
+        let onVisibleWorkspaces = Set(borderCandidateWindowIds)
         var reusable = borders.keys.filter { !onVisibleWorkspaces.contains($0) }
         for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
             for window in workspace.allLeafWindowsRecursive {
