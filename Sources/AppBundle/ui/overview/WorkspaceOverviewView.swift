@@ -11,42 +11,33 @@ struct WorkspaceOverviewView: View {
     private var increasedContrast: Bool { contrast == .increased || previewAccessibility.increasedContrast }
     var body: some View {
         GeometryReader { geometry in
-            let cardHeight = max(50, (geometry.size.height - 200) / 3 - 48)
+            let metrics = WorkspaceOverviewGridMetrics(availableHeight: geometry.size.height)
             VStack(spacing: 18) {
                 HStack {
                     Text("Workspace Overview").font(.title2.bold())
-                    Text(monitorName).foregroundStyle(.secondary)
+                    Text(monitorName).foregroundStyle(.secondary).lineLimit(1)
                     Spacer()
                     Button("Close", action: { model.dismiss?() }).keyboardShortcut(.cancelAction)
                 }
                 HStack {
-                    Text("Arrow keys select workspace · Tab selects window · Return opens · Esc closes").foregroundStyle(.secondary)
+                    Text(keyHint).foregroundStyle(.secondary).lineLimit(1).truncationMode(.tail).help(keyHint)
                     Spacer()
                     Button("Previous", action: { model.changePage(-1) }).disabled(model.page == 0)
                     Text("\(model.page + 1) / \(model.pageCount)").monospacedDigit()
                     Button("Next", action: { model.changePage(1) }).disabled(model.page + 1 >= model.pageCount)
                 }
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18), count: 4), spacing: 18) {
-                    ForEach(model.visibleCards) { card in
-                        VStack(spacing: 6) {
-                            desktop(card)
-                                .aspectRatio(card.desktopSize.width / max(1, card.desktopSize.height), contentMode: .fit)
-                                .overlay(RoundedRectangle(cornerRadius: 7).stroke(model.selectedCard?.id == card.id ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: model.selectedCard?.id == card.id ? 3 : (increasedContrast ? 2 : 1)))
-                                .frame(maxWidth: .infinity, maxHeight: cardHeight, alignment: .top)
-                            Button(card.title) { model.activate?(card.id, nil) }.buttonStyle(.plain)
-                                .accessibilityHidden(true) // The desktop button already exposes this action.
-                            let unknown = card.windows.filter { $0.frame == nil }
-                            if !unknown.isEmpty {
-                                Menu("\(unknown.count) windows without saved positions") {
-                                    ForEach(unknown) { window in
-                                        Button(window.title) { model.activate?(card.id, window.id) }
-                                            .accessibilityLabel("\(window.appName): \(window.title)")
-                                            .accessibilityAddTraits(model.selectedWindow == window.id ? .isSelected : [])
-                                    }
-                                }
+                if metrics.scrolls {
+                    // Small displays cannot fit three rows at the minimum card size.
+                    ScrollViewReader { proxy in
+                        ScrollView { grid(cardHeight: metrics.cardHeight) }
+                            // The opening selection is set before the view appears; reveal it too.
+                            .onAppear { if let id = model.selectedCard?.id { proxy.scrollTo(id) } }
+                            .onChange(of: model.selection) { _ in
+                                if let id = model.selectedCard?.id { proxy.scrollTo(id) }
                             }
-                        }.frame(height: cardHeight + 48, alignment: .top)
                     }
+                } else {
+                    grid(cardHeight: metrics.cardHeight)
                 }
                 if model.cards.isEmpty { Text("No workspaces on this display in the current project.").foregroundStyle(.secondary) }
                 Spacer(minLength: 0)
@@ -54,6 +45,8 @@ struct WorkspaceOverviewView: View {
         }
         .onAppear { accessibilitySelection = model.accessibilitySelection }
         .onChange(of: model.accessibilitySelection) { accessibilitySelection = $0 }
+        .onChange(of: accessibilitySelection) { model.syncAccessibilityFocus($0) }
+        .onChange(of: model.focusRequest) { _ in accessibilitySelection = model.accessibilitySelection }
         .background {
             // One shared surface; cards do not allocate additional blur layers.
             OverlaySurface()
@@ -61,6 +54,37 @@ struct WorkspaceOverviewView: View {
             .onTapGesture { model.dismiss?() }
         }
         .modifier(OverlayAppearance(monitor: model.monitor))
+    }
+
+    private var keyHint: String {
+        "Arrow keys select workspace · Tab selects window · Return opens · Esc closes"
+            + (model.canSwitchDisplay ? " · [ ] switch display" : "")
+    }
+
+    private func grid(cardHeight: CGFloat) -> some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 18), count: 4), spacing: 18) {
+            ForEach(model.visibleCards) { card in
+                VStack(spacing: 6) {
+                    desktop(card)
+                        .aspectRatio(card.desktopSize.width / max(1, card.desktopSize.height), contentMode: .fit)
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(model.selectedCard?.id == card.id ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: model.selectedCard?.id == card.id ? 3 : (increasedContrast ? 2 : 1)))
+                        .frame(maxWidth: .infinity, maxHeight: cardHeight, alignment: .top)
+                    Button(card.title) { model.activate?(card.id, nil) }.buttonStyle(.plain)
+                        .lineLimit(1).truncationMode(.middle)
+                        .accessibilityHidden(true) // The desktop button already exposes this action.
+                    let unknown = card.windows.filter { $0.frame == nil }
+                    if !unknown.isEmpty {
+                        Menu("\(unknown.count) windows without saved positions") {
+                            ForEach(unknown) { window in
+                                Button(window.title) { model.activate?(card.id, window.id) }
+                                    .accessibilityLabel("\(window.appName): \(window.title)")
+                                    .accessibilityAddTraits(model.selectedWindow == window.id ? .isSelected : [])
+                            }
+                        }.lineLimit(1)
+                    }
+                }.frame(height: cardHeight + 48, alignment: .top).id(card.id)
+            }
+        }
     }
 
     private func desktop(_ card: WorkspaceOverviewCard) -> some View {
@@ -110,3 +134,16 @@ struct WorkspaceOverviewView: View {
     }
 }
 
+/// Card sizing for the overview grid. Below the minimum card height three rows of cards no
+/// longer fit the display, so the grid scrolls instead of overflowing.
+struct WorkspaceOverviewGridMetrics: Equatable {
+    static let minimumCardHeight: CGFloat = 50
+    let cardHeight: CGFloat
+    let scrolls: Bool
+
+    init(availableHeight: CGFloat) {
+        let fitted = (availableHeight - 200) / 3 - 48
+        cardHeight = max(Self.minimumCardHeight, fitted)
+        scrolls = fitted < Self.minimumCardHeight
+    }
+}

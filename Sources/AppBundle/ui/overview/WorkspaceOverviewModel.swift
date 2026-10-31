@@ -83,6 +83,11 @@ final class WorkspaceOverviewDisplayModel: ObservableObject {
     var activate: ((WorkspaceId, UInt32?) -> Void)?
     var pageChanged: (() -> Void)?
     var dismiss: (() -> Void)?
+    /// Moves keyboard and VoiceOver focus to the previous (-1) or next (+1) display's overview; bound to [ and ].
+    var switchDisplay: ((Int) -> Void)?
+    @Published var canSwitchDisplay = false
+    /// Incremented when this display's overview receives focus from another display.
+    @Published var focusRequest = 0
     static let pageSize = 12
     var pageCount: Int { max(1, (cards.count + Self.pageSize - 1) / Self.pageSize) }
     var visibleCards: [WorkspaceOverviewCard] { Array(cards.dropFirst(page * Self.pageSize).prefix(Self.pageSize)) }
@@ -117,6 +122,21 @@ final class WorkspaceOverviewDisplayModel: ObservableObject {
     }
     func activateSelection() {
         if let card = selectedCard { activate?(card.id, selectedWindow) }
+    }
+
+    /// VoiceOver can move focus without the arrow keys; keep the selection that Return
+    /// activates on the element VoiceOver is on. Only visible cards can hold that focus.
+    func syncAccessibilityFocus(_ target: WorkspaceOverviewAccessibilitySelection?) {
+        guard let target, target != accessibilitySelection else { return }
+        switch target {
+        case .workspace(let id):
+            guard let index = cards.firstIndex(where: { $0.id == id }) else { return }
+            selection = index; selectedWindow = nil
+        case .window(let id):
+            guard let index = cards.firstIndex(where: { card in visibleCards.contains(card) && card.windows.contains { $0.id == id } })
+            else { return }
+            selection = index; selectedWindow = id
+        }
     }
 }
 

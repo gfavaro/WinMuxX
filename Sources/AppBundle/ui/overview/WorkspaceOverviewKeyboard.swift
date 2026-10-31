@@ -2,13 +2,19 @@ import AppKit
 import SwiftUI
 
 enum WorkspaceOverviewKeyAction: Equatable {
-    case dismiss, move(Int), cycleWindow(backward: Bool), activate, page(Int)
+    case dismiss, move(Int), cycleWindow(backward: Bool), activate, page(Int), display(Int)
 }
 
 func workspaceOverviewKeyAction(keyCode: UInt16, modifiers: NSEvent.ModifierFlags,
-                               hasMarkedText: Bool) -> WorkspaceOverviewKeyAction? {
+                               hasMarkedText: Bool, characters: String? = nil) -> WorkspaceOverviewKeyAction? {
     guard !hasMarkedText, modifiers.intersection([.command, .option, .control]).isEmpty,
           !modifiers.contains(.shift) || keyCode == 48 else { return nil }
+    // [ and ] move between displays. Matched by character so they follow the keyboard layout.
+    switch characters {
+    case "[": return .display(-1)
+    case "]": return .display(1)
+    default: break
+    }
     switch keyCode {
     case 53: return .dismiss
     case 123: return .move(-1)
@@ -48,10 +54,11 @@ final class WorkspaceOverviewPanel: NSPanelHud {
     }
 
     override func mouseDown(with event: NSEvent) { model.dismiss?() }
+    func focusOverview() { makeKey() }
     override func sendEvent(_ event: NSEvent) {
         if event.type == .keyDown,
            let action = workspaceOverviewKeyAction(keyCode: event.keyCode, modifiers: event.modifierFlags,
-                hasMarkedText: overlayHasMarkedText(firstResponder)) {
+                hasMarkedText: overlayHasMarkedText(firstResponder), characters: event.charactersIgnoringModifiers) {
             // Native controls and editors keep their own navigation/activation.
             // Escape remains an overlay dismissal unless composition owns it.
             if firstResponder is NSTextView || (firstResponder is NSControl && action != .dismiss) {
@@ -63,6 +70,7 @@ final class WorkspaceOverviewPanel: NSPanelHud {
             case .cycleWindow(let backward): model.cycleWindow(backward: backward)
             case .activate: model.activateSelection()
             case .page(let delta): model.changePage(delta)
+            case .display(let delta): model.switchDisplay?(delta)
             }
             return
         }
