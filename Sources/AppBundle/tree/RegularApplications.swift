@@ -12,10 +12,27 @@ final class RegularApplications {
     private var policies: [pid_t: NSKeyValueObservation] = [:]
     private var regular: [pid_t: NSRunningApplication] = [:]
 
-    var all: [NSRunningApplication] {
+    var all: [NSRunningApplication] { byPid.map(\.value) }
+
+    /// Keyed by pid, so callers need not ask each app for it: after every app activation AppKit
+    /// fetches even `processIdentifier` again from LaunchServices, once per app.
+    var byPid: [pid_t: NSRunningApplication] {
         if running == nil, !isUnitTest { start() }
-        guard running != nil else { return NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular } }
-        return Array(regular.values)
+        guard running != nil else {
+            return Dictionary(NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }
+                .map { ($0.processIdentifier, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+        return regular
+    }
+
+    func isRegular(_ pid: pid_t) -> Bool {
+        running == nil ? NSRunningApplication(processIdentifier: pid)?.activationPolicy == .regular : regular[pid] != nil
+    }
+
+    /// Whether this app is still running, from the observed running applications.
+    func isRunning(_ app: NSRunningApplication, pid: pid_t) -> Bool {
+        guard running != nil else { return !app.isTerminated }
+        return policies[pid] != nil && (regular[pid].map { $0 === app } ?? true)
     }
 
     private func start() {

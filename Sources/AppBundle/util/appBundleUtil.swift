@@ -12,12 +12,18 @@ private let lockScreenExecutablePath = "/System/Library/CoreServices/loginwindow
 /// Answered from the process's executable path. `bundleIdentifier` is a synchronous
 /// LaunchServices request whenever AppKit has dropped its cached answer, which it does after
 /// every app activation, and these checks run on every refresh and app notification.
+/// The answer is kept on the app object: AppKit also fetches `processIdentifier` again
+/// after an activation, and the same objects are asked about on every refresh.
 func isLockScreenApp(_ app: NSRunningApplication?) -> Bool {
     guard let app else { return false }
+    if let known = objc_getAssociatedObject(app, &lockScreenAnswerKey) as? Bool { return known }
     var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
     guard proc_pidpath(app.processIdentifier, &path, UInt32(path.count)) > 0 else { return false }
-    return String(cString: path) == lockScreenExecutablePath
+    let answer = String(cString: path) == lockScreenExecutablePath
+    objc_setAssociatedObject(app, &lockScreenAnswerKey, answer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    return answer
 }
+nonisolated(unsafe) private var lockScreenAnswerKey: UInt8 = 0
 
 @MainActor
 private let terminationCoordinator = WindowTerminationCoordinator()

@@ -541,11 +541,13 @@ final class MacApp: AbstractApp {
     @MainActor
     private static func refreshAppAndGetAliveWindowIdsWithDeadline(
         _ nsApp: NSRunningApplication,
+        pid: pid_t,
         frontmostAppBundleId: String?,
     ) async throws -> [UInt32] {
-        let pid = nsApp.processIdentifier
         let work = Task { @MainActor () -> [UInt32] in
-            guard let app = try await MacApp.getOrRegister(nsApp) else { return [] }
+            let registered = MacApp.allAppsMap[pid].flatMap { $0.nsApp === nsApp ? $0 : nil }
+            let app = if let registered { registered } else { try await MacApp.getOrRegister(nsApp) }
+            guard let app else { return [] }
             return try await app.refreshAndGetAliveWindowIds(frontmostAppBundleId: frontmostAppBundleId)
         }
         let deadline = Task { @MainActor in
@@ -572,33 +574,30 @@ final class MacApp: AbstractApp {
         // Unit tests use TestApp/TestWindow. Enumerating the runner's real desktop
         // can feed native AX elements into the mock-only attribute decoder.
         guard !isUnitTest else { return [:] }
-        for (_, app) in MacApp.allAppsMap { // gc dead apps
+        for (pid, app) in MacApp.allAppsMap { // gc dead apps
             try checkCancellation()
-            if app.nsApp.isTerminated {
+            if !RegularApplications.shared.isRunning(app.nsApp, pid: pid) {
                 await app.destroy()
             }
         }
         return try await withThrowingTaskGroup(of: (pid_t, [UInt32]).self, returning: [MacApp: [UInt32]].self) { group in
-            func refreshTheApp(_ nsApp: NSRunningApplication) {
+            func refreshTheApp(_ nsApp: NSRunningApplication, pid: pid_t) {
                 group.addTask { @Sendable @MainActor in
-                    (
-                        nsApp.processIdentifier,
-                        try await refreshAppAndGetAliveWindowIdsWithDeadline(nsApp, frontmostAppBundleId: frontmostAppBundleId)
-                    )
+                    (pid, try await refreshAppAndGetAliveWindowIdsWithDeadline(nsApp, pid: pid, frontmostAppBundleId: frontmostAppBundleId))
                 }
             }
             // Register new apps
-            for nsApp in RegularApplications.shared.all {
+            for (pid, nsApp) in RegularApplications.shared.byPid {
                 try checkCancellation()
-                refreshTheApp(nsApp)
+                refreshTheApp(nsApp, pid: pid)
             }
-            for (_, app) in MacApp.allAppsMap {
+            for (pid, app) in MacApp.allAppsMap {
                 try checkCancellation()
                 // "About this Mac" window, TouchID, and a lot of other utility windows
                 // We don't monitor them actively as we do for regular apps, but if a window of one of those utility
                 // apps got focused it will end up in allAppsMap
-                if app.nsApp.activationPolicy != .regular {
-                    refreshTheApp(app.nsApp)
+                if !RegularApplications.shared.isRegular(pid) {
+                    refreshTheApp(app.nsApp, pid: pid)
                 }
             }
             var result: [MacApp: [UInt32]] = [:]
