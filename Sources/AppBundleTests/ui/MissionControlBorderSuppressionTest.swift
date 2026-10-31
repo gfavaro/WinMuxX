@@ -74,6 +74,22 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
     }
 
     @MainActor
+    func testFocusChangeReusesTheDestroyedBordersPanelsInsteadOfCreatingNewOnes() {
+        var settings = WindowBordersConfig()
+        settings.width = 2
+        let frame = CGRect(x: -20000, y: -20000, width: 100, height: 100)
+        let previous = WindowBorder(target: 1, createNativeBorder: { _, _ in false })
+        previous.update(frame: frame, active: true, settings: settings)
+        let panels = Set(previous.windowIds)
+        previous.destroy()
+        XCTAssertTrue(previous.windowIds.isEmpty)
+        let next = WindowBorder(target: 2, createNativeBorder: { _, _ in false })
+        defer { next.destroy() }
+        next.update(frame: frame.offsetBy(dx: 10, dy: 0), active: true, settings: settings)
+        XCTAssertEqual(Set(next.windowIds), panels)
+    }
+
+    @MainActor
     func testDrawingFailureReleasesNativeHandleAndReusesFallback() {
         var creations = 0
         var destructions = 0

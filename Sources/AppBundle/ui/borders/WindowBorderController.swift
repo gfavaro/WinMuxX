@@ -13,6 +13,7 @@ final class WindowBorderController {
     private var watchedWindowIds = Set<UInt32>()
     private let nativeRefresh = NativeWindowRefreshScheduler()
     private var nativeBorderRefreshRequested = false
+    private var nativeRefreshTrigger: String?
     private var movingBorders = WindowBorderMotionTracking()
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
@@ -26,6 +27,7 @@ final class WindowBorderController {
     func setEnabled(_ enabled: Bool) {
         nativeRefresh.cancel()
         nativeBorderRefreshRequested = false
+        nativeRefreshTrigger = nil
         if enabled {
             // Native events were ignored while disabled; re-observe before
             // motion/swipes consult the cached Mission Control state.
@@ -45,9 +47,10 @@ final class WindowBorderController {
             MainActor.assumeIsolated {
                 let controller = WindowBorderController.shared
                 // Our own reshape/order notifications cannot change Mission Control.
-                // Scanning every border transaction creates a geometry feedback storm.
+                // Scanning every border transaction creates a geometry feedback storm, and the
+                // dimmer, sidebar and swipe preview change on every refresh and slide.
                 guard TrayMenuModel.shared.isEnabled else { return }
-                if windowId != 0, controller.borderWindowIds.contains(windowId) { return }
+                if windowId != 0, controller.borderWindowIds.contains(windowId) || NSApp.window(withWindowNumber: Int(windowId)) != nil { return }
                 if [UInt32(723), 806, 807, 808].contains(event) {
                     WorkspaceTransitionDiagnostics.recordNativeEvent(event, windowId: windowId)
                     if runtime.workspaceBackend.capabilities.parksInactiveWindows {
@@ -64,11 +67,20 @@ final class WindowBorderController {
                    [UInt32(723), 806, 807, 808].contains(event) {
                     controller.nativeBorderRefreshRequested = true
                 }
+                if controller.nativeRefreshTrigger == nil {
+                    controller.nativeRefreshTrigger = windowId == 0 ? "space"
+                        : controller.missionControlWindowIds.contains(windowId) ? "Mission Control window"
+                        : MacWindow.allWindowsMap[windowId] != nil ? "managed window" : "other window"
+                }
                 controller.nativeRefresh.request { [weak controller] in
                     guard let controller, TrayMenuModel.shared.isEnabled else { return }
                     let refreshBorders = controller.nativeBorderRefreshRequested
+                    let trigger = controller.nativeRefreshTrigger ?? "other window"
                     controller.nativeBorderRefreshRequested = false
+                    controller.nativeRefreshTrigger = nil
+                    let start = CACurrentMediaTime()
                     controller.missionControlChanged(refreshBorders: refreshBorders)
+                    WorkspaceMotionDiagnostics.record("Window scan after \(trigger) event", milliseconds: (CACurrentMediaTime() - start) * 1000)
                 }
             }
         }) {
@@ -266,6 +278,10 @@ final class WindowBorder {
     private var appearance: Appearance?
     private var scale: CGFloat = 0
     private var fallbackPanels: [WindowBorderFallbackPanel] = []
+    /// Ordered-out panel sets from destroyed borders. The focused window's border is destroyed
+    /// and recreated on every focus change, and creating its eight panels took most of a refresh.
+    private static var spareFallbackPanels: [[WindowBorderFallbackPanel]] = []
+    private static let spareFallbackPanelLimit = 2
     private let createNativeBorder: (Float, inout OpaquePointer?) -> Bool
     private let updateNativeBorder: (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool, CGPath?) -> Bool
     private let destroyNativeBorder: (OpaquePointer?) -> Void
@@ -360,7 +376,9 @@ final class WindowBorder {
     }
 
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
-        if fallbackPanels.isEmpty { fallbackPanels = (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() } }
+        if fallbackPanels.isEmpty {
+            fallbackPanels = Self.spareFallbackPanels.popLast() ?? (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() }
+        }
         let alignedFrame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: scale)
         let outer = alignedFrame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = corners.maximum
@@ -377,7 +395,14 @@ final class WindowBorder {
             destroyNativeBorder(nativeID)
             self.nativeID = nil
         }
-        fallbackPanels.forEach { $0.close() }
+        if !fallbackPanels.isEmpty {
+            fallbackPanels.forEach { $0.orderOut(nil) }
+            if Self.spareFallbackPanels.count < Self.spareFallbackPanelLimit {
+                Self.spareFallbackPanels.append(fallbackPanels)
+            } else {
+                fallbackPanels.forEach { $0.close() }
+            }
+        }
         fallbackPanels.removeAll()
     }
 }
