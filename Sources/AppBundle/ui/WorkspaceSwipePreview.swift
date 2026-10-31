@@ -319,7 +319,8 @@ final class WorkspaceSwipePreview {
             layer.transform = CATransform3DMakeTranslation(to, 0, 0)
             let speed = releaseVelocity * panel.frame.width * (slidesLeft ? -1 : 1)
             let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: visible, to: to, speed: speed, duration: duration)
-            settlingDuration = max(settlingDuration, animation.duration)
+            let spring = WorkspaceGestureScalarSpring(from: visible, to: to, animation: animation)
+            settlingDuration = max(settlingDuration, spring.visibleDuration(within: 1, limit: animation.duration))
             layer.add(animation, forKey: "workspaceSwipe")
         }
         CATransaction.commit()
@@ -343,9 +344,23 @@ final class WorkspaceSwipePreview {
         finishIfReady()
     }
 
+    /// Real windows take over from the snapshots with a short fade rather than in one frame,
+    /// so whatever changed since the snapshots were taken does not flash.
     private func finishIfReady() {
-        if phase == .idle { cancel() }
+        guard phase == .idle else { return }
+        guard let panel, panel.isVisible else { return cancel() }
+        let token = generation
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Self.handOffDuration
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == token else { return }
+                self.cancel()
+            }
+        })
     }
+    static let handOffDuration = 0.08
 
     func invalidate() {
         cancel()
@@ -372,6 +387,13 @@ final class WorkspaceSwipePreview {
         completion?.cancel(); completion = nil
         deadline?.cancel(); deadline = nil
         panel?.orderOut(nil)
+        if let panel {
+            // Replaces a hand-off fade still running, which would otherwise hide the next preview.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().alphaValue = 1
+            }
+        }
         // A reusable surface must never retain a previous workspace's pixels or animations.
         CATransaction.begin()
         CATransaction.setDisableActions(true)

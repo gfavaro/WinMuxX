@@ -34,6 +34,15 @@ final class WorkspaceGestureAnimationTest: XCTestCase {
         XCTAssertGreaterThan(overview.duration, 0)
         XCTAssertLessThan(overview.duration, 5)
     }
+    func testASlideEndsWhenItVisiblyStopsNotAfterTheSpringsInvisibleTail() {
+        let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: -600, to: -1728, speed: 0, duration: 0.177)
+        let spring = WorkspaceGestureScalarSpring(from: -600, to: -1728, animation: animation)
+        let visible = spring.visibleDuration(within: 1, limit: animation.duration)
+        XCTAssertLessThan(visible, animation.duration - 0.03, "The last point of travel is not worth a frozen wait")
+        XCTAssertLessThanOrEqual(abs(spring.value(at: visible) - -1728), 1)
+        XCTAssertGreaterThan(abs(spring.value(at: visible - 0.01) - -1728), 1, "It ends no earlier than that")
+        XCTAssertEqual(spring.visibleDuration(within: 1, limit: 0), 0)
+    }
     func testConfiguredDurationAndAccessibilityDisableMotion() {
         XCTAssertEqual(WorkspaceGestureAnimation.duration(milliseconds: 350, enabled: true, reduceMotion: false), 0.35)
         XCTAssertNil(WorkspaceGestureAnimation.duration(milliseconds: 0, enabled: true, reduceMotion: false))

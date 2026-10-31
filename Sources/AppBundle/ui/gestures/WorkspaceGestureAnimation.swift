@@ -57,4 +57,16 @@ struct WorkspaceGestureScalarSpring {
         let b = initialVelocity - omega * distance
         return to + (a + b * time) * exp(-omega * time)
     }
+
+    /// When the motion comes within `tolerance` of its target and stays there: the spring's
+    /// own settling time also waits out a tail too small to see.
+    func visibleDuration(within tolerance: CGFloat, limit: TimeInterval) -> TimeInterval {
+        var settled = limit
+        var time = limit
+        while time > 0, abs(value(at: time) - to) <= tolerance {
+            settled = time
+            time -= 0.001
+        }
+        return settled
+    }
 }
