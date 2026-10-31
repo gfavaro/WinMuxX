@@ -336,11 +336,9 @@ static bool placeBorder(WinMuxBorderHandle border, uint32_t target, CGPoint orig
             placePiece(transaction, border->windows[i], target, point, above);
         }
     }
-    // The commit's return value is not a status: current macOS leaves an arbitrary value in
-    // it, and treating that as failure sent every border to the AppKit fallback after a
-    // full native attempt. The placement check below is what decides success.
-    SYM("SLSTransactionCommit", Commit)(transaction, synchronous);
+    int result = SYM("SLSTransactionCommit", Commit)(transaction, synchronous);
     CFRelease(transaction);
+    if (result != 0) return false;
     // Small edge windows can be constrained independently at display boundaries.
     // A successful transaction does not guarantee the requested placement.
     for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) {
