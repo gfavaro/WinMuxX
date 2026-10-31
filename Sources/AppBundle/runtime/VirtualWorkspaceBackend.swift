@@ -3,7 +3,8 @@ import Common
 @MainActor
 final class VirtualWorkspaceBackend: WorkspaceBackend {
     func fullscreenDisplayIDs() -> Set<String> {
-        fullscreenWindowDisplays(onScreen: onScreenWindowFrames())
+        // Asked on every refresh; usually nothing is fullscreen, and then WindowServer is not asked.
+        fullscreenWindowDisplays(onScreen: onScreenWindowFrames(nativeFullscreenWindowIds()))
     }
     func run(_ command: any Command, env: CmdEnv, io: CmdIo) async throws -> Bool? { nil }
 

@@ -584,11 +584,9 @@ final class MacApp: AbstractApp {
                 }
             }
             // Register new apps
-            for nsApp in NSWorkspace.shared.runningApplications {
+            for nsApp in RegularApplications.shared.all {
                 try checkCancellation()
-                if nsApp.activationPolicy == .regular {
-                    refreshTheApp(nsApp)
-                }
+                refreshTheApp(nsApp)
             }
             for (_, app) in MacApp.allAppsMap {
                 try checkCancellation()

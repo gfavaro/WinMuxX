@@ -24,8 +24,17 @@ public enum NativeSpaceTransitionGuard {
         guard CGGetActiveDisplayList(count, &ids, &count) == .success else { return false }
         let sizes = ids.prefix(Int(count)).map { CGDisplayBounds($0).size }
         guard sizes.allSatisfy({ $0.width > 0 && $0.height > 0 }) else { return false }
-        return !isMissionControlVisible(windows, screenSizes: sizes) {
-            NSRunningApplication(processIdentifier: $0)?.bundleIdentifier
-        }
+        return !isMissionControlVisible(windows, screenSizes: sizes, bundleIdentifierForPID: windowManagerBundleIdentifier)
+    }
+
+    static let windowManagerPath = "/System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+
+    /// `com.apple.WindowManager` for the process that draws Mission Control, otherwise nil.
+    /// The only bundle these checks ask about, answered from the process's executable path:
+    /// a system call rather than a synchronous LaunchServices request per process.
+    public static func windowManagerBundleIdentifier(_ pid: pid_t) -> String? {
+        var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+        guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
+        return String(cString: path) == windowManagerPath ? "com.apple.WindowManager" : nil
     }
 }

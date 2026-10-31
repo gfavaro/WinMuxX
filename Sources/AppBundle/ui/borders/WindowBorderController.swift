@@ -81,11 +81,12 @@ final class WindowBorderController {
         guard !isUnitTest else { return }
         // Include ordered-out windows so exit notifications are subscribed too.
         let all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
-        var bundles: [pid_t: String] = [:]
+        // Runs after every WindowServer window event; only Mission Control's owner matters.
+        var bundles: [pid_t: String?] = [:]
         func bundleIdentifier(_ pid: pid_t) -> String? {
-            if let bundle = bundles[pid] { return bundle.isEmpty ? nil : bundle }
-            let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
-            bundles[pid] = bundle ?? ""
+            if let bundle = bundles[pid] { return bundle }
+            let bundle = NativeSpaceTransitionGuard.windowManagerBundleIdentifier(pid)
+            bundles[pid] = bundle
             return bundle
         }
         let ids = Set(all.compactMap { entry -> UInt32? in
@@ -424,7 +425,9 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
         let frame = CGRect(x: outer.minX + piece.minX, y: outer.maxY - piece.maxY,
             width: piece.width, height: piece.height)
         if self.frame != frame { setFrame(frame, display: false) }
-        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path !== path
+        // The path is rebuilt for every update: compared by identity it always differed, and
+        // every piece redrew on each focus or geometry refresh even when nothing changed.
+        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path != path
         if geometryChanged || borderView.settings != settings || borderView.active != active {
             borderView.settings = settings
             borderView.active = active

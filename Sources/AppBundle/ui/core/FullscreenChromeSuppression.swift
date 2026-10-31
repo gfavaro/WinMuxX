@@ -21,22 +21,33 @@ func fullscreenNativeSpaceDisplays(_ displays: [NativeSpaceDisplay]) -> Set<Stri
     }.map(\.identifier))
 }
 
+/// Virtual workspaces: the known native fullscreen windows.
+@MainActor
+func nativeFullscreenWindowIds() -> [UInt32] {
+    Workspace.all.compactMap(\.existingMacOsNativeFullscreenWindowsContainer)
+        .flatMap { $0.children.filterIsInstance(of: Window.self) }.map(\.windowId)
+}
+
 /// Virtual workspaces: the displays under a known fullscreen window that is on screen.
 @MainActor
 func fullscreenWindowDisplays(onScreen frames: [UInt32: CGRect]) -> Set<String> {
-    let fullscreen = Workspace.all.compactMap(\.existingMacOsNativeFullscreenWindowsContainer)
-        .flatMap { $0.children.filterIsInstance(of: Window.self) }.map(\.windowId)
-    return Set(fullscreen.compactMap { id in
+    Set(nativeFullscreenWindowIds().compactMap { id in
         frames[id].flatMap { frame in
             monitors.first { $0.rect.contains(CGPoint(x: frame.midX, y: frame.midY)) }?.displayUUID
         }
     })
 }
 
-func onScreenWindowFrames() -> [UInt32: CGRect] {
-    let rows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+/// The on-screen frames of just these windows. WindowServer describes only the windows
+/// asked about rather than every window on screen.
+func onScreenWindowFrames(_ ids: [UInt32]) -> [UInt32: CGRect] {
+    guard !ids.isEmpty else { return [:] }
+    // The array holds the window numbers themselves, not objects.
+    var numbers = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+    guard let array = CFArrayCreate(nil, &numbers, numbers.count, nil) else { return [:] }
+    let rows = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]] ?? []
     var frames: [UInt32: CGRect] = [:]
-    for row in rows {
+    for row in rows where (row[kCGWindowIsOnscreen as String] as? Bool) == true {
         guard let id = (row[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
               let bounds = row[kCGWindowBounds as String] as? NSDictionary,
               let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
