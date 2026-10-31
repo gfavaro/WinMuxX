@@ -121,8 +121,13 @@ final class WorkspaceSwipeController {
 
     /// macOS recognized a three-finger swipe moving toward the next Space (`slidesLeft`) or
     /// the previous one. With no workspace that way it belongs to macOS.
+    /// Whether a macOS swipe may start here, before its direction is known.
+    func dockSwipeMayStart() -> DockSwipeStart {
+        canNavigate ? .started : dependencies.keepsSwipe() ? .ignored : .unavailable
+    }
+
     func beginDockSwipe(slidesLeft: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
-        guard canNavigate else { return dependencies.keepsSwipe() ? .ignored : .unavailable }
+        guard canNavigate else { return dockSwipeMayStart() }
         let point = dependencies.pointer()
         guard let monitor = dependencies.monitors().first(where: { $0.rect.contains(point) }) else { return .unavailable }
         if pending != nil {

@@ -197,8 +197,10 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
 
     func testWhileWinMuxXCannotSwitchADragOrTheOverviewKeepsTheSwipeFromMacOS() {
         navigationAllowed = false
+        XCTAssertEqual(controller.dockSwipeMayStart(), .unavailable)
         XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .unavailable)
         keepsSwipe = true
+        XCTAssertEqual(controller.dockSwipeMayStart(), .ignored, "Decided at touchdown, before macOS sees any motion")
         XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .ignored,
                        "macOS does not switch Spaces under a drag or the overview")
         XCTAssertFalse(preview.isActive)

@@ -222,7 +222,8 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
         // A native fullscreen Space under the pointer is macOS's to swipe away from.
         if let monitor = sortedMonitors.first(where: { $0.rect.contains(pointer) }),
            shouldSuppressChromeForFullscreenContent(on: monitor) { return .unavailable }
-        guard WorkspaceSwipeController.shared.canNavigate else { return .unavailable }
+        let start = WorkspaceSwipeController.shared.dockSwipeMayStart()
+        guard start == .started else { return start }
         // Option with three fingers pans a scrolling workspace through raw touch; it never switches.
         return NSEvent.modifierFlags.contains(.option) ? .ignored : .started
     }
