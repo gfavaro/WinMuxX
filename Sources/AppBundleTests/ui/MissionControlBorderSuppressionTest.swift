@@ -96,19 +96,18 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
     }
 
     @MainActor
-    func testFocusChangeReusesTheDestroyedBordersPanelsInsteadOfCreatingNewOnes() {
+    func testHiddenFallbackBorderShowsTheSamePanelsForItsNextWindow() throws {
         var settings = WindowBordersConfig()
         settings.width = 2
         let frame = CGRect(x: -20000, y: -20000, width: 100, height: 100)
-        let previous = WindowBorder(target: 1, createNativeBorder: { _, _ in false })
-        previous.update(frame: frame, active: true, settings: settings)
-        let panels = Set(previous.windowIds)
-        previous.destroy()
-        XCTAssertTrue(previous.windowIds.isEmpty)
-        let next = WindowBorder(target: 2, createNativeBorder: { _, _ in false })
-        defer { next.destroy() }
-        next.update(frame: frame.offsetBy(dx: 10, dy: 0), active: true, settings: settings)
-        XCTAssertEqual(Set(next.windowIds), panels)
+        let border = WindowBorder(target: 1, createNativeBorder: { _, _ in false })
+        defer { border.destroy() }
+        border.update(frame: frame, active: true, settings: settings)
+        let panels = border.windowIds
+        border.hide()
+        for id in panels { XCTAssertFalse(try XCTUnwrap(NSApp.window(withWindowNumber: Int(id))).isVisible) }
+        border.retarget(2).update(frame: frame, active: true, settings: settings)
+        XCTAssertEqual(border.windowIds, panels)
     }
 
     @MainActor

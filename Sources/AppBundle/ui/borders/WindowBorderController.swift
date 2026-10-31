@@ -8,6 +8,10 @@ import NativeSpaces
 final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
+    /// Hidden borders of parked windows. Every switch parks the outgoing workspace's windows,
+    /// and the incoming ones reuse these instead of creating new WindowServer windows.
+    private var spareBorders: [WindowBorder] = []
+    private let spareBorderLimit = 4
     private var documentWindowCache: [UInt32: Bool] = [:]
     private var borderWindowIds = Set<UInt32>()
     private var watchedWindowIds = Set<UInt32>()
@@ -204,7 +208,7 @@ final class WindowBorderController {
                 guard let target = windowBorderTarget(for: window, nativeFrame: frame) else { continue }
                 visible.insert(window.windowId)
                 let border = borders[window.windowId]
-                    ?? reusable.popLast().flatMap { borders.removeValue(forKey: $0) }.map { $0.retarget(window.windowId) }
+                    ?? (reusable.popLast().flatMap { borders.removeValue(forKey: $0) } ?? spareBorders.popLast())?.retarget(window.windowId)
                     ?? WindowBorder(target: window.windowId)
                 borders[window.windowId] = border
                 border.update(frame: target.frame, active: focus.windowOrNil?.windowId == window.windowId,
@@ -212,21 +216,28 @@ final class WindowBorderController {
             }
         }
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
-        borderWindowIds = Set(borders.values.flatMap(\.windowIds))
+        borderWindowIds = Set((borders.values + spareBorders).flatMap(\.windowIds))
     }
     func clear() {
         movingBorders = WindowBorderMotionTracking()
         DisplayRefreshDriver.shared.remove(owner: self)
-        borders.values.forEach { $0.destroy() }
+        (borders.values + spareBorders).forEach { $0.destroy() }
         borders.removeAll()
+        spareBorders.removeAll()
         borderWindowIds.removeAll()
         documentWindowCache.removeAll()
     }
     func remove(windowId: UInt32) {
         documentWindowCache.removeValue(forKey: windowId)
         if let border = borders.removeValue(forKey: windowId) {
-            borderWindowIds.subtract(border.windowIds)
-            border.destroy()
+            if spareBorders.count < spareBorderLimit {
+                // Its windows stay ours, so their notifications are still ignored.
+                border.hide()
+                spareBorders.append(border)
+            } else {
+                borderWindowIds.subtract(border.windowIds)
+                border.destroy()
+            }
         }
     }
 
@@ -286,10 +297,6 @@ final class WindowBorder {
     private var appearance: Appearance?
     private var scale: CGFloat = 0
     private var fallbackPanels: [WindowBorderFallbackPanel] = []
-    /// Ordered-out panel sets from destroyed borders. The focused window's border is destroyed
-    /// and recreated on every focus change, and creating its eight panels took most of a refresh.
-    private static var spareFallbackPanels: [[WindowBorderFallbackPanel]] = []
-    private static let spareFallbackPanelLimit = 2
     private let createNativeBorder: (Float, inout OpaquePointer?) -> Bool
     private let updateNativeBorder: (OpaquePointer?, UInt32, CGRect, Float, UInt32, Float, Bool, CGPath?) -> Bool
     private let destroyNativeBorder: (OpaquePointer?) -> Void
@@ -390,9 +397,7 @@ final class WindowBorder {
     }
 
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
-        if fallbackPanels.isEmpty {
-            fallbackPanels = Self.spareFallbackPanels.popLast() ?? (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() }
-        }
+        if fallbackPanels.isEmpty { fallbackPanels = (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() } }
         let alignedFrame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: scale)
         let outer = alignedFrame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = corners.maximum
@@ -403,20 +408,20 @@ final class WindowBorder {
         }
     }
 
+    /// Orders the border out but keeps its windows for the next target.
+    func hide() {
+        if let nativeID { winmux_border_hide(nativeID) }
+        fallbackPanels.forEach { $0.orderOut(nil) }
+        placedTarget = nil
+    }
+
     func destroy() {
         if let nativeID {
             winmux_border_hide(nativeID)
             destroyNativeBorder(nativeID)
             self.nativeID = nil
         }
-        if !fallbackPanels.isEmpty {
-            fallbackPanels.forEach { $0.orderOut(nil) }
-            if Self.spareFallbackPanels.count < Self.spareFallbackPanelLimit {
-                Self.spareFallbackPanels.append(fallbackPanels)
-            } else {
-                fallbackPanels.forEach { $0.close() }
-            }
-        }
+        fallbackPanels.forEach { $0.close() }
         fallbackPanels.removeAll()
     }
 }
