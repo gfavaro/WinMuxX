@@ -82,6 +82,14 @@ extension WindowTabStripView {
 
 }
 
+/// Horizontal extent of the tabs themselves, excluding padding and trailing chrome.
+private func windowTabStripTabsSpan(contentMinX: CGFloat, tabWidth: CGFloat, tabCount: Int) -> (start: CGFloat, end: CGFloat) {
+    let tabsStart = contentMinX + windowTabStripContentHorizontalPadding
+    let tabsWidth = CGFloat(tabCount) * tabWidth
+        + CGFloat(max(tabCount - 1, 0)) * windowTabStripTabSpacing
+    return (tabsStart, tabsStart + tabsWidth)
+}
+
 func isWindowTabStripScrollBackgroundDragStart(
     localX: CGFloat,
     contentMinX: CGFloat,
@@ -89,10 +97,7 @@ func isWindowTabStripScrollBackgroundDragStart(
     tabCount: Int,
 ) -> Bool {
     guard tabCount > 0 else { return true }
-    let tabsStart = contentMinX + windowTabStripContentHorizontalPadding
-    let tabsWidth = CGFloat(tabCount) * tabWidth
-        + CGFloat(max(tabCount - 1, 0)) * windowTabStripTabSpacing
-    let tabsEnd = tabsStart + tabsWidth
+    let (tabsStart, tabsEnd) = windowTabStripTabsSpan(contentMinX: contentMinX, tabWidth: tabWidth, tabCount: tabCount)
     return localX < tabsStart || localX > tabsEnd
 }
 
@@ -104,10 +109,7 @@ func isWindowTabStripChromeGroupDragStart(
     tabCount: Int,
 ) -> Bool {
     guard tabCount > 0 else { return true }
-    let tabsStart = contentMinX + windowTabStripContentHorizontalPadding
-    let tabsWidth = CGFloat(tabCount) * tabWidth
-        + CGFloat(max(tabCount - 1, 0)) * windowTabStripTabSpacing
-    let tabsEnd = tabsStart + tabsWidth
+    let (tabsStart, tabsEnd) = windowTabStripTabsSpan(contentMinX: contentMinX, tabWidth: tabWidth, tabCount: tabCount)
     let contentIsKnown = contentMaxX > contentMinX
     if contentIsKnown, localX >= contentMinX, localX <= contentMaxX {
         return localX < tabsStart || localX > tabsEnd
