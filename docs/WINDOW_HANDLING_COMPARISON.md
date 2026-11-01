@@ -40,9 +40,10 @@ are under [Recommendations](#recommendations).
 | App teardown | GC destroys when `nsApp.isTerminated` | GC uses the observed running-apps cache, confirmed by `isTerminated`; `destroy` retires synchronously and removes only its own registry entry | `forget(pid:)` drops cached elements on `didTerminateApplication` |
 | AX isolation | One thread and run loop per app; app element timeout 1 s, focus queries 0.25 s; per-app refresh deadline 1.5 s | Same, plus `AXReadBudget` per refresh | One serial queue per pid (`FrameScheduler`); AX timeout 1 s; raises on a separate queue |
 | Element lookup | Registry only; a stale element yields nil until a refresh re-registers | `withRecoverableWindow` re-looks up once on `.invalidUIElement`; discovery adds main and focused windows to `AXWindows` | Cache keyed by (pid, window ID); `lookUp` creates the app element and finds the window; re-looks up once on `.invalidUIElement` |
-| Frame write | Size, position, size again only if it changed; Enhanced UI off during the write, restored after | Same, plus a position-first path for parked windows, native ownership permits and animated steps | Size, position, size; read back every window; one retry; newest frame per window wins |
-| Minimum sizes | None | Learned per window, persisted | Learned, persisted per bundle ID so a new window is right the first time |
-| Enhanced UI | Toggled per write | Toggled per write, restored | Disabled before each batch and left off, except under VoiceOver or Switch Control |
+| Frame write | Size, position, size again only if it changed; Enhanced UI off during the write, restored after | Same, plus a position-first path for parked windows, native ownership permits and animated steps | Size, position, size; newest frame per window wins |
+| Write confirmation | None | A tiled write that changes size is read back twice, 150 ms apart; a refused size becomes a learned minimum and the layout adapts (`MacWindow.setAxFrame`). App-initiated moves are put back by `VirtualFrameRecovery` | Every window read back; written once more if it landed elsewhere |
+| Minimum sizes | None | Learned per window and persisted per bundle ID (`PersistedAppMinimums`), seeding every new window of the app; reset from Settings | Learned, persisted per bundle ID so a new window is right the first time |
+| Enhanced UI | Toggled per write | Toggled off and restored around each write, left untouched while VoiceOver or Switch Control runs (`AssistiveTechnology`) | Disabled before each batch and left off, except under VoiceOver or Switch Control |
 | Hiding inactive workspaces | Parked in a screen corner; parking trusted its own flag | Virtual mode parks, verifies the parked frame through WindowServer, and records parking only when the write reached an element; native mode uses Spaces | Native Spaces through SkyLight; nothing is parked |
 | Window events | AX observers per app | AX observers; native mode adds WindowServer lifecycle events | WindowServer (SkyLight) notifications |
 | Failure visibility | Silent nil | `doctor` window reachability; a window that cannot be parked is logged once | Logs a window whose element is gone after invalidation, and writes that cannot be read back |
@@ -75,18 +76,17 @@ apps that move their own windows back, which WinMux missed.
 **WinMux** is simpler in app lifecycle: by never replacing a pid's app object, it could not
 orphan windows, at the cost of a LaunchServices request per app per refresh.
 
-**Dinky** has the most robust identity model and confirms every write by reading it back.
-Learning minimum sizes per bundle ID lets a new window of a known app land correctly on
-the first pass, and it leaves Enhanced UI alone for assistive technology users.
+**Dinky** has the most robust identity model, reads back every write including moves, and
+retries a write that landed elsewhere. WinMuxX instead reads back size changes, turns a
+refusal into a learned per-app minimum and lays out around it. Both persist minimums per
+bundle ID and leave Enhanced UI alone for assistive technology users.
 
 ## Recommendations
 
 1. Keep WinMuxX's architecture; do not replace `MacApp` with Dinky's stateless lookup.
 2. Bind refresh results and pending registrations to the process instance that produced
    them (deferred step 4 of the lifecycle review), only if another lifecycle bug appears.
-3. Evaluate read-back confirmation for virtual-mode writes, as Dinky does, so a write an
-   app refuses is detected rather than assumed.
-4. Consider learning minimum sizes per bundle ID as well as per window.
-5. Check toggling Enhanced UI under VoiceOver: WinMuxX restores it after each write but
-   toggles it on every write, which can disturb assistive technology. Uncertain; test with
-   VoiceOver before changing.
+3. Read-back confirmation and per-app minimum sizes already exist (see the table); an
+   earlier draft of this review missed them.
+4. Done: Enhanced UI is no longer toggled while VoiceOver or Switch Control runs. A manual
+   VoiceOver check of workspace switching remains worthwhile.
