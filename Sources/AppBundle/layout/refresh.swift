@@ -66,6 +66,7 @@ private var pendingActivation: RefreshActivationContext? {
 func recordRefreshActivation(workspaceName: String, pid: Int32) {
     activationGeneration += 1
     pendingActivation = RefreshActivationContext(generation: activationGeneration, workspaceName: workspaceName, pid: pid)
+    if runtime.refresh.windowlessActivationPid != pid { runtime.refresh.windowlessActivationPid = nil }
 }
 
 @MainActor
@@ -92,7 +93,7 @@ func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
     frontmostActivationPolicy: NSApplication.ActivationPolicy?,
     frontmostPid: pid_t? = nil,
-    activationPid: pid_t? = nil,
+    windowlessActivationPid: pid_t? = runtime.refresh.windowlessActivationPid,
 ) -> Bool {
     if ignoresCrossWorkspaceActivation(nativeFocused) {
         switch refreshSessionEvent {
@@ -107,11 +108,11 @@ func shouldSyncFocusBackToMacOs(
     if nativeFocused == nil && frontmostActivationPolicy == .accessory {
         return false
     }
-    // This refresh handles the activation of another app that has no window yet, as when it
-    // launches: taking focus back would open its window behind the old one, and its window's own
-    // event focuses it once known. An app that has just closed its last window is not activated
-    // in this refresh, so focus still returns to the window WinMux keeps focused.
-    if nativeFocused == nil, let frontmostPid, frontmostPid == activationPid, frontmostPid != focus.windowOrNil?.app.pid {
+    // Another app was activated before it had a window, as when it launches: taking focus back
+    // would open its window behind the old one, and its window's own event focuses it once known.
+    // An app that has just closed its last window had windows when it was activated, so focus
+    // still returns to the window WinMux keeps focused.
+    if nativeFocused == nil, let frontmostPid, frontmostPid == windowlessActivationPid, frontmostPid != focus.windowOrNil?.app.pid {
         return false
     }
     return true
@@ -300,6 +301,11 @@ private func performRefreshSession(
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
                 let frontmostApplication = NSWorkspace.shared.frontmostApplication
                 let frontmostActivationPolicy = frontmostApplication?.activationPolicy
+                // Decided before this session registers new windows: a launching app has none yet.
+                if let activation, activation.pid == frontmostApplication?.processIdentifier,
+                   !MacWindow.allWindows.contains(where: { $0.app.pid == activation.pid }) {
+                    runtime.refresh.windowlessActivationPid = activation.pid
+                }
                 let observation = try await observeAndRecordNativeFocusForSession()
                 let nativeFocused = observation.window
 
@@ -335,7 +341,6 @@ private func performRefreshSession(
                         nativeFocused: nativeFocused,
                         frontmostActivationPolicy: frontmostActivationPolicy,
                         frontmostPid: frontmostApplication?.processIdentifier,
-                        activationPid: activation?.pid,
                     ) {
                         let logicalFocused = focus.windowOrNil
                         if logicalFocused?.windowId != nativeFocused?.windowId {

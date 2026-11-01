@@ -102,9 +102,15 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         debugFocusLog("updateFocusCache ignoredNativeFocusHold nativeFocused=\(nativeFocused?.windowId.description ?? "nil")")
         return
     }
+    // The launching app has its window now; focus may be taken back from it again.
+    if let pid = nativeFocused?.app.pid, pid == runtime.refresh.windowlessActivationPid {
+        runtime.refresh.windowlessActivationPid = nil
+    }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
         if let nativeFocused, shouldBringActivatedWindowHere(nativeFocused, activation: runtime.refresh.pendingActivation) {
             nativeFocused.bind(to: focus.workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+            // As explicit moves do, so lock-screen recovery does not restore it to its old workspace.
+            syncClosedWindowsCacheToCurrentWorld()
         }
         if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
             _ = setFocus(to: live, origin: .native)

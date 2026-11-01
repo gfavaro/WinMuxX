@@ -244,13 +244,28 @@ final class RefreshFocusSyncTest: XCTestCase {
         XCTAssertTrue(window.focusWindow())
         let focusedPid = window.app.pid, launched = focusedPid + 1
         XCTAssertFalse(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
-                                                  frontmostPid: launched, activationPid: launched))
+                                                  frontmostPid: launched, windowlessActivationPid: launched))
         XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
-                                                 frontmostPid: launched, activationPid: nil),
-                      "An app that closed its last window was not activated now; focus returns to the focused window")
+                                                 frontmostPid: launched, windowlessActivationPid: nil),
+                      "An app that closed its last window had windows when activated; focus returns to the focused window")
         XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
-                                                 frontmostPid: focusedPid, activationPid: focusedPid),
+                                                 frontmostPid: focusedPid, windowlessActivationPid: focusedPid),
                       "The focused window's own app without a focused window still gets focus back")
+    }
+
+    /// The hold lasts across refreshes until the launching app's window is focused or another app is activated.
+    @MainActor
+    func testLaunchHoldEndsWhenItsWindowIsFocusedOrAnotherAppIsActivated() {
+        setUpWorkspacesForTests()
+        let window = TestWindow.new(id: 1, parent: focus.workspace)
+        runtime.refresh.windowlessActivationPid = window.app.pid
+        recordRefreshActivation(workspaceName: focus.workspace.name, pid: window.app.pid)
+        XCTAssertEqual(runtime.refresh.windowlessActivationPid, window.app.pid, "Activating the same app keeps it")
+        updateFocusCache(window)
+        XCTAssertNil(runtime.refresh.windowlessActivationPid, "Its window was focused")
+        runtime.refresh.windowlessActivationPid = window.app.pid
+        recordRefreshActivation(workspaceName: focus.workspace.name, pid: window.app.pid + 1)
+        XCTAssertNil(runtime.refresh.windowlessActivationPid, "Another app was activated")
     }
 
     @MainActor

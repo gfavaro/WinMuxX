@@ -11,6 +11,9 @@ final class RefreshCoordinator {
     var normalizeLayoutReasonOverrideForTests: (@MainActor @Sendable () async throws -> Void)? = nil
     var activationGeneration: UInt64 = 0
     var pendingActivation: RefreshActivationContext?
+    /// An app activated before WinMux knew any window of it, as when it launches. Focus is not
+    /// taken back from it until a window of it is focused or another app is activated.
+    var windowlessActivationPid: pid_t?
     var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? = nil
 
     func invalidate() {
@@ -20,5 +23,6 @@ final class RefreshCoordinator {
         activeScheduledRefreshEvent = nil
         pendingRefreshRequest = nil
         pendingActivation = nil
+        windowlessActivationPid = nil
     }
 }
