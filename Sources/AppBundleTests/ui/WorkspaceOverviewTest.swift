@@ -475,13 +475,22 @@ final class WorkspaceOverviewTest: XCTestCase {
         let gate = SelectionGate()
         addTeardownBlock { await gate.releaseAll() }
         var results: [Bool] = []
+        var finished: XCTestExpectation?
         var deps = dependencies(cards: [card(1), card(2)], image: try image())
         deps.activate = { _, _, isCurrent in
             await gate.wait()
             results.append(isCurrent())
+            finished?.fulfill(); finished = nil
             return results.last!
         }
         let controller = WorkspaceOverviewController(dependencies: deps)
+        // Waits until the released activation has recorded its result, however busy the runner is.
+        func releaseAndFinish() async {
+            let done = expectation(description: "Activation finishes")
+            finished = done
+            gate.releaseFirst()
+            await fulfillment(of: [done], timeout: 2)
+        }
         func selectAndHold() async {
             XCTAssertTrue(controller.show()); await drain(controller)
             let started = expectation(description: "Activation awaits native work")
@@ -494,23 +503,23 @@ final class WorkspaceOverviewTest: XCTestCase {
         await selectAndHold()
         XCTAssertFalse(controller.show(), "A pending selection keeps the overview closed")
         controller.cancelPendingSelection()
-        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        await releaseAndFinish()
         XCTAssertEqual(results, [false], "The invalidated selection must not activate")
 
         // A stale completion must neither activate nor clear a newer selection.
         await selectAndHold()
         controller.cancelPendingSelection()
         await selectAndHold()
-        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        await releaseAndFinish()
         XCTAssertEqual(results, [false, false])
         XCTAssertFalse(controller.show(), "The replacement selection is still pending")
-        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        await releaseAndFinish()
         XCTAssertEqual(results, [false, false, true])
 
         // An explicit hide (command, gesture, Mission Control, palette) after selecting supersedes it.
         await selectAndHold()
         controller.dismiss()
-        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        await releaseAndFinish()
         XCTAssertEqual(results, [false, false, true, false])
         XCTAssertTrue(controller.show())
         controller.dismiss()
