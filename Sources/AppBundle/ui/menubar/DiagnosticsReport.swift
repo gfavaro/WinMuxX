@@ -159,7 +159,7 @@ func buildDiagnosticsReport() async -> String {
         // Probe the live registration: a retired object has no AX thread to ask.
         let app = MacApp.allAppsMap[pid] ?? MacWindow.allWindows.first { $0.app.pid == pid }?.macApp
         details.append(AppReachabilityDetail(appName: app?.nsApp.localizedName ?? String(pid),
-            axWindows: unresponsivePids.contains(pid) ? [] : ((try? await app?.probeAxWindows()) ?? []),
+            axWindows: unresponsivePids.contains(pid) ? nil : ((try? await app?.probeAxWindows()) ?? []),
             windowServerWindows: serverWindows.filter { $0.pid == pid }.map(\.summary)))
     }
     for line in windowReachabilityReport(trackedCount: tracked.count, findings: findings, details: details) { io.out(line) }

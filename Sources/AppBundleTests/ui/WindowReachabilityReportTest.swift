@@ -37,6 +37,15 @@ final class WindowReachabilityReportTest: XCTestCase {
         XCTAssertTrue(lines[7].hasSuffix("; …"), "Long window lists are capped")
     }
 
+    func testAnAppThatWasNotProbedIsNotReportedAsHavingNoWindows() {
+        let finding = WindowReachabilityFinding(windowId: 1, appName: "Slow", workspace: "1", windowServerFrame: nil,
+                                                reachability: .unknown("the app did not answer"))
+        let lines = windowReachabilityReport(trackedCount: 1, findings: [finding],
+            details: [AppReachabilityDetail(appName: "Slow", axWindows: nil, windowServerWindows: [])])
+        XCTAssertEqual(lines[1], "  Slow Accessibility windows: not probed, the app did not answer")
+        XCTAssertFalse(lines.contains("    none"))
+    }
+
     func testUnknownIsNeverReportedAsAllReachable() {
         let finding = WindowReachabilityFinding(windowId: 1, appName: "App", workspace: "1", windowServerFrame: nil,
                                                 reachability: .unknown("the check was interrupted"))

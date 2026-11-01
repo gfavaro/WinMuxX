@@ -42,7 +42,8 @@ struct WindowReachabilityFinding: Equatable, Sendable {
 /// What one app exposes, probed once however many of its windows are listed.
 struct AppReachabilityDetail: Equatable, Sendable {
     let appName: String
-    let axWindows: [AxWindowProbe]
+    /// Nil when the app was not probed because it did not answer.
+    let axWindows: [AxWindowProbe]?
     let windowServerWindows: [WindowServerWindowSummary]
 }
 
@@ -66,9 +67,14 @@ func windowReachabilityReport(trackedCount: Int, findings: [WindowReachabilityFi
         }
     }
     for app in details {
+        guard let axWindows = app.axWindows else {
+            lines.append("  \(app.appName) Accessibility windows: not probed, the app did not answer")
+            lines.append(windowServerLine(app))
+            continue
+        }
         lines.append("  \(app.appName) Accessibility windows, unfiltered:")
-        if app.axWindows.isEmpty { lines.append("    none") }
-        for probe in app.axWindows.prefix(detailLimit) {
+        if axWindows.isEmpty { lines.append("    none") }
+        for probe in axWindows.prefix(detailLimit) {
             if let failure = probe.failure {
                 lines.append("    \(probe.source): unreadable (\(failure))")
             } else {
@@ -76,13 +82,17 @@ func windowReachabilityReport(trackedCount: Int, findings: [WindowReachabilityFi
                 lines.append("    \(probe.source): id=\(id) role=\(probe.role ?? "-") subrole=\(probe.subrole ?? "-") frame=\(describe(probe.frame))")
             }
         }
-        if app.axWindows.count > detailLimit { lines.append("    …") }
-        let shown = app.windowServerWindows.prefix(detailLimit)
-        lines.append("  \(app.appName) WindowServer windows (layer 0): " + (shown.isEmpty ? "none" : shown.map {
-            "\($0.id) \($0.onScreen ? "on" : "off") \(describe($0.frame))"
-        }.joined(separator: "; ")) + (app.windowServerWindows.count > shown.count ? "; …" : ""))
+        if axWindows.count > detailLimit { lines.append("    …") }
+        lines.append(windowServerLine(app))
     }
     return lines
+}
+
+private func windowServerLine(_ app: AppReachabilityDetail) -> String {
+    let shown = app.windowServerWindows.prefix(detailLimit)
+    return "  \(app.appName) WindowServer windows (layer 0): " + (shown.isEmpty ? "none" : shown.map {
+        "\($0.id) \($0.onScreen ? "on" : "off") \(describe($0.frame))"
+    }.joined(separator: "; ")) + (app.windowServerWindows.count > shown.count ? "; …" : "")
 }
 
 private func describe(_ frame: CGRect?) -> String {

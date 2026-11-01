@@ -165,31 +165,32 @@ final class MacApp: AbstractApp {
 
     /// Whether a frame write could reach the window now, for `doctor`. A cached element counts only
     /// if it still answers for this window. Unreachable means the app answered every lookup and none
-    /// was this window; any lookup the app did not answer makes the result unknown.
+    /// was this window; the first lookup it does not answer ends the check as unknown, so a slow app
+    /// costs one timeout. The registered element keeps its operational timeout; only the fresh
+    /// copies read here use the shorter diagnostic one, because the timeout stays on an element.
     func axWindowReachability(_ windowId: UInt32) async -> AxWindowReachability {
         guard let thread else { return .appRetired }
         let timeout = Self.diagnosticTimeout
         do {
             return try await thread.runInLoop { [windows, axApp] job -> AxWindowReachability in
                 if let cached = windows.threadGuarded[windowId]?.ax {
-                    let (resolved, error) = cached.containingWindowIdWithError(timeout: timeout)
+                    let (resolved, error) = cached.containingWindowIdWithError()
                     if resolved == windowId { return .reachable }
                     if error == .cannotComplete { return .unknown("the app did not answer") }
                 }
-                var incomplete = false
+                let unanswered = AxWindowReachability.unknown("the app did not answer")
                 for source in [kAXWindowsAttribute, kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
                     try job.checkCancellation()
                     var raw: CFTypeRef?
-                    let status = AXUIElementCopyAttributeValue(axApp.threadGuarded, source as CFString, &raw)
-                    if status == .cannotComplete { incomplete = true; continue }
+                    if AXUIElementCopyAttributeValue(axApp.threadGuarded, source as CFString, &raw) == .cannotComplete { return unanswered }
                     let elements = (raw as? [AnyObject]) ?? raw.map { [$0 as AnyObject] } ?? []
                     for element in elements where CFGetTypeID(element) == AXUIElementGetTypeID() {
                         let (resolved, error) = (element as! AXUIElement).containingWindowIdWithError(timeout: timeout)
                         if resolved == windowId { return .reachable }
-                        if error == .cannotComplete { incomplete = true }
+                        if error == .cannotComplete { return unanswered }
                     }
                 }
-                return incomplete ? .unknown("the app did not answer every lookup") : .unreachable
+                return .unreachable
             }
         } catch {
             return .unknown("the check was interrupted")
@@ -204,8 +205,10 @@ final class MacApp: AbstractApp {
     func probeAxWindows(limit: Int = 12) async throws -> [AxWindowProbe] {
         try await thread?.runInLoop { [axApp] job in
             let app = axApp.threadGuarded
+            var answering = true
             func probe(_ element: AXUIElement, _ source: String) -> AxWindowProbe {
                 let (windowId, error) = element.containingWindowIdWithError(timeout: Self.diagnosticTimeout)
+                if error == .cannotComplete { answering = false }
                 let origin = element.get(Ax.topLeftCornerAttr), size = element.get(Ax.sizeAttr)
                 return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
                     frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
@@ -218,9 +221,10 @@ final class MacApp: AbstractApp {
             let listed = (raw as? [AnyObject]) ?? []
             if listed.count > limit { result.append(AxWindowProbe(source: "AXWindows", failure: "\(listed.count) windows, first \(limit) shown")) }
             for (index, element) in listed.prefix(limit).enumerated()
-            where CFGetTypeID(element) == AXUIElementGetTypeID() {
+            where answering && CFGetTypeID(element) == AXUIElementGetTypeID() {
                 result.append(probe(element as! AXUIElement, "AXWindows[\(index)]"))
             }
+            guard answering else { return result + [AxWindowProbe(source: "probe", failure: "stopped: the app stopped answering")] }
             for (attribute, source) in [(kAXMainWindowAttribute, "AXMainWindow"), (kAXFocusedWindowAttribute, "AXFocusedWindow")] {
                 var value: CFTypeRef?
                 let status = AXUIElementCopyAttributeValue(app, attribute as CFString, &value)
