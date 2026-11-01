@@ -157,8 +157,8 @@ and blurs everything but the focused window until you turn it off.
 
 ## Hover bar
 
-Rest the pointer on a tiled window's top edge, away from its corners, and a bar appears
-where the pointer is, offering
+Rest the pointer on a tiled window's title bar, away from its corners, and a bar in your
+accent color (blue with the Graphite accent) appears where the pointer is, offering
 **Main** (Master layout: swap it into the main pane), **Focus** (`fullscreen`) and
 **Float** (`layout floating tiling`) for that window. It appears only after a short
 rest, and only for the window actually on top there. Turn it off with:

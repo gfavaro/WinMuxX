@@ -1,20 +1,21 @@
 import AppKit
 import Common
 
-/// Rest the pointer on a tiled window's top edge and a bar offers Main (in Master), Focus
+/// Rest the pointer on a tiled window's title bar and a bar offers Main (in Master), Focus
 /// and Float for that window where the pointer is, so they need no shortcut. Pointer
 /// moves only compare cached layout frames; which window is really on top is checked
 /// once the pointer has rested. Each button runs the ordinary command for that window.
 @MainActor
 final class WindowHoverBar {
     static let shared = WindowHoverBar()
-    static let zoneHeight: CGFloat = 8
+    /// A standard title bar's height, so the whole title bar summons the bar.
+    static let zoneHeight: CGFloat = 28
     static let dwell: Duration = .milliseconds(350)
     private var pending: (windowId: UInt32, task: Task<Void, Never>)?
     private var shown: UInt32?
     private lazy var panel = HoverBarPanel()
 
-    /// The band along a window's top edge that summons the bar: all of it but the corners,
+    /// The band along a window's title bar that summons the bar: all of it but the corners,
     /// which hold the window buttons and resize handles (80 pt each, a quarter on narrow windows).
     static func triggerZone(for frame: Rect) -> Rect {
         let corner = min(80, frame.width / 4)
@@ -131,8 +132,10 @@ final class WindowHoverBar {
 }
 
 @MainActor
-private final class HoverBarPanel: NSPanelHud {
+final class HoverBarPanel: NSPanelHud {
     private let stack = NSStackView()
+    /// The accent wash and border that set the bar apart from window content.
+    private let highlight = NSView()
     private var run: ((String) -> Void)?
 
     override init() {
@@ -155,8 +158,15 @@ private final class HoverBarPanel: NSPanelHud {
         stack.spacing = 4
         stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        highlight.wantsLayer = true
+        highlight.layer?.cornerRadius = 10
+        highlight.layer?.borderWidth = 1
+        highlight.translatesAutoresizingMaskIntoConstraints = false
+        effect.addSubview(highlight)
         effect.addSubview(stack)
         NSLayoutConstraint.activate([
+            highlight.leadingAnchor.constraint(equalTo: effect.leadingAnchor), highlight.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
+            highlight.topAnchor.constraint(equalTo: effect.topAnchor), highlight.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
             stack.leadingAnchor.constraint(equalTo: effect.leadingAnchor), stack.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
             stack.topAnchor.constraint(equalTo: effect.topAnchor), stack.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
         ])
@@ -169,6 +179,13 @@ private final class HoverBarPanel: NSPanelHud {
     /// Lays out one button per action and returns the bar's size.
     func configure(_ actions: [(title: String, symbol: String, command: String)], run: @escaping (String) -> Void) -> CGSize {
         self.run = run
+        let increasedContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
+        // Graphite has no hue, so the bar would not stand out; use blue then.
+        let color = NSColor.currentControlTint == .graphiteControlTint ? NSColor.systemBlue : NSColor.controlAccentColor
+        effect(appearance: contentView?.effectiveAppearance) {
+            highlight.layer?.backgroundColor = color.withAlphaComponent(increasedContrast ? 0.32 : 0.22).cgColor
+            highlight.layer?.borderColor = color.withAlphaComponent(increasedContrast ? 1 : 0.65).cgColor
+        }
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
         for action in actions {
             let button = HoverBarButton(title: action.title, target: self, action: #selector(pressed(_:)))
@@ -192,4 +209,10 @@ private final class HoverBarPanel: NSPanelHud {
 
 private final class HoverBarButton: NSButton {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// Resolves dynamic colors such as the accent color for the given appearance.
+@MainActor
+private func effect(appearance: NSAppearance?, _ body: () -> Void) {
+    if let appearance { appearance.performAsCurrentDrawingAppearance(body) } else { body() }
 }
