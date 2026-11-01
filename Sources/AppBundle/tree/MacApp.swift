@@ -163,33 +163,49 @@ final class MacApp: AbstractApp {
         } ?? false
     }
 
-    /// Whether a frame write could reach the window now. A cached element counts only if it still
-    /// answers for this window; an app that does not answer is unknown, not unreachable.
+    /// Whether a frame write could reach the window now, for `doctor`. A cached element counts only
+    /// if it still answers for this window. Unreachable means the app answered every lookup and none
+    /// was this window; any lookup the app did not answer makes the result unknown.
     func axWindowReachability(_ windowId: UInt32) async -> AxWindowReachability {
         guard let thread else { return .appRetired }
+        let timeout = Self.diagnosticTimeout
         do {
             return try await thread.runInLoop { [windows, axApp] job -> AxWindowReachability in
                 if let cached = windows.threadGuarded[windowId]?.ax {
-                    let (resolved, error) = cached.containingWindowIdWithError()
+                    let (resolved, error) = cached.containingWindowIdWithError(timeout: timeout)
                     if resolved == windowId { return .reachable }
                     if error == .cannotComplete { return .unknown("the app did not answer") }
                 }
-                try job.checkCancellation()
-                guard let listed = axApp.threadGuarded.discoverAxWindows() else { return .unknown("the app did not list its windows") }
-                return listed.contains { $0.windowId == windowId } ? .reachable : .unreachable
+                var incomplete = false
+                for source in [kAXWindowsAttribute, kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+                    try job.checkCancellation()
+                    var raw: CFTypeRef?
+                    let status = AXUIElementCopyAttributeValue(axApp.threadGuarded, source as CFString, &raw)
+                    if status == .cannotComplete { incomplete = true; continue }
+                    let elements = (raw as? [AnyObject]) ?? raw.map { [$0 as AnyObject] } ?? []
+                    for element in elements where CFGetTypeID(element) == AXUIElementGetTypeID() {
+                        let (resolved, error) = (element as! AXUIElement).containingWindowIdWithError(timeout: timeout)
+                        if resolved == windowId { return .reachable }
+                        if error == .cannotComplete { incomplete = true }
+                    }
+                }
+                return incomplete ? .unknown("the app did not answer every lookup") : .unreachable
             }
         } catch {
             return .unknown("the check was interrupted")
         }
     }
 
+    /// Diagnostics wait less than window operations for an unresponsive app.
+    private static let diagnosticTimeout: Float = 0.25
+
     /// The app's raw AX window sources for `doctor`, before the window-id filter that
     /// discovery applies, so an element that maps to no or another window id is visible.
-    func probeAxWindows() async throws -> [AxWindowProbe] {
+    func probeAxWindows(limit: Int = 12) async throws -> [AxWindowProbe] {
         try await thread?.runInLoop { [axApp] job in
             let app = axApp.threadGuarded
             func probe(_ element: AXUIElement, _ source: String) -> AxWindowProbe {
-                let (windowId, error) = element.containingWindowIdWithError()
+                let (windowId, error) = element.containingWindowIdWithError(timeout: Self.diagnosticTimeout)
                 let origin = element.get(Ax.topLeftCornerAttr), size = element.get(Ax.sizeAttr)
                 return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
                     frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
@@ -199,7 +215,9 @@ final class MacApp: AbstractApp {
             var raw: CFTypeRef?
             let status = AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &raw)
             if status != .success { result.append(AxWindowProbe(source: "AXWindows", failure: status.repr)) }
-            for (index, element) in ((raw as? [AnyObject]) ?? []).enumerated()
+            let listed = (raw as? [AnyObject]) ?? []
+            if listed.count > limit { result.append(AxWindowProbe(source: "AXWindows", failure: "\(listed.count) windows, first \(limit) shown")) }
+            for (index, element) in listed.prefix(limit).enumerated()
             where CFGetTypeID(element) == AXUIElementGetTypeID() {
                 result.append(probe(element as! AXUIElement, "AXWindows[\(index)]"))
             }

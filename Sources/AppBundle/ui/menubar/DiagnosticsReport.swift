@@ -138,10 +138,15 @@ func buildDiagnosticsReport() async -> String {
     let tracked = MacWindow.allWindows.sorted { $0.windowId < $1.windowId }
     var findings: [WindowReachabilityFinding] = []
     var probedPids: [pid_t] = []
+    var unresponsivePids: Set<pid_t> = []
     for window in tracked {
-        let reachability = await window.macApp.axWindowReachability(window.windowId)
-        guard reachability != .reachable else { continue }
         let pid = window.app.pid
+        // One unanswered app costs its timeout once, not once per window.
+        let reachability = unresponsivePids.contains(pid)
+            ? .unknown("the app did not answer earlier in this report")
+            : await window.macApp.axWindowReachability(window.windowId)
+        if case .unknown = reachability { unresponsivePids.insert(pid) }
+        guard reachability != .reachable else { continue }
         findings.append(WindowReachabilityFinding(windowId: window.windowId,
             appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(pid),
             workspace: window.nodeWorkspace?.name, windowServerFrame: windowServerFrame(window.windowId),
@@ -154,7 +159,7 @@ func buildDiagnosticsReport() async -> String {
         // Probe the live registration: a retired object has no AX thread to ask.
         let app = MacApp.allAppsMap[pid] ?? MacWindow.allWindows.first { $0.app.pid == pid }?.macApp
         details.append(AppReachabilityDetail(appName: app?.nsApp.localizedName ?? String(pid),
-            axWindows: (try? await app?.probeAxWindows()) ?? [],
+            axWindows: unresponsivePids.contains(pid) ? [] : ((try? await app?.probeAxWindows()) ?? []),
             windowServerWindows: serverWindows.filter { $0.pid == pid }.map(\.summary)))
     }
     for line in windowReachabilityReport(trackedCount: tracked.count, findings: findings, details: details) { io.out(line) }
