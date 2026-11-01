@@ -32,24 +32,9 @@ private func updateWorkspaceSidebarScalarConfig(
     renderedValue: String,
 ) -> String {
     let lines = configText.components(separatedBy: "\n")
-    guard let sectionIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == workspaceSidebarSectionHeader }) else {
-        var result = configText
-        if !result.isEmpty, !result.hasSuffix("\n") {
-            result += "\n"
-        }
-        if !result.isEmpty {
-            result += "\n"
-        }
-        result += "\(workspaceSidebarSectionHeader)\n"
-        result += "    \(key) = \(renderedValue)"
-        return result
+    guard case let (sectionIndex, sectionEnd)? = tomlSectionBounds(in: lines, header: workspaceSidebarSectionHeader) else {
+        return appendingTomlSection(to: configText, header: workspaceSidebarSectionHeader, line: "    \(key) = \(renderedValue)")
     }
-
-    let sectionEnd = lines[(sectionIndex + 1)...]
-        .firstIndex(where: { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            return trimmed.hasPrefix("[") && trimmed.hasSuffix("]")
-        }) ?? lines.endIndex
 
     var resultLines = lines
     for lineIndex in (sectionIndex + 1)..<sectionEnd {
@@ -110,25 +95,10 @@ private func updateWorkspaceSidebarKeyValueSectionConfig(
     value: String?,
 ) -> String {
     let lines = configText.components(separatedBy: "\n")
-    guard let sectionIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == sectionHeader }) else {
+    guard case let (sectionIndex, sectionEnd)? = tomlSectionBounds(in: lines, header: sectionHeader) else {
         guard let value else { return configText }
-        var result = configText
-        if !result.isEmpty, !result.hasSuffix("\n") {
-            result += "\n"
-        }
-        if !result.isEmpty {
-            result += "\n"
-        }
-        result += "\(sectionHeader)\n"
-        result += tomlWorkspaceSidebarKeyValueLine(key: key, value: value)
-        return result
+        return appendingTomlSection(to: configText, header: sectionHeader, line: tomlWorkspaceSidebarKeyValueLine(key: key, value: value))
     }
-
-    let sectionEnd = lines[(sectionIndex + 1)...]
-        .firstIndex(where: { line in
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
-            return trimmed.hasPrefix("[") && trimmed.hasSuffix("]")
-        }) ?? lines.endIndex
 
     var resultLines = Array(lines[..<sectionIndex])
     resultLines.append(lines[sectionIndex])
@@ -160,6 +130,31 @@ private func updateWorkspaceSidebarKeyValueSectionConfig(
     }
     resultLines.append(contentsOf: lines[sectionEnd...])
     return resultLines.joined(separator: "\n")
+}
+
+/// Index of `header` and the index of the next table header (or `lines.endIndex`).
+private func tomlSectionBounds(in lines: [String], header: String) -> (header: Int, end: Int)? {
+    guard let sectionIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == header }) else { return nil }
+    let sectionEnd = lines[(sectionIndex + 1)...]
+        .firstIndex(where: { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return trimmed.hasPrefix("[") && trimmed.hasSuffix("]")
+        }) ?? lines.endIndex
+    return (sectionIndex, sectionEnd)
+}
+
+/// Appends a new table separated from existing content by one blank line.
+private func appendingTomlSection(to configText: String, header: String, line: String) -> String {
+    var result = configText
+    if !result.isEmpty, !result.hasSuffix("\n") {
+        result += "\n"
+    }
+    if !result.isEmpty {
+        result += "\n"
+    }
+    result += "\(header)\n"
+    result += line
+    return result
 }
 
 @MainActor

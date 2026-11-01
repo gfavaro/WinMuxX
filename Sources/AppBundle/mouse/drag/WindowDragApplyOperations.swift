@@ -62,16 +62,13 @@ func applyWindowStackSplitDragIntent(
     targetWindow: Window,
     position: WindowStackSplitPosition,
 ) -> Bool {
-    let sourceNode = dragSubjectNode(for: sourceWindow, subject: sourceSubject)
-    let targetNode = dragIntentTargetNode(
+    let splitOrientation = position.orientation
+    guard case let (sourceNode, targetNode)? = validatedDragNodePair(
         sourceWindow: sourceWindow,
         targetWindow: targetWindow,
         subject: sourceSubject,
         detachOrigin: getCurrentMouseTabDetachOrigin(),
-    )
-    let splitOrientation = position.orientation
-    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
-          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: sourceSubject),
+    ),
           canOfferWindowStackSplit(sourceNode: sourceNode, targetNode: targetNode, position: position),
           let splitContext = windowStackSplitContext(targetNode: targetNode, position: position)
     else { return false }

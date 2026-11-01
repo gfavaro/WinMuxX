@@ -147,14 +147,26 @@ private func parseWorkspaceSidebarLabels(
     _ backtrace: TomlBacktrace,
     _ errors: inout [TomlParseError],
 ) -> [String: String] {
+    parseWorkspaceSidebarStringTable(raw, backtrace, &errors) { label, _, _ in label }
+}
+
+/// Parses a table of string values; `transform` may reject a value by returning nil.
+private func parseWorkspaceSidebarStringTable(
+    _ raw: TOMLValueConvertible,
+    _ backtrace: TomlBacktrace,
+    _ errors: inout [TomlParseError],
+    transform: (_ value: String, _ backtrace: TomlBacktrace, _ errors: inout [TomlParseError]) -> String?,
+) -> [String: String] {
     guard let rawTable = raw.table else {
         errors += [expectedActualTypeError(expected: .table, actual: raw.type, backtrace)]
         return [:]
     }
     var result: [String: String] = [:]
-    for (workspaceName, rawLabel) in rawTable {
-        if let label = parseString(rawLabel, backtrace + .key(workspaceName)).getOrNil(appendErrorTo: &errors) {
-            result[workspaceName] = label
+    for (key, rawValue) in rawTable {
+        let valueBacktrace = backtrace + .key(key)
+        guard let value = parseString(rawValue, valueBacktrace).getOrNil(appendErrorTo: &errors) else { continue }
+        if let transformed = transform(value, valueBacktrace, &errors) {
+            result[key] = transformed
         }
     }
     return result
@@ -177,19 +189,11 @@ private func parseWorkspaceSidebarProjectColors(
     _ backtrace: TomlBacktrace,
     _ errors: inout [TomlParseError],
 ) -> [String: String] {
-    guard let rawTable = raw.table else {
-        errors += [expectedActualTypeError(expected: .table, actual: raw.type, backtrace)]
-        return [:]
-    }
-    var result: [String: String] = [:]
-    for (projectId, rawColor) in rawTable {
-        let colorBacktrace = backtrace + .key(projectId)
-        guard let color = parseString(rawColor, colorBacktrace).getOrNil(appendErrorTo: &errors) else { continue }
+    parseWorkspaceSidebarStringTable(raw, backtrace, &errors) { color, colorBacktrace, errors in
         guard let normalized = normalizedWorkspaceSidebarColorHex(color) else {
             errors.append(.semantic(colorBacktrace, "Must be a hex color like '#RRGGBB'"))
-            continue
+            return nil
         }
-        result[projectId] = normalized
+        return normalized
     }
-    return result
 }

@@ -20,7 +20,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let scrollingColumnWidth: CGFloat?
 
     @MainActor init(_ container: TilingContainer) {
-        children = container.children.map {
+        let children: [FrozenTreeNode] = container.children.map {
             switch $0.nodeCases {
                 case .window(let w): .window(FrozenWindow(w))
                 case .tilingContainer(let c): .container(FrozenContainer(c))
@@ -32,31 +32,45 @@ struct FrozenContainer: Codable, Equatable, Sendable {
                     illegalChildParentRelation(child: $0, parent: container)
             }
         }
-        isMasterStack = container.isMasterStack ? true : nil
-        masterRatio = container.masterRatio
-        masterStackLayout = container.masterStackLayout
-        layout = container.layout
-        orientation = container.orientation
-        weight = getWeightOrNil(container) ?? 1
-        dwindleSplitRatios = container.dwindleSplitRatios.isEmpty ? nil : container.dwindleSplitRatios
-        dwindleOrientation = container.dwindleOrientation
-        dwindleChildRatios = container.dwindleChildRatios
-        scrollingColumnWidth = container.scrollingColumnWidth
+        self.init(
+            children: children,
+            policyOf: container,
+            dwindleSplitRatios: container.dwindleSplitRatios.isEmpty ? nil : container.dwindleSplitRatios,
+            dwindleOrientation: container.dwindleOrientation,
+            dwindleChildRatios: container.dwindleChildRatios,
+        )
     }
 
     /// A terminated process can recover assignments, but cannot finish its old
     /// live-process tree. Keep only the target leaf and constant-size root policy.
     @MainActor init(assignment: FrozenWindow?, in container: TilingContainer) {
-        children = assignment.map { [.window($0)] } ?? []
+        self.init(
+            children: assignment.map { [.window($0)] } ?? [],
+            policyOf: container,
+            dwindleSplitRatios: nil,
+            dwindleOrientation: nil,
+            dwindleChildRatios: nil,
+        )
+    }
+
+    /// Copies the container's layout policy and scrolling column width; dwindle state is supplied by the caller.
+    @MainActor private init(
+        children: [FrozenTreeNode],
+        policyOf container: TilingContainer,
+        dwindleSplitRatios: [CGFloat]?,
+        dwindleOrientation: Orientation?,
+        dwindleChildRatios: [CGFloat]?,
+    ) {
+        self.children = children
         isMasterStack = container.isMasterStack ? true : nil
         masterRatio = container.masterRatio
         masterStackLayout = container.masterStackLayout
         layout = container.layout
         orientation = container.orientation
         weight = getWeightOrNil(container) ?? 1
-        dwindleSplitRatios = nil
-        dwindleOrientation = nil
-        dwindleChildRatios = nil
+        self.dwindleSplitRatios = dwindleSplitRatios
+        self.dwindleOrientation = dwindleOrientation
+        self.dwindleChildRatios = dwindleChildRatios
         scrollingColumnWidth = container.scrollingColumnWidth
     }
 }

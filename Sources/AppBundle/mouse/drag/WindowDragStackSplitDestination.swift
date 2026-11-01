@@ -12,15 +12,8 @@ func stackSplitDestination(
     if shouldSuppressSwapDestination(sourceWindow: sourceWindow, subject: subject) {
         return nil
     }
-    let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
-    let targetNode = dragIntentTargetNode(
-        sourceWindow: sourceWindow,
-        targetWindow: targetWindow,
-        subject: subject,
-        detachOrigin: detachOrigin,
-    )
-    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
-          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: subject),
+    guard case let (sourceNode, targetNode)? = validatedDragNodePair(
+        sourceWindow: sourceWindow, targetWindow: targetWindow, subject: subject, detachOrigin: detachOrigin),
           canOfferWindowStackSplit(sourceNode: sourceNode, targetNode: targetNode, position: position),
           let preview = resolvedWindowStackSplitPreview(targetNode: targetNode, position: position),
           let interactionRect = targetNode.stackSplitDropZoneRect(position: position)?

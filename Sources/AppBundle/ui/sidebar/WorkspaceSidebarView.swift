@@ -345,6 +345,16 @@ extension WorkspaceSidebarView {
                         projectContextColor: projectColor(snapshot.activeProjectId)
                     )
                 }
+                if expansionProgress >= workspaceSidebarRowsRevealProgress,
+                   workspaceSidebarShowsNoSearchMatches(query: searchText, pageWorkspaces: workspaces) {
+                    Text("No matches")
+                        .font(.system(size: 12))
+                        .foregroundStyle(sidebarColors.text(opacity: 0.55))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, workspaceSidebarRowHorizontalPadding)
+                        .padding(.vertical, 4)
+                        .allowsHitTesting(false)
+                }
                 ForEach(workspaces.filter { $0.id != pinned?.id }) { workspace in
                     workspaceSection(
                         workspace: workspace,

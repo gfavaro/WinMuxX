@@ -6,8 +6,21 @@ import SwiftUI
 
 @MainActor private final class OverviewPanelSpy: WorkspaceOverviewPresenting {
     var shown = false
+    var focused = 0
     func present(key: Bool) { shown = true }
     func dismissOverview() { shown = false }
+    func focusOverview() { focused += 1 }
+}
+
+/// Holds overview activations at their native await until the test releases them, in order.
+@MainActor private final class SelectionGate {
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+    var started: XCTestExpectation?
+    func wait() async {
+        await withCheckedContinuation { waiting.append($0); started?.fulfill(); started = nil }
+    }
+    func releaseFirst() { if !waiting.isEmpty { waiting.removeFirst().resume() } }
+    func releaseAll() { while !waiting.isEmpty { waiting.removeFirst().resume() } }
 }
 
 @MainActor private final class InteractiveOverviewPanelSpy: WorkspaceOverviewPresenting {
@@ -134,7 +147,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         return .init(project: { .defaultProject }, displays: { monitors.map {
             .init(id: $0, name: "Test display", frame: CGRect(x: 0, y: 0, width: 1920, height: 1080))
         } }, cards: { _ in cards }, canShow: { true }, ranks: { _ in [:] }, render: { _ in image },
-            makePanel: { _, _ in OverviewPanelSpy() }, activate: { _, _ in true })
+            makePanel: { _, _ in OverviewPanelSpy() }, activate: { _, _, _ in true })
     }
     private func drain(_ controller: WorkspaceOverviewController) async {
         guard let task = controller.task else { return }
@@ -456,6 +469,149 @@ final class WorkspaceOverviewTest: XCTestCase {
             }
             XCTAssertNil(released)
         }
+    }
+
+    func testPendingSelectionCannotActivateAfterLifecycleInvalidation() async throws {
+        let gate = SelectionGate()
+        addTeardownBlock { await gate.releaseAll() }
+        var results: [Bool] = []
+        var deps = dependencies(cards: [card(1), card(2)], image: try image())
+        deps.activate = { _, _, isCurrent in
+            await gate.wait()
+            results.append(isCurrent())
+            return results.last!
+        }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        func selectAndHold() async {
+            XCTAssertTrue(controller.show()); await drain(controller)
+            let started = expectation(description: "Activation awaits native work")
+            gate.started = started
+            controller.models[0].activateSelection()
+            await fulfillment(of: [started], timeout: 2)
+        }
+
+        // Another app, Space or display change arrives while native work is pending.
+        await selectAndHold()
+        XCTAssertFalse(controller.show(), "A pending selection keeps the overview closed")
+        controller.cancelPendingSelection()
+        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        XCTAssertEqual(results, [false], "The invalidated selection must not activate")
+
+        // A stale completion must neither activate nor clear a newer selection.
+        await selectAndHold()
+        controller.cancelPendingSelection()
+        await selectAndHold()
+        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        XCTAssertEqual(results, [false, false])
+        XCTAssertFalse(controller.show(), "The replacement selection is still pending")
+        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        XCTAssertEqual(results, [false, false, true])
+
+        // An explicit hide (command, gesture, Mission Control, palette) after selecting supersedes it.
+        await selectAndHold()
+        controller.dismiss()
+        gate.releaseFirst(); await Task.yield(); await Task.yield()
+        XCTAssertEqual(results, [false, false, true, false])
+        XCTAssertTrue(controller.show())
+        controller.dismiss()
+    }
+
+    func testReopenBeforeCaptureTaskRunsStillCapturesTheNewSession() async throws {
+        let controller = WorkspaceOverviewController(dependencies: dependencies(cards: [card(1), card(2)], image: try image()))
+        defer { controller.dismiss() }
+        // No suspension between these calls: the first capture task has not started yet.
+        XCTAssertTrue(controller.show())
+        controller.dismiss()
+        XCTAssertTrue(controller.show())
+        await controller.task?.value
+        await drain(controller)
+        XCTAssertEqual(controller.models[0].images.count, 2)
+    }
+
+    func testModelChangeAcrossAPageCapturesTheNewPageAndEvictsTheOld() async throws {
+        let picture = try image()
+        var cards = (1...14).map { card($0) }
+        var deps = dependencies(cards: cards, image: picture)
+        deps.cards = { _ in cards }
+        deps.displays = { [.init(id: self.monitor, name: "Test display", frame: CGRect(x: 0, y: 0, width: 1920, height: 1080),
+                                activeWorkspace: WorkspaceId("fixture-13"))] }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        defer { controller.dismiss() }
+        XCTAssertTrue(controller.show()); await drain(controller)
+        let model = try XCTUnwrap(controller.models.first)
+        XCTAssertEqual(model.page, 1)
+
+        cards.removeFirst(); controller.modelDidChange(); await drain(controller)
+        XCTAssertEqual(model.page, 0)
+        XCTAssertEqual(model.selectedCard?.id, WorkspaceId("fixture-13"))
+        XCTAssertEqual(Set(model.images.keys), Set(model.visibleCards.map(\.id)))
+        XCTAssertNil(model.images[WorkspaceId("fixture-14")], "Off-page pixels are evicted")
+    }
+
+    func testBracketsMoveKeyboardAndAccessibilityFocusBetweenDisplays() async throws {
+        XCTAssertEqual(workspaceOverviewKeyAction(keyCode: 33, modifiers: [], hasMarkedText: false, characters: "["), .display(-1))
+        XCTAssertEqual(workspaceOverviewKeyAction(keyCode: 30, modifiers: [], hasMarkedText: false, characters: "]"), .display(1))
+        // Layout-independent: the character decides, not the physical key.
+        XCTAssertEqual(workspaceOverviewKeyAction(keyCode: 0, modifiers: [], hasMarkedText: false, characters: "]"), .display(1))
+        for modifiers: NSEvent.ModifierFlags in [.command, .option, .control, .shift] {
+            XCTAssertNil(workspaceOverviewKeyAction(keyCode: 30, modifiers: modifiers, hasMarkedText: false, characters: "]"))
+        }
+        XCTAssertNil(workspaceOverviewKeyAction(keyCode: 30, modifiers: [], hasMarkedText: true, characters: "]"))
+
+        let second = MonitorViewportId(topLeftCorner: CGPoint(x: 1920, y: 0))
+        var panels: [OverviewPanelSpy] = []
+        var deps = dependencies(cards: [card(1), card(2, monitor: second)], image: try image())
+        deps.displays = { [self.monitor, second].map { .init(id: $0, name: "Display", frame: .zero) } }
+        deps.makePanel = { _, _ in let panel = OverviewPanelSpy(); panels.append(panel); return panel }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        defer { controller.dismiss() }
+        XCTAssertTrue(controller.show())
+        XCTAssertTrue(controller.models.allSatisfy(\.canSwitchDisplay))
+        controller.models[0].switchDisplay?(1)
+        XCTAssertEqual(panels.map(\.focused), [0, 1])
+        XCTAssertEqual(controller.models.map(\.focusRequest), [0, 1])
+        controller.models[0].switchDisplay?(-1) // Wraps to the other display.
+        XCTAssertEqual(panels.map(\.focused), [0, 2])
+        controller.dismiss()
+        XCTAssertTrue(controller.show(), "Reopening after a two-display session works")
+        controller.dismiss()
+
+        let single = WorkspaceOverviewController(dependencies: dependencies(cards: [card()], image: try image()))
+        XCTAssertTrue(single.show())
+        XCTAssertFalse(single.models[0].canSwitchDisplay)
+        single.dismiss()
+    }
+
+    func testAccessibilityFocusDrivesTheSelectionThatReturnActivates() {
+        let model = WorkspaceOverviewDisplayModel()
+        model.cards = [card(1, windows: [window(1)]), card(2, windows: [window(2)])]
+        var activated: (WorkspaceId, UInt32?)?
+        model.activate = { activated = ($0, $1) }
+
+        model.syncAccessibilityFocus(.window(2))
+        XCTAssertEqual(model.selection, 1); XCTAssertEqual(model.selectedWindow, 2)
+        model.activateSelection()
+        XCTAssertEqual(activated?.0, WorkspaceId("fixture-2")); XCTAssertEqual(activated?.1, 2)
+
+        model.syncAccessibilityFocus(.workspace(WorkspaceId("fixture-1")))
+        XCTAssertEqual(model.selection, 0); XCTAssertNil(model.selectedWindow)
+        model.syncAccessibilityFocus(nil) // Focus left the overview: keep the selection.
+        XCTAssertEqual(model.selection, 0)
+
+        model.cards = (1...13).map { card($0) }
+        model.syncAccessibilityFocus(.window(13)) // Not on the visible page, so not focusable.
+        XCTAssertEqual(model.selection, 0); XCTAssertNil(model.selectedWindow)
+    }
+
+    func testGridScrollsWhenThreeRowsCannotFit() {
+        let small = WorkspaceOverviewGridMetrics(availableHeight: 450)
+        XCTAssertTrue(small.scrolls)
+        XCTAssertEqual(small.cardHeight, WorkspaceOverviewGridMetrics.minimumCardHeight)
+        let regular = WorkspaceOverviewGridMetrics(availableHeight: 850)
+        XCTAssertFalse(regular.scrolls)
+        XCTAssertEqual(regular.cardHeight, (850 - 200) / 3 - 48, accuracy: 0.001)
+        // Three rows plus captions and spacing stay inside the space left for the grid.
+        XCTAssertLessThanOrEqual(3 * (regular.cardHeight + 48) + 2 * 18, 850 - 164)
     }
 
     func testRendererDownsamplesWithoutScreenCapture() async throws {

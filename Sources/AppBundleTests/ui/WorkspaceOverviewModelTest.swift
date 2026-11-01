@@ -104,21 +104,35 @@ final class WorkspaceOverviewModelTest: XCTestCase {
         let visibleBefore = world.displays.map { $0.activeWorkspace.id }
         original.unbindFromParent()
         let replacement = TestWindow.new(id: original.windowId, parent: workspace.rootTilingContainer)
-        var result = await WorkspaceOverviewDependencies.live.activate(card, selected)
+        var result = await WorkspaceOverviewDependencies.live.activate(card, selected) { true }
         XCTAssertFalse(result)
         XCTAssertEqual(world.displays.map { $0.activeWorkspace.id }, visibleBefore)
         let freshCard = try XCTUnwrap(buildWorkspaceOverviewCards(project: focus.workspace.projectId, monitors: world.displays).first { $0.id == workspace.id })
         replacement.nativeIsMacosMinimized = true
-        result = await WorkspaceOverviewDependencies.live.activate(freshCard, freshCard.windows.first)
+        result = await WorkspaceOverviewDependencies.live.activate(freshCard, freshCard.windows.first) { true }
         XCTAssertFalse(result)
         XCTAssertEqual(world.displays.map { $0.activeWorkspace.id }, visibleBefore)
+    }
+
+    func testStaleSelectionChangesNoViewportOrFocus() async throws {
+        let workspace = world.spaces[1]
+        let card = try XCTUnwrap(buildWorkspaceOverviewCards(project: focus.workspace.projectId, monitors: world.displays).first { $0.id == workspace.id })
+        let before = world.displays.map { $0.activeWorkspace.id }
+        let focusedBefore = focus.workspace.id
+        let result = await WorkspaceOverviewDependencies.live.activate(card, card.windows.first) { false }
+        XCTAssertFalse(result)
+        XCTAssertEqual(focus.workspace.id, focusedBefore)
+        XCTAssertEqual(world.displays.map { $0.activeWorkspace.id }, before)
+        let workspaceOnly = await WorkspaceOverviewDependencies.live.activate(card, nil) { false }
+        XCTAssertFalse(workspaceOnly)
+        XCTAssertEqual(focus.workspace.id, focusedBefore)
     }
 
     func testSelectingWorkspaceOnAnotherDisplayPreservesAllViewports() async throws {
         let workspace = world.spaces[1]
         let card = try XCTUnwrap(buildWorkspaceOverviewCards(project: focus.workspace.projectId, monitors: world.displays).first { $0.id == workspace.id })
         let before = world.displays.map { $0.activeWorkspace.id }
-        let result = await WorkspaceOverviewDependencies.live.activate(card, card.windows.first)
+        let result = await WorkspaceOverviewDependencies.live.activate(card, card.windows.first) { true }
         XCTAssertTrue(result)
         XCTAssertEqual(focus.workspace.id, workspace.id)
         XCTAssertEqual(world.displays.map { $0.activeWorkspace.id }, before)
