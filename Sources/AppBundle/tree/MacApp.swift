@@ -170,7 +170,7 @@ final class MacApp: AbstractApp {
     /// copies read here use the shorter diagnostic one, because the timeout stays on an element.
     func axWindowReachability(_ windowId: UInt32) async -> AxWindowReachability {
         guard let thread else { return .appRetired }
-        let timeout = Self.diagnosticTimeout
+        let timeout = axDiagnosticTimeout
         do {
             return try await thread.runInLoop { [windows, axApp] job -> AxWindowReachability in
                 if let cached = windows.threadGuarded[windowId]?.ax {
@@ -197,39 +197,27 @@ final class MacApp: AbstractApp {
         }
     }
 
-    /// Diagnostics wait less than window operations for an unresponsive app.
-    private static let diagnosticTimeout: Float = 0.25
 
     /// The app's raw AX window sources for `doctor`, before the window-id filter that
     /// discovery applies, so an element that maps to no or another window id is visible.
     func probeAxWindows(limit: Int = 12) async throws -> [AxWindowProbe] {
         try await thread?.runInLoop { [axApp] job in
-            let app = axApp.threadGuarded
-            var answering = true
-            func probe(_ element: AXUIElement, _ source: String) -> AxWindowProbe {
-                let (windowId, error) = element.containingWindowIdWithError(timeout: Self.diagnosticTimeout)
-                if error == .cannotComplete { answering = false }
-                let origin = element.get(Ax.topLeftCornerAttr), size = element.get(Ax.sizeAttr)
-                return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
-                    frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
-                    role: element.get(Ax.roleAttr), subrole: element.get(Ax.subroleAttr))
-            }
             var result: [AxWindowProbe] = []
-            var raw: CFTypeRef?
-            let status = AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &raw)
-            if status != .success { result.append(AxWindowProbe(source: "AXWindows", failure: status.repr)) }
-            let listed = (raw as? [AnyObject]) ?? []
-            if listed.count > limit { result.append(AxWindowProbe(source: "AXWindows", failure: "\(listed.count) windows, first \(limit) shown")) }
-            for (index, element) in listed.prefix(limit).enumerated()
-            where answering && CFGetTypeID(element) == AXUIElementGetTypeID() {
-                result.append(probe(element as! AXUIElement, "AXWindows[\(index)]"))
-            }
-            guard answering else { return result + [AxWindowProbe(source: "probe", failure: "stopped: the app stopped answering")] }
-            for (attribute, source) in [(kAXMainWindowAttribute, "AXMainWindow"), (kAXFocusedWindowAttribute, "AXFocusedWindow")] {
-                var value: CFTypeRef?
-                let status = AXUIElementCopyAttributeValue(app, attribute as CFString, &value)
-                if status != .success { result.append(AxWindowProbe(source: source, failure: status.repr)); continue }
-                if let value, CFGetTypeID(value) == AXUIElementGetTypeID() { result.append(probe(value as! AXUIElement, source)) }
+            do {
+                // The app element keeps its operational timeout; window copies read here are fresh.
+                let listed = try diagnosticRead(axApp.threadGuarded, kAXWindowsAttribute, into: &result, source: "AXWindows")
+                let elements = (listed as? [AnyObject]) ?? []
+                if elements.count > limit { result.append(AxWindowProbe(source: "AXWindows", failure: "\(elements.count) windows, first \(limit) shown")) }
+                for (index, element) in elements.prefix(limit).enumerated() where CFGetTypeID(element) == AXUIElementGetTypeID() {
+                    try job.checkCancellation()
+                    result.append(try diagnosticProbe(element as! AXUIElement, "AXWindows[\(index)]"))
+                }
+                for (attribute, source) in [(kAXMainWindowAttribute, "AXMainWindow"), (kAXFocusedWindowAttribute, "AXFocusedWindow")] {
+                    let value = try diagnosticRead(axApp.threadGuarded, attribute, into: &result, source: source)
+                    if let value, CFGetTypeID(value) == AXUIElementGetTypeID() { result.append(try diagnosticProbe(value as! AXUIElement, source)) }
+                }
+            } catch {
+                result.append(AxWindowProbe(source: "probe", failure: "stopped: the app stopped answering"))
             }
             return result
         } ?? []
@@ -854,4 +842,38 @@ enum AppRegistrationDecision: Equatable {
 func appRegistrationDecision(existingTerminated: Bool, sameProcess: Bool, incomingTerminated: () -> Bool) -> AppRegistrationDecision {
     if !existingTerminated { return sameProcess || !incomingTerminated() ? .reuse : .reject }
     return incomingTerminated() ? .reject : .replace
+}
+
+/// Diagnostics wait less than window operations for an unresponsive app.
+private let axDiagnosticTimeout: Float = 0.25
+
+/// Thrown by `doctor`'s probe at the first read the app does not answer, so a slow app costs one timeout.
+private struct DiagnosticReadUnanswered: Error {}
+
+/// Reads one attribute for `doctor`; a failure other than "no answer" is recorded under `source`.
+private func diagnosticRead(_ element: AXUIElement, _ attribute: String, into result: inout [AxWindowProbe], source: String) throws -> CFTypeRef? {
+    var value: CFTypeRef?
+    let status = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+    if status == .cannotComplete { throw DiagnosticReadUnanswered() }
+    if status != .success, status != .noValue { result.append(AxWindowProbe(source: source, failure: status.repr)) }
+    return status == .success ? value : nil
+}
+
+/// One window element for `doctor`. Every read stops the probe if the app does not answer.
+private func diagnosticProbe(_ element: AXUIElement, _ source: String) throws -> AxWindowProbe {
+    AXUIElementSetMessagingTimeout(element, axDiagnosticTimeout)
+    let (windowId, error) = element.containingWindowIdWithError(timeout: axDiagnosticTimeout)
+    if error == .cannotComplete { throw DiagnosticReadUnanswered() }
+    func attribute(_ name: String) throws -> CFTypeRef? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        if status == .cannotComplete { throw DiagnosticReadUnanswered() }
+        return status == .success ? value : nil
+    }
+    var origin = CGPoint.zero, size = CGSize.zero
+    let hasOrigin = try attribute(kAXPositionAttribute).map { AXValueGetValue($0 as! AXValue, .cgPoint, &origin) } ?? false
+    let hasSize = try attribute(kAXSizeAttribute).map { AXValueGetValue($0 as! AXValue, .cgSize, &size) } ?? false
+    return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
+        frame: hasOrigin && hasSize ? CGRect(origin: origin, size: size) : nil,
+        role: try attribute(kAXRoleAttribute) as? String, subrole: try attribute(kAXSubroleAttribute) as? String)
 }
