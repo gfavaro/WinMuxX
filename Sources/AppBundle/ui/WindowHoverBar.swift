@@ -1,8 +1,8 @@
 import AppKit
 import Common
 
-/// Rest the pointer on the middle of a tiled window's top edge and a small bar offers
-/// Main (in Master), Focus and Float for that window, so they need no shortcut. Pointer
+/// Rest the pointer on a tiled window's top edge and a bar offers Main (in Master), Focus
+/// and Float for that window where the pointer is, so they need no shortcut. Pointer
 /// moves only compare cached layout frames; which window is really on top is checked
 /// once the pointer has rested. Each button runs the ordinary command for that window.
 @MainActor
@@ -14,15 +14,20 @@ final class WindowHoverBar {
     private var shown: UInt32?
     private lazy var panel = HoverBarPanel()
 
-    /// The band along the middle third of a window's top edge that summons the bar.
+    /// The band along a window's top edge that summons the bar: all of it but the corners,
+    /// which hold the window buttons and resize handles (80 pt each, a quarter on narrow windows).
     static func triggerZone(for frame: Rect) -> Rect {
-        let width = max(frame.width / 3, min(frame.width, 120))
-        return Rect(topLeftX: frame.minX + (frame.width - width) / 2, topLeftY: frame.minY, width: width, height: zoneHeight)
+        let corner = min(80, frame.width / 4)
+        return Rect(topLeftX: frame.minX + corner, topLeftY: frame.minY, width: frame.width - 2 * corner, height: zoneHeight)
     }
 
-    /// The bar's place: centred on the window's top edge, just inside it.
-    static func barFrame(for frame: Rect, size: CGSize) -> Rect {
-        Rect(topLeftX: frame.minX + (frame.width - size.width) / 2, topLeftY: frame.minY + 4, width: size.width, height: size.height)
+    /// The bar's place: centred on the pointer along the window's top edge, just inside the
+    /// window, and kept within it.
+    static func barFrame(for frame: Rect, size: CGSize, pointerX: CGFloat) -> Rect {
+        let inset: CGFloat = 4
+        let lowest = frame.minX + inset, highest = max(lowest, frame.maxX - inset - size.width)
+        let x = min(max(pointerX - size.width / 2, lowest), highest)
+        return Rect(topLeftX: x, topLeftY: frame.minY + inset, width: size.width, height: size.height)
     }
 
     /// Where the window is: a focused (fullscreen) window has no tile, only the screen it
@@ -81,7 +86,7 @@ final class WindowHoverBar {
             // A failed check must not stay pending, or resting there again would never retry.
             self.pending = nil
             guard onTop, let window = Window.get(byId: id) else { return }
-            self.show(for: window)
+            self.show(for: window, pointerX: now.x)
         })
     }
 
@@ -90,7 +95,7 @@ final class WindowHoverBar {
         return CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY, width: frame.width, height: frame.height)
     }
 
-    private func show(for window: Window) {
+    private func show(for window: Window, pointerX: CGFloat) {
         guard let frame = Self.frame(of: window) else { return }
         let id = window.windowId
         let size = panel.configure(Self.actions(for: window)) { [weak self] command in
@@ -106,7 +111,7 @@ final class WindowHoverBar {
                 }
             }
         }
-        let bar = Self.barFrame(for: frame, size: size)
+        let bar = Self.barFrame(for: frame, size: size, pointerX: pointerX)
         panel.setFrame(CGRect(x: bar.minX, y: mainMonitor.height - bar.maxY, width: bar.width, height: bar.height), display: true)
         panel.orderFrontRegardless()
         shown = window.windowId
@@ -144,11 +149,11 @@ private final class HoverBarPanel: NSPanelHud {
         effect.blendingMode = .behindWindow
         effect.state = .active
         effect.wantsLayer = true
-        effect.layer?.cornerRadius = 8
+        effect.layer?.cornerRadius = 10
         effect.layer?.masksToBounds = true
         stack.orientation = .horizontal
-        stack.spacing = 2
-        stack.edgeInsets = NSEdgeInsets(top: 3, left: 4, bottom: 3, right: 4)
+        stack.spacing = 4
+        stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
         effect.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -170,8 +175,8 @@ private final class HoverBarPanel: NSPanelHud {
             button.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)
             button.imagePosition = .imageLeading
             button.bezelStyle = .recessed
-            button.controlSize = .small
-            button.font = .systemFont(ofSize: 11, weight: .medium)
+            button.controlSize = .regular
+            button.font = .systemFont(ofSize: 13, weight: .medium)
             button.identifier = NSUserInterfaceItemIdentifier(action.command)
             stack.addArrangedSubview(button)
         }

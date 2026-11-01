@@ -4,18 +4,28 @@ import XCTest
 
 @MainActor
 final class WindowHoverBarTest: WorkspaceTestCase {
-    func testZoneIsTheMiddleOfTheTopEdgeAndTheBarSitsInsideIt() {
+    func testZoneIsTheTopEdgeWithoutItsCorners() {
         let frame = Rect(topLeftX: 100, topLeftY: 50, width: 900, height: 600)
         let zone = WindowHoverBar.triggerZone(for: frame)
-        XCTAssertEqual(zone.minX, 400)
-        XCTAssertEqual(zone.width, 300)
+        XCTAssertEqual(zone.minX, 180)
+        XCTAssertEqual(zone.width, 740)
         XCTAssertEqual(zone.minY, 50)
         XCTAssertEqual(zone.height, WindowHoverBar.zoneHeight)
-        XCTAssertEqual(WindowHoverBar.triggerZone(for: Rect(topLeftX: 0, topLeftY: 0, width: 200, height: 400)).width, 120,
-                       "Narrow windows keep a usable target")
-        let bar = WindowHoverBar.barFrame(for: frame, size: CGSize(width: 180, height: 26))
-        XCTAssertEqual(bar.minX + bar.width / 2, frame.minX + frame.width / 2, accuracy: 0.01)
-        XCTAssertGreaterThan(bar.minY, frame.minY)
+        let narrow = WindowHoverBar.triggerZone(for: Rect(topLeftX: 0, topLeftY: 0, width: 200, height: 400))
+        XCTAssertEqual(narrow.minX, 50, "Narrow windows keep a quarter at each corner")
+        XCTAssertEqual(narrow.width, 100)
+    }
+
+    func testBarAppearsAtThePointerAndStaysInsideTheWindow() {
+        let frame = Rect(topLeftX: 100, topLeftY: 50, width: 900, height: 600)
+        let size = CGSize(width: 180, height: 26)
+        let atPointer = WindowHoverBar.barFrame(for: frame, size: size, pointerX: 300)
+        XCTAssertEqual(atPointer.minX + atPointer.width / 2, 300, accuracy: 0.01)
+        XCTAssertGreaterThan(atPointer.minY, frame.minY)
+        XCTAssertEqual(WindowHoverBar.barFrame(for: frame, size: size, pointerX: 105).minX, 104, "Kept inside the left edge")
+        XCTAssertEqual(WindowHoverBar.barFrame(for: frame, size: size, pointerX: 995).maxX, 996, "Kept inside the right edge")
+        let tight = WindowHoverBar.barFrame(for: Rect(topLeftX: 0, topLeftY: 0, width: 150, height: 300), size: size, pointerX: 75)
+        XCTAssertEqual(tight.minX, 4, "A bar wider than the window starts at its left edge")
     }
 
     func testOffersMainOnlyInMasterAndTargetsTheWindow() async throws {
