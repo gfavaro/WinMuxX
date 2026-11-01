@@ -73,6 +73,20 @@ final class FollowAppActivationTest: XCTestCase {
         XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: fromHere), "Excluded apps are left alone")
     }
 
+    /// The rule allowed the move but a double-optional check skipped it; exercise the move itself.
+    func testActivatingAFloatingWindowOnAHiddenWorkspaceMovesItHereAndFocusesIt() {
+        setUpWorkspacesForTests()
+        let here = focus.workspace
+        _ = TestWindow.new(id: 1, parent: here.rootTilingContainer).focusWindow()
+        let floating = TestWindow.new(id: 2, parent: Workspace.get(byName: "other"))
+        recordRefreshActivation(workspaceName: here.name, pid: floating.app.pid)
+        updateFocusCache(floating)
+        XCTAssertTrue(floating.nodeWorkspace === here)
+        XCTAssertTrue(floating.isFloating)
+        XCTAssertEqual(focus.windowOrNil?.windowId, floating.windowId)
+        XCTAssertTrue(focus.workspace === here, "The user stays on their workspace")
+    }
+
     func testBrowserVideoSurfacesDoNotBecomeDocumentFocusTargets() {
         for browser in [KnownBundleId.safari, .helium, .chrome, .mozillaFirefox, .edge, .arc] {
             XCTAssertTrue(isBrowserFocusOverlay(app: browser, level: .alwaysOnTopWindow))

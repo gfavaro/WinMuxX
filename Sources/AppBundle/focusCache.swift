@@ -113,14 +113,17 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         runtime.refresh.windowlessActivationPid = nil
     }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
-        let bringHere = nativeFocused.map { bringActivatedWindowHereVerdict($0, activation: runtime.refresh.pendingActivation) }
-        if let nativeFocused, bringHere == nil {
-            nativeFocused.bind(to: focus.workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-            // As explicit moves do, so lock-screen recovery does not restore it to its old workspace.
-            syncClosedWindowsCacheToCurrentWorld()
-            note("movedHere")
+        if let nativeFocused {
+            if let reason = bringActivatedWindowHereVerdict(nativeFocused, activation: runtime.refresh.pendingActivation) {
+                note("focused notMoved:\(reason)")
+            } else {
+                nativeFocused.bind(to: focus.workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+                // As explicit moves do, so lock-screen recovery does not restore it to its old workspace.
+                syncClosedWindowsCacheToCurrentWorld()
+                note("movedHere")
+            }
         } else {
-            note(nativeFocused == nil ? "focused:none" : "focused notMoved:\(bringHere.flatMap { $0 } ?? "-")")
+            note("focused:none")
         }
         if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
             _ = setFocus(to: live, origin: .native)
