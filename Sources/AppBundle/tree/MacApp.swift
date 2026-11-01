@@ -68,8 +68,15 @@ final class MacApp: AbstractApp {
 
         // A registered app was checked when it registered; only new ones need the lock screen check.
         if let existing = allAppsMap[pid] {
-            if !existing.nsApp.isTerminated, isSameRunningProcess(existing.nsApp, nsApp) { return existing }
-            await existing.destroy()
+            switch appRegistrationDecision(existingTerminated: existing.nsApp.isTerminated,
+                                           sameProcess: isSameRunningProcess(existing.nsApp, nsApp),
+                                           incomingTerminated: { nsApp.isTerminated }) {
+                case .reuse: return existing
+                case .reject: return nil
+                case .replace: await existing.destroy()
+            }
+        } else if nsApp.isTerminated {
+            return nil
         }
         if isLockScreenApp(nsApp) { return nil }
         try checkCancellation()
@@ -156,12 +163,24 @@ final class MacApp: AbstractApp {
         } ?? false
     }
 
-    /// Whether WinMux holds an AX element for the window or can find one; a window that is
-    /// neither can be neither moved nor parked.
-    func isAxWindowReachable(_ windowId: UInt32) async throws -> Bool {
-        try await thread?.runInLoop { [windows, axApp] job in
-            windows.threadGuarded[windowId] != nil || axApp.threadGuarded.findAxWindow(windowId: windowId) != nil
-        } ?? false
+    /// Whether a frame write could reach the window now. A cached element counts only if it still
+    /// answers for this window; an app that does not answer is unknown, not unreachable.
+    func axWindowReachability(_ windowId: UInt32) async -> AxWindowReachability {
+        guard let thread else { return .appRetired }
+        do {
+            return try await thread.runInLoop { [windows, axApp] job -> AxWindowReachability in
+                if let cached = windows.threadGuarded[windowId]?.ax {
+                    let (resolved, error) = cached.containingWindowIdWithError()
+                    if resolved == windowId { return .reachable }
+                    if error == .cannotComplete { return .unknown("the app did not answer") }
+                }
+                try job.checkCancellation()
+                guard let listed = axApp.threadGuarded.discoverAxWindows() else { return .unknown("the app did not list its windows") }
+                return listed.contains { $0.windowId == windowId } ? .reachable : .unreachable
+            }
+        } catch {
+            return .unknown("the check was interrupted")
+        }
     }
 
     /// The app's raw AX window sources for `doctor`, before the window-id filter that
@@ -412,14 +431,18 @@ final class MacApp: AbstractApp {
 
     @MainActor
     /// `validation` replaces the native frame permit, as for a restore that outlives tiling.
+    /// False when nothing was written: the app object is retired or the window has no AX element.
+    @discardableResult
     func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false,
-                            validation: (@Sendable (AXUIElement) throws -> Void)? = nil) async throws {
+                            validation: (@Sendable (AXUIElement) throws -> Void)? = nil) async throws -> Bool {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
         let validate = validation ?? nativeFrameValidation(windowId)
-        try await withWindow(windowId) { [axApp, animatedSizes] window, job in
+        let written = try await withWindow(windowId) { [axApp, animatedSizes] window, job -> Bool in
             animatedSizes.threadGuarded[windowId] = nil
             try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate.map { check in { try check(window) } })
+            return true
         }
+        return written == true
     }
 
     @MainActor
@@ -614,7 +637,9 @@ final class MacApp: AbstractApp {
         guard !isUnitTest else { return [:] }
         for (pid, app) in MacApp.allAppsMap { // gc dead apps
             try checkCancellation()
-            if !RegularApplications.shared.isRunning(app.nsApp, pid: pid) {
+            // The cache answers without LaunchServices; confirm before destroying a running app's
+            // object, which would leave its windows unable to move or park.
+            if !RegularApplications.shared.isRunning(app.nsApp, pid: pid), app.nsApp.isTerminated {
                 await app.destroy()
             }
         }
@@ -658,6 +683,7 @@ final class MacApp: AbstractApp {
         }
     }
 
+    @MainActor
     private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [UInt32] {
         if nsApp.isTerminated {
             await destroy()
@@ -713,13 +739,19 @@ final class MacApp: AbstractApp {
         return alive
     }
 
+    /// Retires this app object before any suspension: no new AX work is accepted, and the registry
+    /// entry is removed only while it is still this object, so a late or repeated call cannot
+    /// remove a replacement registered for the same pid.
+    @MainActor
     func destroy() async {
-        _ = await Task { @MainActor [pid] in _ = MacApp.allAppsMap.removeValue(forKey: pid) }.result
+        let retiring = thread
+        thread = nil // Disallow all future job submissions
+        if MacApp.allAppsMap[pid] === self { MacApp.allAppsMap.removeValue(forKey: pid) }
         for (_, job) in setFrameJobs {
             job.cancel()
         }
         setFrameJobs = [:]
-        thread?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, validatedSessions, appAxSubscriptions, axApp, axAppFastTimeout] job in
+        retiring?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, validatedSessions, appAxSubscriptions, axApp, axAppFastTimeout] job in
             animatedSizes.destroy()
             validatedSessions.destroy()
             appAxSubscriptions.destroy() // Destroy AX objects in reverse order of their creation
@@ -729,8 +761,10 @@ final class MacApp: AbstractApp {
             axApp.destroy()
             CFRunLoopStop(CFRunLoopGetCurrent())
         }
-        thread = nil // Disallow all future job submissions
     }
+
+    /// A destroyed app object has no AX thread; windows still holding it cannot be read or moved.
+    var isRetired: Bool { thread == nil }
 
     private func withWindow<T>(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> T?) async throws -> T? {
         try await thread?.runInLoop { [windows, axApp, nsApp, animatedSizes] job in
@@ -786,4 +820,16 @@ func shouldUseActivationOnlyForNativeFocus(
     logicalWindowsCount: Int,
 ) -> Bool {
     lastNativeFocusedWindowId == targetWindowId || logicalWindowsCount == 1
+}
+
+enum AppRegistrationDecision: Equatable {
+    case reuse, reject, replace
+}
+
+/// What `getOrRegister` does with an app already registered for the pid. One process holds a pid at
+/// a time, so a live registration is never evicted; a request carrying an ended process is refused.
+/// `incomingTerminated` is a LaunchServices request, made only when the answer matters.
+func appRegistrationDecision(existingTerminated: Bool, sameProcess: Bool, incomingTerminated: () -> Bool) -> AppRegistrationDecision {
+    if !existingTerminated { return sameProcess || !incomingTerminated() ? .reuse : .reject }
+    return incomingTerminated() ? .reject : .replace
 }

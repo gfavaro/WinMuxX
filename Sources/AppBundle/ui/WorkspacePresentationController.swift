@@ -211,11 +211,12 @@ final class WorkspacePresentationController {
     /// read, so wait for tiling, and once more if another event revokes the permit.
     private func writePresentationFrame(_ window: MacWindow, _ rect: Rect) async throws {
         guard runtime.workspaceBackend.kind == .native else {
-            return try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size)
+            try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size)
+            return
         }
         for attempt in 0..<2 {
             _ = await runtime.workspaceBackend.native.tiling.waitUntilReady()
-            do { return try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size) }
+            do { try await window.setAxFrameBlocking(rect.topLeftCorner, rect.size); return }
             catch NativeSpaceWriteError.revoked where attempt == 0 { continue }
         }
     }

@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import PrivateApi
+import os
 
 final class MacWindow: Window {
     let macApp: MacApp
@@ -366,9 +367,14 @@ final class MacWindow: Window {
         let parkingGeneration = workspaceReveal.generation
         WorkspaceTransitionDiagnostics.record("park-begin", window: self, generation: parkingGeneration,
             requested: CGRect(origin: p, size: CGSize(width: lastKnownActualRect?.width ?? 0, height: lastKnownActualRect?.height ?? 0)))
-        try await setAxFrameBlocking(p, nil)
+        let written = try await setAxFrameBlocking(p, nil)
         try checkCancellation()
         guard workspaceReveal.generation == parkingGeneration else { return }
+        guard written else {
+            // Not recording the corner keeps the window unparked, so the next refresh tries again.
+            reportUnmovableWindow(self)
+            return
+        }
         hiddenInCorner = (corner, nodeMonitor.visibleRect)
         WorkspaceTransitionDiagnostics.record("park-end", window: self, generation: parkingGeneration)
     }
@@ -582,14 +588,15 @@ final class MacWindow: Window {
     }
 
     @MainActor
-    func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
+    @discardableResult
+    func setAxFrameBlocking(_ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws -> Bool {
         WindowMotion.shared.cancel(windowId)
         frameRequestGeneration &+= 1
         minimumObservation?.cancel()
         minimumRequest = nil
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
         NativeOriginalFrames.shared.recordBeforeWrite(self)
-        try await macApp.setAxFrameBlocking(windowId, topLeft, size, positionFirst: positionFirst)
+        return try await macApp.setAxFrameBlocking(windowId, topLeft, size, positionFirst: positionFirst)
     }
 
     @MainActor
@@ -602,4 +609,15 @@ final class MacWindow: Window {
         }
         return rect
     }
+}
+
+private let accessibilityLog = Logger(subsystem: winMuxAppId, category: "accessibility")
+@MainActor private var reportedUnmovableWindows: Set<UInt32> = []
+
+/// Logs once per window that a frame write reached no AX element, instead of failing silently.
+@MainActor
+private func reportUnmovableWindow(_ window: MacWindow) {
+    guard reportedUnmovableWindows.insert(window.windowId).inserted else { return }
+    let reason = window.macApp.isRetired ? "its app object was destroyed while the app runs" : "it has no Accessibility element"
+    accessibilityLog.error("window \(window.windowId, privacy: .public) could not be parked: \(reason, privacy: .public)")
 }

@@ -135,29 +135,41 @@ func buildDiagnosticsReport() async -> String {
     io.out("")
 
     io.out("Window reachability:")
-    var unreachable: [UnreachableWindowDiagnosis] = []
     let tracked = MacWindow.allWindows.sorted { $0.windowId < $1.windowId }
-    for window in tracked where (try? await window.macApp.isAxWindowReachable(window.windowId)) == false {
-        unreachable.append(UnreachableWindowDiagnosis(windowId: window.windowId,
-            appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(window.app.pid),
-            workspace: window.nodeWorkspace?.name,
-            windowServerFrame: windowServerFrame(window.windowId),
-            axWindows: (try? await window.macApp.probeAxWindows()) ?? [],
-            appWindowServerWindows: windowServerWindows(pid: window.app.pid)))
+    var findings: [WindowReachabilityFinding] = []
+    var probedPids: [pid_t] = []
+    for window in tracked {
+        let reachability = await window.macApp.axWindowReachability(window.windowId)
+        guard reachability != .reachable else { continue }
+        let pid = window.app.pid
+        findings.append(WindowReachabilityFinding(windowId: window.windowId,
+            appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(pid),
+            workspace: window.nodeWorkspace?.name, windowServerFrame: windowServerFrame(window.windowId),
+            reachability: reachability, liveAppRegistered: MacApp.allAppsMap[pid].map { !$0.isRetired } ?? false))
+        if !probedPids.contains(pid) { probedPids.append(pid) }
     }
-    for line in windowReachabilityReport(trackedCount: tracked.count, unreachable: unreachable) { io.out(line) }
+    let serverWindows = probedPids.isEmpty ? [] : windowServerWindows()
+    var details: [AppReachabilityDetail] = []
+    for pid in probedPids {
+        // Probe the live registration: a retired object has no AX thread to ask.
+        let app = MacApp.allAppsMap[pid] ?? MacWindow.allWindows.first { $0.app.pid == pid }?.macApp
+        details.append(AppReachabilityDetail(appName: app?.nsApp.localizedName ?? String(pid),
+            axWindows: (try? await app?.probeAxWindows()) ?? [],
+            windowServerWindows: serverWindows.filter { $0.pid == pid }.map(\.summary)))
+    }
+    for line in windowReachabilityReport(trackedCount: tracked.count, findings: findings, details: details) { io.out(line) }
     return io.stdout.joined(separator: "\n")
 }
 
-/// Normal-layer windows WindowServer holds for the app, on screen or not.
-private func windowServerWindows(pid: pid_t) -> [WindowServerWindowSummary] {
+/// Normal-layer windows WindowServer holds, on screen or not, read once per report.
+private func windowServerWindows() -> [(pid: pid_t, summary: WindowServerWindowSummary)] {
     let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     return info.compactMap { entry in
-        guard (entry[kCGWindowOwnerPID as String] as? pid_t) == pid, (entry[kCGWindowLayer as String] as? Int) == 0,
+        guard let pid = entry[kCGWindowOwnerPID as String] as? pid_t, (entry[kCGWindowLayer as String] as? Int) == 0,
               let id = entry[kCGWindowNumber as String] as? UInt32,
               let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
               let frame = CGRect(dictionaryRepresentation: bounds) else { return nil }
-        return WindowServerWindowSummary(id: id, frame: frame, onScreen: (entry[kCGWindowIsOnscreen as String] as? Bool) ?? false)
+        return (pid, WindowServerWindowSummary(id: id, frame: frame, onScreen: (entry[kCGWindowIsOnscreen as String] as? Bool) ?? false))
     }
 }
 
