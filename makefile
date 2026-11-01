@@ -85,11 +85,14 @@ cli:
 check:
 	/bin/bash -lc 'cd "$(CURDIR)" && \
 	set -euo pipefail && \
+	{ test -x ./.deps/config-schema/bin/python || { echo "Missing schema test environment. Run: python3 -m venv .deps/config-schema && ./.deps/config-schema/bin/pip install --requirement requirements-schema.txt" >&2; exit 1; }; } && \
 	source ./script/setup.sh && \
 	mkdir -p .build && \
+	python3 script/check_contributor_guidance.py && \
+	python3 -m unittest script/test_contributor_guidance.py && \
+	./.deps/config-schema/bin/python script/test_config_schema.py && \
 	swift test --force-resolved-versions --no-parallel 2>&1 | tee .build/test-output.log && \
 	python3 -m unittest script/test_validate_appcast.py && \
-	./.deps/config-schema/bin/python script/test_config_schema.py && \
 	python3 -m unittest script/test_fork_identity.py && \
 	python3 -m unittest script/test_swift_version.py && \
 	python3 -m unittest script/test_signing_cleanup.py && \

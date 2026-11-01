@@ -19,6 +19,9 @@ New to WinMuxX? Start with the [quick start](docs/QUICK_START.md), learn the
 [recipes](docs/RECIPES.md). Use the [command guide](docs/COMMANDS.md) alongside
 `winmuxx --help`.
 
+Contributing? Read our [core principles](docs/PRINCIPLES.md) and
+[contributor guide](CONTRIBUTING.md), including the repository-local agent skill.
+
 Personal fork by gfavaro, based on ZimengXiong/WinMux. Automatic upstream updates
 are disabled; releases and configuration belong to this fork.
 

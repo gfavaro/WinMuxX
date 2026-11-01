@@ -2,6 +2,12 @@
 
 ## Current guides
 
+- [Contributor task map](CONTRIBUTOR_TASKS.md) and [workspace behavior examples](WORKSPACE_BEHAVIOR.md): entry points, acceptance criteria and verification.
+- [Agent evaluation](AGENT_EVALUATION.md): optional isolated trials and evidence from the initial Luna evaluation.
+
+- [Core principles](PRINCIPLES.md): product behavior to preserve, especially whole-workspace display moves.
+- [Contributing](../CONTRIBUTING.md) and [agent guidance](../AGENTS.md): contributor workflow and repository-local skills.
+
 - [Project README](../README.md): features and current settings.
 - [Quick start](QUICK_START.md), [concepts](CONCEPTS.md), [layouts](LAYOUTS.md), [recipes](RECIPES.md) and [commands](COMMANDS.md): learn and use WinMuxX.
 - [HACKING](../HACKING.md): architecture, development, checks, builds and installation.

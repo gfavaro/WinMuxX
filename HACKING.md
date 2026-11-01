@@ -1,5 +1,9 @@
 # Developing WinMuxX
 
+Start with [core principles](docs/PRINCIPLES.md) and [CONTRIBUTING](CONTRIBUTING.md)
+for product expectations and the contribution workflow. Coding agents enter through
+[AGENTS.md](AGENTS.md) and its repository-local skill.
+
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for
 bundle identity, configuration ownership, upstream integration and signing policy.
 Current user-facing options are described in [README.md](README.md). Historical
