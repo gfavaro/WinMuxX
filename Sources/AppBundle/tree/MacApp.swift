@@ -68,7 +68,7 @@ final class MacApp: AbstractApp {
 
         // A registered app was checked when it registered; only new ones need the lock screen check.
         if let existing = allAppsMap[pid] {
-            if !existing.nsApp.isTerminated, existing.nsApp === nsApp || existing.nsApp.launchDate == nsApp.launchDate { return existing }
+            if !existing.nsApp.isTerminated, isSameRunningProcess(existing.nsApp, nsApp) { return existing }
             await existing.destroy()
         }
         if isLockScreenApp(nsApp) { return nil }
@@ -583,7 +583,7 @@ final class MacApp: AbstractApp {
         frontmostAppBundleId: String?,
     ) async throws -> [UInt32] {
         let work = Task { @MainActor () -> [UInt32] in
-            let registered = MacApp.allAppsMap[pid].flatMap { $0.nsApp === nsApp ? $0 : nil }
+            let registered = MacApp.allAppsMap[pid].flatMap { isSameRunningProcess($0.nsApp, nsApp) ? $0 : nil }
             let app = if let registered { registered } else { try await MacApp.getOrRegister(nsApp) }
             guard let app else { return [] }
             return try await app.refreshAndGetAliveWindowIds(frontmostAppBundleId: frontmostAppBundleId)

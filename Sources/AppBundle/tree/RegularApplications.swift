@@ -32,7 +32,7 @@ final class RegularApplications {
     /// Whether this app is still running, from the observed running applications.
     func isRunning(_ app: NSRunningApplication, pid: pid_t) -> Bool {
         guard running != nil else { return !app.isTerminated }
-        return policies[pid] != nil && (regular[pid].map { $0 === app } ?? true)
+        return policies[pid] != nil && (regular[pid].map { isSameRunningProcess($0, app) } ?? true)
     }
 
     private func start() {
@@ -66,8 +66,16 @@ final class RegularApplications {
 
     private func forget(_ app: NSRunningApplication) {
         let pid = app.processIdentifier
-        guard regular[pid] == nil || regular[pid] === app else { return }
+        guard regular[pid].map({ isSameRunningProcess($0, app) }) ?? true else { return }
         policies.removeValue(forKey: pid)?.invalidate()
         regular[pid] = nil
     }
+}
+
+/// AppKit returns a different `NSRunningApplication` object for the same process depending on
+/// where it came from (`frontmostApplication`, `runningApplications`, a pid lookup), so object
+/// identity cannot tell whether two refer to one process. Equality can: it is per process, so a
+/// pid reused by a later process is still a different app.
+func isSameRunningProcess(_ lhs: NSRunningApplication, _ rhs: NSRunningApplication) -> Bool {
+    lhs === rhs || lhs.isEqual(rhs)
 }
