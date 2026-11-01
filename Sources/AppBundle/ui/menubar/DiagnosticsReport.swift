@@ -132,7 +132,33 @@ func buildDiagnosticsReport() async -> String {
         let windows = row.windows >= 0 ? "\(row.windows)" : "error"
         io.out("  \(String(format: "%7.1f", row.ms))ms  \(row.name) (\(windows) ax windows)\(flag)")
     }
+    io.out("")
+
+    io.out("Window reachability:")
+    var unreachable: [UnreachableWindowDiagnosis] = []
+    let tracked = MacWindow.allWindows.sorted { $0.windowId < $1.windowId }
+    for window in tracked where (try? await window.macApp.isAxWindowReachable(window.windowId)) == false {
+        unreachable.append(UnreachableWindowDiagnosis(windowId: window.windowId,
+            appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(window.app.pid),
+            workspace: window.nodeWorkspace?.name,
+            windowServerFrame: windowServerFrame(window.windowId),
+            axWindows: (try? await window.macApp.probeAxWindows()) ?? [],
+            appWindowServerWindows: windowServerWindows(pid: window.app.pid)))
+    }
+    for line in windowReachabilityReport(trackedCount: tracked.count, unreachable: unreachable) { io.out(line) }
     return io.stdout.joined(separator: "\n")
+}
+
+/// Normal-layer windows WindowServer holds for the app, on screen or not.
+private func windowServerWindows(pid: pid_t) -> [WindowServerWindowSummary] {
+    let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    return info.compactMap { entry in
+        guard (entry[kCGWindowOwnerPID as String] as? pid_t) == pid, (entry[kCGWindowLayer as String] as? Int) == 0,
+              let id = entry[kCGWindowNumber as String] as? UInt32,
+              let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+              let frame = CGRect(dictionaryRepresentation: bounds) else { return nil }
+        return WindowServerWindowSummary(id: id, frame: frame, onScreen: (entry[kCGWindowIsOnscreen as String] as? Bool) ?? false)
+    }
 }
 
 func otherTilingManagers(_ bundleIds: [String]) -> [String] {

@@ -156,6 +156,44 @@ final class MacApp: AbstractApp {
         } ?? false
     }
 
+    /// Whether WinMux holds an AX element for the window or can find one; a window that is
+    /// neither can be neither moved nor parked.
+    func isAxWindowReachable(_ windowId: UInt32) async throws -> Bool {
+        try await thread?.runInLoop { [windows, axApp] job in
+            windows.threadGuarded[windowId] != nil || axApp.threadGuarded.findAxWindow(windowId: windowId) != nil
+        } ?? false
+    }
+
+    /// The app's raw AX window sources for `doctor`, before the window-id filter that
+    /// discovery applies, so an element that maps to no or another window id is visible.
+    func probeAxWindows() async throws -> [AxWindowProbe] {
+        try await thread?.runInLoop { [axApp] job in
+            let app = axApp.threadGuarded
+            func probe(_ element: AXUIElement, _ source: String) -> AxWindowProbe {
+                let (windowId, error) = element.containingWindowIdWithError()
+                let origin = element.get(Ax.topLeftCornerAttr), size = element.get(Ax.sizeAttr)
+                return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
+                    frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
+                    role: element.get(Ax.roleAttr), subrole: element.get(Ax.subroleAttr))
+            }
+            var result: [AxWindowProbe] = []
+            var raw: CFTypeRef?
+            let status = AXUIElementCopyAttributeValue(app, kAXWindowsAttribute as CFString, &raw)
+            if status != .success { result.append(AxWindowProbe(source: "AXWindows", failure: status.repr)) }
+            for (index, element) in ((raw as? [AnyObject]) ?? []).enumerated()
+            where CFGetTypeID(element) == AXUIElementGetTypeID() {
+                result.append(probe(element as! AXUIElement, "AXWindows[\(index)]"))
+            }
+            for (attribute, source) in [(kAXMainWindowAttribute, "AXMainWindow"), (kAXFocusedWindowAttribute, "AXFocusedWindow")] {
+                var value: CFTypeRef?
+                let status = AXUIElementCopyAttributeValue(app, attribute as CFString, &value)
+                if status != .success { result.append(AxWindowProbe(source: source, failure: status.repr)); continue }
+                if let value, CFGetTypeID(value) == AXUIElementGetTypeID() { result.append(probe(value as! AXUIElement, source)) }
+            }
+            return result
+        } ?? []
+    }
+
     func getAxSize(_ windowId: UInt32) async throws -> CGSize? {
         try await withWindow(windowId) { window, job in
             window.get(Ax.sizeAttr)
