@@ -92,6 +92,7 @@ func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
     frontmostActivationPolicy: NSApplication.ActivationPolicy?,
     frontmostPid: pid_t? = nil,
+    activationPid: pid_t? = nil,
 ) -> Bool {
     if ignoresCrossWorkspaceActivation(nativeFocused) {
         switch refreshSessionEvent {
@@ -106,9 +107,11 @@ func shouldSyncFocusBackToMacOs(
     if nativeFocused == nil && frontmostActivationPolicy == .accessory {
         return false
     }
-    // Another app was activated before it has a window, as when it launches: taking focus back
-    // would open its window behind the old one. Its window's own event focuses it once known.
-    if nativeFocused == nil, let frontmostPid, frontmostPid != focus.windowOrNil?.app.pid {
+    // This refresh handles the activation of another app that has no window yet, as when it
+    // launches: taking focus back would open its window behind the old one, and its window's own
+    // event focuses it once known. An app that has just closed its last window is not activated
+    // in this refresh, so focus still returns to the window WinMux keeps focused.
+    if nativeFocused == nil, let frontmostPid, frontmostPid == activationPid, frontmostPid != focus.windowOrNil?.app.pid {
         return false
     }
     return true
@@ -332,6 +335,7 @@ private func performRefreshSession(
                         nativeFocused: nativeFocused,
                         frontmostActivationPolicy: frontmostActivationPolicy,
                         frontmostPid: frontmostApplication?.processIdentifier,
+                        activationPid: activation?.pid,
                     ) {
                         let logicalFocused = focus.windowOrNil
                         if logicalFocused?.windowId != nativeFocused?.windowId {

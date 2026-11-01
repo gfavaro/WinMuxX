@@ -242,9 +242,14 @@ final class RefreshFocusSyncTest: XCTestCase {
         setUpWorkspacesForTests()
         let window = TestWindow.new(id: 1, parent: focus.workspace)
         XCTAssertTrue(window.focusWindow())
-        let focusedPid = window.app.pid
-        XCTAssertFalse(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular, frontmostPid: focusedPid + 1))
-        XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular, frontmostPid: focusedPid),
+        let focusedPid = window.app.pid, launched = focusedPid + 1
+        XCTAssertFalse(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
+                                                  frontmostPid: launched, activationPid: launched))
+        XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
+                                                 frontmostPid: launched, activationPid: nil),
+                      "An app that closed its last window was not activated now; focus returns to the focused window")
+        XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular,
+                                                 frontmostPid: focusedPid, activationPid: focusedPid),
                       "The focused window's own app without a focused window still gets focus back")
     }
 
