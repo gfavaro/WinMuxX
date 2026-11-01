@@ -6,6 +6,7 @@ import Foundation
     Task {
         initTerminationHandler()
         isCli = false
+        AssistiveTechnology.startObserving()
         initServerArgs()
         var bootstrappedConfigUrl: URL? = nil
         do {

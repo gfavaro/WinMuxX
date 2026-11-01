@@ -59,8 +59,12 @@ func setFrame(_ window: any AxUiElementMock, app: any AxUiElementMock, _ topLeft
     }
 }
 
-func disableAnimations<T>(app: any AxUiElementMock, _ job: RunLoopJob, _ body: () throws -> T) throws -> T {
-    let wasEnabled = app.get(Ax.enhancedUserInterfaceAttr) == true
+/// Switches the app's Enhanced User Interface off for `body`, which stops frame changes animating,
+/// and restores it. Left untouched while assistive technology that depends on it is running.
+func disableAnimations<T>(app: any AxUiElementMock, _ job: RunLoopJob,
+                          assistiveTechnologyActive: Bool = AssistiveTechnology.isActive,
+                          _ body: () throws -> T) throws -> T {
+    let wasEnabled = !assistiveTechnologyActive && app.get(Ax.enhancedUserInterfaceAttr) == true
     if wasEnabled {
         app.set(Ax.enhancedUserInterfaceAttr, false)
     }
