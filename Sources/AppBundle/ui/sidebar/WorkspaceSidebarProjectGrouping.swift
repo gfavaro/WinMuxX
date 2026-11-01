@@ -33,3 +33,12 @@ func workspaceSidebarWorkspaceIsOnOtherDisplay(
     }
     return workspace.monitorScopeId != selectedScopeId
 }
+
+/// Showing on another display right now, not merely owned by one. Most workspaces another display
+/// owns are hidden; only the one it shows is marked, as WinMux marked workspaces in use there.
+func workspaceSidebarWorkspaceIsShownOnOtherDisplay(
+    _ workspace: WorkspaceSidebarWorkspaceViewModel,
+    selectedScopeId: String,
+) -> Bool {
+    workspace.isVisible && workspaceSidebarWorkspaceIsOnOtherDisplay(workspace, selectedScopeId: selectedScopeId)
+}

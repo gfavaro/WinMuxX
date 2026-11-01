@@ -481,6 +481,8 @@ extension WorkspaceSidebarView {
             emitsDropTarget: emitsDropTarget,
             isFromOtherDisplay: isFromOtherDisplay,
             isInUseOnOtherDisplay: isInUseOnOtherDisplay,
+            isShownOnOtherDisplay: workspaceSidebarWorkspaceIsShownOnOtherDisplay(
+                workspace, selectedScopeId: snapshot.targetMonitorScopeId),
             isOnFocusedMonitor: workspace.monitorScopeId == snapshot.focusedMonitorScopeId,
             allowsWorkspaceActivation: allowsWorkspaceActivation,
             isPinnedActiveWorkspace: isPinnedActiveWorkspace,

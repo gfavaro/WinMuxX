@@ -11,6 +11,8 @@ struct WorkspaceSidebarWorkspaceSection: View {
     let emitsDropTarget: Bool
     let isFromOtherDisplay: Bool
     let isInUseOnOtherDisplay: Bool
+    /// The workspace another display is showing now; the row names that display.
+    var isShownOnOtherDisplay = false
     let isOnFocusedMonitor: Bool
     let allowsWorkspaceActivation: Bool
     let isPinnedActiveWorkspace: Bool
@@ -308,6 +310,21 @@ extension WorkspaceSidebarWorkspaceSection {
             weight: isActiveOnTargetMonitor ? .bold : .semibold, secondary: !isActiveOnTargetMonitor,
             monospacedDigit: true, alignment: .center, customColor: workspaceBadgeForeground)
             .frame(width: compactMetrics.badgeSize, height: compactMetrics.badgeSize)
+            .overlay(alignment: .topTrailing) {
+                if isShownOnOtherDisplay {
+                    // Collapsed rows have no room for the display name; it is in the tooltip and VoiceOver value.
+                    Circle()
+                        .fill(sidebarColors.text(opacity: sidebarColors.increasedContrast ? 0.9 : 0.6))
+                        .frame(width: 5, height: 5)
+                        .accessibilityHidden(true)
+                }
+            }
+    }
+
+    /// The display showing this workspace when it is not this one.
+    var shownOnDisplayName: String? {
+        guard isShownOnOtherDisplay else { return nil }
+        return workspace.monitorName.flatMap { $0.isEmpty ? nil : $0 } ?? "another display"
     }
 
     var workspaceBadgeText: String {
@@ -344,7 +361,7 @@ extension WorkspaceSidebarWorkspaceSection {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
+        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused, shownOn: shownOnDisplayName)
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -393,6 +410,17 @@ extension WorkspaceSidebarWorkspaceSection {
                     }
             }
             Spacer(minLength: 0)
+            if let shownOnDisplayName {
+                HStack(spacing: 3) {
+                    Image(systemName: "display")
+                    Text(shownOnDisplayName)
+                }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(sidebarColors.text(opacity: sidebarColors.increasedContrast ? 0.85 : 0.55))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .accessibilityHidden(true) // The row's VoiceOver value says where it is shown.
+            }
         }
         .padding(.leading, workspaceSidebarHeaderRowLeadingPadding)
         .padding(.trailing, workspaceSidebarRowHorizontalPadding)
@@ -443,7 +471,7 @@ extension WorkspaceSidebarWorkspaceSection {
                     .contentShape(sectionShape)
             }
             .buttonStyle(.plain)
-            .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
+            .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused, shownOn: shownOnDisplayName)
             .frame(maxWidth: .infinity, alignment: .center)
             .contentShape(sectionShape)
         } else {
@@ -456,7 +484,7 @@ extension WorkspaceSidebarWorkspaceSection {
             Color.clear.contentShape(sectionShape)
         }
         .buttonStyle(.plain)
-        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused)
+        .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused, shownOn: shownOnDisplayName)
     }
 
     var sectionContent: some View {
@@ -625,7 +653,8 @@ func workspaceSidebarTabGroupAccessibilityLabel(title: String, windowCount: Int)
 
 private extension View {
     /// Every button that activates a workspace speaks its full name and focus, in compact and expanded layouts.
-    func workspaceAccessibility(name: String, isFocused: Bool) -> some View {
+    func workspaceAccessibility(name: String, isFocused: Bool, shownOn display: String?) -> some View {
         accessibilityLabel(name).accessibilityAddTraits(isFocused ? .isSelected : [])
+            .accessibilityValue(display.map { "Shown on \($0)" } ?? "")
     }
 }
