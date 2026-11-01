@@ -153,7 +153,7 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("A delay of 0 focuses immediately. Mouse clicks and window manipulation always take priority.")
                     .font(.callout).foregroundStyle(.secondary)
                 SettingsToggle("Follow app activation", id: "follow-app-activation.enabled", isOn: $followAppActivation,
-                    help: "When another app comes to the front (Dock, Cmd-Tab, a notification), focus follows it to its workspace.") {
+                    help: "When another app comes to the front (Dock, Cmd-Tab, a notification), focus follows it to its workspace. A floating window on a hidden workspace comes to the current one instead.") {
                     persistConfig(section: "follow-app-activation", key: "enabled", value: followAppActivation ? "true" : "false")
                 }
                 SettingsTextField("Apps not followed", id: "follow-app-activation.exclude-apps", text: $followAppActivationExcluded,

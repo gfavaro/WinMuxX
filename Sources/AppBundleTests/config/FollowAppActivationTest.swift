@@ -48,6 +48,31 @@ final class FollowAppActivationTest: XCTestCase {
         }
     }
 
+    /// Opening System Settings from another workspace took the user to workspace 3; a floating
+    /// window now comes to the workspace it was activated from instead.
+    func testActivatedFloatingWindowFromAHiddenWorkspaceComesHere() {
+        setUpWorkspacesForTests()
+        let here = focus.workspace
+        _ = TestWindow.new(id: 1, parent: here.rootTilingContainer).focusWindow()
+        let hidden = Workspace.get(byName: "other")
+        let floating = TestWindow.new(id: 2, parent: hidden)
+        let tiled = TestWindow.new(id: 3, parent: hidden.rootTilingContainer)
+        XCTAssertFalse(hidden.isVisible)
+        let fromHere = RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid)
+
+        XCTAssertTrue(shouldBringActivatedWindowHere(floating, activation: fromHere))
+        XCTAssertFalse(shouldBringActivatedWindowHere(tiled, activation: fromHere), "Tiled windows keep their layout")
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: nil), "No activation, as when focus lags a workspace switch")
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating,
+            activation: RefreshActivationContext(generation: 1, workspaceName: hidden.name, pid: floating.app.pid)),
+            "Activated from another workspace than the current one")
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating,
+            activation: RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid + 1)),
+            "Another app was activated")
+        config.followAppActivation.excludeApps = [floating.app.rawAppBundleId ?? ""]
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: fromHere), "Excluded apps are left alone")
+    }
+
     func testBrowserVideoSurfacesDoNotBecomeDocumentFocusTargets() {
         for browser in [KnownBundleId.safari, .helium, .chrome, .mozillaFirefox, .edge, .arc] {
             XCTAssertTrue(isBrowserFocusOverlay(app: browser, level: .alwaysOnTopWindow))

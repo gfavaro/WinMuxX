@@ -42,6 +42,8 @@ exclude-apps = ['com.example.Utility']
 
 Replace the example bundle ID with the app's actual ID. Set `enabled = false` to
 disable following for every app, or remove its ID to restore the default behavior.
+A floating window on a hidden workspace is not followed: activating its app brings
+it to the current workspace. One shown on another display is focused there.
 
 ## Use one side of a modifier
 

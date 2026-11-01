@@ -103,6 +103,9 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         return
     }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
+        if let nativeFocused, shouldBringActivatedWindowHere(nativeFocused, activation: runtime.refresh.pendingActivation) {
+            nativeFocused.bind(to: focus.workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        }
         if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
             _ = setFocus(to: live, origin: .native)
         }
@@ -112,6 +115,21 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
     debugFocusLog(
         "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(runtime.nativeFocus.lastKnownWindowID?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
     )
+}
+
+/// A floating window the user activates while on another workspace comes to that workspace
+/// instead of taking the user to its own: floating windows (Settings, chat, a calculator) are in
+/// no layout, so moving one rearranges nothing. Only for an activation of this app made from the
+/// current workspace, so a focus report that lags a workspace switch moves nothing; and only from
+/// a hidden workspace. A window another display shows is focused there; tiled windows and excluded
+/// apps keep following the activation; native Spaces handles its own windows.
+@MainActor
+func shouldBringActivatedWindowHere(_ window: Window, activation: RefreshActivationContext?) -> Bool {
+    guard runtime.workspaceBackend.capabilities.parksInactiveWindows,
+          let activation, activation.pid == window.app.pid, activation.workspaceName == focus.workspace.name,
+          window.isFloating, let source = window.nodeWorkspace, source !== focus.workspace, !source.isVisible
+    else { return false }
+    return config.followAppActivation.follows(window.app.rawAppBundleId)
 }
 
 @MainActor
