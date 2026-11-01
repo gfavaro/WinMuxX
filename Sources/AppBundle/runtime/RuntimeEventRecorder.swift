@@ -6,7 +6,13 @@ import Common
 /// No payload is constructed, encoded or retained unless recording is explicitly enabled.
 @MainActor
 final class RuntimeEventRecorder {
-    enum Kind: String, Codable { case refreshRequested, refreshCoalesced, refreshCompleted, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten }
+    enum Kind: String, Codable {
+        case refreshRequested, refreshCoalesced, refreshCompleted, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten
+        /// An app activation was recorded; reason "pid:N", workspace = the one it was made from.
+        case activationRecorded
+        /// Native focus WinMux acted on; reason is a fixed code for the decision and the refresh event.
+        case focusObserved
+    }
     enum Source: String, Codable { case refresh, nativeState, model }
     struct Frame: Codable, Equatable {
         let x: Double, y: Double, width: Double, height: Double
@@ -40,12 +46,13 @@ final class RuntimeEventRecorder {
     func start() { reset(); isRecording = true }
     func stop() { isRecording = false; reset() }
     func reset() { records.removeAll(keepingCapacity: false); head = 0; count = 0; payloadBytes = 0; dropped = 0 }
-    func record(_ kind: Kind, source: Source, generation: UInt64, windowID: UInt32? = nil, workspaceID: WorkspaceId? = nil, viewport: MonitorViewportId? = nil, intendedFrame: Rect? = nil, observedFrame: Rect? = nil) {
+    /// `reason` takes fixed codes only, never native text.
+    func record(_ kind: Kind, source: Source, generation: UInt64, windowID: UInt32? = nil, workspaceID: WorkspaceId? = nil, viewport: MonitorViewportId? = nil, intendedFrame: Rect? = nil, observedFrame: Rect? = nil, reason: String? = nil) {
         guard isRecording else { return }
         let event = Event(monotonicNanoseconds: DispatchTime.now().uptimeNanoseconds, kind: kind,
                           source: source, generation: generation, windowID: windowID, workspaceID: workspaceID?.rawValue,
                           viewport: viewport?.description,
-                          reason: kind == .cancelled ? "task-cancelled" : kind == .staleObservation ? "native-generation-changed" : nil,
+                          reason: reason ?? (kind == .cancelled ? "task-cancelled" : kind == .staleObservation ? "native-generation-changed" : nil),
                           intendedFrame: intendedFrame.map(Frame.init), observedFrame: observedFrame.map(Frame.init))
         guard let data = try? JSONEncoder().encode(event) else { return }
         let bytes = data.count + 1 // include the serialized array separator

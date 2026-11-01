@@ -66,6 +66,8 @@ private var pendingActivation: RefreshActivationContext? {
 func recordRefreshActivation(workspaceName: String, pid: Int32) {
     activationGeneration += 1
     pendingActivation = RefreshActivationContext(generation: activationGeneration, workspaceName: workspaceName, pid: pid)
+    runtime.events.record(.activationRecorded, source: .refresh, generation: activationGeneration,
+                          workspaceID: Workspace.existing(byName: workspaceName)?.id, reason: "pid:\(pid)")
     if runtime.refresh.windowlessActivationPid != pid { runtime.refresh.windowlessActivationPid = nil }
 }
 

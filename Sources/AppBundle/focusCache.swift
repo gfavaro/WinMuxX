@@ -77,45 +77,57 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 ///                      (from nativeFocused to runtime.nativeFocus.lastKnownWindowID)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
+    // Recorded with `debug-windows --events-start`: which refresh event delivered this focus and what was decided.
+    func note(_ decision: String) {
+        runtime.events.record(.focusObserved, source: .refresh, generation: runtime.refresh.activationGeneration,
+            windowID: nativeFocused?.windowId, workspaceID: nativeFocused?.nodeWorkspace?.id,
+            reason: "\(decision) event:\(refreshSessionEvent?.eventCode ?? "none")")
+    }
     // AX can report a key-window change caused by stacking while a viewport
     // gesture is in flight. A real click ends the gesture in GlobalObserver.
-    guard !WorkspaceScrollingGestureController.shared.isMotionActive else { return }
-    if ignoresCrossWorkspaceActivation(nativeFocused) { return }
+    guard !WorkspaceScrollingGestureController.shared.isMotionActive else { return note("ignored:gesture") }
+    if ignoresCrossWorkspaceActivation(nativeFocused) { return note("ignored:excludedApp") }
     if nativeFocused?.parent is MacosPopupWindowsContainer {
-        return
+        return note("ignored:popup")
     }
     let lastKnownNativeFocusedWindowIdBefore = runtime.nativeFocus.lastKnownWindowID
     if shouldIgnoreNativeFocusAfterWindowClosure(nativeFocused, now: now) {
         runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog("updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
-        return
+        return note("ignored:windowClosure")
     }
     if shouldIgnoreNativeFocusDuringProjectHold(nativeFocused) {
         runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog(
             "updateFocusCache ignoredProjectHold event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") heldProject=\(activeWorkspaceProjectFocusHold()?.projectId.rawValue ?? "nil") logicalFocus=\(debugDescribe(focus))"
         )
-        return
+        return note("ignored:projectHold")
     }
     if nativeFocusHoldRejects(nativeFocused) {
         runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog("updateFocusCache ignoredNativeFocusHold nativeFocused=\(nativeFocused?.windowId.description ?? "nil")")
-        return
+        return note("ignored:focusHold")
     }
     // The launching app has its window now; focus may be taken back from it again.
     if let pid = nativeFocused?.app.pid, pid == runtime.refresh.windowlessActivationPid {
         runtime.refresh.windowlessActivationPid = nil
     }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
-        if let nativeFocused, shouldBringActivatedWindowHere(nativeFocused, activation: runtime.refresh.pendingActivation) {
+        let bringHere = nativeFocused.map { bringActivatedWindowHereVerdict($0, activation: runtime.refresh.pendingActivation) }
+        if let nativeFocused, bringHere == nil {
             nativeFocused.bind(to: focus.workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
             // As explicit moves do, so lock-screen recovery does not restore it to its old workspace.
             syncClosedWindowsCacheToCurrentWorld()
+            note("movedHere")
+        } else {
+            note(nativeFocused == nil ? "focused:none" : "focused notMoved:\(bringHere.flatMap { $0 } ?? "-")")
         }
         if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
             _ = setFocus(to: live, origin: .native)
         }
         runtime.nativeFocus.lastKnownWindowID = nativeFocused?.windowId
+    } else {
+        note("unchanged")
     }
     (nativeFocused?.app as? MacApp)?.lastNativeFocusedWindowId = nativeFocused?.windowId
     debugFocusLog(
@@ -131,11 +143,20 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 /// apps keep following the activation; native Spaces handles its own windows.
 @MainActor
 func shouldBringActivatedWindowHere(_ window: Window, activation: RefreshActivationContext?) -> Bool {
-    guard runtime.workspaceBackend.capabilities.parksInactiveWindows,
-          let activation, activation.pid == window.app.pid, activation.workspaceName == focus.workspace.name,
-          window.isFloating, let source = window.nodeWorkspace, source !== focus.workspace, !source.isVisible
-    else { return false }
-    return config.followAppActivation.follows(window.app.rawAppBundleId)
+    bringActivatedWindowHereVerdict(window, activation: activation) == nil
+}
+
+/// Nil when the window comes here, otherwise a fixed code saying why not, for event recording.
+@MainActor
+func bringActivatedWindowHereVerdict(_ window: Window, activation: RefreshActivationContext?) -> String? {
+    guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return "nativeBackend" }
+    guard let activation else { return "noActivation" }
+    guard activation.pid == window.app.pid else { return "otherAppActivated" }
+    guard activation.workspaceName == focus.workspace.name else { return "activatedFromOtherWorkspace" }
+    guard window.isFloating else { return "notFloating" }
+    guard let source = window.nodeWorkspace, source !== focus.workspace else { return "alreadyHere" }
+    guard !source.isVisible else { return "sourceVisible" }
+    return config.followAppActivation.follows(window.app.rawAppBundleId) ? nil : "excludedApp"
 }
 
 @MainActor

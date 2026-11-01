@@ -115,6 +115,17 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
         if case .startup = self { return true } else { return false }
     }
 
+    /// A short code for event recording: the case and, for observers, the system notification
+    /// name. Command arguments are left out because they can carry user text.
+    public var eventCode: String {
+        switch self {
+            case .globalObserver(let name): "global:\(name)"
+            case .ax(let name): "ax:\(name)"
+            case .socketServer: "socketServer"
+            default: String(describing: self).components(separatedBy: "(").first ?? "event"
+        }
+    }
+
     public var canReuseLastAppliedWindowFrames: Bool {
         switch self {
             case .ax(let notif):
