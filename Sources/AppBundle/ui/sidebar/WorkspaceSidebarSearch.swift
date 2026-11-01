@@ -20,6 +20,11 @@ func workspaceSidebarFilteredWorkspacesByProject(
     }
 }
 
+/// Whitespace-only queries do not filter, so they never produce an empty result.
+func workspaceSidebarShowsNoSearchMatches(query: String, pageWorkspaces: [WorkspaceSidebarWorkspaceViewModel]) -> Bool {
+    pageWorkspaces.isEmpty && !workspaceSidebarSearchTerms(query).isEmpty
+}
+
 private func workspaceSidebarFilteredWorkspace(
     _ workspace: WorkspaceSidebarWorkspaceViewModel,
     projectName: String?,

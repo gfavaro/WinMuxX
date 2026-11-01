@@ -360,7 +360,7 @@ private func isActionableSidebarDropTarget(
 }
 
 @MainActor
-private func workspaceSidebarDropPreview(
+func workspaceSidebarDropPreview(
     sourceWindow: Window,
     subject: WindowDragSubject,
     targetWorkspaceName: String?,

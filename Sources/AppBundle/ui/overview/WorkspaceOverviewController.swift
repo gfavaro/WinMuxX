@@ -17,9 +17,11 @@ protocol WorkspaceOverviewPresenting: AnyObject {
     func updateGesture(progress: Double)
     func settleGesture(velocity: Double)
     func dismissOverview(animated: Bool, velocity: Double, completion: @escaping @MainActor () -> Void)
+    func focusOverview()
 }
 
 extension WorkspaceOverviewPresenting {
+    func focusOverview() {}
     func present(key: Bool, gestureProgress: Double?) { present(key: key) }
     func updateGesture(progress: Double) {}
     func settleGesture(velocity: Double) {}
@@ -41,7 +43,9 @@ struct WorkspaceOverviewDependencies {
     var ranks: @Sendable (UUID) async -> [UInt32: Int]
     var render: @Sendable (WorkspaceSwipeSnapshotRequest) async throws -> CGImage
     var makePanel: (WorkspaceOverviewDisplayModel, WorkspaceOverviewDisplay) -> any WorkspaceOverviewPresenting
-    var activate: (WorkspaceOverviewCard, WorkspaceOverviewWindow?) async -> Bool
+    /// `isCurrent` turns false when the selection is superseded or the desktop context changes
+    /// (another app, Space, sleep, display change); check it immediately before activating.
+    var activate: (WorkspaceOverviewCard, WorkspaceOverviewWindow?, _ isCurrent: @escaping @MainActor () -> Bool) async -> Bool
     var releaseCaptureSession: @Sendable (UUID) async -> Void = { _ in }
     var nativeIntegration = false
 
@@ -60,7 +64,7 @@ struct WorkspaceOverviewDependencies {
             try await WorkspaceSwipeSnapshotRenderer.shared.renderOverview(request)
         }, makePanel: { model, display in
             WorkspaceOverviewPanel(model: model, monitorName: display.name, frame: display.frame)
-        }, activate: { card, selection in
+        }, activate: { card, selection, isCurrent in
             guard let token: RunSessionGuard = .isServerEnabled else { return false }
             do {
                 return try await runLightSession(.globalObserver("workspaceOverviewSelection"), token, shouldSchedulePostRefresh: false) {
@@ -79,11 +83,13 @@ struct WorkspaceOverviewDependencies {
                               Workspace.existing(byName: card.name) === workspace, workspace.projectId == focus.workspace.projectId,
                               TrayMenuModel.shared.isEnabled,
                               MonitorViewportId(workspace.workspaceMonitor) == card.monitor,
+                              isCurrent(), !WindowBorderController.shared.isMissionControlActive,
                               activateWorkspaceForUser(workspace, on: monitor) else { return false }
                         _ = window.focusWindow()
                         window.nativeFocus()
                         return true
                     }
+                    guard isCurrent(), !WindowBorderController.shared.isMissionControlActive else { return false }
                     return activateWorkspaceForUser(workspace, on: monitor)
                 }
             } catch { return false }
@@ -106,6 +112,8 @@ final class WorkspaceOverviewController {
     private var captureSession = UUID()
     private(set) var task: Task<Void, Never>?
     private var selectionTask: Task<Void, Never>?
+    private var selectionGeneration = 0
+    private var selectionObservers: [(NotificationCenter, NSObjectProtocol)] = []
     private var attempted = Set<WorkspaceId>()
     private var invalidated = Set<WorkspaceId>()
     private var ranks: [UInt32: Int] = [:]
@@ -157,6 +165,11 @@ final class WorkspaceOverviewController {
             model.activate = { [weak self] id, window in self?.select(id, window: window) }
             model.pageChanged = { [weak self] in self?.pagesChanged() }
             model.dismiss = { [weak self] in self?.dismiss() }
+            model.switchDisplay = { [weak self, weak model] delta in
+                guard let self, let model else { return }
+                self.switchDisplay(from: model, by: delta)
+            }
+            model.canSwitchDisplay = displays.count > 1
             models.append(model)
             panels.append(reused ?? dependencies.makePanel(model, display))
         }
@@ -175,6 +188,9 @@ final class WorkspaceOverviewController {
     }
 
     func dismiss(animated: Bool = true, restoreFocus: Bool = true, gestureVelocity: Double = 0) {
+        // Any dismissal after a selection was made (hide command, gesture, Mission Control,
+        // palette) supersedes it. select() dismisses before creating its own selection.
+        cancelPendingSelection()
         gestureOpening = nil
         guard phase != .closed else { return }
         if phase == .closing {
@@ -191,7 +207,7 @@ final class WorkspaceOverviewController {
         for (center, token) in observers { center.removeObserver(token) }
         observers.removeAll()
         for model in models {
-            model.activate = nil; model.pageChanged = nil; model.dismiss = nil
+            model.activate = nil; model.pageChanged = nil; model.dismiss = nil; model.switchDisplay = nil
         }
         attempted.removeAll(); invalidated.removeAll(); ranks.removeAll(); project = nil
         if dependencies.nativeIntegration {
@@ -228,7 +244,8 @@ final class WorkspaceOverviewController {
             } else { panel.dismissOverview() }
             model.images.removeAll(); model.cards.removeAll()
             model.page = 0; model.selection = 0; model.selectedWindow = nil
-            model.activate = nil; model.pageChanged = nil; model.dismiss = nil
+            model.activate = nil; model.pageChanged = nil; model.dismiss = nil; model.switchDisplay = nil
+            model.canSwitchDisplay = false
         }
     }
 
@@ -244,11 +261,13 @@ final class WorkspaceOverviewController {
         guard isOpen, let project else { return }
         guard dependencies.canShow(), dependencies.project() == project else { dismiss(restoreFocus: false); return }
         let cards = ordered(dependencies.cards(project))
+        var changed = false
         for model in models {
             let monitor = model.monitor
             guard let monitor else { continue }
             let next = cards.filter { $0.monitor == monitor }
             guard next != model.cards else { continue }
+            changed = true
             let selectedCard = model.selectedCard
             let selectedWindow = selectedCard?.windows.first { $0.id == model.selectedWindow }
             let previous = Dictionary(uniqueKeysWithValues: model.cards.map { ($0.id, $0) })
@@ -262,6 +281,9 @@ final class WorkspaceOverviewController {
                 model.selectedWindow = nil
             }
         }
+        // Selection may have crossed a page: evict off-page pixels and capture newly visible cards.
+        // Invalidated cards stay excluded from capture, as before.
+        if changed { pagesChanged() }
     }
 
     func nativeWindowChanged(_ id: UInt32) {
@@ -318,16 +340,17 @@ final class WorkspaceOverviewController {
     private func startCaptures() {
         // Keep the slot until native work actually returns, including after cancellation.
         guard isOpen, task == nil else { return }
-        let ranks = dependencies.ranks, render = dependencies.render, session = captureSession
+        // Record the session's generation now: a task that only starts running after a
+        // dismiss/reopen must recognise itself as stale and restart for the new session.
+        let ranks = dependencies.ranks, render = dependencies.render, session = captureSession, generation = generation
         task = Task(priority: .utility) { @MainActor [weak self] in
-            let generation = self?.generation
             let ordering = self?.ranksGeneration == generation ? (self?.ranks ?? [:]) : await ranks(session)
             if let self, self.isOpen, self.generation == generation {
                 self.ranks = ordering
                 self.ranksGeneration = self.generation
                 for model in self.models { model.cards = self.ordered(model.cards) }
             }
-            while !Task.isCancelled, let (generation, card, request) = self?.nextCapture() {
+            while !Task.isCancelled, self?.generation == generation, let (generation, card, request) = self?.nextCapture() {
                 let image = try? await render(request)
                 self?.accept(image, card: card, generation: generation)
             }
@@ -352,10 +375,59 @@ final class WorkspaceOverviewController {
         if window != nil && selection == nil { return }
         let activate = dependencies.activate
         dismiss(restoreFocus: false)
+        selectionGeneration += 1
+        let current = selectionGeneration
+        if dependencies.nativeIntegration { installSelectionObservers() }
         selectionTask = Task { @MainActor [weak self] in
-            _ = await activate(card, selection)
-            self?.selectionTask = nil
+            _ = await activate(card, selection) { [weak self] in
+                guard let self else { return false }
+                return self.selectionGeneration == current
+            }
+            guard let self, self.selectionGeneration == current else { return }
+            self.finishSelection()
         }
+    }
+
+    /// Invalidates a selection whose activation is still awaiting native work. Lifecycle
+    /// changes after the overview closed (another app, Space, sleep, display change) call this.
+    func cancelPendingSelection() {
+        guard selectionTask != nil else { return }
+        selectionGeneration += 1
+        selectionTask?.cancel()
+        finishSelection()
+    }
+
+    private func finishSelection() {
+        selectionTask = nil
+        for (center, token) in selectionObservers { center.removeObserver(token) }
+        selectionObservers.removeAll()
+    }
+
+    private func installSelectionObservers() {
+        func observe(_ center: NotificationCenter, _ name: Notification.Name) {
+            let token = center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.cancelPendingSelection() }
+            }
+            selectionObservers.append((center, token))
+        }
+        observe(.default, NSApplication.didChangeScreenParametersNotification)
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [NSWorkspace.willSleepNotification, NSWorkspace.screensDidSleepNotification,
+                     NSWorkspace.sessionDidResignActiveNotification, NSWorkspace.activeSpaceDidChangeNotification] { observe(workspace, name) }
+        let activation = workspace.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] notification in
+            let pid = (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier
+            MainActor.assumeIsolated {
+                if let pid, pid != myPid { self?.cancelPendingSelection() }
+            }
+        }
+        selectionObservers.append((workspace, activation))
+    }
+
+    private func switchDisplay(from model: WorkspaceOverviewDisplayModel, by delta: Int) {
+        guard isOpen, models.count > 1, let index = models.firstIndex(where: { $0 === model }) else { return }
+        let target = (index + delta % models.count + models.count) % models.count
+        panels[target].focusOverview()
+        models[target].focusRequest += 1
     }
 
     private func installObservers() {

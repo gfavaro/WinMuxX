@@ -71,6 +71,28 @@ func isInvalidGroupSelfTarget(sourceNode: TreeNode, targetNode: TreeNode, subjec
     return targetNode.parentsWithSelf.contains(sourceNode)
 }
 
+/// Resolves the dragged and target nodes for swap or stack-split, rejecting pairs where
+/// one contains the other or a group targets itself.
+@MainActor
+func validatedDragNodePair(
+    sourceWindow: Window,
+    targetWindow: Window,
+    subject: WindowDragSubject,
+    detachOrigin: TabDetachOrigin,
+) -> (source: TreeNode, target: TreeNode)? {
+    let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
+    let targetNode = dragIntentTargetNode(
+        sourceWindow: sourceWindow,
+        targetWindow: targetWindow,
+        subject: subject,
+        detachOrigin: detachOrigin,
+    )
+    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
+          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: subject)
+    else { return nil }
+    return (sourceNode, targetNode)
+}
+
 @MainActor
 func sidebarDragSourceTitle(for sourceWindow: Window, subject: WindowDragSubject) -> String {
     let moveNode = dragSubjectNode(for: sourceWindow, subject: subject)
@@ -84,20 +106,6 @@ func sidebarDragSourceTitle(for sourceWindow: Window, subject: WindowDragSubject
         return "\(sidebarDisplayLabel(for: representativeWindow)) • \(windowCount) windows"
     }
     return sidebarDisplayLabel(for: sourceWindow)
-}
-
-@MainActor
-private func sidebarDragPreviewTabItems(for moveNode: TreeNode, isTabGroup: Bool) -> [WorkspaceSidebarDropPreviewTabItem] {
-    guard isTabGroup else { return [] }
-    return moveNode.allLeafWindowsRecursive.map { window in
-        let appName = window.app.name ?? window.app.rawAppBundleId ?? "Window"
-        return WorkspaceSidebarDropPreviewTabItem(
-            title: cachedWindowTitle(for: window)?.takeIf { $0 != appName } ?? appName,
-            appName: appName,
-            appBundleIdentifier: window.app.rawAppBundleId,
-            appBundlePath: window.app.bundlePath
-        )
-    }
 }
 
 @MainActor
@@ -125,44 +133,26 @@ func updateSidebarDragFeedback(sourceWindow: Window, subject: WindowDragSubject,
         return
     }
 
-    let moveNode = dragSubjectNode(for: sourceWindow, subject: subject)
-    let isTabGroup = moveNode is TilingContainer
-    let windowCount = max(moveNode.allLeafWindowsRecursive.count, 1)
-    let sourceLabel = sidebarDragSourceTitle(for: sourceWindow, subject: subject)
-    let appName = sourceWindow.app.name ?? sourceWindow.app.rawAppBundleId ?? "Window"
-    let tabItems = sidebarDragPreviewTabItems(for: moveNode, isTabGroup: isTabGroup)
     let targetWorkspaceName: String? = switch destination.kind {
         case .moveToWorkspace(let workspaceName): workspaceName
         case .moveToWorkspaceZone(let workspaceName, _): workspaceName
         case .createWorkspace, .sidebarHover, .tabStack, .reorderTab, .detachTab, .stackSplit, .swap: nil
     }
     if targetWorkspaceName != nil {
-        setWorkspaceSidebarDropPreviewIfChanged(WorkspaceSidebarDropPreviewViewModel(
-            sourceWindowId: sourceWindow.windowId,
-            label: sourceLabel,
-            appName: appName,
-            appBundleIdentifier: sourceWindow.app.rawAppBundleId,
-            appBundlePath: sourceWindow.app.bundlePath,
+        setWorkspaceSidebarDropPreviewIfChanged(workspaceSidebarDropPreview(
+            sourceWindow: sourceWindow,
+            subject: subject,
             targetWorkspaceName: targetWorkspaceName,
             targetsNewWorkspace: false,
-            isTabGroup: isTabGroup,
-            windowCount: windowCount,
-            tabItems: tabItems,
         ))
     } else if case .createWorkspace(let projectId, let monitorScopeId) = destination.kind {
-        setWorkspaceSidebarDropPreviewIfChanged(WorkspaceSidebarDropPreviewViewModel(
-            sourceWindowId: sourceWindow.windowId,
-            label: sourceLabel,
-            appName: appName,
-            appBundleIdentifier: sourceWindow.app.rawAppBundleId,
-            appBundlePath: sourceWindow.app.bundlePath,
+        setWorkspaceSidebarDropPreviewIfChanged(workspaceSidebarDropPreview(
+            sourceWindow: sourceWindow,
+            subject: subject,
             targetWorkspaceName: nil,
             targetsNewWorkspace: true,
             targetProjectId: projectId,
             targetMonitorScopeId: monitorScopeId,
-            isTabGroup: isTabGroup,
-            windowCount: windowCount,
-            tabItems: tabItems,
         ))
     } else {
         setWorkspaceSidebarDropPreviewIfChanged(nil)

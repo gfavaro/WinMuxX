@@ -269,15 +269,8 @@ private func performRefreshSession(
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
                 let frontmostActivationPolicy = NSWorkspace.shared.frontmostApplication?.activationPolicy
-                let observation = try await observeNativeFocusForSession()
+                let observation = try await observeAndRecordNativeFocusForSession()
                 let nativeFocused = observation.window
-                try checkCancellation()
-                if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
-                if observation.known {
-                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
-                    updateFocusCache(nativeFocused)
-                }
-                try checkCancellation()
 
                 if shouldLayoutWorkspaces && optimisticallyPreLayoutWorkspaces { try await layoutWorkspaces() }
                 try checkCancellation()
@@ -391,15 +384,7 @@ private func performLightSession<T>(
     return try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
-                let observation = try await observeNativeFocusForSession()
-                let nativeFocused = observation.window
-                try checkCancellation()
-                if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
-                if observation.known {
-                    await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
-                    updateFocusCache(nativeFocused)
-                }
-                try checkCancellation()
+                let nativeFocused = try await observeAndRecordNativeFocusForSession().window
                 let focusBefore = focus.windowOrNil
 
                 refreshModel()
@@ -674,4 +659,20 @@ private func normalizeContainers() {
     for workspace in Workspace.all {
         workspace.normalizeContainers()
     }
+}
+
+/// Reads native focus and, when it is known, records it in the focus cache and
+/// fullscreen chrome state. Shared preamble of full and light refresh sessions.
+@MainActor
+private func observeAndRecordNativeFocusForSession() async throws -> (window: Window?, known: Bool) {
+    let observation = try await observeNativeFocusForSession()
+    let nativeFocused = observation.window
+    try checkCancellation()
+    if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
+    if observation.known {
+        await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+        updateFocusCache(nativeFocused)
+    }
+    try checkCancellation()
+    return observation
 }

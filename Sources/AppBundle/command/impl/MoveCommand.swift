@@ -80,13 +80,7 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
 ) -> Bool {
     switch args.boundaries {
         case .workspace:
-            switch args.boundariesAction {
-                case .stop: return true
-                case .fail: return false
-                case .createImplicitContainer:
-                    createImplicitContainerAndMoveNode(node, workspace, direction)
-                    return true
-            }
+            return hitAllMonitorsOuterFrameBoundaries(node, workspace, args, direction)
         case .allMonitorsOuterFrame:
             guard let (monitors, index) = node.nodeMonitor?.findRelativeMonitor(inDirection: direction) else {
                 return io.err("Should never happen. Can't find the current monitor")

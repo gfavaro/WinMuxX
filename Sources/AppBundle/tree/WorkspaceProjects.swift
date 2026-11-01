@@ -200,50 +200,20 @@ func deleteWorkspaceProjectFromSidebar(_ projectId: WorkspaceProjectId) async th
 
 @MainActor
 private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: WorkspaceProjectId) throws {
-    materializePersistedWorkspaceProjects()
-    guard let project = runtime.workspaces.projectsById[projectId] else {
-        throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
-    }
-    guard canDeleteWorkspaceProject(projectId) else {
-        throw WorkspaceMutationError.projectCannotBeDeleted(project.name)
-    }
-
-    let fallbackId = workspaceProjectFallbackForDeletion(excluding: projectId)
-    let viewportsShowingDeletedProject = runtime.workspaces.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
-        guard let activeWorkspaceId = viewport.activeWorkspaceId,
-              runtime.workspaces.workspaceById[activeWorkspaceId]?.projectId == projectId
-        else { return nil }
-        return viewport.id
-    }
-    for viewportId in viewportsShowingDeletedProject {
-        _ = switchWorkspaceProject(fallbackId, on: viewportId.topLeftCorner.monitorApproximation)
-    }
-
-    for workspace in Workspace.all.filter({ $0.projectId == projectId }) {
+    _ = try deletableWorkspaceProject(projectId)
+    try removeWorkspaceProject(projectId) { workspace, fallbackId in
         let fallback = workspaceFallbackForDeletion(
             excluding: workspace,
             projectId: fallbackId,
             monitor: workspace.workspaceMonitor,
         )
         moveWorkspaceContents(from: workspace, to: fallback)
-        removeWorkspaceFromRegistry(workspace)
     }
-
-    runtime.workspaces.projectsById.removeValue(forKey: projectId)
-    try clearWorkspaceSidebarProjectMetadata(projectId)
-    ensureVisibleActiveProjectWorkspaces()
-    checkWorkspaceHierarchyInvariants()
 }
 
 @MainActor
 private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProjectId) async throws {
-    materializePersistedWorkspaceProjects()
-    guard let project = runtime.workspaces.projectsById[projectId] else {
-        throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
-    }
-    guard canDeleteWorkspaceProject(projectId) else {
-        throw WorkspaceMutationError.projectCannotBeDeleted(project.name)
-    }
+    let project = try deletableWorkspaceProject(projectId)
 
     let windows = windowsInWorkspaceProject(projectId)
     if !windows.isEmpty {
@@ -253,6 +223,28 @@ private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProject
         }
     }
 
+    try removeWorkspaceProject(projectId) { _, _ in }
+}
+
+@MainActor
+private func deletableWorkspaceProject(_ projectId: WorkspaceProjectId) throws -> WorkspaceProject {
+    materializePersistedWorkspaceProjects()
+    guard let project = runtime.workspaces.projectsById[projectId] else {
+        throw WorkspaceMutationError.projectNotFound(projectId.rawValue)
+    }
+    guard canDeleteWorkspaceProject(projectId) else {
+        throw WorkspaceMutationError.projectCannotBeDeleted(project.name)
+    }
+    return project
+}
+
+/// Switches viewports showing the project to its fallback, then removes the project's
+/// workspaces and metadata. `beforeRemovingWorkspace` runs for each workspace first.
+@MainActor
+private func removeWorkspaceProject(
+    _ projectId: WorkspaceProjectId,
+    beforeRemovingWorkspace: (_ workspace: Workspace, _ fallbackProjectId: WorkspaceProjectId) -> Void,
+) throws {
     let fallbackId = workspaceProjectFallbackForDeletion(excluding: projectId)
     let viewportsShowingDeletedProject = runtime.workspaces.monitorViewportsById.values.compactMap { viewport -> MonitorViewportId? in
         guard let activeWorkspaceId = viewport.activeWorkspaceId,
@@ -265,6 +257,7 @@ private func closeWindowsAndDeleteWorkspaceProject(_ projectId: WorkspaceProject
     }
 
     for workspace in Workspace.all.filter({ $0.projectId == projectId }) {
+        beforeRemovingWorkspace(workspace, fallbackId)
         removeWorkspaceFromRegistry(workspace)
     }
 

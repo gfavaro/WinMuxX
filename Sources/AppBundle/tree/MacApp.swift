@@ -573,15 +573,8 @@ final class MacApp: AbstractApp {
     private func withWindow<T>(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> T?) async throws -> T? {
         try await thread?.runInLoop { [windows, axApp, nsApp, animatedSizes] job in
             if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { throw AXReadFailure(code: .cannotComplete) }
-            let value = try withRecoverableWindow(load: { replacing in
-                try job.checkCancellation()
-                if replacing {
-                    windows.threadGuarded.removeValue(forKey: windowId)
-                    animatedSizes.threadGuarded[windowId] = nil
-                }
-                return try windows.threadGuarded.getOrRegisterAxWindow(
-                    windowId: windowId, from: axApp.threadGuarded, nsApp, job)
-            }, identify: { (window: AxWindow) in ObjectIdentifier(window.ax) }, body: { window in try body(window.ax, job) })
+            let value = try Self.withRecoverableAxWindow(
+                windowId, windows: windows, animatedSizes: animatedSizes, axApp: axApp, nsApp: nsApp, job, body)
             if AXReadBudget.current?.permits(nsApp.processIdentifier) == false { throw AXReadFailure(code: .cannotComplete) }
             return value
         }
@@ -590,19 +583,34 @@ final class MacApp: AbstractApp {
     private func withWindowAsync(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> ()) -> RunLoopJob {
         thread?.runInLoopAsync { [windows, axApp, nsApp, animatedSizes] job in
             do {
-                let _: Void? = try withRecoverableWindow(load: { replacing in
-                    try job.checkCancellation()
-                    if replacing {
-                        windows.threadGuarded.removeValue(forKey: windowId)
-                        animatedSizes.threadGuarded[windowId] = nil
-                    }
-                    return try windows.threadGuarded.getOrRegisterAxWindow(
-                        windowId: windowId, from: axApp.threadGuarded, nsApp, job)
-                }, identify: { (window: AxWindow) in ObjectIdentifier(window.ax) }, body: { window in try body(window.ax, job) })
+                let _: Void? = try Self.withRecoverableAxWindow(
+                    windowId, windows: windows, animatedSizes: animatedSizes, axApp: axApp, nsApp: nsApp, job, body)
             } catch {
                 // Closed windows, cancelled jobs and failed AX requests are retried by refresh.
             }
         } ?? .cancelled
+    }
+
+    /// Runs `body` on the window's AX element; a stale element is dropped and reloaded once.
+    /// Must be called on the app's AX thread.
+    private static func withRecoverableAxWindow<T>(
+        _ windowId: UInt32,
+        windows: ThreadGuardedValue<[UInt32: AxWindow]>,
+        animatedSizes: ThreadGuardedValue<[UInt32: (session: UUID, size: CGSize)]>,
+        axApp: ThreadGuardedValue<AXUIElement>,
+        nsApp: NSRunningApplication,
+        _ job: RunLoopJob,
+        _ body: (AXUIElement, RunLoopJob) throws -> T?,
+    ) throws -> T? {
+        try withRecoverableWindow(load: { replacing in
+            try job.checkCancellation()
+            if replacing {
+                windows.threadGuarded.removeValue(forKey: windowId)
+                animatedSizes.threadGuarded[windowId] = nil
+            }
+            return try windows.threadGuarded.getOrRegisterAxWindow(
+                windowId: windowId, from: axApp.threadGuarded, nsApp, job)
+        }, identify: { (window: AxWindow) in ObjectIdentifier(window.ax) }, body: { window in try body(window.ax, job) })
     }
 }
 
