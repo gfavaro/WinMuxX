@@ -6,12 +6,14 @@ struct AgentWorkspaceLayout: Codable {
     let focusPane: AgentPaneRef?
     let layout: AgentLayoutNode
     let floating: [AgentPaneRef]?
+    var arrangement: WorkspaceLayoutName? = nil
 
     private enum CodingKeys: String, CodingKey {
         case name
         case focusPane = "focus"
         case layout
         case floating
+        case arrangement
     }
 
     @MainActor
@@ -59,6 +61,7 @@ struct AgentWorkspaceLayout: Codable {
         bindFloatingPanes(to: workspace)
         restoreUnreferencedWindows(oldWindows, referenced: referenced, root: workspace.rootTilingContainer)
         layout.applySizeRatios(to: workspace.rootTilingContainer)
+        workspace.transitionArrangement(to: arrangement ?? workspace.arrangement)
         if let focusNode = focusPane?.resolveNode() {
             _ = focusNode.mostRecentWindowRecursive?.focusWindow()
         }

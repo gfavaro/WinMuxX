@@ -398,13 +398,17 @@ python3 script/install_fork.py --resume .release/local-install.json
 ```
 
 Preflight verifies both bundles, signing certificate equality, configuration and
-permissions. Installation archives the previous bundle outside Applications,
+permissions; both backends' `doctor` reports print the loaded config path and the
+permission lines it reads, and relaunch keeps that `--config-path`, so an app running
+in native mode is upgraded in place and comes back native. Installation archives the previous bundle outside Applications,
 rechecks desktop state, stops the old process, stages the complete new bundle,
 verifies its signature and launches it. Startup compares surviving window IDs
 and workspace assignments; opened and closed windows are recorded separately.
 A failed replacement/startup attempts rollback only while unlocked with unchanged
 display topology. The report records rollback failure instead of hiding it.
 
+Focus that moves during startup but settles back where it was before the install
+is not a review reason; focus left somewhere else is, and is never overridden.
 A locked session remains pending; resume verifies the installed build and current
 state without replaying old focus commands. Changed config, topology or surviving
 window assignments require review. Reports contain local window IDs and config
@@ -693,3 +697,25 @@ replaying focus. All seven window IDs and their workspace assignments, both
 display identities, and the active configuration hash matched the pre-install
 snapshot. The installer retained build 131 as a rollback archive. Interactive
 multi-display animation behavior was not manually exercised.
+
+## Overview swipe contact participation (build 230)
+
+Signed build 230 is installed with source `4e27b98b360c802a16bd6fa4f7afdf0ea979929f`.
+Installer dry-run and config validation passed. The initial install check reported
+`focus_changed_during_validation`; a read-only resume validated the installation
+with no moved, opened or closed managed windows. Client and server versions match.
+The app reports its raw touch source is registered; registration alone does not
+prove a physical gesture works.
+
+`make check` passed 1,587 Swift tests, 53 Python tests and 19 schema fixtures.
+The overview recognizer checks each contact's vertical displacement before locking
+its axis. Synthetic tests cover a stationary contact in each position, both swipe
+directions, direction changes after recognition, contact replacement, continued
+progress and copying transient driver contact data before returning. Horizontal
+workspace navigation keeps its previous recognition policy.
+
+Physical trackpad validation of an ordinary three-finger overview swipe and a
+two-finger scroll with a resting third contact remains pending user feedback. The
+threshold is a normalized distance, so actual comfort and device variation need
+physical checking. macOS Mission Control was changed with user consent to four
+fingers; System Settings also changed App Exposé to four fingers.

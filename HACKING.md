@@ -4,6 +4,30 @@ Start with [core principles](docs/PRINCIPLES.md) and [CONTRIBUTING](CONTRIBUTING
 for product expectations and the contribution workflow. Coding agents enter through
 [AGENTS.md](AGENTS.md) and its repository-local skill.
 
+WinMuxX has an experimental native backend: observation is
+the default, with a separate Dwindle/Master tiling opt-in. Initial single-display
+positioning/focus/fullscreen checks passed; broader native validation remains pending.
+`WorkspaceBackendState` belongs to `WinMuxRuntime`; its native lifecycle owns
+observation and native runtime services. Capabilities gate virtual lifecycle, parking
+and recovery. `NativeSpaces` isolates dynamic read-side SkyLight
+access and generation-checked event reconciliation. Layout trees/algorithms remain
+shared, with native visibility filtering and separate UUID-keyed persistence.
+
+When behaviour differs between the backends, shared code does not check
+`workspaceBackend.kind`. It asks `runtime.workspaceBackend.current` (the
+`WorkspaceBackend` protocol in `runtime/WorkspaceBackend.swift`) for behaviour:
+commands with their own implementation, listing and naming workspaces, focus side
+effects, diagnostics and geometry events. `workspaceBackend.ui` selects sidebar,
+palette and tray adapters. It asks
+`workspaceBackend.capabilities` for policy, such as parking hidden windows, virtual
+recovery, animated motion, arranging floating windows, publishing state and owning
+workspace lifecycle. Checking `kind` directly is left to the native tiling engine
+itself: its command fence, layout projection, write validation, startup and
+observers. Add a protocol method or capability rather than a new `kind` check.
+See [workspace backend architecture](docs/WORKSPACE_BACKEND_ARCHITECTURE.md),
+[native mode and rollback](docs/NATIVE_SPACES.md), the
+[assessment](docs/NATIVE_SPACES_ASSESSMENT.md) and [decision record](docs/NATIVE_SPACES_ADR.md).
+
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for
 bundle identity, configuration ownership, upstream integration and signing policy.
 Current user-facing options are described in [README.md](README.md). Historical
@@ -83,6 +107,13 @@ tests, create a fresh ShortcutSettingsModel with injected SettingsConfigAccess a
 SettingsDraftStore; production uses the shared instance with native access. The
 workspace/config state has an explicit runtime owner as described below.
 
+Every user-facing config key has a Settings control (a `@SettingsDraft("section.key")`
+written with `persistConfig`), and every user command has a Shortcuts entry, and a
+menu item when it is an action. Add the key to `docs/schemas/winmuxx.schema.json`
+(`make check` rejects parser keys missing from it) and to `SettingsNewKeysTest`,
+which writes each key the way Settings does and parses the result back. Deprecated
+keys, hooks and `config-version` stay config-only.
+
 `runtime/WinMuxRuntime.swift` is the composition point for configuration, workspace /
 project / viewport registry, focus history and native focus holds, monitor caches,
 hotkeys and recovery snapshots/tasks. Production uses one process-lifetime owner.
@@ -108,6 +139,12 @@ invalidate recovery state and replace secondary slots, returning displaced owner
 to main without activating them. Startup/restoration only seed ownership.
 
 `WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
+`DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events instead of
+raw touch when macOS assigns a gesture to three fingers: horizontal for workspace
+swipes, vertical (Mission Control) for the overview. `DockSwipeTracker` decides which
+swipes WinMuxX keeps from the Dock and replays the rest; vertical progress follows
+Natural scrolling, horizontal progress already accounts for it. On macOS 27 the Dock must still receive the physical Ended event (motion
+zeroed), or its gesture state stays open.
 Recognizer policy, the bounded mailbox, native device ownership and the shared
 spring each have separate modules. The overview presentation owns panel-only
 motion; the horizontal controller owns horizontal navigation. Keep new gesture

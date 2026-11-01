@@ -18,7 +18,7 @@ final class WindowBorderPiecesTest: XCTestCase {
         // A 40.5-point top band drew through y=76.5, while WindowServer
         // placed the neighboring side at y=77: one missing Retina row.
         for size in [CGSize(width: 859, height: 1077), CGSize(width: 160.5, height: 100.5)] {
-            for index in 0..<4 {
+            for index in 0..<Int(WINMUX_BORDER_PIECES) {
                 let piece = winmux_border_piece(size, 16, 4, 2, Int32(index))
                 XCTAssertEqual(piece.minX, piece.minX.rounded())
                 XCTAssertEqual(piece.minY, piece.minY.rounded())
@@ -37,7 +37,7 @@ final class WindowBorderPiecesTest: XCTestCase {
                     XCTAssertLessThanOrEqual(abs(aligned.minY - frame.minY), 0.5 / scale)
                     XCTAssertEqual(pixelAlignedWindowBorderFrame(aligned, width: width, scale: scale), aligned)
                     let outer = aligned.insetBy(dx: -width, dy: -width)
-                    for index in 0..<4 {
+                    for index in 0..<Int(WINMUX_BORDER_PIECES) {
                         let piece = winmux_border_piece(outer.size, 19, Float(width), Float(scale), Int32(index))
                         for coordinate in [outer.minX + piece.minX, outer.minY + piece.minY] {
                             XCTAssertEqual(coordinate * scale, (coordinate * scale).rounded(), accuracy: 0.000001)
@@ -53,7 +53,7 @@ final class WindowBorderPiecesTest: XCTestCase {
             for size in [CGSize(width: 1700, height: 1400), CGSize(width: 20, height: 14), CGSize(width: 5, height: 3), CGSize(width: 5, height: 100), CGSize(width: 160.5, height: 100.5)] {
                 for width: Float in [0.5, 4.5, 12] {
                     let bounds = CGRect(x: 0, y: 0, width: ceil(size.width * CGFloat(scale)) / CGFloat(scale), height: ceil(size.height * CGFloat(scale)) / CGFloat(scale))
-                    let pieces = (0..<4).map { winmux_border_piece(size, 12, width, scale, Int32($0)) }
+                    let pieces = (0..<Int(WINMUX_BORDER_PIECES)).map { winmux_border_piece(size, 12, width, scale, Int32($0)) }
                     for (i, piece) in pieces.enumerated() {
                         XCTAssertTrue(bounds.contains(piece))
                         for other in pieces.dropFirst(i + 1) {
@@ -64,6 +64,11 @@ final class WindowBorderPiecesTest: XCTestCase {
                     if size.width > 1000 {
                         let area = pieces.reduce(CGFloat(0)) { $0 + $1.width * $1.height }
                         XCTAssertLessThan(area, size.width * size.height * 0.1)
+                        // Between the corners the top and bottom are as thin as the sides.
+                        let edge = ceil(CGFloat(width) + 1 / CGFloat(scale))
+                        XCTAssertEqual(pieces[1].height, edge)
+                        XCTAssertLessThanOrEqual(pieces[4].height, edge + 1.5)
+                        XCTAssertEqual(pieces[0].width, pieces[0].height, "Corners are square")
                     }
                 }
             }
@@ -146,7 +151,7 @@ final class WindowBorderPiecesTest: XCTestCase {
             bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.scaleBy(x: key.scale, y: key.scale)
         if pieces {
-            for index in 0..<4 {
+            for index in 0..<Int(WINMUX_BORDER_PIECES) {
                 let piece = winmux_border_piece(key.size, Float(key.partitionRadius), Float(key.width), Float(key.scale), Int32(index))
                 if piece.isEmpty { continue }
                 context.saveGState()
@@ -170,7 +175,7 @@ final class WindowBorderPiecesTest: XCTestCase {
                                             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
         context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
         if pieces {
-            for index in 0..<4 {
+            for index in 0..<Int(WINMUX_BORDER_PIECES) {
                 let piece = winmux_border_piece(size, 12, width, scale, Int32(index))
                 if piece.isEmpty { continue }
                 context.saveGState()

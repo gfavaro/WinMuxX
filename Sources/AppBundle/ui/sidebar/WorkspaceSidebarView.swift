@@ -185,7 +185,8 @@ struct WorkspaceSidebarView: View {
             isSidebarExpanding = true
             let panel = notificationPanel(from: notification)
             let generation = panel?.hoverRevealGeneration
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) {
+            // Posted just before expandSidebar marks the panel expanded; check once it has.
+            DispatchQueue.main.async {
                 guard let panel, !panel.isRetired, panel.viewModel.isWorkspaceSidebarExpanded,
                       panel.hoverRevealGeneration == generation else { return }
                 beginSidebarSearchIfNeeded(panel: panel)
@@ -235,10 +236,16 @@ struct WorkspaceSidebarContainerView: View {
 
     var body: some View {
         let snapshot = workspaceSidebarSnapshot(from: viewModel)
-        WorkspaceSidebarView(
-            snapshot: snapshot,
-            actions: actions
-        )
+        Group {
+            if viewModel.workspaceSidebarContentLoaded {
+                WorkspaceSidebarView(
+                    snapshot: snapshot,
+                    actions: actions
+                )
+            } else {
+                Color.clear
+            }
+        }
         .modifier(WorkspaceSidebarWallpaperContrast(
             snapshot: snapshot,
             refreshGeneration: viewModel.workspaceSidebarWallpaperRefreshGeneration

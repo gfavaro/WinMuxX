@@ -12,13 +12,18 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
-        if target.workspace.rootTilingContainer.layout == .master {
+        if target.workspace.arrangement == .scrolling {
+            return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
+        }
+        if target.workspace.arrangement == .master {
+            // Swap with the window on that side, as master always did. Master is tracked by its
+            // group, so a move between master and stack also hands the master role across.
             if let neighbor = dwindleDirectionalFocusTarget(from: currentWindow, direction: direction, excludingMoveNode: currentNode) {
-                swapWindows(currentWindow, neighbor)
+                swapMasterAware(currentWindow, neighbor, in: target.workspace)
                 return true
             }
-            // Master slots stay fixed; crossing a pane edge must not wrap the
-            // master root in an implicit split and silently abandon its policy.
+            // Master slots stay fixed; crossing a pane edge must not wrap the master root
+            // in an implicit split. Other displays and the boundary action still apply.
             if args.boundaries == .workspace { return args.boundariesAction == .stop }
             return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
         }
@@ -64,6 +69,87 @@ struct MoveCommand: Command {
 }
 
 @MainActor
+private func moveScrollingNode(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
+    let groups = workspace.workspaceLayoutUnits
+    let column = window.topLevelWorkspaceGroup
+    guard let index = groups.firstIndex(where: { $0 === column }) else { return false }
+    if direction.orientation == .v {
+        var node = window.moveNode
+        while let parent = node.parent as? TilingContainer, parent !== column {
+            if parent.navigationOrientation == direction.orientation,
+               let ownIndex = node.ownIndex {
+                let target = ownIndex + direction.focusOffset
+                if parent.children.indices.contains(target) {
+                    let sibling = parent.children[target]
+                    if node is TilingContainer || (sibling as? TilingContainer)?.layout == .tabGroup {
+                        let binding = node.unbindFromParent()
+                        node.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: target)
+                    } else if let siblingContainer = sibling as? TilingContainer {
+                        return deepMoveIn(node: node, into: siblingContainer, moveDirection: direction)
+                    } else {
+                        swapNodes(node, sibling)
+                    }
+                    scheduleRefreshSession(.globalObserver("moveWithinScrollingColumn"))
+                    return true
+                }
+            }
+            node = parent
+        }
+        return false
+    }
+    // `groups` can omit columns native mode is not laying out (a lone minimized window),
+    // so positions are taken from the tree, next to the neighbouring visible column.
+    if column.allLeafWindowsRecursive.count <= 1 {
+        guard let root = column.parent as? TilingContainer, root === workspace.rootTilingContainer,
+              groups.indices.contains(index + direction.focusOffset) else { return false }
+        let neighbor = groups[index + direction.focusOffset]
+        let binding = column.unbindFromParent()
+        guard let neighborIndex = root.children.firstIndex(where: { $0 === neighbor }) else {
+            column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return false
+        }
+        column.bind(to: root, adaptiveWeight: binding.adaptiveWeight, index: neighborIndex + (direction.isPositive ? 1 : 0))
+    } else {
+        let width = column.scrollingColumnWidth
+        window.unbindFromParent()
+        let parent = ensureScrollingRootSupportsColumns(workspace)
+        let at = parent.children.firstIndex(where: { $0 === column }) ?? index
+        let insertion = min(max(at + (direction.isPositive ? 1 : 0), 0), parent.children.count)
+        window.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: insertion)
+        window.scrollingColumnWidth = width
+        workspace.normalizeContainers()
+    }
+    scheduleRefreshSession(.globalObserver("moveScrollingColumn"))
+    return true
+}
+
+@MainActor
+@discardableResult
+func ensureScrollingRootSupportsColumns(_ workspace: Workspace) -> TilingContainer {
+    let previousRoot = workspace.rootTilingContainer
+    guard previousRoot.layout == .tabGroup || previousRoot.layout == .stacked else { return previousRoot }
+    let orientation = previousRoot.orientation
+    previousRoot.unbindFromParent()
+    let root = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)
+    previousRoot.bind(to: root, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    return root
+}
+
+@MainActor
+private func swapMasterAware(_ window: Window, _ neighbor: Window, in workspace: Workspace) {
+    let mine = window.topLevelWorkspaceGroup
+    let theirs = neighbor.topLevelWorkspaceGroup
+    let master = workspace.workspaceLayoutUnits.indices.contains(workspace.masterGroupIndex)
+        ? workspace.workspaceLayoutUnits[workspace.masterGroupIndex] : nil
+    guard mine !== theirs, master === mine || master === theirs else { return swapWindows(window, neighbor) }
+    swapNodes(mine, theirs)
+    // The group now in the master's place takes the role.
+    let incoming = master === mine ? theirs : mine
+    if let index = workspace.workspaceLayoutUnits.firstIndex(where: { $0 === incoming }) { workspace.masterGroupIndex = index }
+    scheduleRefreshSession(.globalObserver("moveMaster"))
+}
+
+@MainActor
 private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer, _ targetIndex: Int) -> Bool {
     let prevBinding = node.unbindFromParent()
     node.bind(to: parent, adaptiveWeight: prevBinding.adaptiveWeight, index: targetIndex)
@@ -92,8 +178,14 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
                 let moveNodeToMonitorArgs = MoveNodeToMonitorCmdArgs(target: .direction(direction))
                     .copy(\.windowId, focusWindow.windowId)
                     .copy(\.focusFollowsWindow, focus.windowOrNil == focusWindow)
-
-                return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).run(env, io)
+                if runtime.workspaceBackend.kind == .native {
+                    guard let sink = NativeTilingCommandScope.monitorMoveSink else {
+                        return io.err("Moving to another display runs through native tiling")
+                    }
+                    sink.pending = moveNodeToMonitorArgs
+                    return true
+                }
+                return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).runVirtual(env, io)
             } else {
                 return hitAllMonitorsOuterFrameBoundaries(node, workspace, args, direction)
             }

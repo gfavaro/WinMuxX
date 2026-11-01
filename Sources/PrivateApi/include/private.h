@@ -6,6 +6,9 @@
 #import <stdint.h>
 
 typedef struct WinMuxBorder *WinMuxBorderHandle;
+/// Separate WindowServer surfaces per border: four corners, two thin edges between
+/// them, and the two sides.
+#define WINMUX_BORDER_PIECES 8
 bool winmux_border_create(float scale, WinMuxBorderHandle *handle);
 bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect frame,
                          float radius, uint32_t rgba, float width, bool above, CGPathRef path);
@@ -30,9 +33,11 @@ void winmux_watch_windows(const uint32_t *windows, int count);
 typedef void (*WinMuxWindowServerChangedCallback)(uint32_t event, uint32_t window);
 bool winmux_watch_mission_control(WinMuxWindowServerChangedCallback callback);
 
-// Raw trackpad frames: copied summaries only, no private pointers exposed to Swift.
+// Raw trackpad frames: the callback copies these transient contact values immediately.
+typedef struct { int32_t identifier; double y; } WinMuxTouchContact;
 typedef void (*WinMuxTouchFrameCallback)(uint64_t generation, uint64_t device, int32_t fingers,
-                                       double x, double y, double timestamp, uint64_t contacts);
+                                       double x, double y, double timestamp, uint64_t contacts,
+                                       const WinMuxTouchContact *threeContacts);
 typedef void (*WinMuxTouchTopologyCallback)(void);
 int winmux_touch_start(uint64_t generation, WinMuxTouchFrameCallback callback);
 void winmux_touch_stop(void);

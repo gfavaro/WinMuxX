@@ -4,8 +4,9 @@
 
 Horizontal preview travel now follows normalized gesture progress directly: halfway
 progress displays halfway travel. Tracking updates layer transforms without restarting
-an easing animation. Release springs use device sample timestamp deltas and start at
-the visible position. Recognition and commit thresholds are unchanged.
+an easing animation. Release motion starts at the visible position and the finger's
+speed (from device sample timestamp deltas) and slows to a stop on a cubic curve; a
+spring started at that speed peaked at up to five times it, a visible lurch. Recognition and commit thresholds are unchanged.
 
 Overview dismissal clears session images, cards, selection and callbacks while retaining
 one native panel and hosting view per display. Reopening refreshes model and geometry;

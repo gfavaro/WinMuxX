@@ -6,8 +6,7 @@ func focusWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
     guard let window = Window.get(byId: windowId),
           let liveFocus = window.toLiveFocusOrNil()
     else {
-        _ = Workspace.existing(byName: fallbackWorkspace)?.focusWorkspace()
-        scheduleRefreshSession(.menuBarButton)
+        selectWorkspaceFromTabStrip(fallbackWorkspace)
         return
     }
     // Make the switch feel instant: place the newly active tab into the spot the currently
@@ -65,6 +64,15 @@ func focusWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
     }
     // Within a tab group no new windows can appear, so skip the heavy refresh barrier.
     scheduleRefreshSession(isTabSwitch ? .onTabSwitched : .menuBarButton)
+}
+
+/// The clicked tab's window is gone; show its strip's workspace instead.
+@MainActor
+func selectWorkspaceFromTabStrip(_ name: String) {
+    guard let token: RunSessionGuard = .isServerEnabled else { return }
+    Task { @MainActor in
+        _ = try? await runLightSession(.menuBarButton, token) { try await selectWorkspaceFromUi(name) }
+    }
 }
 
 @MainActor

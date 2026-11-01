@@ -18,6 +18,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     var pendingExpand: DispatchWorkItem?
     var pendingCollapse: DispatchWorkItem?
     var pendingCollapseFinalize: DispatchWorkItem?
+    var pendingContentUnload: DispatchWorkItem?
     var lastHoverMonitorTimestamp: CFTimeInterval = 0
     var hasPendingHoverRecheck = false
     var menuTrackingDepth = 0
@@ -66,6 +67,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
             actions: makeWorkspaceSidebarActionsAdapter(viewModel: viewModel, targetMonitorScopeId: monitorScopeId)
         ))
         materialContainer = WorkspaceSidebarMaterialContainer()
+        viewModel.workspaceSidebarContentLoaded = !workspaceSidebarUnloadsWhenResting(config.workspaceSidebar)
         super.init()
         identifier = NSUserInterfaceItemIdentifier("\(workspaceSidebarPanelId).\(monitorScopeId)")
         styleMask.remove(.nonactivatingPanel)
@@ -125,6 +127,8 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         guard !isRetired else { return }
         isRetired = true
         cancelExpansionWork()
+        pendingContentUnload?.cancel()
+        pendingContentUnload = nil
         endInlineTextEditing()
         removeInlineTextEditingEventMonitors()
         removeInlineTextEditingKeyEventTap()

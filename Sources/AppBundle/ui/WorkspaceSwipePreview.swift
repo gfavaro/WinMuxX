@@ -8,8 +8,24 @@ struct WorkspaceSwipePreviewGeometry {
         progress.isFinite ? min(1, max(0, progress)) : 0
     }
 
-    static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration: Double) -> CASpringAnimation {
-        WorkspaceGestureAnimation.settlingAnimation(keyPath: "transform.translation.x", from: from, to: to, speed: speed, duration: duration)
+    /// The motion after release: it carries on at the finger's speed and slows to a stop,
+    /// ending exactly on time. A spring started at that speed accelerates hard in its first
+    /// frames (up to five times the finger's speed), which shows as a lurch at release.
+    /// `speed` is in points per second; `duration` is the longest the motion may take.
+    static func settlingAnimation(from: CGFloat, to: CGFloat, speed: CGFloat, duration maximum: Double) -> CABasicAnimation {
+        let distance = to - from
+        // The finger's speed as a share of the distance left per second, toward the target.
+        let towards = abs(distance) > 0.5 ? Double(speed / distance) : 0
+        let duration = towards > 0 ? min(maximum, max(0.12, 1 / towards)) : maximum
+        // A cubic from the finger's speed to rest; its peak stays within about a third above
+        // the average speed, and a slower finger accelerates gradually instead of at once.
+        let slope = min(3, max(0, towards * duration))
+        let animation = CABasicAnimation(keyPath: "transform.translation.x")
+        animation.fromValue = from
+        animation.toValue = to
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(controlPoints: 1 / 3, Float(slope / 3), 2 / 3, 1)
+        return animation
     }
 
     static func offsets(width: CGFloat, progress: Double, slidesLeft: Bool) -> (outgoing: CGFloat, incoming: CGFloat) {
@@ -50,28 +66,69 @@ final class WorkspaceSwipePreview {
     private var completion: Task<Void, Never>?
     private var deadline: Task<Void, Never>?
     private var phase = WorkspaceSwipePreviewPhase.idle
+    /// The screen grabbed as a swipe starts, before its direction is known, so the preview
+    /// can appear with the first movement instead of one capture later.
+    private struct TouchdownFront {
+        let key: WorkspaceSwipeSnapshotKey
+        let at: Double
+        var image: CGImage?
+        var arrived: ((CGImage) -> Void)?
+    }
+    private var touchdownFront: TouchdownFront?
+    var hasTouchdownFront: Bool { touchdownFront?.image != nil }
+    private var slideEndedAt: Double?
+    static let touchdownFrontLifetime = 1.0
     var isSettling: Bool { phase.isSettling }
     var isActive: Bool { phase != .idle }
 
-    func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
-               isValid: @escaping @MainActor () -> Bool) {
-        cancel()
-        guard !isUnitTest, config.animations.enabled, config.workspaceSwipe.animationDurationMs > 0,
-              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion,
-              !WindowBorderController.shared.isMissionControlActive, CGPreflightScreenCaptureAccess() else {
-            invalidate()
-            return
-        }
-        let started = CACurrentMediaTime()
+    private var canPreview: Bool {
+        !isUnitTest && config.animations.enabled && config.workspaceSwipe.animationDurationMs > 0 &&
+            !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
+            !WindowBorderController.shared.isMissionControlActive && CGPreflightScreenCaptureAccess()
+    }
+
+    private func area(on monitor: Monitor) -> (rect: Rect, capture: WorkspaceSwipeSnapshotRequest) {
         let visible = monitor.visibleRect
         let inset = monitor.workspaceSidebarInset
         let rect = Rect(topLeftX: visible.minX + (config.workspaceSidebar.position == .left ? inset : 0),
                         topLeftY: visible.minY, width: visible.width - inset, height: visible.height)
-        let request = WorkspaceSwipeSnapshotRequest(workspace: target, monitor: monitor, rect: rect)
         let sourceKey = WorkspaceSwipeSnapshotKey(workspace: monitor.activeWorkspace, monitor: monitor, rect: rect)
         let captureRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
-        begin(request: request, capture: WorkspaceSwipeSnapshotRequest(screenKey: sourceKey, rect: captureRect),
-              rect: rect, slidesLeft: slidesLeft, started: started) {
+        return (rect, WorkspaceSwipeSnapshotRequest(screenKey: sourceKey, rect: captureRect))
+    }
+
+    /// A swipe has started on the monitor; its direction is not known yet.
+    func prepareFront(on monitor: Monitor) {
+        guard phase == .idle, canPreview else { return }
+        prepareFront(area(on: monitor).capture)
+    }
+
+    func prepareFront(_ capture: WorkspaceSwipeSnapshotRequest) {
+        guard phase == .idle else { return }
+        let key = capture.key
+        touchdownFront = TouchdownFront(key: key, at: CACurrentMediaTime())
+        snapshots.request(capture) { [weak self] result in
+            guard let self, self.touchdownFront?.key == key, self.touchdownFront?.image == nil else { return }
+            guard case .success(let front) = result else { self.touchdownFront = nil; return }
+            if let arrived = self.touchdownFront?.arrived {
+                self.touchdownFront = nil
+                arrived(front.image)
+            } else {
+                self.touchdownFront?.image = front.image
+            }
+        }
+    }
+
+    func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
+               isValid: @escaping @MainActor () -> Bool) {
+        guard canPreview else {
+            invalidate()
+            return
+        }
+        let started = CACurrentMediaTime()
+        let (rect, capture) = area(on: monitor)
+        let request = WorkspaceSwipeSnapshotRequest(workspace: target, monitor: monitor, rect: rect)
+        begin(request: request, capture: capture, rect: rect, slidesLeft: slidesLeft, started: started) {
             isValid() && CGPreflightScreenCaptureAccess()
         }
     }
@@ -81,6 +138,26 @@ final class WorkspaceSwipePreview {
     func begin(request: WorkspaceSwipeSnapshotRequest, capture: WorkspaceSwipeSnapshotRequest,
                rect: Rect, slidesLeft: Bool, started: Double = CACurrentMediaTime(),
                isValid: @escaping @MainActor () -> Bool = { true }) {
+        if var front = touchdownFront, front.key == capture.key, CACurrentMediaTime() - front.at < Self.touchdownFrontLifetime {
+            if let image = front.image {
+                touchdownFront = nil
+                return begin(request: request, front: image, rect: rect, slidesLeft: slidesLeft, started: started, isValid: isValid)
+            }
+            // Still capturing: take that capture over rather than starting the same one again.
+            clear()
+            let cached = snapshots.cache.image(for: request.key)
+            prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: nil,
+                    requestMs: (CACurrentMediaTime() - started) * 1000)
+            let token = generation
+            front.arrived = { [weak self] image in
+                guard let self, self.generation == token, self.phase == .preparing else { return }
+                guard isValid() else { self.invalidate(); return }
+                self.updateTiming { $0.captureReadyMs = (CACurrentMediaTime() - started) * 1000 }
+                self.prepareIncoming(request, front: image, cached: cached, rect: rect, started: started, isValid: isValid)
+            }
+            touchdownFront = front
+            return
+        }
         cancel()
         let cached = snapshots.cache.image(for: request.key)
         prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: nil,
@@ -142,14 +219,12 @@ final class WorkspaceSwipePreview {
             switch result {
                 case .success(let snapshot):
                     self.updateTiming { $0.workerMs = snapshot.renderMs }
+                    // A slide already showing the cached image keeps it: replacing a full-screen
+                    // image mid-slide stalls the next frames while it uploads, and the fresh one
+                    // is cached for the next swipe. The fade at the end covers the difference.
                     if self.phase == .preparing {
                         self.phase.imageReady()
                         self.show(front: front, back: snapshot.image, rect: rect, started: started)
-                    } else {
-                        CATransaction.begin()
-                        CATransaction.setDisableActions(true)
-                        self.incoming?.contents = snapshot.image
-                        CATransaction.commit()
                     }
                 case .failure:
                     if self.phase == .preparing { self.cancel() }
@@ -267,18 +342,38 @@ final class WorkspaceSwipePreview {
             do { try await Task.sleep(for: .seconds(settlingDuration)) } catch { return }
             guard let self, self.generation == token else { return }
             self.phase.animationFinished()
+            if self.phase == .waitingForWorkspace { self.slideEndedAt = CACurrentMediaTime() }
             self.finishIfReady()
         }
     }
 
     func revealWorkspace() {
+        // How long the finished slide stood still waiting for the real workspace.
+        if phase == .waitingForWorkspace || phase == .waitingForAnimationAndWorkspace {
+            WorkspaceMotionDiagnostics.record("Swipe landing wait after slide",
+                milliseconds: slideEndedAt.map { (CACurrentMediaTime() - $0) * 1000 } ?? 0)
+        }
         phase.workspaceReady()
         finishIfReady()
     }
 
+    /// Real windows take over from the snapshots with a short fade rather than in one frame,
+    /// so whatever changed since the snapshots were taken does not flash.
     private func finishIfReady() {
-        if phase == .idle { cancel() }
+        guard phase == .idle else { return }
+        guard let panel, panel.isVisible else { return cancel() }
+        let token = generation
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = Self.handOffDuration
+            panel.animator().alphaValue = 0
+        }, completionHandler: { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, self.generation == token else { return }
+                self.cancel()
+            }
+        })
     }
+    static let handOffDuration = 0.08
 
     func invalidate() {
         cancel()
@@ -294,10 +389,24 @@ final class WorkspaceSwipePreview {
 
     func cancel() {
         snapshots.cancel()
+        touchdownFront = nil
+        clear()
+    }
+
+    /// Ends the presentation; a capture still running for the next swipe is left alone.
+    private func clear() {
+        slideEndedAt = nil
         generation += 1
         completion?.cancel(); completion = nil
         deadline?.cancel(); deadline = nil
         panel?.orderOut(nil)
+        if let panel {
+            // Replaces a hand-off fade still running, which would otherwise hide the next preview.
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0
+                panel.animator().alphaValue = 1
+            }
+        }
         // A reusable surface must never retain a previous workspace's pixels or animations.
         CATransaction.begin()
         CATransaction.setDisableActions(true)

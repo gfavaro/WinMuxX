@@ -122,7 +122,11 @@ private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessio
     if case .onWindowParkingDrift = new { return old }
     if case .onWindowParkingDrift = old { return new }
     func score(_ e: RefreshSessionEvent) -> Int {
-        (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
+        // Re-parking hidden windows after a wake has no other trigger, and it used to tie
+        // with (and lose to) the Space and mouse events that arrive right after a wake.
+        // From WinMux PR #30 by Ilya Kudravets.
+        (e.requiresHiddenWindowsReassertion ? 4 : 0) +
+            (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
     }
     return score(new) >= score(old) ? new : old
 }
@@ -134,6 +138,9 @@ func scheduleRefreshSession(
     recordsActivation: Bool = true,
 ) {
     runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
+    if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, nativeScrollingRelayoutEvents.contains(name) {
+        return runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling()
+    }
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
     guard isUnitTest || isWinMuxRuntimeReady else { return }
@@ -198,9 +205,22 @@ func scheduleRefreshSession(
     }
 }
 
+/// Scrolling events that change only the strip's offset or its in-memory tree, never which
+/// windows a desktop owns: native mode re-lays out showing scrolling desktops at once
+/// instead of waiting for a full observation read. Listed explicitly, not by name prefix.
+let nativeScrollingRelayoutEvents: Set<String> = [
+    "scrollingCenter", "scrollingGesture", "scrollingGestureCancelled", "scrollingGestureSettleFrame",
+    "scrollingGestureSettled", "scrollingMinimapSelection", "scrollingMove", "scrollingPin", "scrollingWidth",
+    "moveScrollingColumn", "moveWithinScrollingColumn", "resizeScrollingColumn", "joinScrolling",
+]
+
 @MainActor
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
                                optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
+    guard runtime.workspaceBackend.kind == .virtual else {
+        runtime.workspaceBackend.native.observation?.requestRead(event: "refresh")
+        return
+    }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -228,6 +248,7 @@ func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard
 func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
                        shouldSchedulePostRefresh: Bool = true,
                        body: @MainActor () async throws -> T) async throws -> T {
+    guard runtime.workspaceBackend.kind == .virtual else { return try await body() }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -473,6 +494,7 @@ struct RunSessionGuard: Sendable {
 
 @MainActor
 func refreshModel() {
+    guard runtime.workspaceBackend.capabilities.ownsWorkspaceLifecycle else { return }
     // Focus-only sessions skip AX enumeration, but must still free layout slots
     // for closed native windows. Hidden/minimized windows remain valid here.
     if !isUnitTest {
@@ -487,13 +509,15 @@ func refreshModel() {
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
+    if !isUnitTest { WorkspaceScrollingMinimap.shared.modelDidChange() }
     if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 
 @MainActor
 private func refresh() async throws {
     // Garbage collect terminated apps and windows before working with all windows
-    let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(frontmostAppBundleId: NSWorkspace.shared.frontmostApplication?.bundleIdentifier)
+    let mapping = try await MacApp.refreshAllAndGetAliveWindowIds(
+        frontmostAppBundleId: isLockScreenApp(NSWorkspace.shared.frontmostApplication) ? lockScreenAppBundleId : nil)
     let aliveWindowIds = mapping.values.flatMap { $0 }.toSet()
 
     for window in MacWindow.allWindows {
@@ -558,6 +582,23 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
     let invalidateNativeStateAppPid: pid_t? =
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
+        if destroyedWindowId != nil { windowLifecycleChanges.notify() }
+        // Both backends: a sheet appearing or going away changes what scrolling reveals.
+        if let emittingAppPid,
+           notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
+            notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {
+            for window in MacWindow.allWindows where window.macApp.pid == emittingAppPid {
+                window.invalidateScrollingSheetCache()
+            }
+        }
+        if runtime.workspaceBackend.kind == .native {
+            // A pan's own window moves must not revoke the permits it is streaming
+            // with; the pan reads once when it settles.
+            if NativeScrollingPan.shared.isPanning, nativePanIgnoresNotification(notif) { return }
+            runtime.workspaceBackend.native.writeAuthority.invalidate()
+            runtime.workspaceBackend.native.observation?.requestRead(event: "axWindowChange")
+            return
+        }
         if let destroyedWindowId {
             WindowBorderController.shared.remove(windowId: destroyedWindowId)
             (Window.get(byId: destroyedWindowId) as? MacWindow)?.garbageCollect(skipClosedWindowsCache: false)
@@ -567,6 +608,13 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         }
         if let invalidateNativeStateWindowId {
             Window.get(byId: invalidateNativeStateWindowId)?.invalidateLastKnownNativeState()
+            if notif == kAXWindowMiniaturizedNotification as String {
+                NotificationCenter.default.post(name: workspaceControlsWindowInvalidated, object: nil,
+                    userInfo: ["windowId": invalidateNativeStateWindowId])
+            } else if notif == kAXWindowDeminiaturizedNotification as String {
+                NotificationCenter.default.post(name: workspaceControlsWindowRestored, object: nil,
+                    userInfo: ["windowId": invalidateNativeStateWindowId])
+            }
         } else if let invalidateNativeStateAppPid {
             for window in MacWindow.allWindows where window.macApp.pid == invalidateNativeStateAppPid {
                 window.invalidateLastKnownNativeState()
@@ -579,6 +627,7 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
 
 @MainActor
 private func layoutWorkspaces() async throws {
+    guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return }
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
     let monitors = monitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]
@@ -670,7 +719,7 @@ private func observeAndRecordNativeFocusForSession() async throws -> (window: Wi
     try checkCancellation()
     if let nativeFocused { try await debugWindowsIfRecording(nativeFocused) }
     if observation.known {
-        await updateNativeFullscreenChromeSuppression(nativeFocused: nativeFocused)
+        updateNativeFullscreenChromeSuppression()
         updateFocusCache(nativeFocused)
     }
     try checkCancellation()

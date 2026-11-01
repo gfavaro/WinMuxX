@@ -1,3 +1,4 @@
+import Common
 import Foundation
 
 /// Window IDs and process IDs are reused. Never restore using an ID alone.
@@ -48,7 +49,7 @@ final class WindowRecoveryJournal {
     private let write: (Data, URL) throws -> Void
 
     init(url: URL, owner: RecoveryJournalOwner,
-         write: @escaping (Data, URL) throws -> Void = { try $0.write(to: $1, options: .atomic) },
+         write: @escaping (Data, URL) throws -> Void = { assertTestWriteIsTemporary($1); try $0.write(to: $1, options: .atomic) },
          isOwnerAlive: (RecoveryJournalOwner) -> Bool) {
         self.url = url
         self.owner = owner

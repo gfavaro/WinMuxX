@@ -12,7 +12,7 @@ public let shortcutSettingsWindowId = "\(winMuxAppName).shortcutSettings"
 @MainActor
 public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scene {
     SwiftUI.Window("WinMuxX Settings", id: shortcutSettingsWindowId) {
-        ShortcutSettingsView(model: model)
+        ShortcutSettingsWindowContent(model: model)
             .frame(minWidth: settingsWindowWidth,
                    minHeight: settingsWindowMinimumHeight, maxHeight: .infinity)
             .onAppear {
@@ -33,7 +33,10 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
 
 @MainActor
 public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
+    WorkspaceControlsPanelController.shared.dismiss()
     ShortcutSettingsModel.shared.reload()
+    ShortcutSettingsModel.shared.isWindowShown = true
+    _ = releaseSettingsPagesOnClose
     if let existingWindow = shortcutSettingsWindow() {
         presentShortcutSettingsWindow(existingWindow)
     } else {
@@ -42,6 +45,32 @@ public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
             if let createdWindow = shortcutSettingsWindow() {
                 presentShortcutSettingsWindow(createdWindow)
             }
+        }
+    }
+}
+
+/// SwiftUI keeps a closed Window scene, and it builds this one at launch even when
+/// Settings is never opened, so every page used to stay in memory for the app's life.
+@MainActor
+private let releaseSettingsPagesOnClose: Void = {
+    _ = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+        guard (note.object as? NSWindow)?.identifier?.rawValue == shortcutSettingsWindowId else { return }
+        MainActor.assumeIsolated { ShortcutSettingsModel.shared.isWindowShown = false }
+    }
+}()
+
+/// Holds the pages while the window is open. The rule and display editors live here so
+/// their unsaved edits outlast a close, like the other setting drafts.
+struct ShortcutSettingsWindowContent: View {
+    @ObservedObject var model: ShortcutSettingsModel
+    @StateObject private var displays = SettingsDisplaysModel()
+    @StateObject private var rules = SettingsWindowRulesModel()
+
+    var body: some View {
+        if model.isWindowShown {
+            ShortcutSettingsView(model: model, displays: displays, rules: rules)
+        } else {
+            Color.clear
         }
     }
 }
@@ -92,8 +121,8 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
 
 struct ShortcutSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
-    @StateObject private var displays = SettingsDisplaysModel()
-    @StateObject private var rules = SettingsWindowRulesModel()
+    @ObservedObject var displays: SettingsDisplaysModel
+    @ObservedObject var rules: SettingsWindowRulesModel
     @AppStorage("settings.selectedPage") private var storedPage = SettingsSidebarItem.general.rawValue
     @State private var shortcutSearch = ""
 
@@ -128,9 +157,15 @@ struct ShortcutSettingsView: View {
                     case .shortcuts:
                         ShortcutSettingsShortcutsView(model: model, query: $shortcutSearch)
                     case .workspaces:
-                        ShortcutSettingsWorkspacePane(model: model)
+                        VStack(spacing: 0) {
+                            NativeSpacesSettingsNote("WinMuxX is using macOS Spaces: workspace shortcuts switch to macOS desktop 1, 2, 3 and so on. Names, projects and persistent workspaces apply to WinMuxX workspaces.")
+                            ShortcutSettingsWorkspacePane(model: model)
+                        }
                     case .displays:
-                        SettingsDisplaysView(model: model, displays: displays, onGeneral: { selectedItem = .general })
+                        VStack(spacing: 0) {
+                            NativeSpacesSettingsNote("WinMuxX is using macOS Spaces: each display has its own desktops in Mission Control. Workspace assignments here apply to WinMuxX workspaces.")
+                            SettingsDisplaysView(model: model, displays: displays, onGeneral: { selectedItem = .general })
+                        }
                     case .windows:
                         ShortcutBehaviorSettingsView(model: model)
                     case .sidebar:
@@ -342,5 +377,20 @@ struct ShortcutRow: View {
             .frame(width: 160, height: 28)
         }
         .padding(.vertical, 6)
+    }
+}
+
+/// Explains, while macOS Spaces runs, which settings on a page apply only to WinMuxX workspaces.
+private struct NativeSpacesSettingsNote: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+
+    var body: some View {
+        if runtime.workspaceBackend.kind == .native {
+            Label(text, systemImage: "info.circle")
+                .font(.callout).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 20).padding(.top, 12)
+        }
     }
 }

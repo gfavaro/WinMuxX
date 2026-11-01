@@ -4,12 +4,22 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
+        await WorkspacePresentationController.shared.restorePendingFloatingFrames(in: self)
+        if WorkspacePresentationController.shared.preservesLayout(for: self) { return }
+        var pinIndicatorShown = false
+        defer { if !pinIndicatorShown { ScrollingPinIndicator.shared.hide(self) } }
         applyConfiguredLayout()
+        if runtime.workspaceBackend.kind == .native, !supportsNativeTiling {
+            throw NativeTilingUnsupportedLayout()
+        }
         normalizeMasterLayout()
         if isEffectivelyEmpty { return }
         let rect = workspaceTilingRect(self)
         let context = LayoutContext(self)
         if let tabGroup = rootTilingContainer.allTabbedContainersRecursive.first(where: \.hasFullscreenTab) {
+            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -21,6 +31,9 @@ extension Workspace {
             return
         }
         if let fullscreenWindow = rootTilingContainer.mostRecentWindowRecursive, fullscreenWindow.isFullscreen {
+            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -31,10 +44,96 @@ extension Workspace {
             try await fullscreenWindow.layoutFullscreen(context)
             return
         }
+        if arrangement == .master || arrangement == .scrolling {
+            lastAppliedLayoutPhysicalRect = rect
+            lastAppliedLayoutVirtualRect = rect
+            rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
+            rootTilingContainer.lastAppliedLayoutVirtualRect = rect
+            try await layoutWorkspaceGroups(in: rect, context)
+            ScrollingPinIndicator.shared.update(self, rect: rect, gaps: context.resolvedGaps)
+            pinIndicatorShown = true
+            for window in children.filterIsInstance(of: Window.self) {
+                window.lastAppliedLayoutPhysicalRect = nil
+                window.lastAppliedLayoutVirtualRect = nil
+                try await window.layoutFloatingWindow(context)
+            }
+            return
+        }
         // If monitors are aligned vertically and the monitor below has smaller width, then macOS may not allow the
         // window on the upper monitor to take full width. rect.height - 1 resolves this problem
         // But I also faced this problem in monitors horizontal configuration. ¯\_(ツ)_/¯
         try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, context)
+    }
+}
+
+struct NativeTilingUnsupportedLayout: Error, CustomStringConvertible {
+    var description: String { "Native tiling currently supports Dwindle/Master and non-overlapping tile groups; retained unsupported groups were not modified" }
+}
+
+extension Workspace {
+    @MainActor var supportsNativeTiling: Bool {
+        func supported(_ container: TilingContainer) -> Bool {
+            // Tabbed groups stack their tabs at one frame and Accordion overlaps them;
+            // either way the active window is raised, see raiseCoveredNativeTabs.
+            [.tiles, .dwindle, .tabGroup, .stacked].contains(container.layout) &&
+                container.children.allSatisfy {
+                guard let nested = $0 as? TilingContainer else { return true }
+                return supported(nested)
+            }
+        }
+        // Scrolling keeps out-of-view columns at the display edges, never parked in a corner.
+        return [.dwindle, .master, .scrolling].contains(arrangement) && masterStackLayout == .tiles && supported(rootTilingContainer)
+    }
+}
+
+@MainActor
+private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) async throws {
+    let workspace = context.workspace
+    if workspace.arrangement == .scrolling {
+        workspace.rebaseScrollingViewportIfNeeded(using: workspace.scrollingMetrics)
+        let metrics = workspace.scrollingMetrics
+        if !workspace.scrollingGestureMotionActive, let focused = focus.windowOrNil,
+           workspace.lastScrollingFocusWindowId != focused.windowId,
+           let column = metrics.columns.first(where: { $0.node === focused.topLevelWorkspaceGroup })
+        {
+            workspace.scrollingOffset = metrics.focusedOffset(for: column, current: workspace.scrollingOffset)
+            workspace.lastScrollingFocusWindowId = focused.windowId
+        }
+        workspace.scrollingOffset = metrics.clampedOffset(workspace.scrollingOffset)
+        if !workspace.scrollingGestureMotionActive, let window = focus.windowOrNil as? MacWindow,
+           window.nodeWorkspace === workspace,
+           let column = metrics.columns.first(where: { $0.node === window.topLevelWorkspaceGroup }) {
+            let epoch = workspace.scrollingSessionEpoch
+            let offsets = (try? await window.scrollingSheetOffsets()) ?? []
+            try checkCancellation()
+            if workspace.scrollingSessionEpoch == epoch, focus.windowOrNil === window {
+                let leafInset = (window.lastAppliedLayoutVirtualRect?.minX ?? 0) -
+                    (column.node.lastAppliedLayoutVirtualRect?.minX ?? 0)
+                let target = offsets.map(\.minX).min().flatMap { left in offsets.map(\.maxX).max().map { right in
+                    metrics.sheetRevealedOffset(start: column.start + leafInset + left,
+                        end: column.start + leafInset + right, current: workspace.scrollingOffset)
+                } }
+                let step = ScrollingSheetReveal.step(current: workspace.scrollingOffset, windowId: window.windowId,
+                    target: target, remembered: workspace.scrollingSheetReveal)
+                // Stored before the offset so the geometry's range already reaches it.
+                workspace.scrollingSheetReveal = step.remembered
+                workspace.scrollingOffset = step.remembered == nil ? metrics.clampedOffset(step.offset) : step.offset
+            }
+        }
+    }
+    let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
+    for frame in frames {
+        for window in frame.node.allLeafWindowsRecursive {
+            window.isConcealedByScrolling = workspace.arrangement == .scrolling && frame.node !== workspace.pinnedScrollingColumn &&
+                !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size)
+                    .intersects(workspace.scrollingMetrics.geometry.area)
+        }
+        try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
+                                             height: frame.physical.height, virtual: frame.virtual, context)
+    }
+    if workspace.arrangement == .scrolling {
+        workspace.captureScrollingViewportAnchor()
+        ScrollingWindowOrdering.shared.update(workspace: workspace, frames: frames)
     }
 }
 
@@ -66,7 +165,8 @@ extension TreeNode {
                         if !isFullscreenTab {
                             window.isFullscreen = false
                         }
-                        if window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
+                        let leftAlone = !window.isHiddenInCorner && frameRecoveryLeavesAlone(window, tile: physicalRect)
+                        if !leftAlone, window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
                             try await WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
                         }
                     }
@@ -116,6 +216,7 @@ private struct LayoutContext {
 extension Window {
     @MainActor
     fileprivate func layoutFloatingWindow(_ context: LayoutContext) async throws {
+        guard runtime.workspaceBackend.capabilities.arrangesFloatingWindows else { return }
         // A failed corner restoration must retry from its saved position, rather
         // than treating the still-parked native frame as a cross-display move.
         guard !isHiddenInCorner else { return }
@@ -172,11 +273,15 @@ extension TilingContainer {
     fileprivate func layoutTiles(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = tileChildFrames(in: rect, gaps: context.resolvedGaps)
-        if layout == .master, frames.count == 2, width > 0, height > 0 {
+        let selected = frameLayoutChildren
+        // While native Spaces hides a child, the frames are a projection: the stored weights
+        // still describe every child and stay as they are until all are shown again.
+        let complete = selected.count == children.count
+        if complete, layout == .master, frames.count == 2, width > 0, height > 0 {
             masterRatio = frames[0].weight / rect.getDimension(orientation)
         }
-        for (child, frame) in zip(children, frames) {
-            child.setWeight(orientation, frame.weight)
+        for (child, frame) in zip(selected, frames) {
+            if complete { child.setWeight(orientation, frame.weight) }
             let childVirtual = Rect(
                 topLeftX: frame.virtual.topLeftX + virtual.topLeftX - point.x,
                 topLeftY: frame.virtual.topLeftY + virtual.topLeftY - point.y,
@@ -190,7 +295,7 @@ extension TilingContainer {
     fileprivate func layoutDwindle(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = dwindleChildFrames(in: rect, gaps: context.resolvedGaps)
-        for (child, frame) in zip(children, frames) {
+        for (child, frame) in zip(frameLayoutChildren, frames) {
             let childVirtual = Rect(
                 topLeftX: virtual.topLeftX + frame.topLeftX - point.x,
                 topLeftY: virtual.topLeftY + frame.topLeftY - point.y,
@@ -227,7 +332,13 @@ extension TilingContainer {
                 context,
             )
             for child in children where child != activeChild {
-                try await child.hideTabbedWindows(context.workspace)
+                if runtime.workspaceBackend.kind == .native {
+                    // Native never parks windows: inactive tabs wait behind the active one.
+                    try await child.layoutRecursive(contentPoint, width: contentWidth, height: contentHeight,
+                        virtual: contentVirtual, context)
+                } else {
+                    try await child.hideTabbedWindows(context.workspace)
+                }
             }
             return
         }
@@ -280,11 +391,12 @@ extension TreeNode {
                 let minimum = window.minimumLayoutSize
                 return axis == .h ? minimum.width : minimum.height
             case .tilingContainer(let container):
+                let children = container.frameLayoutChildren
                 let rect = rect ?? container.lastAppliedLayoutPhysicalRect ?? container.nodeMonitor?.visibleRectPaddedByOuterGaps
                 if container.layout == .dwindle, let rect {
-                    return container.dwindleMinimumExtent(children: container.children[...], along: axis, rect: rect, gaps: gaps)
+                    return container.dwindleMinimumExtent(children: children[...], along: axis, rect: rect, gaps: gaps)
                 }
-                let minimums = container.children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
+                let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
                 guard !minimums.isEmpty else { return 0 }
                 if container.layout == .tabGroup || container.layout == .stacked {
                     if container.layout == .stacked {

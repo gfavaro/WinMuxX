@@ -52,7 +52,11 @@ final class TestWindow: Window, CustomStringConvertible {
         }
     }
 
-    @MainActor override func getAxSize() async throws -> CGSize? { _rect?.size }
+    @MainActor var sizeReader: (@MainActor () async throws -> CGSize?)?
+    @MainActor override func getAxSize() async throws -> CGSize? {
+        if let sizeReader { return try await sizeReader() }
+        return _rect?.size
+    }
 
     @MainActor override func getAxRect() async throws -> Rect? { // todo change to not Optional
         recordAuthoritativeActualRect(_rect)

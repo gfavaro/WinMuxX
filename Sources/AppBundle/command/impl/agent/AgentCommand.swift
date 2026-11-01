@@ -143,7 +143,9 @@ private let agentSkillText = """
     - `setPaneSize`: `{ "type": "setPaneSize", "pane": { "windowId": 123 }, "size": 0.8 }`
     - `setPaneSize` percent alt: `{ "type": "setPaneSize", "pane": { "tabGroupId": "tabgroup-123" }, "sizePercent": 80 }`
     - `setPaneSize` vertical split: `{ "type": "setPaneSize", "pane": { "windowId": 123 }, "axis": "vertical", "size": 0.75 }`
-    - `setWorkspaceLayout`: `{ "type": "setWorkspaceLayout", "layout": { "name": "1", "layout": { "kind": "window", "windowId": 123 } } }`
+    - `setWorkspaceLayout`: `{ "type": "setWorkspaceLayout", "layout": { "name": "1", "arrangement": "scrolling", "layout": { "kind": "window", "windowId": 123 } } }`
+
+    `setWorkspaceLayout.arrangement` optionally selects `dwindle`, `master`, or `scrolling`; omitted arrangement retains the existing workspace mode. Nested groups remain separate from the arrangement.
 
     For a small change, the `edit` object in the queried file should look like this. Keep the rest of the queried file unchanged:
     ```json

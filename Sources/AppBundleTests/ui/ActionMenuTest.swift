@@ -65,6 +65,11 @@ final class ActionMenuTest: XCTestCase {
         let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
         XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Toggle Floating" }).keyEquivalent, "t")
+        for arrangement in WorkspaceLayoutName.allCases {
+            let item = try XCTUnwrap(layout.items.first { $0.title == arrangement.rawValue.capitalized })
+            XCTAssertNotNil(item.image, "\(arrangement) shows its picture")
+            XCTAssertEqual(item.state, focus.workspace.arrangement == arrangement ? .on : .off)
+        }
         for title in ["Tiles", "Tabbed", "Accordion", "Horizontal", "Vertical"] {
             let item = try XCTUnwrap(layout.items.first { $0.title == title })
             XCTAssertEqual(item.title, title)
@@ -79,7 +84,7 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
-        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Reload Config", "Enabled", "Settings…", "Quit WinMuxX"] {
+        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes", "Workspace Controls…", "Reload Config", "Enabled", "Settings…", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
         XCTAssertFalse(titles.contains("Mode: main"))
@@ -287,6 +292,18 @@ final class ActionMenuTest: XCTestCase {
         configUrl = projectRoot.appendingPathComponent("missing-\(UUID().uuidString).toml")
         let report = await buildDiagnosticsReport()
         XCTAssertTrue(report.contains("file is missing"))
+    }
+
+    func testBothBackendsReportWhatTheInstallerChecks() async {
+        let virtual = await buildDiagnosticsReport()
+        runtime.workspaceBackend.selectForStartup(.native, nativeTilingEnabled: true)
+        let native = await buildDiagnosticsReport()
+        XCTAssertTrue(native.contains("Native Spaces"))
+        for report in [virtual, native] {
+            XCTAssertTrue(report.contains("  accessibility: "))
+            XCTAssertTrue(report.contains("  screen capture: "))
+            XCTAssertTrue(report.contains("loaded: \(configUrl.path)"))
+        }
     }
 
     func testWorkspaceMenuIsScopedToActiveProject() {

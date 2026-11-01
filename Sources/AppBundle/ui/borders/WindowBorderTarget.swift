@@ -14,6 +14,7 @@ struct WindowBorderTarget: Equatable {
 
 @MainActor
 func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorderTarget? {
+    guard !window.isConcealedByScrolling || window.nodeWorkspace?.arrangement != .scrolling else { return nil }
     let ordinary = WindowBorderTarget(frame: nativeFrame,
         corners: .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius()))
     guard let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior else { return ordinary }

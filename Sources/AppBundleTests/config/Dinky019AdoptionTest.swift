@@ -92,22 +92,22 @@ final class Dinky019AdoptionTest: XCTestCase {
         XCTAssertTrue(parseConfig("on-display-changed = 'exec-and-forget echo $WINMUX_DISPLAYS'").errors.isEmpty)
     }
 
-    func testDisplayLayoutsInheritBaseAndPickMostSpecificPattern() throws {
+    func testWorkspaceArrangementsInheritBaseAndPickMostSpecificPattern() throws {
         let (main, external) = displays()
         let parsed = parseConfig("""
             [workspace.1]
             layout = 'dwindle'
             orientation = 'horizontal'
             [workspace.1.display.'Samsung']
-            layout = 'tiles'
+            layout = 'scrolling'
             [workspace.1.display.'Samsung Ultra']
-            layout = 'accordion'
+            layout = 'master'
             orientation = 'vertical'
             """)
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
         let rule = try XCTUnwrap(parsed.config.workspaceLayouts["1"])
         XCTAssertEqual(rule.settings(on: main), WorkspaceLayoutSettings(layout: .dwindle, orientation: .horizontal))
-        XCTAssertEqual(rule.settings(on: external), WorkspaceLayoutSettings(layout: .stacked, orientation: .vertical))
+        XCTAssertEqual(rule.settings(on: external), WorkspaceLayoutSettings(layout: .master, orientation: .vertical))
         let partial = parseConfig("[workspace.1]\nlayout = 'dwindle'\n[workspace.1.display.secondary]\norientation = 'vertical'")
         XCTAssertEqual(partial.config.workspaceLayouts["1"]?.settings(on: external), WorkspaceLayoutSettings(layout: .dwindle, orientation: .vertical))
         for invalid in ["workspace = []", "[workspace.1]\nlayout = 'fixed'", "[workspace.1]\nrows = 2", "[workspace.1.display.'[']\nlayout = 'tiles'", "[workspace.1]\ndisplay = 5", "[workspace.1]\norientation = 'diagonal'"] {
@@ -121,27 +121,30 @@ final class Dinky019AdoptionTest: XCTestCase {
             [workspace.1]
             layout = 'dwindle'
             [workspace.1.display.'Samsung']
-            layout = 'accordion'
+            layout = 'master'
             """).config.workspaceLayouts
         let workspace = Workspace.get(byName: "1")
         _ = main.setActiveWorkspace(workspace)
         let window = TestWindow.new(id: 99002, parent: workspace.rootTilingContainer)
+        let initialGroupLayout = workspace.rootTilingContainer.layout
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.rootTilingContainer.layout, .dwindle)
+        XCTAssertEqual(workspace.rootTilingContainer.layout, initialGroupLayout)
+        XCTAssertEqual(workspace.arrangement, .dwindle)
         workspace.rootTilingContainer.layout = .tiles
         workspace.applyConfiguredLayout()
         XCTAssertEqual(workspace.rootTilingContainer.layout, .tiles, "Manual layout survives refresh")
         XCTAssertEqual(workspace.workspaceMonitor.name, main.name)
         XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: external))
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(workspace.arrangement, .master)
         XCTAssertTrue(window.nodeWorkspace === workspace)
         XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: main))
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.rootTilingContainer.layout, .dwindle)
+        XCTAssertEqual(workspace.arrangement, .dwindle)
+        XCTAssertEqual(workspace.rootTilingContainer.layout, .tiles)
         config.workspaceLayouts = [:]
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.rootTilingContainer.layout, config.defaultRootContainerLayout)
+        XCTAssertEqual(workspace.arrangement, .dwindle)
     }
 
     func testCommandsSucceedAtAnEdgeButKeepExplicitFailAndFloatingErrors() async throws {
@@ -212,14 +215,14 @@ final class Dinky019AdoptionTest: XCTestCase {
     }
 
     func testGlobalLayoutReloadDoesNotOverrideExplicitWorkspacePolicy() {
-        config.workspaceLayouts = parseConfig("[workspace.1]\nlayout = 'tiles'\norientation = 'vertical'").config.workspaceLayouts
+        config.workspaceLayouts = parseConfig("[workspace.1]\nlayout = 'scrolling'\norientation = 'vertical'").config.workspaceLayouts
         let workspace = Workspace.get(byName: "1")
         workspace.applyConfiguredLayout()
         config.defaultRootContainerLayout = .dwindle
         _ = applyDwindleToExistingTiledWorkspaces()
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.rootTilingContainer.layout, .tiles)
-        XCTAssertEqual(workspace.rootTilingContainer.orientation, .v)
+        XCTAssertEqual(workspace.arrangement, .scrolling)
+        XCTAssertEqual(workspace.rootTilingContainer.orientation, .h)
     }
 
     func testSettledDisplayHookSurvivesCoalescingIntoAnotherNativeEvent() async throws {

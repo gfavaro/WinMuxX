@@ -37,6 +37,9 @@ def differences(before, after):
 
 
 class NativeOperations:
+    # The running app's config; relaunching keeps it, so a native-mode install stays native.
+    config_path = None
+
     def run(self, *args):
         return subprocess.check_output([str(a) for a in args], text=True, stderr=subprocess.PIPE, timeout=30)
 
@@ -73,6 +76,7 @@ class NativeOperations:
         if not path:
             raise RuntimeError('Could not resolve active config path')
         self.cli('reload-config', '--dry-run', '--no-gui')
+        self.config_path = path
         return {'path': path, 'sha256': hashlib.sha256(Path(path).read_bytes()).hexdigest()}
 
     def snapshot(self):
@@ -128,7 +132,7 @@ class NativeOperations:
         self.metadata(APP)
 
     def launch(self):
-        self.run('open', APP)
+        self.run('open', APP, *(['--args', '--config-path', self.config_path] if self.config_path else []))
 
     def rollback(self, archive, expected):
         with tempfile.TemporaryDirectory() as directory:
@@ -262,6 +266,10 @@ class Installer:
             return self.status('needs_review', reason='window_assignments', differences=delta, after=current)
         if self.ops.locked():
             return self.status('installed_pending_validation', reason='session_locked')
+        before = self.report['before']
+        # Startup focus that settled back where it was is not a user's change.
+        if focus_changed and (current['focus'], current['focused_window']) == (before['focus'], before['focused_window']):
+            focus_changed = False
         if restore and not focus_changed:
             try:
                 self.ops.restore(self.report['before'], current)
@@ -298,6 +306,7 @@ def main():
     try:
         if args.resume or args.rollback:
             installer.report = json.loads(report_path.read_text())
+            installer.ops.config_path = installer.report.get('config', {}).get('path')
             if args.resume:
                 result = installer.verify()
             elif installer.ops.locked():

@@ -7,6 +7,7 @@ import Foundation
 final class WinMuxRuntime {
     let configuration: ConfigurationState
     var workspaces = WinMuxWorkspaceState()
+    let workspaceBackend = WorkspaceBackendState()
     let focus = WorkspaceFocusState()
     let nativeFocus = NativeFocusState()
     let displays = MonitorState()
@@ -19,6 +20,7 @@ final class WinMuxRuntime {
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
         configuration = ConfigurationState(value: config, url: configURL)
+        workspaceBackend.selectForStartup(config.workspaceBackend, nativeTilingEnabled: config.nativeSpaces.tilingEnabled)
     }
 
     private static var process = WinMuxRuntime()
@@ -48,6 +50,7 @@ final class WinMuxRuntime {
         precondition(bound == nil, "Replace the fixture outside a scoped runtime binding")
         process.hotkeys.modeSession.invalidate()
         process.refresh.invalidate()
+        process.workspaceBackend.stop()
         process.recovery.reset()
         process.displays.displayChangeTask?.cancel()
         process.configuration.reloadScheduler?.cancelPending()

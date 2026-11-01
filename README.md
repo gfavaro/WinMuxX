@@ -180,8 +180,10 @@ reduce the mandatory system reservation.
 
 Settings → Appearance → Menu bar offers Icon or Workspace. Workspace follows the
 focused monitor and shows the label initial, or the workspace number when there
-is no label. Icon supports color or monochrome appearance. Both open the same
-native action menu. Settings saves these choices to TOML:
+is no label. Icon supports color or monochrome appearance. Clicking the status
+item opens the native action menu. Choose **Workspace Controls…** to open the
+optional visual panel.
+Settings saves these choices to TOML:
 
 ```toml
 [menu-bar]
@@ -209,21 +211,34 @@ extra container operations, utilities and maintenance tools stay in Settings or 
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
 
+The optional **Workspace Controls…** panel shows the current workspace, project, display, applied group
+frames, and controls for arrangement, floating, fullscreen, scrolling width, and
+fit issues. It uses the displayed workspace's current frames, so opening it does not
+change scrolling position. Choose **More Actions…** to return to the full menu.
+
+Use `presentation [on|off|toggle] [--window-id <id>]` to enlarge one visible,
+managed window over a dark backdrop. The command has no default key binding.
+The target stays above the opaque nonactivating backdrop, and WinMuxX keeps the
+workspace's groups, tabs, and scrolling position intact. Escape, clicking the
+backdrop, switching focus on the same display, or changing the layout ends the
+session and restores the window's prior tiled or floating placement.
+
 Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,
 and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).
 
 Dinky 0.20 adaptations add optional master layout / `swap-with-master`,
 app-activation exclusions, browser overlay filtering, and original-frame restoration
-on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md). In master
-mode, `layout tiles accordion` toggles only the stack from any tiled window;
-`workspace-layout dwindle` returns the workspace to its splitting tree.
+on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md) for the
+historical adoption notes. Current Master and Scrolling modes arrange each existing
+top-level group as a whole, preserving its nested splits and tabs. Group layout
+commands continue to affect their own group; `workspace-layout dwindle` restores
+the workspace's default arrangement mode.
 
-Dinky 0.21 command separation uses `workspace-layout dwindle master` to toggle
-workspace modes; `layout` only changes containers or floating/tiling. Existing
-`layout dwindle` and `layout master` bindings must be migrated. Three-option
-container cycles now visit every option, and `%{workspace-layout}` reports the
-workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
+Dinky 0.21 command separation uses `workspace-layout dwindle master scrolling`
+to select workspace modes; `layout` changes container layouts or floating/tiling.
+Three-option container cycles visit every option, and `%{workspace-layout}` reports
+the workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
 
 Run `winmuxx doctor` to inspect the loaded config path, file validation, effective default layout,
 permissions, monitors, potentially conflicting window managers and per-app accessibility latency.
@@ -454,6 +469,8 @@ automatically-tile-new-windows = false
 
 This applies to windows discovered when WinMux starts and windows opened later. You can still tile an individual floating window with `winmux layout tiling` or the configured `layout floating tiling` shortcut.
 
+The WinMuxX menu bar actions **Always Float This App…** and **Create Floating Rule for This Window…** save an ordered `on-window-detected` rule in your configuration. Window rules run in file order; if an earlier stopping rule may match, WinMuxX opens the configuration for review instead of silently changing its behavior. Restored windows keep their saved placement.
+
 While dragging a window by its title bar, shake it horizontally to toggle between floating and tiling. The gesture requires several deliberate direction changes in quick succession, and does not activate during resize, sidebar, tab-strip, or tab-group drags. Disable it with:
 
 ```toml
@@ -546,8 +563,11 @@ Left Option then runs Option shortcuts; right Option remains available for typin
 Pressing both sides of a restricted modifier passes through too. Modifier-only tap
 bindings keep their explicitly configured sides. Accessibility access is required.
 
-Confirmed application minimum sizes persist across restarts. Use **Clear Saved
-Minimum Sizes…** in the menu to clear saved and current observations.
+Confirmed application minimum sizes persist across restarts. Settings → Windows
+lists each app and its known width and height; unknown axes are shown explicitly.
+Forget an app or all evidence there, or use **Clear Saved Minimum Sizes…** in the
+menu to clear saved and current observations. When an explicit resize reaches a
+confirmed app minimum, WinMuxX shows a brief nonactivating notice.
 
 ### Window search palette
 
@@ -597,17 +617,25 @@ The `show` and `hide` arguments are idempotent.
     three-finger-up = false # opt in after adjusting macOS Mission Control
 ```
 
-The optional three-finger upward gesture opens the overview. A three-finger
-downward gesture closes it whenever it is open, including when opened by command
+The optional three-finger upward gesture opens the overview. With **System Settings →
+Trackpad → More Gestures → Mission Control** on three fingers, macOS recognizes the
+swipe and WinMuxX opens its overview in place of Mission Control, so the gesture starts,
+ignores resting fingers and settles exactly as Mission Control's does. Mission Control
+stays on its keyboard shortcut and its own swipes still work while it is open. Three
+fingers down closes the overview; with the overview closed, down stays with macOS (App
+Exposé when enabled), as does the whole gesture when the overview gesture is off.
+Natural scrolling is read for each swipe. With Mission Control on four fingers or off,
+WinMuxX recognizes raw touches itself: all three fingers must
+move in the same direction to start it, reducing accidental triggers while a finger
+is resting. A three-finger downward gesture closes it whenever it is open, including when opened by command
 with the upward shortcut disabled. The overview follows your fingers while swiping
 up or down; reversing a short swipe returns it to its starting state. Release
 settles with your swipe velocity. Hidden overview surfaces are reused between openings;
-images and selection state are cleared on dismissal. Opening and closing share the workspace-swipe
-spring and `workspace-swipe.animation-duration-ms`. The overview uses the expanded
+images and selection state are cleared on dismissal. Opening and closing use a spring
+timed by `workspace-swipe.animation-duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
-animations skip motion. Assign macOS Mission Control to four fingers or disable its trackpad
-gesture first; WinMuxX does not change macOS settings. Horizontal workspace swipes
+animations skip motion. WinMuxX does not change macOS settings. Horizontal workspace swipes
 and the overview gesture can be enabled independently.
 
 Minimized windows, hidden apps, native full-screen windows and popups are excluded.
@@ -682,8 +710,8 @@ Tabbed for new groups created by dragging (`drag-stack-layout = 'accordion'` or
 
 ### Experimental workspace swipes
 
-**Settings → Windows → Workspace swipes — experimental** enables raw trackpad
-recognition. It is off by default:
+**Settings → Windows → Workspace swipes — experimental** enables three-finger
+workspace swipes. It is off by default:
 
 ```toml
 [workspace-swipe]
@@ -692,7 +720,23 @@ reverse-direction = false
 animation-duration-ms = 220
 ```
 
-Exactly three touching fingers moving horizontally select the next/previous existing
+When **System Settings → Trackpad → More Gestures → Swipe between full-screen
+applications** uses three fingers, macOS recognizes the swipe and WinMuxX acts on it,
+so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
+as in macOS. WinMuxX keeps the swipe from the Dock only when it switches a workspace:
+with no workspace that way, over a native full-screen app, while Mission Control is
+open or while WinMuxX is not taking swipes, macOS gets the swipe as usual. While a
+window drag or the workspace overview is in progress, the swipe does nothing, so
+macOS does not switch Spaces underneath. macOS's own release speed decides a flick: a
+quick flick switches after a little travel, and flicking back cancels even past
+halfway. Quick swipes chain: a swipe begun while the previous switch is still landing
+waits for it, then continues from the workspace it reached. Natural
+scrolling sets the direction as it does for Spaces. An event tap reads macOS's
+private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
+the Accessibility permission WinMuxX already has.
+
+With that setting on four fingers or off, WinMuxX recognizes raw touches itself:
+exactly three touching fingers moving horizontally select the next/previous existing
 workspace on the display under the pointer. Left means next, right means previous;
 reverse direction is optional. Navigation stays within that display and project,
 stops at either end, and never creates, moves or swaps workspaces.
@@ -706,11 +750,12 @@ extra/replaced contacts and invalid frames cancel it. Window dragging/resizing b
 Only snapshots move during the gesture; real workspace activation waits for release.
 The preview is clipped to the target display and leaves its sidebar fixed. Snapshot
 images are cached in memory (up to four images / 64 MiB), while fresh incoming
-images are prepared off the main thread. Cached content refreshes while dragging
-and freezes on release. A cold preview appears only if ready before release;
-otherwise navigation proceeds without a delayed animation. Incoming previews use
-windows' last visible positions. Perceptual settling defaults to 220 ms and follows
-the remaining distance; the spring can take longer to settle completely. Global animations,
+images are prepared off the main thread. A slide keeps the incoming image it started
+with; a fresh one is cached for the next swipe. A cold preview appears only if ready
+before release; otherwise navigation proceeds without a delayed animation. Incoming
+previews use windows' last visible positions. After release the slide carries on at
+your fingers' speed and slows to a stop, taking at most 220 ms scaled by the remaining
+distance (never less than 120 ms), then fades over 80 ms into the real windows. Global animations,
 Reduce Motion, a zero settle duration or missing Screen Recording access disable the
 visual preview while retaining release-to-switch navigation. Keyboard/mouse actions,
 disabling, sleep and display changes clear the preview. No screen images are saved.
@@ -724,8 +769,6 @@ the callback. Wake and device topology changes re-register the devices. Disable 
 feature to unregister the callbacks. The binding and recognizer are independently
 implemented; OmniWM's raw-touch architecture was reviewed as a reference.
 
-Set **System Settings → Trackpad → More Gestures → Swipe between full-screen apps**
-to four fingers or off so the native gesture does not run alongside WinMuxX. This
-backend does not change system preferences or suppress macOS gestures. Test in Safari,
-Ghostty and another app before keeping it enabled. Settings shows backend registration
-and the highest finger count detected; `winmuxx doctor` also reports received frames.
+Neither backend changes system preferences. Settings shows which backend is in use,
+its registration and the highest finger count detected; `winmuxx doctor` also reports
+received frames and the last macOS swipe's progress, velocity and outcome.

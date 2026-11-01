@@ -19,8 +19,8 @@ or discoverability issue rather than adding a second implementation.
 
 [HACKING](HACKING.md) describes setup, subsystem ownership, build commands and
 installation. [Fork maintenance](docs/FORK.md) describes branch targeting, app
-identity and upstream integration. Use `feat/*` from `main` for this fork;
-upstream contributions use `contrib/*` from `upstream/main`.
+identity and upstream integration. Commit fork work directly to `main` and push
+once `make check` passes; upstream contributions use `contrib/*` from `upstream/main`.
 
 For workspace and monitor changes, start with
 `Sources/AppBundle/tree/WorkspaceMonitorAssignment.swift`, the relevant command
@@ -56,8 +56,8 @@ ownership, layout retention, assignment constraints and recovery. Real two-displ
 checks should include moving back, different usable sizes, and disconnect/reconnect
 when affected. Do not claim those checks passed based on mocked monitors.
 
-A pull request should explain the problem, resulting behavior, validation and any
-remaining limitation. Update current guides when behavior or configuration changes.
+A commit message, or an upstream pull request, should explain the problem, resulting
+behavior, validation and any remaining limitation. Update current guides when behavior or configuration changes.
 Historical investigations in `docs/` provide context; current guides and the checked
 out implementation describe today's behavior.
 

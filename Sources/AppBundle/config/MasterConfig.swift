@@ -1,3 +1,4 @@
+import CoreGraphics
 import Common
 import TOMLKit
 
@@ -11,7 +12,12 @@ struct MasterConfig: ConvenienceCopyable, Equatable {
     var size = 0.6
     var side = MasterSide.left
     var stackLayout = Layout.tiles
+    /// Main windows side by side on a display at least twice as wide as tall.
+    var ultrawideMains = 1
 }
+
+/// A display this much wider than tall counts as ultrawide (21:9 is about 2.4).
+let ultrawideAspectRatio: CGFloat = 2
 
 func parseMaster(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ errors: inout [TomlParseError]) -> MasterConfig {
     parseTable(raw, MasterConfig(), [
@@ -21,6 +27,9 @@ func parseMaster(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ errors: 
         },
         "side": Parser(\.side) { raw, trace in
             parseString(raw, trace).flatMap { MasterSide(rawValue: $0).orFailure(.semantic(trace, "Expected left, right, top or bottom")) }
+        },
+        "ultrawide-mains": Parser(\.ultrawideMains) { raw, trace in
+            raw.int.orFailure(.semantic(trace, "Expected 1 or 2")).filter(.semantic(trace, "Expected 1 or 2")) { $0 == 1 || $0 == 2 }
         },
         "stack-layout": Parser(\.stackLayout) { raw, trace in
             parseString(raw, trace).flatMap { value in

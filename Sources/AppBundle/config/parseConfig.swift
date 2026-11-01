@@ -46,6 +46,8 @@ private let persistentWorkspacesKey = "persistent-workspaces"
 // 1. Does it make sense to have different value
 // 2. Prefer commands and commands flags over toml options if possible
 private let configParser: [String: any ParserProtocol<Config>] = [
+    "workspace-backend": Parser(\.workspaceBackend, parseWorkspaceBackend),
+    "native-spaces": Parser(\.nativeSpaces, parseNativeSpaces),
     "appearance": Parser(\.appearance) { raw, backtrace in
         parseString(raw, backtrace).flatMap {
             AppAppearance(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: system, light, dark"))
@@ -76,6 +78,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "enable-shake-to-toggle-tiling": Parser(\.enableShakeToToggleTiling, parseBool),
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
     "master": Parser(\.master, parseMaster),
+    "scrolling": Parser(\.scrolling, parseScrolling),
     "follow-app-activation": Parser(\.followAppActivation, parseFollowAppActivation),
     "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
@@ -108,6 +111,8 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "menu-bar": Parser(\.menuBar, parseMenuBar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
+    "dimming": Parser(\.dimming, parseDimming),
+    "hover-bar": Parser(\.hoverBar, parseHoverBar),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
     "animations": Parser(\.animations, parseAnimations),
     "workspace": Parser(\.workspaceLayouts, parseWorkspaceLayouts),
@@ -225,6 +230,14 @@ func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]
                 My recommendation: keep the normalizations enabled, and prefer 'join-with' over 'split'.
                 """,
             )]
+        }
+    }
+    if config.workspaceBackend == .native && config.nativeSpaces.tilingEnabled {
+        if config.defaultRootContainerLayout != .dwindle && config.defaultRootContainerLayout != .tiles && config.defaultRootContainerLayout != .master {
+            errors.append(.semantic(.rootKey("native-spaces"), "Native tiling currently supports Dwindle, Master and tiles; overlapping layouts are not enabled"))
+        }
+        if config.master.stackLayout != .tiles {
+            errors.append(.semantic(.rootKey("native-spaces"), "Native Master currently requires a tiles stack"))
         }
     }
     return (config, errors)

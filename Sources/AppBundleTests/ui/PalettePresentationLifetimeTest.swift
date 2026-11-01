@@ -74,4 +74,20 @@ final class PalettePresentationLifetimeTest: XCTestCase {
         XCTAssertFalse(panel.isPaletteActive)
         XCTAssertEqual(panel.ownedMonitorCount, 0)
     }
+
+    func testClosedPaletteKeepsRowsUntilTheHoldEndsAndReopeningCancelsIt() async throws {
+        let model = SwitcherPaletteModel()
+        let item = SwitcherPaletteItem(id: 7, title: "Kept", appName: "Fixture", icon: nil, workspaceName: "1", isFocused: false)
+        let panel = SwitcherPalettePanel(model: model, loadItems: { [item] }, nativePresentation: false,
+            heldContentLifetime: .milliseconds(60))
+        await panel.show()
+        panel.dismiss()
+        XCTAssertEqual(model.items.map(\.id), [7])
+        await panel.show() // Reopened in time: the pending release must not empty it.
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertEqual(model.items.map(\.id), [7])
+        panel.dismiss()
+        try await Task.sleep(for: .milliseconds(150))
+        XCTAssertTrue(model.items.isEmpty)
+    }
 }

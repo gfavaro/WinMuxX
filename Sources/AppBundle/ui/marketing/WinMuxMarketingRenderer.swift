@@ -792,11 +792,6 @@ private struct MarketingAppIcon: View {
     }
 }
 
-private enum MarketingWindowKind {
-    case code
-    case browser
-}
-
 /// Uses the production tab-group shell and tab-strip views around synthetic window content.
 
 

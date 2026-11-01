@@ -99,6 +99,10 @@ final class WindowMotion: NSObject {
 
     func apply(_ window: Window, target: CGRect) async throws {
         let target = windowMotionNativeTarget(target)
+        if !runtime.workspaceBackend.capabilities.animatesWindowMotion {
+            window.setAxFrame(target.origin, target.size)
+            return
+        }
         let snap = displayPolicy.shouldSnap(window.windowId)
         guard let window = window as? MacWindow else {
             window.setAxFrame(target.origin, target.size)
@@ -108,6 +112,11 @@ final class WindowMotion: NSObject {
         if window.isHiddenInCorner {
             cancel(id)
             _ = try await window.restoreFromCorner(to: target)
+            return
+        }
+        if window.nodeWorkspace?.scrollingGestureMotionActive == true {
+            cancel(id)
+            window.setScrollingGestureFrame(target)
             return
         }
         if snap {

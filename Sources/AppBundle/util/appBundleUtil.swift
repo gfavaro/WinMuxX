@@ -7,6 +7,23 @@ let signposter = OSSignposter(subsystem: winMuxAppId, category: .pointsOfInteres
 
 let myPid = NSRunningApplication.current.processIdentifier
 let lockScreenAppBundleId = "com.apple.loginwindow"
+private let lockScreenExecutablePath = "/System/Library/CoreServices/loginwindow.app/Contents/MacOS/loginwindow"
+
+/// Answered from the process's executable path. `bundleIdentifier` is a synchronous
+/// LaunchServices request whenever AppKit has dropped its cached answer, which it does after
+/// every app activation, and these checks run on every refresh and app notification.
+/// The answer is kept on the app object: AppKit also fetches `processIdentifier` again
+/// after an activation, and the same objects are asked about on every refresh.
+func isLockScreenApp(_ app: NSRunningApplication?) -> Bool {
+    guard let app else { return false }
+    if let known = objc_getAssociatedObject(app, &lockScreenAnswerKey) as? Bool { return known }
+    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard proc_pidpath(app.processIdentifier, &path, UInt32(path.count)) > 0 else { return false }
+    let answer = String(cString: path) == lockScreenExecutablePath
+    objc_setAssociatedObject(app, &lockScreenAnswerKey, answer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    return answer
+}
+nonisolated(unsafe) private var lockScreenAnswerKey: UInt8 = 0
 
 @MainActor
 private let terminationCoordinator = WindowTerminationCoordinator()
@@ -48,6 +65,12 @@ func initTerminationHandler() {
 
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
+        // Native windows were never parked; tiled ones go back to where they started.
+        if !runtime.workspaceBackend.capabilities.usesVirtualRecovery {
+            await stopNativeTilingAndRestoreFrames()
+            runtime.workspaceBackend.stop()
+            return
+        }
         await terminationCoordinator.run {
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()
@@ -95,6 +118,18 @@ func terminateApp() {
     NSApplication.shared.terminate(nil)
 }
 
+/// Quits, then opens the same bundle with the same arguments once this process has
+/// exited, so termination cleanup finishes before the new instance starts.
+@MainActor
+func relaunchApp() {
+    let relaunch = Process()
+    relaunch.executableURL = URL(fileURLWithPath: "/bin/sh")
+    relaunch.arguments = ["-c", "pid=$0; app=$1; shift; while kill -0 \"$pid\" 2>/dev/null; do sleep 0.2; done; exec /usr/bin/open -n \"$app\" --args \"$@\"",
+                          String(ProcessInfo.processInfo.processIdentifier), Bundle.main.bundlePath] + CommandLine.arguments.dropFirst()
+    do { try relaunch.run() } catch { NSLog("WinMux relaunch: %@", String(describing: error)); return }
+    terminateApp()
+}
+
 extension String {
     func copyToClipboard() {
         let pasteboard = NSPasteboard.general
@@ -135,10 +170,6 @@ extension CGPoint {
         guard let yRange = rect.minY.until(incl: rect.maxY - 1) else { return nil }
         return CGPoint(x: x.coerce(in: xRange), y: y.coerce(in: yRange))
     }
-
-    func addingXOffset(_ offset: CGFloat) -> CGPoint { CGPoint(x: x + offset, y: y) }
-    func addingYOffset(_ offset: CGFloat) -> CGPoint { CGPoint(x: x, y: y + offset) }
-    func addingOffset(_ orientation: Orientation, _ offset: CGFloat) -> CGPoint { orientation == .h ? addingXOffset(offset) : addingYOffset(offset) }
 
     func getProjection(_ orientation: Orientation) -> Double { orientation == .h ? x : y }
 

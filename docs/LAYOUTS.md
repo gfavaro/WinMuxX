@@ -20,6 +20,11 @@ in each mode. `swap-with-master` exchanges the selected pane with the master.
 `balance-sizes` resets split shares; it does not rebuild the tree. See
 [master settings](DINKY_020_ADOPTION.md#master-layout).
 
+On an ultrawide display (at least twice as wide as tall), `[master] ultrawide-mains = 2`
+puts the next window beside the main one, both full height, and stacks the rest in a
+narrow column for chat or mail. Two windows simply share the screen. The default, 1,
+keeps one main window everywhere; side `top` or `bottom` always does.
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another.

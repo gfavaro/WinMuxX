@@ -10,12 +10,11 @@ func buildWorkspaceSidebarModelState() async -> WorkspaceSidebarModelState {
         focusedMonitorScopeId: focusedMonitorScopeId,
     )
     let activeProjectId = currentFocus.workspace.projectId
-    let projects = buildWorkspaceSidebarProjectViewModels()
-    let workspaces = await buildWorkspaceSidebarWorkspaceViewModels(
-        currentFocus: currentFocus,
-        workspaceLabels: config.workspaceSidebar.workspaceLabels,
-        availableMonitors: availableMonitors,
-    )
+    // Native desktops have no projects: no pager, project menu or project swipe. This also
+    // keeps project materialization from creating virtual workspaces in native mode.
+    let projects = runtime.workspaceBackend.ui.hasProjects ? buildWorkspaceSidebarProjectViewModels() : []
+    let workspaces = await runtime.workspaceBackend.ui.sidebarWorkspaces(
+        currentFocus: currentFocus, labels: config.workspaceSidebar.workspaceLabels, monitors: availableMonitors)
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceSidebarResolvedPanelMonitor())
     return WorkspaceSidebarModelState(
         workspaces: workspaces,

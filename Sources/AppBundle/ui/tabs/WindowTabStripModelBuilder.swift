@@ -5,6 +5,8 @@ func buildWindowTabStripViewModelsFromChromeItems() async -> [WindowTabStripView
     var occlusionsByWorkspace: [String: [CGRect]] = [:]
     var strips: [WindowTabStripViewModel] = []
     for item in await buildWindowTabChromeItemsFromSource10Tree() {
+        if let window = Window.get(byId: item.activeWindowId), window.isConcealedByScrolling,
+           window.nodeWorkspace?.arrangement == .scrolling { continue }
         guard let groupFrame = item.visibleFrame else { continue }
         let occlusions = await cachedWindowTabOcclusions(
             workspaceName: item.workspaceName,

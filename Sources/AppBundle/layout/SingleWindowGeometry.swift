@@ -27,7 +27,7 @@ func singleWindowWidthTarget(in workspace: Workspace) -> Window? {
     guard windows.count == 1, let window = windows.first, !window.isFullscreen else { return nil }
     if workspace.windowWidthSettings.fullscreenWidth != nil { return window }
     // Compatibility for configs written before fullscreen-width.
-    guard workspace.rootTilingContainer.layout != .master else { return nil }
+    guard workspace.arrangement != .master else { return nil }
     let monitor = workspace.workspaceMonitor
     let ratio = config.singleWindowAspectRatio.getValue(for: monitor)
     guard ratio.isFinite, ratio > 0, monitor.rect.height > 0,

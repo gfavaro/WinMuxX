@@ -14,6 +14,7 @@ func movedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutableR
 
 @MainActor
 private func handleMovedEvent(windowId: UInt32?, notif: String) async {
+    if runtime.workspaceBackend.current.windowGeometryChanged(windowId, moved: true) { return }
     if let windowId, WindowMotion.shared.isAnimating(windowId), NSEvent.pressedMouseButtons & 1 == 0 {
         Window.get(byId: windowId)?.invalidateLastKnownNativeState()
         return
@@ -57,7 +58,7 @@ private func handleMovedEvent(windowId: UInt32?, notif: String) async {
     guard (try? await isManipulatedWithMouse(window)) == true else {
         moveWithMouseSessionWindowIdsInFlight.remove(windowId)
         moveWithMouseTrailingRerunWindowIds.remove(windowId)
-        scheduleRefreshSession(.ax(notif))
+        VirtualFrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
         return
     }
     Task {

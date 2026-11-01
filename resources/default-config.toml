@@ -166,6 +166,7 @@ on-mode-changed = []
     alt-shift-l = 'move right'
     alt-shift-t = 'layout floating tiling'
     alt-shift-m = 'fullscreen'
+    alt-ctrl-m = 'scrolling-minimap'
     cmd-shift-h = 'join-with left'
     cmd-shift-j = 'join-with down'
     cmd-shift-k = 'join-with up'

@@ -30,3 +30,31 @@ enum WorkspaceGestureAnimation {
         return Double(milliseconds) / 1000
     }
 }
+
+/// Scalar sampling for viewport motion. It uses the stiffness, mass and
+/// normalized initial velocity of the same critically damped spring used by
+/// workspace swipe and overview presentation.
+struct WorkspaceGestureScalarSpring {
+    let from: CGFloat
+    let to: CGFloat
+    let initialVelocity: CGFloat
+    let stiffness: CGFloat
+    let mass: CGFloat
+
+    init(from: CGFloat, to: CGFloat, animation: CASpringAnimation) {
+        self.from = from
+        self.to = to
+        self.initialVelocity = animation.initialVelocity * (to - from)
+        self.stiffness = max(animation.stiffness, 0.001)
+        self.mass = max(animation.mass, 0.001)
+    }
+
+    func value(at elapsed: TimeInterval) -> CGFloat {
+        let time = max(0, elapsed)
+        let omega = sqrt(stiffness / mass)
+        let distance = to - from
+        let a = -distance
+        let b = initialVelocity - omega * distance
+        return to + (a + b * time) * exp(-omega * time)
+    }
+}

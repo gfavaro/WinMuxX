@@ -14,6 +14,8 @@ public final class ShortcutSettingsModel: ObservableObject {
     @Published var workspaceMoveModifiers: NSEvent.ModifierFlags = defaultWorkspaceMoveModifiers
     @Published var workspaceOverrides: [WorkspaceOverride] = []
     @Published public var openRequestId: Int = 0
+    /// The settings pages exist only while their window is open; see ShortcutSettingsWindowContent.
+    @Published var isWindowShown = false
     @Published var failedSaveRevision: Int = 0
     @Published var settingsRevision: Int = 0
     @Published var savingSettingIDs: Set<String> = []

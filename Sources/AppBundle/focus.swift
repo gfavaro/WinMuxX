@@ -49,12 +49,6 @@ struct FrozenFocus: WinMuxAny, Equatable, Sendable {
     }
 
     @MainActor var live: LiveFocus { liveOrNil ?? mainMonitor.activeWorkspace.toLiveFocus() }
-
-    func replacingWorkspaceName(_ oldName: String, with newName: String) -> FrozenFocus {
-        workspaceName == oldName
-            ? FrozenFocus(windowId: windowId, workspaceName: newName, monitorId_oneBased: monitorId_oneBased)
-            : self
-    }
 }
 
 struct RefreshSessionFocusSnapshot: Sendable {
@@ -112,17 +106,6 @@ final class WorkspaceFocusState {
     var runningCallbacks = false
 }
 
-@MainActor
-func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
-    runtime.focus.requested = runtime.focus.requested.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.lastKnown = runtime.focus.lastKnown.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.previous = runtime.focus.previous?.replacingWorkspaceName(oldName, with: newName)
-    runtime.focus.previousPrevious = runtime.focus.previousPrevious?.replacingWorkspaceName(oldName, with: newName)
-    if _prevFocusedWorkspaceName == oldName {
-        _prevFocusedWorkspaceName = newName
-    }
-}
-
 /// Global focus.
 /// Commands must be cautious about accessing this property directly. There are legitimate cases.
 /// But, in general, commands must firstly check --window-id, --workspace, WINMUX_WINDOW_ID env and
@@ -132,11 +115,32 @@ func replaceWorkspaceNameInFocusState(oldName: String, newName: String) {
 /// Unlike derived live focus, this changes only when focus is explicitly assigned.
 @MainActor func captureRequestedFocus() -> FrozenFocus { runtime.focus.requested }
 
-@MainActor func setFocus(to newFocus: LiveFocus) -> Bool {
+enum FocusChangeOrigin: Equatable { case explicit, native }
+
+@MainActor func setFocus(to newFocus: LiveFocus, origin: FocusChangeOrigin = .explicit) -> Bool {
+    if runtime.workspaceBackend.kind == .native {
+        guard let snapshot = runtime.workspaceBackend.native.layouts.snapshot,
+              snapshot.displays.contains(where: { runtime.workspaceBackend.native.layouts.activeWorkspace(on: $0.identifier) === newFocus.workspace }),
+              newFocus.windowOrNil?.nativeLayoutEligible != false else { return false }
+        runtime.focus.requested = newFocus.frozen
+        if origin == .native { runtime.focus.lastKnown = newFocus.frozen }
+        newFocus.windowOrNil?.markAsMostRecentChild()
+        return true
+    }
+    WorkspacePresentationController.shared.cancelForFocusChange(to: newFocus)
+    if origin == .explicit {
+        ScrollingWindowOrdering.shared.cancel()
+        let interruptedMotion = WorkspaceScrollingGestureController.shared.isMotionActive
+        WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
+        if interruptedMotion { newFocus.workspace.lastScrollingFocusWindowId = nil }
+    } else if WorkspaceScrollingGestureController.shared.isMotionActive {
+        return false
+    }
     if runtime.focus.requested == newFocus.frozen {
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
     let oldFocus = focus
+    if oldFocus.workspace !== newFocus.workspace { WorkspaceScrollingMinimap.shared.dismiss() }
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     guard status else { return false }
 
@@ -272,6 +276,9 @@ extension Workspace {
         windowId: focus.windowOrNil?.windowId,
         workspace: focus.workspace.name,
     ))
+    var controlsUserInfo: [String: Any] = ["workspaceId": focus.workspace.id]
+    if let windowId = focus.windowOrNil?.windowId { controlsUserInfo["windowId"] = windowId }
+    NotificationCenter.default.post(name: workspaceControlsFocusChanged, object: nil, userInfo: controlsUserInfo)
     if config.onFocusChanged.isEmpty { return }
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     // todo potential optimization: don't run runSession if we are already in runSession
@@ -291,15 +298,19 @@ extension Workspace {
         workspace: newWorkspace,
         prevWorkspace: oldWorkspace,
     ))
-    if let exec = config.execOnWorkspaceChange.first {
-        let process = Process()
-        process.executableURL = URL(filePath: exec)
-        process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
-        var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
-        environment[WINMUX_FOCUSED_WORKSPACE] = newWorkspace
-        environment[WINMUX_PREV_WORKSPACE] = oldWorkspace
-        environment[WINMUX_WORKSPACE] = newWorkspace
-        process.environment = environment
-        _ = Result { try process.run() }
-    }
+    runExecOnWorkspaceChange(new: newWorkspace, previous: oldWorkspace)
+}
+
+/// `exec-on-workspace-change`, shared by both backends.
+@MainActor func runExecOnWorkspaceChange(new newWorkspace: String, previous oldWorkspace: String) {
+    guard let exec = config.execOnWorkspaceChange.first else { return }
+    let process = Process()
+    process.executableURL = URL(filePath: exec)
+    process.arguments = Array(config.execOnWorkspaceChange.dropFirst())
+    var environment = config.execConfig.envVariables + hookEnvironment(event: "focused-workspace-changed").asMap
+    environment[WINMUX_FOCUSED_WORKSPACE] = newWorkspace
+    environment[WINMUX_PREV_WORKSPACE] = oldWorkspace
+    environment[WINMUX_WORKSPACE] = newWorkspace
+    process.environment = environment
+    _ = Result { try process.run() }
 }

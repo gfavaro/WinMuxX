@@ -161,13 +161,21 @@ extension WorkspaceSidebarView {
     func finishProjectSwipeNavigation(to projectId: WorkspaceProjectId, direction: Int) {
         let startProjectId = projectSwipeStartProjectId
         let fullPageOffset = -CGFloat(direction) * max(projectPagerWidth, snapshot.configuration.expandedWidth, 1)
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
-            projectSwipeTranslation = fullPageOffset
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+        let finish = {
             guard projectSwipeStartProjectId == startProjectId else { return }
             actions.send(.selectProject(projectId))
             resetProjectSwipeWithoutAnimation()
+        }
+        if #available(macOS 14, *) {
+            // Switch when the page has slid out, not after a duration that only matches it.
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12), completionCriteria: .logicallyComplete) {
+                projectSwipeTranslation = fullPageOffset
+            } completion: { finish() }
+        } else {
+            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
+                projectSwipeTranslation = fullPageOffset
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: finish)
         }
     }
 

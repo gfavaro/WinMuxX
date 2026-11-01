@@ -2,16 +2,38 @@ import AppKit
 import Common
 import TOMLKit
 
+/// `layout = ...` in a workspace section: an arrangement, or one of the root container
+/// layouts these sections accepted before arrangements existed.
+enum WorkspaceLayoutSetting: Equatable {
+    case arrangement(WorkspaceLayoutName)
+    /// tiles, accordion or tab-group: the root's own layout under the Dwindle arrangement.
+    case rootLayout(Layout)
+}
+
 struct WorkspaceLayoutSettings: ConvenienceCopyable, Equatable {
-    var layout: Layout?
+    var layout: WorkspaceLayoutName?
     var orientation: DefaultContainerOrientation?
     var fullscreenWidth: Double?
     var singleWindowAlignment: SingleWindowAlignment?
+    var rootLayout: Layout?
+
+    var layoutSetting: WorkspaceLayoutSetting? {
+        get { rootLayout.map { .rootLayout($0) } ?? layout.map { .arrangement($0) } }
+        set {
+            switch newValue {
+                case .arrangement(let arrangement): layout = arrangement; rootLayout = nil
+                case .rootLayout(let root): layout = .dwindle; rootLayout = root
+                case nil: layout = nil; rootLayout = nil
+            }
+        }
+    }
 
     func overlaying(_ base: Self) -> Self {
-        Self(layout: layout ?? base.layout, orientation: orientation ?? base.orientation,
+        let inheritsLayout = layout == nil
+        return Self(layout: layout ?? base.layout, orientation: orientation ?? base.orientation,
              fullscreenWidth: fullscreenWidth ?? base.fullscreenWidth,
-             singleWindowAlignment: singleWindowAlignment ?? base.singleWindowAlignment)
+             singleWindowAlignment: singleWindowAlignment ?? base.singleWindowAlignment,
+             rootLayout: inheritsLayout ? base.rootLayout : rootLayout)
     }
 }
 
@@ -36,23 +58,26 @@ struct WorkspaceDisplayLayout {
 }
 
 private let workspaceLayoutParsers: [String: any ParserProtocol<WorkspaceLayoutSettings>] = [
-    "layout": Parser(\.layout, parseOptionalWorkspaceLayout),
+    "layout": Parser(\.layoutSetting, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.orientation, parseOptionalWorkspaceOrientation),
     "fullscreen-width": Parser(\.fullscreenWidth, parseFullscreenWidth),
     "single-window-alignment": Parser(\.singleWindowAlignment, parseOptionalSingleWindowAlignment),
 ]
 
 private let workspaceParsers: [String: any ParserProtocol<WorkspaceLayoutConfig>] = [
-    "layout": Parser(\.defaults.layout, parseOptionalWorkspaceLayout),
+    "layout": Parser(\.defaults.layoutSetting, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.defaults.orientation, parseOptionalWorkspaceOrientation),
     "fullscreen-width": Parser(\.defaults.fullscreenWidth, parseFullscreenWidth),
     "single-window-alignment": Parser(\.defaults.singleWindowAlignment, parseOptionalSingleWindowAlignment),
     "display": Parser(\.displays, parseWorkspaceDisplayLayouts),
 ]
 
-private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<Layout?> {
-    parseString(raw, trace).flatMap {
-        $0.parseLayout().map { Optional($0) }.orFailure(.semantic(trace, "Expected dwindle, master, tiles, accordion or tab-group"))
+private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<WorkspaceLayoutSetting?> {
+    parseString(raw, trace).flatMap { value in
+        if let arrangement = WorkspaceLayoutName(rawValue: value) { return .success(.arrangement(arrangement)) }
+        // Configs written before arrangements existed set the root layout here.
+        if let root = value.parseLayout(), [.tiles, .stacked, .tabGroup].contains(root) { return .success(.rootLayout(root)) }
+        return .failure(.semantic(trace, "Expected dwindle, master, scrolling, tiles, accordion or tab-group"))
     }
 }
 
@@ -114,28 +139,33 @@ extension Workspace {
         // Width/alignment policies must not reset a manually selected layout.
         let settings = resolved.flatMap { value -> WorkspaceLayoutSettings? in
             guard value.layout != nil || value.orientation != nil else { return nil }
-            return WorkspaceLayoutSettings(layout: value.layout ?? config.defaultRootContainerLayout,
-                                           orientation: value.orientation ?? config.defaultRootContainerOrientation)
+            return WorkspaceLayoutSettings(layout: value.layout,
+                                           orientation: value.orientation ?? config.defaultRootContainerOrientation,
+                                           rootLayout: value.rootLayout)
         }
         guard settings != lastConfiguredLayout else { return }
         let previous = lastConfiguredLayout
         lastConfiguredLayout = settings
         guard settings != nil || previous != nil else { return }
+        if previous?.layout != nil, settings?.layout == nil { transitionArrangement(to: .dwindle) }
         let root = rootTilingContainer
-        let layout = settings?.layout ?? config.defaultRootContainerLayout
         let orientation = settings?.orientation ?? config.defaultRootContainerOrientation
-        root.layout = layout
-        root.dwindleOrientation = switch orientation {
-            case .horizontal: .h
-            case .vertical: .v
-            case .auto: nil
+        if let layout = settings?.layout { transitionArrangement(to: layout) }
+        if let rootLayout = settings?.rootLayout { root.layout = rootLayout }
+        if arrangement == .dwindle {
+            root.dwindleOrientation = switch orientation {
+                case .horizontal: .h
+                case .vertical: .v
+                case .auto: nil
+            }
+            let axis: Orientation = switch orientation {
+                case .horizontal: .h
+                case .vertical: .v
+                case .auto: workspaceMonitor.visibleRectPaddedByOuterGaps.width >= workspaceMonitor.visibleRectPaddedByOuterGaps.height ? .h : .v
+            }
+            root.changeOrientation(axis)
         }
-        let axis: Orientation = switch orientation {
-            case .horizontal: .h
-            case .vertical: .v
-            case .auto: workspaceMonitor.visibleRectPaddedByOuterGaps.width >= workspaceMonitor.visibleRectPaddedByOuterGaps.height ? .h : .v
-        }
-        root.changeOrientation(axis)
         for window in allLeafWindowsRecursive { window.lastAppliedLayoutPhysicalRect = nil }
+        WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
     }
 }

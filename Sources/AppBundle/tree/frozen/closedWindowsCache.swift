@@ -1,4 +1,5 @@
 import AppKit
+import Common
 
 struct FrozenMonitor: Codable, Equatable, Sendable {
     let displayUUID: String?
@@ -33,6 +34,18 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let rootTilingNode: FrozenContainer
     let floatingWindows: [FrozenWindow]
     let macosUnconventionalWindows: [FrozenWindow]
+    let arrangement: WorkspaceLayoutName?
+    let preservesTopLevelGroups: Bool?
+    let scrollingOffset: CGFloat?
+    let scrollingAnchorIdentity: RestartWindowIdentity?
+    let scrollingAnchorFrozenID: UInt32?
+    let scrollingAnchorViewportPosition: CGFloat?
+    let masterGroupIndex: Int?
+    let masterRatio: CGFloat?
+    let masterStackLayout: Layout?
+    /// A window of the pinned scrolling column, and its side.
+    let scrollingPinnedFrozenID: UInt32?
+    let scrollingPinSide: ScrollingPinCmdArgs.Side?
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -43,6 +56,17 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         case rootTilingNode
         case floatingWindows
         case macosUnconventionalWindows
+        case arrangement
+        case preservesTopLevelGroups
+        case scrollingOffset
+        case scrollingAnchorIdentity
+        case scrollingAnchorFrozenID
+        case scrollingAnchorViewportPosition
+        case masterGroupIndex
+        case masterRatio
+        case masterStackLayout
+        case scrollingPinnedFrozenID
+        case scrollingPinSide
     }
 
     @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
@@ -51,6 +75,25 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         namingStyle = workspace.namingStyle
         displayIndex = workspace.usesAutomaticDisplayName ? automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focus.workspace) : nil
         monitor = FrozenMonitor(workspace.workspaceMonitor)
+        arrangement = workspace.arrangement
+        preservesTopLevelGroups = workspace.preservesTopLevelGroups
+        scrollingOffset = workspace.scrollingOffset
+        workspace.captureScrollingViewportAnchor()
+        let anchor = workspace.scrollingAnchorWindowId.flatMap(Window.get(byId:))
+        if let anchor {
+            scrollingAnchorIdentity = anchor.restartIdentity
+            scrollingAnchorFrozenID = anchor.windowId
+            scrollingAnchorViewportPosition = workspace.scrollingAnchorViewportPosition
+        } else {
+            scrollingAnchorIdentity = nil
+            scrollingAnchorFrozenID = nil
+            scrollingAnchorViewportPosition = nil
+        }
+        masterGroupIndex = workspace.masterGroupIndex
+        masterRatio = workspace.masterRatio
+        masterStackLayout = workspace.masterStackLayout
+        scrollingPinnedFrozenID = workspace.pinnedScrollingColumn?.mostRecentWindowRecursive?.windowId
+        scrollingPinSide = scrollingPinnedFrozenID == nil ? nil : workspace.scrollingPinSide
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -78,10 +121,22 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         rootTilingNode = try container.decode(FrozenContainer.self, forKey: .rootTilingNode)
         floatingWindows = try container.decode([FrozenWindow].self, forKey: .floatingWindows)
         macosUnconventionalWindows = try container.decode([FrozenWindow].self, forKey: .macosUnconventionalWindows)
+        arrangement = try container.decodeIfPresent(WorkspaceLayoutName.self, forKey: .arrangement)
+        preservesTopLevelGroups = try container.decodeIfPresent(Bool.self, forKey: .preservesTopLevelGroups)
+        scrollingOffset = try container.decodeIfPresent(CGFloat.self, forKey: .scrollingOffset)
+        scrollingAnchorIdentity = try container.decodeIfPresent(RestartWindowIdentity.self, forKey: .scrollingAnchorIdentity)
+        scrollingAnchorFrozenID = try container.decodeIfPresent(UInt32.self, forKey: .scrollingAnchorFrozenID)
+        scrollingAnchorViewportPosition = try container.decodeIfPresent(CGFloat.self, forKey: .scrollingAnchorViewportPosition)
+        masterGroupIndex = try container.decodeIfPresent(Int.self, forKey: .masterGroupIndex)
+        masterRatio = try container.decodeIfPresent(CGFloat.self, forKey: .masterRatio)
+        masterStackLayout = try container.decodeIfPresent(Layout.self, forKey: .masterStackLayout)
+        scrollingPinnedFrozenID = try container.decodeIfPresent(UInt32.self, forKey: .scrollingPinnedFrozenID)
+        scrollingPinSide = try container.decodeIfPresent(ScrollingPinCmdArgs.Side.self, forKey: .scrollingPinSide)
     }
 }
 
 @MainActor func cacheClosedWindowIfNeeded() {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     let frozenWorld = snapshotCurrentFrozenWorld()
     if frozenWorld.windowIds.isSubset(of: runtime.recovery.closedWindows.windowIds) {
         return // already cached
@@ -96,11 +151,13 @@ func replaceClosedWindowsCache(_ frozenWorld: FrozenWorld) {
 
 @MainActor
 func syncClosedWindowsCacheToCurrentWorld() {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     invalidateLateRestartTreeRestoration()
     runtime.recovery.closedWindows = snapshotCurrentFrozenWorld()
 }
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return false }
     // An empty cache is not a restoration: new-window rules must still run.
     guard !runtime.recovery.closedWindows.workspaces.isEmpty else { return false }
     return try await restoreFrozenWorldIfNeeded(runtime.recovery.closedWindows, newlyDetectedWindow: newlyDetectedWindow)
@@ -125,6 +182,11 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
 
     for frozenWorkspace in frozenWorld.workspaces {
         let workspace = Workspace.get(byName: frozenWorkspace.name)
+        workspace.arrangement = frozenWorkspace.arrangement ?? (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle)
+        workspace.preservesTopLevelGroups = (frozenWorkspace.preservesTopLevelGroups ?? false) || workspace.arrangement != .dwindle
+        workspace.scrollingOffset = frozenWorkspace.scrollingOffset ?? 0
+        workspace.masterRatio = frozenWorkspace.masterRatio
+        workspace.masterStackLayout = frozenWorkspace.masterStackLayout ?? .tiles
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex
@@ -148,6 +210,31 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
         restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST, windowsById: windowsById)
+        workspace.transitionArrangement(to: frozenWorkspace.arrangement ??
+            (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle))
+        if workspace.arrangement == .scrolling,
+           let position = frozenWorkspace.scrollingAnchorViewportPosition, position.isFinite,
+           let anchoredFrozen = resolveScrollingAnchor(in: frozenWorkspace, frozenWindows: frozenWindowById),
+           let anchoredWindow = windowsById[anchoredFrozen.id],
+           let column = workspace.scrollingMetrics.columns.first(where: { $0.node === anchoredWindow.topLevelWorkspaceGroup }) {
+            let metrics = workspace.scrollingMetrics
+            workspace.scrollingOffset = metrics.clampedOffset(column.start + column.width / 2 - position * metrics.areaWidth)
+            workspace.lastScrollingFocusWindowId = anchoredWindow.windowId
+        } else if workspace.arrangement == .scrolling,
+                  let fallback = workspace.mostRecentWorkspaceFocusableWindowRecursive,
+                  let column = workspace.scrollingMetrics.columns.first(where: { $0.node === fallback.topLevelWorkspaceGroup }) {
+            workspace.scrollingOffset = workspace.scrollingMetrics.revealedOffset(for: column, current: 0)
+            workspace.lastScrollingFocusWindowId = fallback.windowId
+        }
+        if let id = frozenWorkspace.scrollingPinnedFrozenID, let window = windowsById[id] {
+            workspace.scrollingPinnedNode = window.topLevelWorkspaceGroup
+            workspace.scrollingPinSide = frozenWorkspace.scrollingPinSide ?? .left
+        }
+        if frozenWorkspace.arrangement == nil, workspace.rootTilingContainer.layout == .master {
+            migrateLegacyMasterTree(workspace)
+        } else {
+            workspace.masterGroupIndex = frozenWorkspace.masterGroupIndex ?? 0
+        }
         for window in (potentialOrphans - workspace.rootTilingContainer.allLeafWindowsRecursive) {
             if matchedWindows == nil, let frozenWindow = frozenWindowById[window.windowId] {
                 if case .macos = frozenWindow.layoutReason {
@@ -179,7 +266,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
 
 @discardableResult
 @MainActor
-private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeNodeObject, index: Int, windowsById: [UInt32: Window]) -> Bool {
+func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeNodeObject, index: Int, windowsById: [UInt32: Window]) -> Bool {
     let container = TilingContainer(
         parent: parent,
         adaptiveWeight: frozenContainer.weight,
@@ -189,6 +276,7 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
     )
 
     container.isMasterStack = frozenContainer.isMasterStack ?? false
+    container.scrollingColumnWidth = frozenContainer.scrollingColumnWidth
     container.masterRatio = frozenContainer.masterRatio
     container.masterStackLayout = frozenContainer.masterStackLayout
     container.dwindleOrientation = frozenContainer.dwindleOrientation
@@ -213,6 +301,7 @@ private func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonL
 
 @MainActor
 func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
+    window.scrollingColumnWidth = frozenWindow.scrollingColumnWidth
     window.isFullscreen = frozenWindow.isFullscreen
     window.noOuterGapsInFullscreen = frozenWindow.noOuterGapsInFullscreen
     window.layoutReason = frozenWindow.layoutReason
@@ -222,13 +311,38 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
         window.workspacePreviewFrame = valid
         window.preserveRestoredWorkspacePreview = true
     }
-    (window as? MacWindow)?.restoreLearnedMinimum(frozenWindow.learnedMinimumSize)
+    (window as? MacWindow)?.restoreLearnedMinimum(
+        frozenWindow.learnedMinimumSize,
+        savedBundleId: frozenWindow.minimumEvidenceBundleId,
+        generation: MinimumEvidenceGeneration(global: frozenWindow.minimumEvidenceGlobalGeneration,
+                                              app: frozenWindow.minimumEvidenceAppGeneration)
+    )
     if let size = frozenWindow.lastFloatingSize, validRestoredWindowSize(size) {
         window.lastFloatingSize = size
     }
     if let width = frozenWindow.singleWindowManualWidth, width.isFinite, width > 0 {
         window.singleWindowManualWidth = width
     }
+}
+
+@MainActor
+func migrateLegacyMasterTree(_ workspace: Workspace) {
+    let root = workspace.rootTilingContainer
+    guard root.layout == .master else { return }
+    workspace.masterRatio = root.masterRatio
+    let stack = root.children.compactMap { $0 as? TilingContainer }.first(where: \.isMasterStack)
+    if let stack {
+        let groups = stack.children
+        for group in groups {
+            group.unbindFromParent()
+            group.bind(to: root, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        }
+        stack.unbindFromParent()
+        workspace.masterStackLayout = root.masterStackLayout ?? .tiles
+    }
+    workspace.masterGroupIndex = 0
+    root.layout = .dwindle
+    root.isMasterStack = false
 }
 
 func validRestoredWindowSize(_ size: CGSize) -> Bool {
@@ -297,6 +411,17 @@ func collectFrozenWindows(_ frozenWorkspace: FrozenWorkspace) -> [UInt32: Frozen
     }
     collectFrozenWindowsRecursive(frozenWorkspace.rootTilingNode, result: &result)
     return result
+}
+
+private func resolveScrollingAnchor(in workspace: FrozenWorkspace, frozenWindows: [UInt32: FrozenWindow]) -> FrozenWindow? {
+    if let id = workspace.scrollingAnchorFrozenID, let exact = frozenWindows[id] { return exact }
+    guard let identity = workspace.scrollingAnchorIdentity else { return nil }
+    let saved = Array(frozenWindows.values)
+    let strengths = saved.map { $0.restartIdentity?.matchStrength(with: identity) ?? 0 }
+    guard let best = strengths.max(), best > 0 else { return nil }
+    let candidates = saved.indices.filter { strengths[$0] == best }
+    guard candidates.count == 1 else { return nil }
+    return saved[candidates[0]]
 }
 
 private func collectFrozenWindowsRecursive(_ frozenContainer: FrozenContainer, result: inout [UInt32: FrozenWindow]) {

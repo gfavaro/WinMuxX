@@ -2,9 +2,21 @@
 import AppKit
 import XCTest
 
+private func testContacts(_ a: Double, _ b: Double, _ c: Double) -> WorkspaceTouchContacts {
+    WorkspaceTouchContacts(first: .init(identifier: 1, y: a), second: .init(identifier: 2, y: b),
+                           third: .init(identifier: 3, y: c))
+}
+
 final class WorkspaceGestureRouterTest: XCTestCase {
+    func testOptionGestureIsReservedForScrollingOnlyInScrollingWorkspaces() {
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: false, scrollingEnabledAtStart: true), .workspaceSwipe)
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: true, scrollingEnabledAtStart: true), .scrolling)
+        XCTAssertEqual(WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: true, scrollingEnabledAtStart: false), .ignore)
+    }
+
     private func frame(_ x: Double = 0.5, _ y: Double = 0.5, fingers: Int = 3, device: UInt64 = 1, contacts: UInt64 = 123, time: Double = 1) -> WorkspaceTouchFrame {
-        .init(device: device, fingers: fingers, x: x, y: y, timestamp: time, contacts: contacts)
+        .init(device: device, fingers: fingers, x: x, y: y, timestamp: time, contacts: contacts,
+              touchContacts: fingers == 3 ? testContacts(y, y, y) : nil)
     }
     func testHorizontalSequenceRetainsOriginalAnchorAndAxis() throws {
         var router = WorkspaceGestureAxisRouter()
@@ -39,11 +51,67 @@ final class WorkspaceGestureRouterTest: XCTestCase {
         XCTAssertNil(router.route(frame(fingers: 4)))
         XCTAssertNil(router.route(frame(0.5, 0.8, time: 1.2)))
     }
+    func testInterruptedScrollingContactCannotRestartUntilFullLift() {
+        var gate = ScrollingGestureContactGate()
+        XCTAssertTrue(gate.allows(frame()))
+        gate.interrupt() // Explicit click/focus supersedes the captured offset.
+        XCTAssertFalse(gate.allows(frame(0.2, time: 1.1)))
+        XCTAssertFalse(gate.allows(frame(0.1, time: 1.2)))
+        XCTAssertFalse(gate.allows(frame(fingers: 2, time: 1.3)))
+        XCTAssertFalse(gate.allows(frame(fingers: 0, time: 1.4)))
+        XCTAssertTrue(gate.allows(frame(time: 2)))
+    }
     func testAmbiguousMovementDoesNotChooseAnAxis() {
         var router = WorkspaceGestureAxisRouter()
         _ = router.route(frame())
         XCTAssertNil(router.route(frame(0.56, 0.56, time: 1.1)))
         XCTAssertNil(router.route(frame(fingers: 0, time: 1.2)))
+    }
+
+    func testOverviewRequiresAllThreeContactsToMoveInTheSameDirection() {
+        for sign in [-1.0, 1.0] {
+            var router = WorkspaceGestureAxisRouter()
+            var start = frame(time: 1)
+            start.touchContacts = testContacts(0.5, 0.5, 0.5)
+            XCTAssertNil(router.route(start))
+            // Two fingers move a long way while a third remains nearly still.
+            var resting = frame(0.5, 0.5 + sign * 0.12, time: 1.1)
+            resting.touchContacts = testContacts(0.502, 0.5 + sign * 0.18, 0.5 + sign * 0.18)
+            XCTAssertNil(router.route(resting))
+            XCTAssertNil(router.axis)
+            // Once every contact moves together, the same sequence can start.
+            var moving = frame(0.5, 0.5 + sign * 0.13, time: 1.2)
+            moving.touchContacts = testContacts(0.5 + sign * 0.018, 0.5 + sign * 0.18, 0.5 + sign * 0.19)
+            XCTAssertEqual(router.route(moving)?.0, .vertical)
+            // Recognition stays locked through a reversal or an uneven finger.
+            moving.touchContacts = testContacts(0.5, 0.5, 0.5)
+            XCTAssertEqual(router.route(moving)?.0, .vertical)
+        }
+    }
+
+    func testOverviewRejectsMissingOrReplacedIndividualContacts() {
+        var router = WorkspaceGestureAxisRouter()
+        _ = router.route(frame())
+        var missing = frame(0.5, 0.7, time: 1.1)
+        missing.touchContacts = nil
+        XCTAssertNil(router.route(missing))
+        var replaced = frame(0.5, 0.7, time: 1.2)
+        replaced.touchContacts = .init(first: .init(identifier: 99, y: 0.7),
+                                       second: .init(identifier: 2, y: 0.7),
+                                       third: .init(identifier: 3, y: 0.7))
+        XCTAssertNil(router.route(replaced))
+        XCTAssertNil(router.axis)
+    }
+
+    func testOverviewRejectsEachPossibleRestingContact() {
+        for resting in 0..<3 {
+            var router = WorkspaceGestureAxisRouter()
+            _ = router.route(frame())
+            var sample = frame(0.5, 0.7, time: 1.1)
+            let ys = (0..<3).map { $0 == resting ? 0.5 : 0.8 }
+            sample.touchContacts = testContacts(ys[0], ys[1], ys[2])
+            XCTAssertNil(router.route(sample), "resting contact \(resting)")
+        }
     }
     func testTransformedVerticalRecognizerCommitsOnlyAtLiftAndRejectsReversal() {
         for reversed in [false, true] {
@@ -66,6 +134,24 @@ final class WorkspaceGestureRouterTest: XCTestCase {
 
 @MainActor
 final class WorkspaceGestureIntegrationTest: XCTestCase {
+    func testRestingFingerCannotOpenOverviewAndRealSwipeStillTracks() {
+        var open = false, updates: [Double] = []
+        let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },
+            overviewIsOpen: { open }, horizontal: { _ in XCTFail() }, show: { XCTFail() }, hide: { XCTFail() },
+            beginOverviewGesture: { _, progress in open = true; updates.append(progress); return true },
+            updateOverviewGesture: { updates.append($0) }, endOverviewGesture: { _, _ in }))
+        router.handle(frame())
+        var resting = frame(0.5, 0.7, time: 1.1)
+        resting.touchContacts = testContacts(0.5, 0.8, 0.8)
+        router.handle(resting)
+        XCTAssertFalse(open)
+        router.handle(frame(fingers: 0, time: 1.2))
+        router.handle(frame(time: 2))
+        router.handle(frame(0.5, 0.56, time: 2.1))
+        router.handle(frame(0.5, 0.7, time: 2.2))
+        XCTAssertTrue(open)
+        XCTAssertGreaterThan(updates.last ?? 0, updates.first ?? 1)
+    }
     func testInteractiveOpeningTracksBeforeLiftAndCommitsEvenThoughOverviewIsAlreadyOpen() {
         var open = false, progress: [Double] = [], endings: [Bool] = []
         let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },
@@ -98,6 +184,14 @@ final class WorkspaceGestureIntegrationTest: XCTestCase {
         XCTAssertEqual(endings, [false, false])
     }
 
+    func testRawTouchLeavesTheOverviewAloneWhileMacOSSwipesDriveIt() {
+        let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },
+            overviewIsOpen: { false }, horizontal: { _ in }, show: { XCTFail() }, hide: { XCTFail() },
+            beginOverviewGesture: { _, _ in XCTFail(); return true }, endOverviewGesture: { _, _ in XCTFail() },
+            verticalFromRawTouch: { false }))
+        for item in [frame(), frame(0.5, 0.56, time: 1.05), frame(0.5, 0.7, time: 1.1), frame(fingers: 0, time: 1.2)] { router.handle(item) }
+    }
+
     func testMotionDisabledFallbackStillCommitsOnRelease() {
         var open = false
         let router = WorkspaceGestureRouter(dependencies: .init(horizontalEnabled: { false }, overviewEnabled: { true },
@@ -109,7 +203,8 @@ final class WorkspaceGestureIntegrationTest: XCTestCase {
         XCTAssertTrue(open)
     }
     private func frame(_ x: Double = 0.5, _ y: Double = 0.5, fingers: Int = 3, time: Double = 1) -> WorkspaceTouchFrame {
-        .init(device: 1, fingers: fingers, x: x, y: y, timestamp: time, contacts: 123)
+        .init(device: 1, fingers: fingers, x: x, y: y, timestamp: time, contacts: 123,
+              touchContacts: fingers == 3 ? testContacts(y, y, y) : nil)
     }
     func testIndependentFeatureFlagsAndVerticalCommands() {
         for horizontal in [false, true] {

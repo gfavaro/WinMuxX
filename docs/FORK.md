@@ -10,8 +10,9 @@ validation is tracked in the roadmap.
 
 - `origin`: https://github.com/gfavaro/WinMuxX.git
 - `upstream`: https://github.com/ZimengXiong/WinMux.git
-- `main`: stable personal integration branch; never rebase or force-push it.
-- `feat/*`: personal feature branches, based on `main`.
+- `main`: where all fork work happens. Commit directly to it and push once
+  `make check` passes; there are no fork feature branches or pull requests. Never
+  rebase or force-push it.
 - `contrib/*`: clean upstream contributions, based on `upstream/main`.
 
 The existing six PR branches are preserved. Do not rebase or delete them while
@@ -20,10 +21,11 @@ conflict stops synchronization for manual resolution. If upstream squash-merges
 a contribution, check for duplicate or altered implementations during integration.
 
 ```sh
-git fetch upstream
-git switch -c feat/my-change main
-# For a contribution instead:
-git switch -c contrib/my-fix upstream/main
+git switch main && git pull --ff-only
+# ...commit, run make check, then:
+git push origin main
+# For an upstream contribution instead:
+git fetch upstream && git switch -c contrib/my-fix upstream/main
 ```
 
 ## App isolation

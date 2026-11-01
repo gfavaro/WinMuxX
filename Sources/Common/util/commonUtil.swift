@@ -187,10 +187,6 @@ public enum RefreshSessionEvent: Sendable, CustomStringConvertible {
     }
 }
 
-public func throwT<T>(_ error: Error) throws -> T {
-    throw error
-}
-
 public func getStringStacktrace() -> String { Thread.callStackSymbols.joined(separator: "\n") }
 
 @inlinable public func die(
@@ -285,4 +281,19 @@ public func allowOnlyCancellationError<T>(_ block: () async throws -> sending T)
     } catch {
         die("throws must only be used for CancellationError")
     }
+}
+
+/// Tests may write only temporary files. A write to user data (the config, window
+/// state, recovery journal, native layouts) during tests stops the run loudly
+/// instead of silently changing the developer's own setup.
+public func assertTestWriteIsTemporary(_ url: URL) {
+    guard isUnitTest, !isTemporaryPath(url) else { return }
+    die("A test tried to write outside the temporary directory: \(url.path)")
+}
+
+public func isTemporaryPath(_ url: URL) -> Bool {
+    let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+    return [NSTemporaryDirectory(), "/tmp/", "/private/tmp/", "/private/var/folders/"]
+        .map { URL(filePath: $0).standardizedFileURL.resolvingSymlinksInPath().path }
+        .contains { path.hasPrefix($0.hasSuffix("/") ? $0 : $0 + "/") }
 }

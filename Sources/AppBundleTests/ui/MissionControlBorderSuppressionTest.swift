@@ -1,5 +1,6 @@
 @testable import AppBundle
 import AppKit
+import PrivateApi
 import XCTest
 
 final class MissionControlBorderSuppressionTest: XCTestCase {
@@ -43,9 +44,10 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         let panel = try XCTUnwrap(NSApp.windows.first { $0.windowNumber == Int(border.windowId) })
         XCTAssertTrue(panel.ignoresMouseEvents)
         XCTAssertFalse(panel.canBecomeKey)
-        XCTAssertEqual(panel.frame.width, 104)
+        let pieces = border.windowIds.compactMap { id in NSApp.windows.first { $0.windowNumber == Int(id) }?.frame }
+        XCTAssertEqual(pieces.reduce(CGRect.null) { $0.union($1) }.width, 104)
         XCTAssertLessThan(panel.frame.height, 104)
-        XCTAssertEqual(border.windowIds.count, 4)
+        XCTAssertEqual(border.windowIds.count, Int(WINMUX_BORDER_PIECES))
         border.update(frame: frame.offsetBy(dx: 10, dy: 0), active: false, settings: settings)
         XCTAssertEqual(attempts, 1)
         XCTAssertEqual(panel.frame.minX, -19992)
@@ -63,12 +65,49 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         border.update(frame: frame, active: true, settings: settings)
         let outer = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
                            width: frame.width, height: frame.height).insetBy(dx: -4, dy: -4)
-        XCTAssertEqual(border.windowIds.count, 4)
+        XCTAssertEqual(border.windowIds.count, Int(WINMUX_BORDER_PIECES))
         for id in border.windowIds {
             let panel = try XCTUnwrap(NSApp.windows.first { $0.windowNumber == Int(id) })
             XCTAssertTrue(outer.contains(panel.frame))
             XCTAssertEqual(panel.constrainFrameRect(panel.frame, to: NSScreen.main), panel.frame)
         }
+    }
+
+    @MainActor
+    func testRetargetedBorderKeepsItsNativeWindowsAndDrawsAgainstTheNewTarget() {
+        var creations = 0
+        var targets: [UInt32] = []
+        let border = WindowBorder(target: 1, createNativeBorder: { _, handle in
+            creations += 1
+            handle = OpaquePointer(bitPattern: 1)
+            return true
+        }, updateNativeBorder: { _, target, _, _, _, _, _, _ in
+            targets.append(target)
+            return true
+        }, destroyNativeBorder: { _ in })
+        var settings = WindowBordersConfig()
+        settings.width = 2
+        let frame = CGRect(x: -20000, y: -20000, width: 100, height: 100)
+        border.update(frame: frame, active: true, settings: settings)
+        border.retarget(2).update(frame: frame.insetBy(dx: 10, dy: 10), active: true, settings: settings)
+        XCTAssertEqual(creations, 1)
+        XCTAssertEqual(targets, [1, 2])
+        XCTAssertEqual(border.target, 2)
+    }
+
+    @MainActor
+    func testHiddenFallbackBorderShowsTheSamePanelsForItsNextWindow() throws {
+        var settings = WindowBordersConfig()
+        settings.width = 2
+        let frame = CGRect(x: -20000, y: -20000, width: 100, height: 100)
+        let border = WindowBorder(target: 1, createNativeBorder: { _, _ in false })
+        defer { border.destroy() }
+        border.update(frame: frame, active: true, settings: settings)
+        let panels = border.windowIds
+        border.hide()
+        for id in panels { XCTAssertFalse(try XCTUnwrap(NSApp.window(withWindowNumber: Int(id))).isVisible) }
+        border.retarget(2).update(frame: frame, active: true, settings: settings)
+        XCTAssertEqual(border.windowIds, panels)
     }
 
     @MainActor
@@ -88,7 +127,7 @@ final class MissionControlBorderSuppressionTest: XCTestCase {
         border.update(frame: frame, active: true, settings: settings)
         XCTAssertEqual(destructions, 1)
         let fallbackIds = border.windowIds
-        XCTAssertEqual(fallbackIds.count, 4)
+        XCTAssertEqual(fallbackIds.count, Int(WINMUX_BORDER_PIECES))
         border.update(frame: frame.offsetBy(dx: 10, dy: 0), active: false, settings: settings)
         XCTAssertEqual(creations, 1)
         XCTAssertEqual(border.windowIds, fallbackIds)

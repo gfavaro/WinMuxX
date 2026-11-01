@@ -40,6 +40,8 @@ var defaultConfigUrl: URL {
 }
 
 struct Config: ConvenienceCopyable {
+    var workspaceBackend: WorkspaceBackendKind = .virtual
+    var nativeSpaces = NativeSpacesConfig()
     var appearance: AppAppearance = .system
     var configVersion: Int = 1
     var afterLoginCommand: [any Command] = []
@@ -57,6 +59,7 @@ struct Config: ConvenienceCopyable {
     var enableShakeToToggleTiling: Bool = true
     var focusFollowsMouse: Bool = false
     var master = MasterConfig()
+    var scrolling = ScrollingConfig()
     var followAppActivation = FollowAppActivationConfig()
     var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none
@@ -86,6 +89,8 @@ struct Config: ConvenienceCopyable {
     var menuBar = MenuBarConfig()
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
+    var dimming = DimmingConfig()
+    var hoverBar = HoverBarConfig()
     var animations = AnimationsConfig()
     var workspaceLayouts: [String: WorkspaceLayoutConfig] = [:]
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]

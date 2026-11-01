@@ -1,37 +1,11 @@
 import Common
 
-func automaticWorkspaceIndex(_ name: String) -> Int? {
-    Int(name)
-}
-
-func internalAutomaticWorkspaceIndex(_ name: String) -> Int? {
-    guard name.hasPrefix(internalAutomaticWorkspacePrefix) else { return nil }
-    let suffix = name.replacingOccurrences(of: internalAutomaticWorkspacePrefix, with: "")
-    return Int(suffix)
-}
-
 func lowestUnusedPositiveIndex(_ usedIndices: Set<Int>) -> Int {
     var candidate = 1
     while usedIndices.contains(candidate) {
         candidate += 1
     }
     return candidate
-}
-
-@MainActor
-func nextInternalAutomaticWorkspaceName() -> String {
-    let usedIndices = Set(runtime.workspaces.workspaceIdByName.keys.compactMap(internalAutomaticWorkspaceIndex))
-    return "\(internalAutomaticWorkspacePrefix)\(lowestUnusedPositiveIndex(usedIndices))"
-}
-
-@MainActor
-func nextAutomaticWorkspaceDisplayIndex(projectId: WorkspaceProjectId, monitor: Monitor) -> Int {
-    let usedIndices = orderedWorkspacesForPresentation()
-        .filter { $0.projectId == projectId }
-        .filter(\.usesAutomaticDisplayName)
-        .compactMap { automaticWorkspaceDisplayIndex($0, focusedWorkspace: nil) }
-        .toSet()
-    return lowestUnusedPositiveIndex(usedIndices)
 }
 
 @MainActor

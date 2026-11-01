@@ -3,6 +3,40 @@ import AppKit
 import XCTest
 
 final class LearnedWindowMinimumTest: XCTestCase {
+    @MainActor
+    func testPerAppForgetInvalidatesFrozenEvidenceAndPersistsGeneration() throws {
+        let suite = "LearnedWindowMinimumTest.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistedAppMinimums(defaults: defaults)
+        store.remember(CGSize(width: 800, height: 600), for: "com.example.one")
+        store.remember(CGSize(width: 900, height: 700), for: "com.example.two")
+        let stale = store.evidenceGeneration(for: "com.example.one")
+        store.forget("com.example.one")
+        XCTAssertFalse(store.acceptsEvidence(stale, for: "com.example.one", savedBundleId: "com.example.one"))
+        XCTAssertNil(store.size(for: "com.example.one"))
+        XCTAssertEqual(store.size(for: "com.example.two"), CGSize(width: 900, height: 700))
+
+        let restored = PersistedAppMinimums(defaults: defaults)
+        XCTAssertEqual(restored.evidenceGeneration(for: "com.example.one").app, 1)
+        XCTAssertFalse(restored.acceptsEvidence(stale, for: "com.example.one", savedBundleId: "com.example.one"))
+    }
+
+    @MainActor
+    func testGlobalForgetInvalidatesAllOldEvidenceAndSnapshotShowsUnknownAxes() throws {
+        let suite = "LearnedWindowMinimumTest.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = PersistedAppMinimums(defaults: defaults)
+        store.remember(CGSize(width: 720, height: 0), for: "com.example.one")
+        let evidence = store.evidenceGeneration(for: "com.example.one")
+        XCTAssertEqual(store.snapshot.first?.unknownAxes, ["height"])
+        store.forgetAll()
+        XCTAssertFalse(store.acceptsEvidence(evidence, for: "com.example.one", savedBundleId: "com.example.one"))
+        XCTAssertTrue(store.snapshot.isEmpty)
+        XCTAssertEqual(PersistedAppMinimums(defaults: defaults).evidenceGeneration(for: "com.example.one").global, 1)
+    }
+
     func testFullscreenMinimizedAndIntermediateAnimationFramesAreNotEvidence() {
         XCTAssertTrue(shouldLearnWindowMinimum(nativeFullscreen: false, nativeMinimized: false, animating: false))
         XCTAssertFalse(shouldLearnWindowMinimum(nativeFullscreen: true, nativeMinimized: false, animating: false))

@@ -23,11 +23,12 @@ and failure handling. Read [workspace examples](docs/WORKSPACE_BEHAVIOR.md) when
 selection or movement is affected. [Agent evaluation](docs/AGENT_EVALUATION.md)
 is only for an explicitly requested model/guidance trial, not routine work.
 
-The current backend parks hidden windows. Native Spaces migration remains an
-exploration, not an approved implementation plan. Treat dated adoption documents
-as historical scope and validate their assumptions against current code and the
-requested change.
+The default backend uses WinMuxX workspaces and parks hidden windows. An
+experimental native Spaces backend is opt-in ([native Spaces](docs/NATIVE_SPACES.md));
+keep virtual behavior working and validate native changes separately. Treat dated
+adoption documents as historical scope and validate their assumptions against
+current code and the requested change.
 
 Use the checks specified in CONTRIBUTING and report native manual validation
 separately. Preserve the fork's configuration, bundle/signing identity and recovery
-data; follow [fork maintenance](docs/FORK.md) for branches and installation.
+data; follow [fork maintenance](docs/FORK.md) for the commit workflow and installation.

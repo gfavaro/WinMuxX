@@ -3,6 +3,20 @@ import Common
 extension CmdArgs {
     @MainActor
     func resolveTargetOrReportError(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
+        guard let target = resolveUncheckedTarget(env, io) else { return nil }
+        if runtime.workspaceBackend.kind == .native {
+            let layouts = runtime.workspaceBackend.native.layouts
+            guard let snapshot = layouts.snapshot,
+                  snapshot.displays.contains(where: { layouts.activeWorkspace(on: $0.identifier) === target.workspace }),
+                  target.windowOrNil?.nativeLayoutEligible != false else {
+                io.err("Native target is not an eligible window or active desktop")
+                return nil
+            }
+        }
+        return target
+    }
+
+    @MainActor func resolveUncheckedTarget(_ env: CmdEnv, _ io: CmdIo) -> LiveFocus? {
         // Flags
         if let windowId {
             if let wi = Window.get(byId: windowId) {
@@ -13,7 +27,7 @@ extension CmdArgs {
             }
         }
         if let workspaceName {
-            guard let workspace = Workspace.existing(byName: workspaceName.raw),
+            guard let workspace = nativeAwareWorkspace(named: workspaceName.raw),
                   isUserFacingWorkspace(workspace, focusedWorkspace: focus.workspace)
             else {
                 io.err("Workspace '\(workspaceName.raw)' doesn't exist")
@@ -31,7 +45,7 @@ extension CmdArgs {
             }
         }
         if let wsName = env.workspaceName {
-            guard let workspace = Workspace.existing(byName: wsName),
+            guard let workspace = nativeAwareWorkspace(named: wsName),
                   isUserFacingWorkspace(workspace, focusedWorkspace: focus.workspace)
             else {
                 io.err("Workspace '\(wsName)' doesn't exist")
@@ -54,4 +68,10 @@ extension Window {
             return nil
         }
     }
+}
+
+/// Native desktops are also named by their number, as `workspace N` does.
+@MainActor
+private func nativeAwareWorkspace(named name: String) -> Workspace? {
+    runtime.workspaceBackend.current.workspace(named: name) ?? Workspace.existing(byName: name)
 }

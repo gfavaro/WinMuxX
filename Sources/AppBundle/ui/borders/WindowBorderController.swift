@@ -2,16 +2,27 @@ import AppKit
 import Common
 import PrivateApi
 import QuartzCore
+import NativeSpaces
 
 @MainActor
 final class WindowBorderController {
     static let shared = WindowBorderController()
     private var borders: [UInt32: WindowBorder] = [:]
+    /// Hidden borders of parked windows. Every switch parks the outgoing workspace's windows,
+    /// and the incoming ones reuse these instead of creating new WindowServer windows.
+    private var spareBorders: [WindowBorder] = []
+    private let spareBorderLimit = 4
+    /// Set once a border fell back to AppKit: the native renderer then fails for every border,
+    /// and each attempt created and drew WindowServer windows before failing.
+    private var nativeBordersUnavailable = false
     private var documentWindowCache: [UInt32: Bool] = [:]
     private var borderWindowIds = Set<UInt32>()
     private var watchedWindowIds = Set<UInt32>()
     private let nativeRefresh = NativeWindowRefreshScheduler()
     private var nativeBorderRefreshRequested = false
+    private var nativeRefreshTrigger: String?
+    /// False while every coalesced event only moved or reordered a managed window.
+    private var nativeRefreshNeedsScan = false
     private var movingBorders = WindowBorderMotionTracking()
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
@@ -25,6 +36,7 @@ final class WindowBorderController {
     func setEnabled(_ enabled: Bool) {
         nativeRefresh.cancel()
         nativeBorderRefreshRequested = false
+        nativeRefreshTrigger = nil
         if enabled {
             // Native events were ignored while disabled; re-observe before
             // motion/swipes consult the cached Mission Control state.
@@ -32,6 +44,9 @@ final class WindowBorderController {
         } else {
             missionControlState = MissionControlBorderState()
             clear()
+            ScrollingPinIndicator.shared.hideAll()
+            InactiveWindowDimmer.shared.hide()
+            WindowHoverBar.shared.hide()
         }
     }
 
@@ -41,12 +56,15 @@ final class WindowBorderController {
             MainActor.assumeIsolated {
                 let controller = WindowBorderController.shared
                 // Our own reshape/order notifications cannot change Mission Control.
-                // Scanning every border transaction creates a geometry feedback storm.
+                // Scanning every border transaction creates a geometry feedback storm, and the
+                // dimmer, sidebar and swipe preview change on every refresh and slide.
                 guard TrayMenuModel.shared.isEnabled else { return }
-                if windowId != 0, controller.borderWindowIds.contains(windowId) { return }
+                if windowId != 0, controller.borderWindowIds.contains(windowId) || NSApp.window(withWindowNumber: Int(windowId)) != nil { return }
                 if [UInt32(723), 806, 807, 808].contains(event) {
                     WorkspaceTransitionDiagnostics.recordNativeEvent(event, windowId: windowId)
-                    HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
+                    if runtime.workspaceBackend.capabilities.parksInactiveWindows {
+                        HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
+                    }
                 }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),
@@ -57,12 +75,33 @@ final class WindowBorderController {
                 if MacWindow.allWindowsMap[windowId] != nil,
                    [UInt32(723), 806, 807, 808].contains(event) {
                     controller.nativeBorderRefreshRequested = true
+                } else {
+                    controller.nativeRefreshNeedsScan = true
+                }
+                if controller.nativeRefreshTrigger == nil {
+                    controller.nativeRefreshTrigger = windowId == 0 ? "space"
+                        : controller.missionControlWindowIds.contains(windowId) ? "Mission Control window"
+                        : MacWindow.allWindowsMap[windowId] != nil ? "managed window" : "other window"
                 }
                 controller.nativeRefresh.request { [weak controller] in
                     guard let controller, TrayMenuModel.shared.isEnabled else { return }
                     let refreshBorders = controller.nativeBorderRefreshRequested
+                    let trigger = controller.nativeRefreshTrigger ?? "other window"
+                    let scan = controller.nativeRefreshNeedsScan
                     controller.nativeBorderRefreshRequested = false
-                    controller.missionControlChanged(refreshBorders: refreshBorders)
+                    controller.nativeRefreshTrigger = nil
+                    controller.nativeRefreshNeedsScan = false
+                    let start = CACurrentMediaTime()
+                    if scan || controller.missionControlState.active {
+                        controller.missionControlChanged(refreshBorders: refreshBorders)
+                        WorkspaceMotionDiagnostics.record("Window scan after \(trigger) event", milliseconds: (CACurrentMediaTime() - start) * 1000)
+                    } else {
+                        // Moving a managed window cannot open Mission Control: only its border needs
+                        // the new frames. Every switch moves the parked and revealed windows, and
+                        // listing every window waited for WindowServer through each slide.
+                        controller.refresh(onScreenFrames: onScreenWindowFrames(controller.borderCandidateWindowIds))
+                        WorkspaceMotionDiagnostics.record("Border refresh after managed window event", milliseconds: (CACurrentMediaTime() - start) * 1000)
+                    }
                 }
             }
         }) {
@@ -75,11 +114,12 @@ final class WindowBorderController {
         guard !isUnitTest else { return }
         // Include ordered-out windows so exit notifications are subscribed too.
         let all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
-        var bundles: [pid_t: String] = [:]
+        // Runs after every WindowServer window event; only Mission Control's owner matters.
+        var bundles: [pid_t: String?] = [:]
         func bundleIdentifier(_ pid: pid_t) -> String? {
-            if let bundle = bundles[pid] { return bundle.isEmpty ? nil : bundle }
-            let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier
-            bundles[pid] = bundle ?? ""
+            if let bundle = bundles[pid] { return bundle }
+            let bundle = NativeSpaceTransitionGuard.windowManagerBundleIdentifier(pid)
+            bundles[pid] = bundle
             return bundle
         }
         let ids = Set(all.compactMap { entry -> UInt32? in
@@ -112,6 +152,9 @@ final class WindowBorderController {
 
     func windowGeometryChanged(_ windowId: UInt32) {
         guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
+        // Borders are hidden during a native pan; redrawing each moved window's
+        // border would take most of the main thread.
+        guard !NativeScrollingPan.shared.isPanning else { return }
         refreshMovingBorder(windowId)
         // Poll only the moving window between notifications, which can arrive well
         // after the WindowServer has already moved the content.
@@ -139,26 +182,48 @@ final class WindowBorderController {
         border.update(frame: target.frame, active: focus.windowOrNil?.windowId == windowId,
             settings: config.windowBorders, corners: target.corners)
     }
-    func refresh(nativeSnapshot: [[String: Any]]? = nil) {
+    private var borderCandidateWindowIds: [UInt32] {
+        Workspace.all.filter(\.isVisible).flatMap { $0.allLeafWindowsRecursive.map(\.windowId) }
+    }
+
+    /// `onScreenFrames` holds the on-screen frames of the visible workspaces' windows, read without
+    /// listing every window; Mission Control is then known not to be showing.
+    func refresh(nativeSnapshot: [[String: Any]]? = nil, onScreenFrames: [UInt32: CGRect]? = nil) {
         guard !isUnitTest else { return }
         synchronizeNativeWindowSubscriptions()
-        guard !missionControlState.active else { clear(); return }
+        var chromeAllowed = false
+        defer { InactiveWindowDimmer.shared.refresh(chromeAllowed: chromeAllowed) }
+        // Dimming stays through a pan; only borders wait for it to settle.
+        chromeAllowed = !missionControlState.active
+        guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
         let settings = config.windowBorders
-        guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0, !shouldSuppressChromeForNativeFullscreenContent else { clear(); return }
-        let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
-        guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size }, bundleIdentifierForPID: { NSRunningApplication(processIdentifier: $0)?.bundleIdentifier }) else { clear(); return }
-        var frames: [UInt32: CGRect] = [:]
-        for entry in native {
-            guard let number = entry[kCGWindowNumber as String] as? NSNumber,
-                  let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
-                  let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
-            frames[number.uint32Value] = frame
+        guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0 else { clear(); return }
+        var frames = onScreenFrames ?? [:]
+        if onScreenFrames == nil {
+            let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
+            guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size },
+                bundleIdentifierForPID: NativeSpaceTransitionGuard.windowManagerBundleIdentifier) else {
+                chromeAllowed = false
+                clear()
+                return
+            }
+            for entry in native {
+                guard let number = entry[kCGWindowNumber as String] as? NSNumber,
+                      let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+                      let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
+                frames[number.uint32Value] = frame
+            }
         }
         var visible = Set<UInt32>()
-        for workspace in Workspace.all where workspace.isVisible {
+        // A border whose window left the screen moves to the next window that needs one: creating
+        // a border makes new WindowServer windows, and a workspace switch replaces every border.
+        let onVisibleWorkspaces = Set(borderCandidateWindowIds)
+        var reusable = borders.keys.filter { !onVisibleWorkspaces.contains($0) }
+        for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
             for window in workspace.allLeafWindowsRecursive {
+                if WorkspacePresentationController.shared.suppressesChrome(for: window) { continue }
                 if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
-                guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen,
+                guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen, !window.isInactiveWindowTab,
                       let snapshot = frames[window.windowId], snapshot.width > 0, snapshot.height > 0 else { continue }
                 guard isBorderEligibleDocument(window.windowId) else { continue }
                 // Overview thumbnails can have transformed bounds; native bounds
@@ -168,28 +233,38 @@ final class WindowBorderController {
                 let frame = resolvedWindowBorderFrame(snapshot: snapshot, nativeFrame: hasNativeFrame ? nativeFrame : nil)
                 guard let target = windowBorderTarget(for: window, nativeFrame: frame) else { continue }
                 visible.insert(window.windowId)
-                let border = borders[window.windowId] ?? WindowBorder(target: window.windowId)
+                let border = borders[window.windowId]
+                    ?? (reusable.popLast().flatMap { borders.removeValue(forKey: $0) } ?? spareBorders.popLast())?.retarget(window.windowId)
+                    ?? (nativeBordersUnavailable ? WindowBorder(target: window.windowId, createNativeBorder: { _, _ in false }) : WindowBorder(target: window.windowId))
                 borders[window.windowId] = border
                 border.update(frame: target.frame, active: focus.windowOrNil?.windowId == window.windowId,
                     settings: settings, corners: target.corners)
+                if !border.usesNativeBackend { nativeBordersUnavailable = true }
             }
         }
         for id in Array(borders.keys) where !visible.contains(id) { borders.removeValue(forKey: id)?.destroy() }
-        borderWindowIds = Set(borders.values.flatMap(\.windowIds))
+        borderWindowIds = Set((borders.values + spareBorders).flatMap(\.windowIds))
     }
     func clear() {
         movingBorders = WindowBorderMotionTracking()
         DisplayRefreshDriver.shared.remove(owner: self)
-        borders.values.forEach { $0.destroy() }
+        (borders.values + spareBorders).forEach { $0.destroy() }
         borders.removeAll()
+        spareBorders.removeAll()
         borderWindowIds.removeAll()
         documentWindowCache.removeAll()
     }
     func remove(windowId: UInt32) {
         documentWindowCache.removeValue(forKey: windowId)
         if let border = borders.removeValue(forKey: windowId) {
-            borderWindowIds.subtract(border.windowIds)
-            border.destroy()
+            if spareBorders.count < spareBorderLimit {
+                // Its windows stay ours, so their notifications are still ignored.
+                border.hide()
+                spareBorders.append(border)
+            } else {
+                borderWindowIds.subtract(border.windowIds)
+                border.destroy()
+            }
         }
     }
 
@@ -239,7 +314,9 @@ func resolvedWindowBorderFrame(snapshot: CGRect, nativeFrame: CGRect?) -> CGRect
 
 @MainActor
 final class WindowBorder {
-    let target: UInt32
+    private(set) var target: UInt32
+    /// The window the native pieces were last ordered against.
+    private var placedTarget: UInt32?
     private var nativeID: OpaquePointer?
     private var frame: CGRect?
     private var geometry: WindowBorderGeometry?
@@ -252,11 +329,16 @@ final class WindowBorder {
     private let destroyNativeBorder: (OpaquePointer?) -> Void
 
     var windowIds: [UInt32] {
-        if let nativeID { return (0..<4).map { winmux_border_window_id(nativeID, Int32($0)) }.filter { $0 != 0 } }
+        if let nativeID { return (0..<Int(WINMUX_BORDER_PIECES)).map { winmux_border_window_id(nativeID, Int32($0)) }.filter { $0 != 0 } }
         return fallbackPanels.map { UInt32(max($0.windowNumber, 0)) }.filter { $0 != 0 }
     }
 
     var windowId: UInt32 { windowIds.first ?? 0 }
+
+    func retarget(_ target: UInt32) -> WindowBorder {
+        self.target = target
+        return self
+    }
     var usesNativeBackend: Bool { nativeID != nil }
 
     init(
@@ -277,12 +359,15 @@ final class WindowBorder {
     }
 
     func update(frame: CGRect, active: Bool, settings: WindowBordersConfig, corners: WindowBorderCornerRadii? = nil) {
+        let display = monitors.first { $0.rect.contains(CGPoint(x: frame.midX, y: frame.midY)) }
+            .map { CGRect(x: $0.rect.minX, y: $0.rect.minY, width: $0.rect.width, height: $0.rect.height) }
+        let onDisplay = windowBorderFrame(frame, width: CGFloat(settings.width), within: display)
         let nextCorners = corners ?? .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius())
-        var cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
-                                width: frame.width, height: frame.height)
+        var cocoaFrame = CGRect(x: onDisplay.minX, y: mainMonitor.height - onDisplay.maxY,
+                                width: onDisplay.width, height: onDisplay.height)
         let center = CGPoint(x: cocoaFrame.midX, y: cocoaFrame.midY)
         let nextScale = NSScreen.screens.first(where: { $0.frame.contains(center) })?.backingScaleFactor ?? 2
-        let frame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: nextScale)
+        let frame = pixelAlignedWindowBorderFrame(onDisplay, width: CGFloat(settings.width), scale: nextScale)
         cocoaFrame = CGRect(x: frame.minX, y: mainMonitor.height - frame.maxY,
             width: frame.width, height: frame.height)
         if !fallbackPanels.isEmpty {
@@ -303,7 +388,7 @@ final class WindowBorder {
             appearance = nil
         }
         let nextAppearance = Appearance(settings: settings, active: active)
-        if appearance == nextAppearance, self.frame == frame, self.corners == nextCorners { return }
+        if appearance == nextAppearance, self.frame == frame, self.corners == nextCorners, placedTarget == target { return }
         if appearance != nextAppearance || self.frame?.size != frame.size || self.corners != nextCorners {
             let radius = nextCorners.maximum
             let outerSize = frame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width)).size
@@ -326,6 +411,7 @@ final class WindowBorder {
         }
         self.frame = frame
         self.corners = nextCorners
+        placedTarget = target
     }
 
     private func borderGeometry(size: CGSize, corners: WindowBorderCornerRadii, width: CGFloat, scale: CGFloat) -> WindowBorderGeometry {
@@ -338,7 +424,7 @@ final class WindowBorder {
     }
 
     private func updateFallback(frame: CGRect, active: Bool, settings: WindowBordersConfig, scale: CGFloat, corners: WindowBorderCornerRadii) {
-        if fallbackPanels.isEmpty { fallbackPanels = (0..<4).map { _ in WindowBorderFallbackPanel() } }
+        if fallbackPanels.isEmpty { fallbackPanels = (0..<Int(WINMUX_BORDER_PIECES)).map { _ in WindowBorderFallbackPanel() } }
         let alignedFrame = pixelAlignedWindowBorderFrame(frame, width: CGFloat(settings.width), scale: scale)
         let outer = alignedFrame.insetBy(dx: -CGFloat(settings.width), dy: -CGFloat(settings.width))
         let radius = corners.maximum
@@ -347,6 +433,13 @@ final class WindowBorder {
             let piece = winmux_border_piece(outer.size, Float(radius), Float(settings.width), Float(scale), Int32(index))
             panel.update(outer: outer, piece: piece, radius: radius, path: path, windowId: target, active: active, settings: settings)
         }
+    }
+
+    /// Orders the border out but keeps its windows for the next target.
+    func hide() {
+        if let nativeID { winmux_border_hide(nativeID) }
+        fallbackPanels.forEach { $0.orderOut(nil) }
+        placedTarget = nil
     }
 
     func destroy() {
@@ -367,7 +460,8 @@ private struct Appearance: Equatable {
 }
 
 func isMissionControlVisible(_ windows: [[String: Any]], screenSizes: [CGSize], bundleIdentifierForPID: (pid_t) -> String?) -> Bool {
-    windows.contains { w in guard let p = (w[kCGWindowOwnerPID as String] as? NSNumber).map({ pid_t($0.int32Value) }), bundleIdentifierForPID(p) == "com.apple.WindowManager", let l = (w[kCGWindowLayer as String] as? NSNumber)?.intValue, l == 19, let b = w[kCGWindowBounds as String] as? NSDictionary, let f = CGRect(dictionaryRepresentation: b), f.width > 0, f.height > 0 else { return false }; return screenSizes.contains { abs($0.width - f.width) < 2 && abs($0.height - f.height) < 2 } }
+    NativeSpaceTransitionGuard.isMissionControlVisible(windows, screenSizes: screenSizes,
+        bundleIdentifierForPID: bundleIdentifierForPID)
 }
 
 // Public AppKit fallback when the private WindowServer renderer is unavailable.
@@ -402,7 +496,9 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
         let frame = CGRect(x: outer.minX + piece.minX, y: outer.maxY - piece.maxY,
             width: piece.width, height: piece.height)
         if self.frame != frame { setFrame(frame, display: false) }
-        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path !== path
+        // The path is rebuilt for every update: compared by identity it always differed, and
+        // every piece redrew on each focus or geometry refresh even when nothing changed.
+        let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path != path
         if geometryChanged || borderView.settings != settings || borderView.active != active {
             borderView.settings = settings
             borderView.active = active

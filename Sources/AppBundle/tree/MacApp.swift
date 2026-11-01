@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import PrivateApi
+import NativeSpaces
 
 // Potential alternative implementation
 // https://github.com/swiftlang/swift-evolution/blob/main/proposals/0392-custom-actor-executors.md
@@ -22,13 +23,17 @@ final class MacApp: AbstractApp {
     // prevents a late/stale AXWindows response from resurrecting a closed node.
     private let destroyedWindows: ThreadGuardedValue<[UInt32: AXUIElement]> = .init([:])
     private let animatedSizes: ThreadGuardedValue<[UInt32: (session: UUID, size: CGSize)]> = .init([:])
+    /// Gesture sessions whose window already passed the full native ownership check.
+    private let validatedSessions: ThreadGuardedValue<[UInt32: UUID]> = .init([:])
     private var windowsCount = 0
     var lastNativeFocusedWindowId: UInt32? = nil
     private var thread: Thread?
     private var setFrameJobs: [UInt32: RunLoopJob] = [:]
     @MainActor private static var focusJob: RunLoopJob? = nil
 
-    /*conforms*/ var name: String? { nsApp.localizedName }
+    /// Read once: after every app activation AppKit drops its cached answer and asks
+    /// LaunchServices again, and the menu bar and sidebar read every window's app name.
+    /*conforms*/ let name: String?
     /*conforms*/ var execPath: String? { nsApp.executableURL?.path }
     /*conforms*/ var bundlePath: String? { nsApp.bundleURL?.path }
 
@@ -45,6 +50,7 @@ final class MacApp: AbstractApp {
         self.axAppFastTimeout = .init(axAppFastTimeout)
         self.pid = nsApp.processIdentifier
         self.rawAppBundleId = nsApp.bundleIdentifier
+        self.name = nsApp.localizedName
         self.appId = nsApp.bundleIdentifier.flatMap { KnownBundleId.init(rawValue: $0) }
         assert(!axSubscriptions.isEmpty)
         self.appAxSubscriptions = .init(axSubscriptions)
@@ -56,15 +62,23 @@ final class MacApp: AbstractApp {
     static func getOrRegister(_ nsApp: NSRunningApplication) async throws -> MacApp? {
         // Don't perceive any of the lock screen windows as real windows
         // Otherwise, false positive ax notifications might trigger that lead to gcWindows
-        if nsApp.bundleIdentifier == lockScreenAppBundleId { return nil }
         let pid = nsApp.processIdentifier
         // AX requests crash if you send them to yourself
         if pid == myPid { return nil }
 
+        // A registered app was checked when it registered; only new ones need the lock screen check.
         if let existing = allAppsMap[pid] {
-            if !existing.nsApp.isTerminated, existing.nsApp.launchDate == nsApp.launchDate { return existing }
-            await existing.destroy()
+            switch appRegistrationDecision(existingTerminated: existing.nsApp.isTerminated,
+                                           sameProcess: isSameRunningProcess(existing.nsApp, nsApp),
+                                           incomingTerminated: { nsApp.isTerminated }) {
+                case .reuse: return existing
+                case .reject: return nil
+                case .replace: await existing.destroy()
+            }
+        } else if nsApp.isTerminated {
+            return nil
         }
+        if isLockScreenApp(nsApp) { return nil }
         try checkCancellation()
         if let wip = wipPids[pid] {
             try await wip.await()
@@ -149,6 +163,66 @@ final class MacApp: AbstractApp {
         } ?? false
     }
 
+    /// Whether a frame write could reach the window now, for `doctor`. A cached element counts only
+    /// if it still answers for this window. Unreachable means the app answered every lookup and none
+    /// was this window; the first lookup it does not answer ends the check as unknown, so a slow app
+    /// costs one timeout. The registered element keeps its operational timeout; only the fresh
+    /// copies read here use the shorter diagnostic one, because the timeout stays on an element.
+    func axWindowReachability(_ windowId: UInt32) async -> AxWindowReachability {
+        guard let thread else { return .appRetired }
+        let timeout = axDiagnosticTimeout
+        do {
+            return try await thread.runInLoop { [windows, axApp] job -> AxWindowReachability in
+                if let cached = windows.threadGuarded[windowId]?.ax {
+                    let (resolved, error) = cached.containingWindowIdWithError()
+                    if resolved == windowId { return .reachable }
+                    if error == .cannotComplete { return .unknown("the app did not answer") }
+                }
+                let unanswered = AxWindowReachability.unknown("the app did not answer")
+                for source in [kAXWindowsAttribute, kAXMainWindowAttribute, kAXFocusedWindowAttribute] {
+                    try job.checkCancellation()
+                    var raw: CFTypeRef?
+                    if AXUIElementCopyAttributeValue(axApp.threadGuarded, source as CFString, &raw) == .cannotComplete { return unanswered }
+                    let elements = (raw as? [AnyObject]) ?? raw.map { [$0 as AnyObject] } ?? []
+                    for element in elements where CFGetTypeID(element) == AXUIElementGetTypeID() {
+                        let (resolved, error) = (element as! AXUIElement).containingWindowIdWithError(timeout: timeout)
+                        if resolved == windowId { return .reachable }
+                        if error == .cannotComplete { return unanswered }
+                    }
+                }
+                return .unreachable
+            }
+        } catch {
+            return .unknown("the check was interrupted")
+        }
+    }
+
+
+    /// The app's raw AX window sources for `doctor`, before the window-id filter that
+    /// discovery applies, so an element that maps to no or another window id is visible.
+    func probeAxWindows(limit: Int = 12) async throws -> [AxWindowProbe] {
+        try await thread?.runInLoop { [axApp] job in
+            var result: [AxWindowProbe] = []
+            do {
+                // The app element keeps its operational timeout; window copies read here are fresh.
+                let listed = try diagnosticRead(axApp.threadGuarded, kAXWindowsAttribute, into: &result, source: "AXWindows")
+                let elements = (listed as? [AnyObject]) ?? []
+                if elements.count > limit { result.append(AxWindowProbe(source: "AXWindows", failure: "\(elements.count) windows, first \(limit) shown")) }
+                for (index, element) in elements.prefix(limit).enumerated() where CFGetTypeID(element) == AXUIElementGetTypeID() {
+                    try job.checkCancellation()
+                    result.append(try diagnosticProbe(element as! AXUIElement, "AXWindows[\(index)]"))
+                }
+                for (attribute, source) in [(kAXMainWindowAttribute, "AXMainWindow"), (kAXFocusedWindowAttribute, "AXFocusedWindow")] {
+                    let value = try diagnosticRead(axApp.threadGuarded, attribute, into: &result, source: source)
+                    if let value, CFGetTypeID(value) == AXUIElementGetTypeID() { result.append(try diagnosticProbe(value as! AXUIElement, source)) }
+                }
+            } catch {
+                result.append(AxWindowProbe(source: "probe", failure: "stopped: the app stopped answering"))
+            }
+            return result
+        } ?? []
+    }
+
     func getAxSize(_ windowId: UInt32) async throws -> CGSize? {
         try await withWindow(windowId) { window, job in
             window.get(Ax.sizeAttr)
@@ -206,10 +280,11 @@ final class MacApp: AbstractApp {
     @MainActor func nativeFocus(_ windowId: UInt32, forceRaise: Bool = false) {
         if serverArgs.isReadOnly || !TrayMenuModel.shared.isEnabled || WindowRecoveryController.shared.isTerminating { return }
         MacApp.focusJob?.cancel()
+        let validateNative = nativeFocusValidation(windowId)
         // Performance optimization. If possible avoid doing AX requests
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
         // Beware of the macOS bug: https://github.com/nikitabobko/WinMux/issues/101
-        let useActivationOnly = !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
+        let useActivationOnly = validateNative == nil && !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
             shouldUseActivationOnlyForNativeFocus(
                 targetWindowId: windowId,
                 lastNativeFocusedWindowId: lastNativeFocusedWindowId,
@@ -224,17 +299,37 @@ final class MacApp: AbstractApp {
         } else {
             MacApp.focusJob = withWindowAsync(windowId) { [nsApp, axApp] window, job in
                 try job.checkCancellation()
+                try validateNative?(window)
                 _ = measuredAXOperation(.axWrite, { AXUIElementSetAttributeValue(axApp.threadGuarded, kAXFocusedWindowAttribute as CFString, window) })
                 try job.checkCancellation()
                 // Raise firstly to make sure that by the time we activate the app, the window would be already on top
+                try validateNative?(window)
                 window.set(Ax.isMainAttr, true)
                 try job.checkCancellation()
+                try validateNative?(window)
                 let raiseError = measuredAXOperation(.axAction, { AXUIElementPerformAction(window, kAXRaiseAction as CFString) })
                 AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
                 try job.checkCancellation()
+                try validateNative?(window)
                 nsApp.activate(options: .activateIgnoringOtherApps)
             }
         }
+    }
+
+    /// Restack a window without setting main/focused attributes or activating its app.
+    @MainActor func raiseWithoutActivating(_ windowId: UInt32) async throws {
+        // A raise is an AX write too: in native mode it needs a live permit for the window.
+        let validate = nativeFrameValidation(windowId)
+        try await withWindow(windowId) { window, job in
+            try job.checkCancellation()
+            try validate?(window)
+            let error = measuredAXOperation(.axAction) { AXUIElementPerformAction(window, kAXRaiseAction as CFString) }
+            AXWindowOperation.current?.record(error, from: ObjectIdentifier(window))
+        }
+    }
+
+    @MainActor func cancelFrameWrite(_ windowId: UInt32) {
+        setFrameJobs.removeValue(forKey: windowId)?.cancel()
     }
 
     @MainActor static func cancelPendingFocus() {
@@ -248,13 +343,69 @@ final class MacApp: AbstractApp {
         setFrameJobs.removeAll()
     }
 
+    /// Whether native tiling currently grants writes to the window.
+    @MainActor
+    func hasNativeWriteGrant(_ windowID: UInt32) -> Bool {
+        guard let launched = nsApp.launchDate else { return false }
+        return runtime.workspaceBackend.native.writeAuthority.explicitFocusLease(windowID: windowID, pid: pid, processLaunchDate: launched) != nil
+    }
+
+    /// A short lease that keeps checking live ownership after tiling stops granting writes.
+    @MainActor
+    func nativeLeaseValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? { nativeFocusValidation(windowID) }
+
+    @MainActor
+    private func nativeFocusValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let lease = runtime.workspaceBackend.native.writeAuthority.explicitFocusLease(
+                windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { _ in throw NativeSpaceWriteError.revoked }
+        }
+        return { window in
+            try lease.check()
+            guard window.containingWindowId() == windowID,
+                  window.get(Ax.minimizedAttr) == false,
+                  window.get(Ax.isFullscreenAttr) == false else { throw NativeSpaceWriteError.liveOwnershipChanged }
+            try lease.check()
+        }
+    }
+
+    @MainActor
+    private func nativeFrameValidation(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let permit = runtime.workspaceBackend.native.writeAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { _ in throw NativeSpaceWriteError.revoked }
+        }
+        return { window in
+            try permit.check()
+            guard window.containingWindowId() == windowID,
+                  window.get(Ax.minimizedAttr) == false,
+                  window.get(Ax.isFullscreenAttr) == false else { throw NativeSpaceWriteError.liveOwnershipChanged }
+            try permit.check()
+        }
+    }
+
+    /// The permit alone, with no AX or WindowServer reads: for gesture steps after a full check.
+    @MainActor
+    private func nativePermitCheck(_ windowID: UInt32) -> (@Sendable (AXUIElement) throws -> Void)? {
+        guard runtime.workspaceBackend.kind == .native else { return nil }
+        guard let launched = nsApp.launchDate,
+              let permit = runtime.workspaceBackend.native.writeAuthority.permit(windowID: windowID, pid: pid, processLaunchDate: launched) else {
+            return { _ in throw NativeSpaceWriteError.revoked }
+        }
+        return { _ in try permit.checkGranted() }
+    }
+
     @MainActor
     func setAxFrame(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
+        let validate = nativeFrameValidation(windowId)
         setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, validateWrite: validate.map { check in { try check(window) } })
         }
     }
 
@@ -262,24 +413,57 @@ final class MacApp: AbstractApp {
     func setAnimatedAxFrame(_ windowId: UInt32, _ frame: CGRect, session: UUID) {
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes] window, job in
+        let full = nativeFrameValidation(windowId)
+        let permit = nativePermitCheck(windowId)
+        setFrameJobs[windowId] = withWindowAsync(windowId) { [axApp, animatedSizes, validatedSessions] window, job in
             // Intermediate steps need no readback or minimum-size confirmation.
             // Finish both writes of a started step; cancellation drops queued steps.
+            // Native ownership is read once per gesture session; later steps only
+            // recheck the permit, which WindowServer lifecycle events revoke.
+            let validate: ((AXUIElement) throws -> Void)?
+            if let full, validatedSessions.threadGuarded[windowId] != session {
+                try full(window)
+                validatedSessions.threadGuarded[windowId] = session
+                validate = permit
+            } else { validate = permit }
             try disableAnimations(app: axApp.threadGuarded, job) {
                 if animatedSizes.threadGuarded[windowId]?.session != session || animatedSizes.threadGuarded[windowId]?.size != frame.size {
+                    try validate?(window)
                     let accepted = window.set(Ax.sizeAttr, frame.size)
                     animatedSizes.threadGuarded[windowId] = accepted ? (session, frame.size) : nil
                 }
+                if validate != nil { try job.checkCancellation() }
+                try validate?(window)
                 window.set(Ax.topLeftCornerAttr, frame.origin)
             }
         }
     }
 
-    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false) async throws {
+    @MainActor
+    /// `validation` replaces the native frame permit, as for a restore that outlives tiling.
+    /// False when nothing was written: the app object is retired or the window has no AX element.
+    @discardableResult
+    func setAxFrameBlocking(_ windowId: UInt32, _ topLeft: CGPoint?, _ size: CGSize?, positionFirst: Bool = false,
+                            validation: (@Sendable (AXUIElement) throws -> Void)? = nil) async throws -> Bool {
         setFrameJobs.removeValue(forKey: windowId)?.cancel()
-        try await withWindow(windowId) { [axApp, animatedSizes] window, job in
+        let validate = validation ?? nativeFrameValidation(windowId)
+        let written = try await withWindow(windowId) { [axApp, animatedSizes] window, job -> Bool in
             animatedSizes.threadGuarded[windowId] = nil
-            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId)
+            try setFrame(window, app: axApp.threadGuarded, topLeft, size, job, positionFirst: positionFirst, traceWindowId: windowId, validateWrite: validate.map { check in { try check(window) } })
+            return true
+        }
+        return written == true
+    }
+
+    @MainActor
+    func getAxRectForLayoutConfirmation(_ windowId: UInt32) async throws -> Rect? {
+        let validate = nativeFrameValidation(windowId)
+        return try await withWindow(windowId) { window, job in
+            try job.checkCancellation()
+            try validate?(window)
+            guard let point = window.get(Ax.topLeftCornerAttr), let size = window.get(Ax.sizeAttr) else { return nil }
+            try validate?(window)
+            return Rect(topLeftX: point.x, topLeftY: point.y, width: size.width, height: size.height)
         }
     }
 
@@ -333,6 +517,19 @@ final class MacApp: AbstractApp {
             guard let size = window.get(Ax.sizeAttr) else { return nil }
             return Rect(topLeftX: topLeftCorner.x, topLeftY: topLeftCorner.y, width: size.width, height: size.height)
         }
+    }
+
+    func attachedSheetOffsets(_ windowId: UInt32) async throws -> [CGRect] {
+        (try await withWindow(windowId) { window, job -> [CGRect] in
+            guard let children = window.get(Ax.childrenAttr), !children.isEmpty,
+                  let parent = window.get(Ax.topLeftCornerAttr) else { return [] }
+            return try children.prefix(32).compactMap { sheet -> CGRect? in
+                try job.checkCancellation()
+                guard sheet.get(Ax.roleAttr) == (kAXSheetRole as String) else { return nil }
+                guard let position = sheet.get(Ax.topLeftCornerAttr), let size = sheet.get(Ax.sizeAttr) else { return nil }
+                return CGRect(x: position.x - parent.x, y: position.y - parent.y, width: size.width, height: size.height)
+            }
+        }) ?? []
     }
 
     func isWindowHeuristic(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> Bool {
@@ -415,11 +612,13 @@ final class MacApp: AbstractApp {
     @MainActor
     private static func refreshAppAndGetAliveWindowIdsWithDeadline(
         _ nsApp: NSRunningApplication,
+        pid: pid_t,
         frontmostAppBundleId: String?,
     ) async throws -> [UInt32] {
-        let pid = nsApp.processIdentifier
         let work = Task { @MainActor () -> [UInt32] in
-            guard let app = try await MacApp.getOrRegister(nsApp) else { return [] }
+            let registered = MacApp.allAppsMap[pid].flatMap { isSameRunningProcess($0.nsApp, nsApp) ? $0 : nil }
+            let app = if let registered { registered } else { try await MacApp.getOrRegister(nsApp) }
+            guard let app else { return [] }
             return try await app.refreshAndGetAliveWindowIds(frontmostAppBundleId: frontmostAppBundleId)
         }
         let deadline = Task { @MainActor in
@@ -446,35 +645,32 @@ final class MacApp: AbstractApp {
         // Unit tests use TestApp/TestWindow. Enumerating the runner's real desktop
         // can feed native AX elements into the mock-only attribute decoder.
         guard !isUnitTest else { return [:] }
-        for (_, app) in MacApp.allAppsMap { // gc dead apps
+        for (pid, app) in MacApp.allAppsMap { // gc dead apps
             try checkCancellation()
-            if app.nsApp.isTerminated {
+            // The cache answers without LaunchServices; confirm before destroying a running app's
+            // object, which would leave its windows unable to move or park.
+            if !RegularApplications.shared.isRunning(app.nsApp, pid: pid), app.nsApp.isTerminated {
                 await app.destroy()
             }
         }
         return try await withThrowingTaskGroup(of: (pid_t, [UInt32]).self, returning: [MacApp: [UInt32]].self) { group in
-            func refreshTheApp(_ nsApp: NSRunningApplication) {
+            func refreshTheApp(_ nsApp: NSRunningApplication, pid: pid_t) {
                 group.addTask { @Sendable @MainActor in
-                    (
-                        nsApp.processIdentifier,
-                        try await refreshAppAndGetAliveWindowIdsWithDeadline(nsApp, frontmostAppBundleId: frontmostAppBundleId)
-                    )
+                    (pid, try await refreshAppAndGetAliveWindowIdsWithDeadline(nsApp, pid: pid, frontmostAppBundleId: frontmostAppBundleId))
                 }
             }
             // Register new apps
-            for nsApp in NSWorkspace.shared.runningApplications {
+            for (pid, nsApp) in RegularApplications.shared.byPid {
                 try checkCancellation()
-                if nsApp.activationPolicy == .regular {
-                    refreshTheApp(nsApp)
-                }
+                refreshTheApp(nsApp, pid: pid)
             }
-            for (_, app) in MacApp.allAppsMap {
+            for (pid, app) in MacApp.allAppsMap {
                 try checkCancellation()
                 // "About this Mac" window, TouchID, and a lot of other utility windows
                 // We don't monitor them actively as we do for regular apps, but if a window of one of those utility
                 // apps got focused it will end up in allAppsMap
-                if app.nsApp.activationPolicy != .regular {
-                    refreshTheApp(app.nsApp)
+                if !RegularApplications.shared.isRegular(pid) {
+                    refreshTheApp(app.nsApp, pid: pid)
                 }
             }
             var result: [MacApp: [UInt32]] = [:]
@@ -497,6 +693,7 @@ final class MacApp: AbstractApp {
         }
     }
 
+    @MainActor
     private func refreshAndGetAliveWindowIds(frontmostAppBundleId: String?) async throws -> [UInt32] {
         if nsApp.isTerminated {
             await destroy()
@@ -552,14 +749,21 @@ final class MacApp: AbstractApp {
         return alive
     }
 
-    private func destroy() async {
-        _ = await Task { @MainActor [pid] in _ = MacApp.allAppsMap.removeValue(forKey: pid) }.result
+    /// Retires this app object before any suspension: no new AX work is accepted, and the registry
+    /// entry is removed only while it is still this object, so a late or repeated call cannot
+    /// remove a replacement registered for the same pid.
+    @MainActor
+    func destroy() async {
+        let retiring = thread
+        thread = nil // Disallow all future job submissions
+        if MacApp.allAppsMap[pid] === self { MacApp.allAppsMap.removeValue(forKey: pid) }
         for (_, job) in setFrameJobs {
             job.cancel()
         }
         setFrameJobs = [:]
-        thread?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, appAxSubscriptions, axApp, axAppFastTimeout] job in
+        retiring?.runInLoopAsync { [windows, destroyedWindows, animatedSizes, validatedSessions, appAxSubscriptions, axApp, axAppFastTimeout] job in
             animatedSizes.destroy()
+            validatedSessions.destroy()
             appAxSubscriptions.destroy() // Destroy AX objects in reverse order of their creation
             windows.destroy()
             destroyedWindows.destroy()
@@ -567,8 +771,10 @@ final class MacApp: AbstractApp {
             axApp.destroy()
             CFRunLoopStop(CFRunLoopGetCurrent())
         }
-        thread = nil // Disallow all future job submissions
     }
+
+    /// A destroyed app object has no AX thread; windows still holding it cannot be read or moved.
+    var isRetired: Bool { thread == nil }
 
     private func withWindow<T>(_ windowId: UInt32, _ body: @Sendable @escaping (AXUIElement, RunLoopJob) throws -> T?) async throws -> T? {
         try await thread?.runInLoop { [windows, axApp, nsApp, animatedSizes] job in
@@ -624,4 +830,50 @@ func shouldUseActivationOnlyForNativeFocus(
     logicalWindowsCount: Int,
 ) -> Bool {
     lastNativeFocusedWindowId == targetWindowId || logicalWindowsCount == 1
+}
+
+enum AppRegistrationDecision: Equatable {
+    case reuse, reject, replace
+}
+
+/// What `getOrRegister` does with an app already registered for the pid. One process holds a pid at
+/// a time, so a live registration is never evicted; a request carrying an ended process is refused.
+/// `incomingTerminated` is a LaunchServices request, made only when the answer matters.
+func appRegistrationDecision(existingTerminated: Bool, sameProcess: Bool, incomingTerminated: () -> Bool) -> AppRegistrationDecision {
+    if !existingTerminated { return sameProcess || !incomingTerminated() ? .reuse : .reject }
+    return incomingTerminated() ? .reject : .replace
+}
+
+/// Diagnostics wait less than window operations for an unresponsive app.
+private let axDiagnosticTimeout: Float = 0.25
+
+/// Thrown by `doctor`'s probe at the first read the app does not answer, so a slow app costs one timeout.
+private struct DiagnosticReadUnanswered: Error {}
+
+/// Reads one attribute for `doctor`; a failure other than "no answer" is recorded under `source`.
+private func diagnosticRead(_ element: AXUIElement, _ attribute: String, into result: inout [AxWindowProbe], source: String) throws -> CFTypeRef? {
+    var value: CFTypeRef?
+    let status = AXUIElementCopyAttributeValue(element, attribute as CFString, &value)
+    if status == .cannotComplete { throw DiagnosticReadUnanswered() }
+    if status != .success, status != .noValue { result.append(AxWindowProbe(source: source, failure: status.repr)) }
+    return status == .success ? value : nil
+}
+
+/// One window element for `doctor`. Every read stops the probe if the app does not answer.
+private func diagnosticProbe(_ element: AXUIElement, _ source: String) throws -> AxWindowProbe {
+    AXUIElementSetMessagingTimeout(element, axDiagnosticTimeout)
+    let (windowId, error) = element.containingWindowIdWithError(timeout: axDiagnosticTimeout)
+    if error == .cannotComplete { throw DiagnosticReadUnanswered() }
+    func attribute(_ name: String) throws -> CFTypeRef? {
+        var value: CFTypeRef?
+        let status = AXUIElementCopyAttributeValue(element, name as CFString, &value)
+        if status == .cannotComplete { throw DiagnosticReadUnanswered() }
+        return status == .success ? value : nil
+    }
+    var origin = CGPoint.zero, size = CGSize.zero
+    let hasOrigin = try attribute(kAXPositionAttribute).map { AXValueGetValue($0 as! AXValue, .cgPoint, &origin) } ?? false
+    let hasSize = try attribute(kAXSizeAttribute).map { AXValueGetValue($0 as! AXValue, .cgSize, &size) } ?? false
+    return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
+        frame: hasOrigin && hasSize ? CGRect(origin: origin, size: size) : nil,
+        role: try attribute(kAXRoleAttribute) as? String, subrole: try attribute(kAXSubroleAttribute) as? String)
 }

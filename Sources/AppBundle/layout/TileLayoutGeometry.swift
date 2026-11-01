@@ -25,22 +25,17 @@ enum TileLayoutGeometry {
         let horizontal = input.horizontal
         let extent = horizontal ? input.size.width : input.size.height
         let gap = input.innerGap
-        var requested = input.weights
-        if input.master {
-            let total = requested.reduce(0, +)
-            if total > 0 { requested = requested.map { $0 / total * extent } }
-        }
+        // Weights are scaled to the space, never shifted by equal amounts: a window that comes
+        // and goes, or a display that shrinks and grows back, leaves the proportions as they were
+        // and cannot squeeze a narrow tile to nothing.
+        var requested = input.weights.map { max($0, 0) }
+        let total = requested.reduce(0, +)
+        requested = total > 0 ? requested.map { $0 / total * extent } : requested.map { _ in extent / CGFloat(requested.count) }
         let edgeGaps = requested.indices.map { index in
             gap - (index == 0 ? gap / 2 : 0) - (index == requested.count - 1 ? gap / 2 : 0)
         }
         let minimums = zip(input.minimumExtents, edgeGaps).map(+)
-        let sizes: [CGFloat]
-        if input.minimumExtents.allSatisfy({ $0 == 0 }) {
-            let delta = (extent - requested.reduce(0, +)) / CGFloat(requested.count)
-            sizes = requested.map { max($0 + delta, 0) }
-        } else {
-            sizes = fit(requested, minimums: minimums, total: extent)
-        }
+        let sizes = input.minimumExtents.allSatisfy({ $0 == 0 }) ? requested : fit(requested, minimums: minimums, total: extent)
         var point = input.origin
         return sizes.indices.map { index in
             let size = sizes[index]

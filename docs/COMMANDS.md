@@ -1,5 +1,13 @@
 # Command guide
 
+With the experimental native read-only backend, `doctor` reports native Space
+observations and `reload-config` validates configuration. Other commands return an
+unsupported error. The separate experimental native tiling opt-in also supports
+workspace-local focus/move/resize/swap, Dwindle/Master, tiles/orientation/floating,
+split, balance and shortcut modes. Native navigation and cross-display movement
+remain unsupported. See [Native Spaces](NATIVE_SPACES.md) for exact limits and the
+unverified native release gates; virtual remains the default.
+
 Run `winmuxx --help` for the command list and `winmuxx <command> --help` for
 arguments. This guide groups commands by what they affect.
 
@@ -12,6 +20,14 @@ help documents an explicit target.
 `flatten-workspace-tree` rebuilds its tree; `balance-sizes` redistributes sizes.
 `layout` changes the selected window's container. These scopes differ; see
 [layouts](LAYOUTS.md).
+
+**Scrolling workspaces:** `scrolling-width next|previous|full` changes the focused group's width; `scrolling-center` centers it. `scrolling-focus 1-9|first|last` focuses a column by place (9 is the last), `scrolling-move 1-9|first|last` moves the focused column there, and `scrolling-pin left|right` pins the focused column to a screen edge (again to unpin). `scrolling-minimap toggle` opens or closes the clickable workspace map; explicit opening keeps it visible and supports Left/Right, Return and Escape, also available from Layout → Show Scrolling Minimap and Control–Option–M in fresh configurations.
+
+**Undo:** `undo-layout` puts the focused workspace's layout back as it was before its last layout command (`layout`, `move`, `join-with`, `resize`, `balance-sizes`, `workspace-layout`, scrolling moves, widths and pins, and similar), one step at a time, up to 20 steps. It rearranges only windows still on that workspace, and a window opened since is tiled into the restored layout. Available from Layout → Undo Layout Change.
+
+**Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. It also renews the put-back budget for windows whose apps kept moving them: an app that moves its tiled window off its tile again and again is put back at most three times in 10 seconds per tile, then left alone until that time passes or the tile changes. Available from Layout → Retile.
+
+**No peek:** `no-peek [on|off|toggle]` darkens and blurs everything except the focused window, on every display, so people beside you or on a call can't read your other windows. It follows focus, stays out of Mission Control and native fullscreen, and clicks still reach the windows behind it. Without an argument it toggles; also in the menu as No Peek.
 
 **Workspace and project:** `workspace` selects a workspace;
 `workspace-back-and-forth` returns to the previous one; `project` selects a

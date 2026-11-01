@@ -6,6 +6,7 @@ struct WorkspaceGestureAxisRouter {
     private var anchor: WorkspaceTouchFrame?
     private(set) var axis: Axis?
     private var rejected = false
+    var isRejected: Bool { rejected }
 
     mutating func route(_ frame: WorkspaceTouchFrame) -> (Axis, [WorkspaceTouchFrame])? {
         if let anchor, anchor.device != frame.device { return nil }
@@ -22,9 +23,22 @@ struct WorkspaceGestureAxisRouter {
               frame.timestamp - anchor.timestamp <= 10 else { rejected = true; return nil }
         let dx = abs(frame.x - anchor.x), dy = abs(frame.y - anchor.y)
         if dx >= 0.02, dx >= dy * 1.5 { axis = .horizontal }
-        else if dy >= 0.04, dy >= dx * 1.5 { axis = .vertical }
+        else if dy >= 0.04, dy >= dx * 1.5,
+                let start = anchor.touchContacts, let current = frame.touchContacts,
+                current.movedTogether(from: start, direction: frame.y > anchor.y ? 1 : -1, minimum: 0.012) {
+            axis = .vertical
+        }
         guard let axis else { return nil }
         return (axis, [anchor, frame])
+    }
+}
+
+enum WorkspaceHorizontalGestureRoute: Equatable {
+    case workspaceSwipe, scrolling, ignore
+
+    static func resolve(optionHeldAtStart: Bool, scrollingEnabledAtStart: Bool) -> Self {
+        guard optionHeldAtStart else { return .workspaceSwipe }
+        return scrollingEnabledAtStart ? .scrolling : .ignore
     }
 }
 
@@ -39,16 +53,19 @@ struct WorkspaceGestureRouterDependencies {
     var beginOverviewGesture: ((Bool, Double) -> Bool)? = nil
     var updateOverviewGesture: ((Double) -> Void)? = nil
     var endOverviewGesture: ((Bool, Double) -> Void)? = nil
+    /// False while macOS's own vertical swipe drives the overview instead.
+    var verticalFromRawTouch: () -> Bool = { true }
     static var live: Self {
-        Self(horizontalEnabled: { config.workspaceSwipe.enabled },
-             overviewEnabled: { config.workspaceOverview.threeFingerUp },
+        Self(horizontalEnabled: { rawWorkspaceSwipeEnabled },
+             overviewEnabled: { workspaceOverviewGestureEnabled },
              overviewIsOpen: { WorkspaceOverviewController.shared.isOpen },
              horizontal: { WorkspaceSwipeController.shared.handle($0) },
              show: { _ = WorkspaceOverviewController.shared.show() },
              hide: { WorkspaceOverviewController.shared.dismiss() },
              beginOverviewGesture: { WorkspaceOverviewController.shared.beginGesture(opening: $0, progress: $1) },
              updateOverviewGesture: { WorkspaceOverviewController.shared.updateGesture(progress: $0) },
-             endOverviewGesture: { WorkspaceOverviewController.shared.endGesture(commit: $0, velocity: $1) })
+             endOverviewGesture: { WorkspaceOverviewController.shared.endGesture(commit: $0, velocity: $1) },
+             verticalFromRawTouch: { !DockWorkspaceSwipeSource.shared.readsVertical })
     }
 }
 
@@ -63,9 +80,30 @@ final class WorkspaceGestureRouter {
     private var interactive = false
     private var sampleTime = 0.0
     private var velocity = 0.0
+    private var sequenceStarted = false
+    private var optionLatched = false
+    private var scrollingEnabledAtStart = false
+    private var contactDeviceAtStart: UInt64?
+    private weak var scrollingWorkspaceAtStart: Workspace?
+    private var scrollingMonitorPointAtStart: CGPoint?
+    private var scrollingOffsetAtStart: CGFloat?
+    private var scrollingTopologyAtStart: String?
+    private var scrollingEpochAtStart: UInt64?
     private let dependencies: WorkspaceGestureRouterDependencies
 
     init(dependencies: WorkspaceGestureRouterDependencies = .live) { self.dependencies = dependencies }
+
+    /// What a touch sequence latched at its start, cleared when its fingers lift.
+    private func clearSequenceState() {
+        sequenceStarted = false
+        optionLatched = false
+        scrollingEnabledAtStart = false
+        scrollingWorkspaceAtStart = nil
+        scrollingMonitorPointAtStart = nil
+        scrollingOffsetAtStart = nil
+        scrollingTopologyAtStart = nil
+        scrollingEpochAtStart = nil
+    }
 
     func reset() {
         let cancelsInteraction = interactive
@@ -75,17 +113,70 @@ final class WorkspaceGestureRouter {
         eligible = false
         verticalProgress = 0
         velocity = 0
+        clearSequenceState()
+        contactDeviceAtStart = nil
+        WorkspaceScrollingGestureController.shared.reset()
         if cancelsInteraction { dependencies.endOverviewGesture?(false, 0) }
     }
 
     func handle(_ frame: WorkspaceTouchFrame) {
-        guard let (axis, frames) = axes.route(frame) else { return }
+        defer { if frame.fingers == 0 { WorkspaceScrollingGestureController.shared.contactsEnded() } }
+        if !sequenceStarted, frame.fingers == 3 {
+            sequenceStarted = true
+            contactDeviceAtStart = frame.device
+            optionLatched = NSEvent.modifierFlags.contains(.option)
+            let pointer = mouseLocation
+            if let monitor = sortedMonitors.first(where: { $0.rect.contains(pointer) }) {
+                scrollingMonitorPointAtStart = monitor.rect.topLeftCorner
+                scrollingWorkspaceAtStart = monitor.activeWorkspace
+                scrollingEnabledAtStart = monitor.activeWorkspace.arrangement == .scrolling
+                if scrollingEnabledAtStart {
+                    scrollingOffsetAtStart = monitor.activeWorkspace.scrollingMetrics.clampedOffset(monitor.activeWorkspace.scrollingOffset)
+                    scrollingTopologyAtStart = monitor.activeWorkspace.scrollingTopologySignature
+                    scrollingEpochAtStart = monitor.activeWorkspace.scrollingSessionEpoch
+                }
+            }
+        }
+        if sequenceStarted, optionLatched, frame.device != contactDeviceAtStart {
+            WorkspaceScrollingGestureController.shared.reset()
+            if frame.fingers == 0 { reset() }
+            return
+        }
+        guard let (axis, frames) = axes.route(frame) else {
+            if axes.isRejected { WorkspaceScrollingGestureController.shared.reset() }
+            if frame.fingers == 0 {
+                WorkspaceScrollingGestureController.shared.reset(commit: true)
+                clearSequenceState()
+            }
+            return
+        }
         switch axis {
         case .horizontal:
+            switch WorkspaceHorizontalGestureRoute.resolve(optionHeldAtStart: optionLatched,
+                                                            scrollingEnabledAtStart: scrollingEnabledAtStart) {
+            case .scrolling:
+                WorkspaceScrollingGestureController.shared.handle(frames,
+                    capturedWorkspace: scrollingWorkspaceAtStart,
+                    capturedMonitorPoint: scrollingMonitorPointAtStart,
+                    capturedOffset: scrollingOffsetAtStart,
+                    capturedTopology: scrollingTopologyAtStart,
+                    capturedEpoch: scrollingEpochAtStart)
+                if frame.fingers == 0 {
+                    clearSequenceState()
+                }
+                return
+            case .ignore:
+                if frame.fingers == 0 {
+                    clearSequenceState()
+                }
+                return
+            case .workspaceSwipe:
+                break
+            }
             guard dependencies.horizontalEnabled(), !dependencies.overviewIsOpen() else { return }
             for item in frames { dependencies.horizontal(item) }
         case .vertical:
-            for item in frames {
+            for item in frames where dependencies.verticalFromRawTouch() {
                 let transformed = WorkspaceTouchFrame(device: item.device, fingers: item.fingers,
                     x: 1 - item.y, y: item.x, timestamp: item.timestamp, contacts: item.contacts)
                 guard let event = vertical.receive(transformed, displayPoint: .zero, reversed: false) else { continue }
@@ -129,6 +220,9 @@ final class WorkspaceGestureRouter {
                     }
                 }
             }
+        }
+        if frame.fingers == 0 {
+            clearSequenceState()
         }
     }
 }

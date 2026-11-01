@@ -21,7 +21,7 @@ enum GlobalObserver {
     private static func onNotif(_ notification: Notification) {
         // Third line of defence against lock screen window. See: closedWindowsCache
         // Second and third lines of defence are technically needed only to avoid potential flickering
-        if (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier == lockScreenAppBundleId {
+        if isLockScreenApp(notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication) {
             return
         }
         let notifName = notification.name.rawValue
@@ -29,6 +29,7 @@ enum GlobalObserver {
             ? (notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.processIdentifier : nil
         Task { @MainActor in
             if let terminatedPid {
+                windowLifecycleChanges.notify()
                 MacApp.registrationRetries.cancel(pid: terminatedPid)
                 WindowDetectionOperations.shared.cancel(pid: terminatedPid)
             }
@@ -90,6 +91,7 @@ enum GlobalObserver {
         let modifierFlags = event.modifierFlags
         runOnMainActor {
             noteTapBindingFlagsChanged(keyCode: keyCode, modifierFlags: modifierFlags)
+            WorkspaceScrollingMinimap.shared.modifiersChanged(modifierFlags)
         }
     }
 
@@ -102,10 +104,12 @@ enum GlobalObserver {
         let point = normalizeAppKitScreenPoint(screenPoint)
         runOnMainActor {
             if isClick {
+                WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
                 WorkspaceSwipeController.shared.cancelVisualInteraction()
                 DoubleSidedWindowController.shared.cancelPreparation()
             }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
+            WindowHoverBar.shared.pointerMoved(point)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)
             WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
@@ -128,7 +132,8 @@ enum GlobalObserver {
 
     @MainActor
     private static func scheduleFocusFollowsMouse(point: CGPoint, timestamp: TimeInterval) {
-        guard !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
+        guard !WorkspaceScrollingGestureController.shared.isMotionActive,
+              !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
               !isMouseManipulationActive,
               let window = pointerFocusCandidate(at: point),
               window.participatesInWorkspaceFocus else {
@@ -143,13 +148,15 @@ enum GlobalObserver {
         let dwell = max(config.focusFollowsMouseDwell, 0)
         focusFollowsMouseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(dwell))
-            guard !Task.isCancelled, !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+            guard !Task.isCancelled, !WorkspaceScrollingGestureController.shared.isMotionActive,
+                  !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive,
                   !isLeftMouseButtonDown,
                   let ready = FocusFollowsMouseController.shared.isReady(dwell: Double(dwell) / 1000, timestamp: ProcessInfo.processInfo.systemUptime),
                   ready == window.windowId else { return }
             let id = await PointerFocusNativeHitTester.shared.windowId(at: point)
-            guard !Task.isCancelled, !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+            guard !Task.isCancelled, !WorkspaceScrollingGestureController.shared.isMotionActive,
+                  !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive, !isLeftMouseButtonDown,
                   let target = pointerFocusTarget(at: point, frontmostWindowId: id),
                   target != focus.windowOrNil else { return }
@@ -237,6 +244,50 @@ enum GlobalObserver {
             return event
         })
 
+        installKeyboardMonitors()
+    }
+
+    /// Native Spaces: the sidebar's edge reveal, hover and drags, and tap and sequence
+    /// bindings. Focus-follows-mouse and virtual mouse resizing stay virtual-only.
+    @MainActor
+    static func initNativeInputObserver() {
+        guard !isInitialized else { return }
+        isInitialized = true
+        retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
+            runOnMainActor {
+                finishWorkspaceSidebarDragAfterGlobalMouseUp()
+                WorkspaceSidebarPanel.scheduleHoverRecheckForVisiblePanels()
+            }
+        })
+        let pointerActivityMask: NSEvent.EventTypeMask = [
+            .mouseMoved, .leftMouseDown, .rightMouseDown, .otherMouseDown, .leftMouseUp,
+            .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .scrollWheel,
+        ]
+        retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: pointerActivityMask, handler: onNativePointerActivity))
+        retainEventMonitor(NSEvent.addLocalMonitorForEvents(matching: pointerActivityMask) { event in
+            onNativePointerActivity(event)
+            return event
+        })
+        installKeyboardMonitors()
+    }
+
+    private static func onNativePointerActivity(_ event: NSEvent) {
+        let eventType = event.type
+        let timestamp = event.timestamp
+        let screenPoint = NSEvent.mouseLocation
+        let point = normalizeAppKitScreenPoint(screenPoint)
+        runOnMainActor {
+            MousePointerTracker.shared.note(point: point, timestamp: timestamp)
+            WindowHoverBar.shared.pointerMoved(point)
+            WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
+            WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
+            WorkspaceSidebarPanel.noteHoverPointerActivityForVisiblePanels(timestamp: timestamp)
+            noteTapBindingKeyDown()
+        }
+    }
+
+    @MainActor
+    private static func installKeyboardMonitors() {
         retainEventMonitor(NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged, handler: onFlagsChanged))
         retainEventMonitor(NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { event in
             onFlagsChanged(event)

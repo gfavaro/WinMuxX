@@ -18,7 +18,7 @@ final class AxWindow {
         // could stall its AX thread for 6×N seconds per refresh.
         AXUIElementSetMessagingTimeout(ax, 1.0)
         let handlers: HandlerToNotifKeyMapping = [
-            (refreshObs, [kAXUIElementDestroyedNotification, kAXWindowDeminiaturizedNotification, kAXWindowMiniaturizedNotification]),
+            (refreshObs, [kAXUIElementDestroyedNotification, kAXWindowDeminiaturizedNotification, kAXWindowMiniaturizedNotification, kAXSheetCreatedNotification]),
             (movedObs, [kAXMovedNotification]),
             (resizedObs, [kAXResizedNotification]),
         ]

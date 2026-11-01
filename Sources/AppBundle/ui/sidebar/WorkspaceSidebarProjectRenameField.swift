@@ -2,6 +2,13 @@ import AppKit
 import SwiftUI
 
 final class WorkspaceSidebarProjectRenameNSTextField: NSTextField {
+    var onAttach: (@MainActor () -> Void)?
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil { onAttach?() }
+    }
+
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
         debugWorkspaceSidebarRenameLog("textField becomeFirstResponder result=\(result) windowKey=\(window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: window?.firstResponder))")
@@ -40,8 +47,8 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         field.cell?.wraps = false
         field.cell?.isScrollable = true
         field.delegate = context.coordinator
-        DispatchQueue.main.async {
-            context.coordinator.focus(field)
+        field.onAttach = { [weak field, weak coordinator = context.coordinator] in
+            if let field { coordinator?.focus(field) }
         }
         return field
     }
@@ -61,6 +68,8 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
 
     static func dismantleNSView(_ field: NSTextField, coordinator: Coordinator) {
         coordinator.isAttached = false
+        coordinator.stopWaitingForKey()
+        (field as? WorkspaceSidebarProjectRenameNSTextField)?.onAttach = nil
         field.delegate = nil
     }
 
@@ -68,14 +77,14 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         Coordinator(text: $text, onCommit: onCommit, onCancel: onCancel, onPanelReady: onPanelReady)
     }
 
-    final class Coordinator: NSObject, NSTextFieldDelegate {
+    @MainActor final class Coordinator: NSObject, NSTextFieldDelegate {
         @Binding var text: String
         let onCommit: @MainActor @Sendable () -> Void
         let onCancel: @MainActor @Sendable () -> Void
         let onPanelReady: @MainActor (WorkspaceSidebarPanel) -> Void
         var isAttached = true
         var didFocus = false
-        var focusAttempts = 0
+        private var keyObserver: NSObjectProtocol?
 
         init(
             text: Binding<String>,
@@ -92,13 +101,10 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         @MainActor
         func focus(_ field: NSTextField) {
             guard isAttached, !didFocus else { return }
-            guard let window = field.window else {
-                debugWorkspaceSidebarRenameLog("focus noWindow attempt=\(focusAttempts)")
-                scheduleFocusRetry(field)
-                return
-            }
+            // The field's attachment calls this again.
+            guard let window = field.window else { return }
             let panel = (window as? WorkspaceSidebarPanel) ?? WorkspaceSidebarPanel.shared
-            debugWorkspaceSidebarRenameLog("focus attempt=\(focusAttempts) before panelKey=\(panel.isKeyWindow) fieldWindowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder))")
+            debugWorkspaceSidebarRenameLog("focus before panelKey=\(panel.isKeyWindow) fieldWindowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder))")
             panel.prepareForInlineTextEditing()
             onPanelReady(panel)
             window.makeKeyAndOrderFront(nil)
@@ -106,20 +112,26 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
             field.selectText(nil)
             didFocus = didBecomeFirstResponder && window.isKeyWindow && window.firstResponder === field.currentEditor()
             debugWorkspaceSidebarRenameLog("focus result makeFirstResponder=\(didBecomeFirstResponder) didFocus=\(didFocus) windowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder)) currentEditor=\(String(describing: field.currentEditor())) selectedRange=\(field.currentEditor()?.selectedRange ?? NSRange(location: -1, length: -1))")
-            if !didFocus {
-                scheduleFocusRetry(field)
+            if didFocus { stopWaitingForKey() } else if !window.isKeyWindow { focusWhenKey(field, window) }
+        }
+
+        /// A panel ordered front may become key a moment later; focus when it does.
+        @MainActor
+        private func focusWhenKey(_ field: NSTextField, _ window: NSWindow) {
+            guard keyObserver == nil else { return }
+            keyObserver = NotificationCenter.default.addObserver(forName: NSWindow.didBecomeKeyNotification,
+                                                                 object: window, queue: .main) { [weak self, weak field] _ in
+                MainActor.assumeIsolated {
+                    self?.stopWaitingForKey()
+                    if let field { self?.focus(field) }
+                }
             }
         }
 
         @MainActor
-        private func scheduleFocusRetry(_ field: NSTextField) {
-            guard focusAttempts < 8 else { return }
-            focusAttempts += 1
-            debugWorkspaceSidebarRenameLog("scheduleFocusRetry attempt=\(focusAttempts)")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) { [weak self, weak field] in
-                guard let self, let field else { return }
-                self.focus(field)
-            }
+        func stopWaitingForKey() {
+            if let keyObserver { NotificationCenter.default.removeObserver(keyObserver) }
+            keyObserver = nil
         }
 
         func controlTextDidChange(_ notification: Notification) {

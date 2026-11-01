@@ -1,0 +1,3 @@
+[workspace-backend]
+type = "native"
+activation-fallback = true

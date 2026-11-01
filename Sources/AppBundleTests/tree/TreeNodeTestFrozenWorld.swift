@@ -88,7 +88,7 @@ extension TreeNodeTest {
         XCTAssertEqual(frozenWorld.workspaces.map(\.name), [persistent.name])
         XCTAssertTrue(frozenWorld.windowIds.isEmpty)
 
-        removeWorkspaceFromRegistry(persistent)
+        removeWorkspaceFromRegistry(persistent, forgetLabel: true)
         let trigger = TestWindow.new(id: 33, parent: focus.workspace.rootTilingContainer)
         let didRestore = try await restoreFrozenWorldIfNeeded(frozenWorld, newlyDetectedWindow: trigger)
 

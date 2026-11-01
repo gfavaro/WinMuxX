@@ -3,6 +3,7 @@ import Common
 
 @MainActor
 func buildDiagnosticsReport() async -> String {
+    if let report = await runtime.workspaceBackend.current.diagnosticsReport() { return report }
     let io = CmdIo(stdin: .emptyStdin)
     io.out("WinMux doctor — git \(gitShortHash)")
     io.out("")
@@ -62,7 +63,12 @@ func buildDiagnosticsReport() async -> String {
     io.out("")
 
     let touch = RawWorkspaceTouchSource.shared
-    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) backend=raw-touch status=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
+    let dock = DockWorkspaceSwipeSource.shared
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "raw-touch") overview=\(dock.readsVertical ? "macos-swipe" : "raw-touch") macOS=\(dock.status) raw=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
+    for (axis, swipe) in [("left/right", dock.horizontalSummary), ("up/down", dock.verticalSummary)] {
+        io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
+                      axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
+    }
     let preview = WorkspaceSwipePreview.shared
     if let timing = preview.timings.last {
         let submission = timing.submissionMs.map { String(format: "%.1fms", $0) } ?? "not submitted"
@@ -95,9 +101,7 @@ func buildDiagnosticsReport() async -> String {
         io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms (submission/layout, not screen presentation)", stage,
             sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
     }
-    io.out("Permissions:")
-    io.out("  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")")
-    io.out("  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")")
+    diagnosticsPermissionLines().forEach { io.out($0) }
     io.out("")
 
     io.out("Monitors (system window corner radius: \(systemWindowCornerRadius())pt):")
@@ -128,7 +132,50 @@ func buildDiagnosticsReport() async -> String {
         let windows = row.windows >= 0 ? "\(row.windows)" : "error"
         io.out("  \(String(format: "%7.1f", row.ms))ms  \(row.name) (\(windows) ax windows)\(flag)")
     }
+    io.out("")
+
+    io.out("Window reachability:")
+    let tracked = MacWindow.allWindows.sorted { $0.windowId < $1.windowId }
+    var findings: [WindowReachabilityFinding] = []
+    var probedPids: [pid_t] = []
+    var unresponsivePids: Set<pid_t> = []
+    for window in tracked {
+        let pid = window.app.pid
+        // One unanswered app costs its timeout once, not once per window.
+        let reachability = unresponsivePids.contains(pid)
+            ? .unknown("the app did not answer earlier in this report")
+            : await window.macApp.axWindowReachability(window.windowId)
+        if case .unknown = reachability { unresponsivePids.insert(pid) }
+        guard reachability != .reachable else { continue }
+        findings.append(WindowReachabilityFinding(windowId: window.windowId,
+            appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(pid),
+            workspace: window.nodeWorkspace?.name, windowServerFrame: windowServerFrame(window.windowId),
+            reachability: reachability, liveAppRegistered: MacApp.allAppsMap[pid].map { !$0.isRetired } ?? false))
+        if !probedPids.contains(pid) { probedPids.append(pid) }
+    }
+    let serverWindows = probedPids.isEmpty ? [] : windowServerWindows()
+    var details: [AppReachabilityDetail] = []
+    for pid in probedPids {
+        // Probe the live registration: a retired object has no AX thread to ask.
+        let app = MacApp.allAppsMap[pid] ?? MacWindow.allWindows.first { $0.app.pid == pid }?.macApp
+        details.append(AppReachabilityDetail(appName: app?.nsApp.localizedName ?? String(pid),
+            axWindows: unresponsivePids.contains(pid) ? nil : ((try? await app?.probeAxWindows()) ?? []),
+            windowServerWindows: serverWindows.filter { $0.pid == pid }.map(\.summary)))
+    }
+    for line in windowReachabilityReport(trackedCount: tracked.count, findings: findings, details: details) { io.out(line) }
     return io.stdout.joined(separator: "\n")
+}
+
+/// Normal-layer windows WindowServer holds, on screen or not, read once per report.
+private func windowServerWindows() -> [(pid: pid_t, summary: WindowServerWindowSummary)] {
+    let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    return info.compactMap { entry in
+        guard let pid = entry[kCGWindowOwnerPID as String] as? pid_t, (entry[kCGWindowLayer as String] as? Int) == 0,
+              let id = entry[kCGWindowNumber as String] as? UInt32,
+              let bounds = entry[kCGWindowBounds as String] as? NSDictionary,
+              let frame = CGRect(dictionaryRepresentation: bounds) else { return nil }
+        return (pid, WindowServerWindowSummary(id: id, frame: frame, onScreen: (entry[kCGWindowIsOnscreen as String] as? Bool) ?? false))
+    }
 }
 
 func otherTilingManagers(_ bundleIds: [String]) -> [String] {
@@ -154,4 +201,12 @@ private func separateSpacesDiagnosticSetting() -> String {
         return "not explicitly set (macOS default)"
     }
     return spans ? "off" : "on"
+}
+
+/// Both backends' doctor reports print these; the fork installer checks them.
+@MainActor
+func diagnosticsPermissionLines() -> [String] {
+    ["Permissions:",
+     "  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")",
+     "  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")"]
 }

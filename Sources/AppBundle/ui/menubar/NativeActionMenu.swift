@@ -22,6 +22,7 @@ public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
 final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
+    private var nativeMenu: NSMenu?
     private var observation: AnyCancellable?
     private var accessibilityObservation: NSObjectProtocol?
     private var appearanceObservation: NSKeyValueObservation?
@@ -29,7 +30,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName, stopped: String?)?
+    private var capturedRuleTarget: QuickFloatingRuleTarget?
 
     func install(checkForUpdates: (() -> Void)?) {
         guard statusItem == nil else { return }
@@ -37,6 +39,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.delegate = self
+        nativeMenu = menu
         item.menu = menu
         statusItem = item
         if let button = item.button {
@@ -67,60 +70,76 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
     }
 
+    func openMenu() {
+        guard let button = statusItem?.button, let nativeMenu else { return }
+        nativeMenu.update()
+        nativeMenu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.maxY), in: button)
+    }
+
+    func containsStatusItem(point: NSPoint) -> Bool {
+        guard let button = statusItem?.button, let window = button.window else { return false }
+        return window.convertToScreen(button.convert(button.bounds, to: nil)).contains(point)
+    }
+
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, lastModePresentation == model.modePresentation { return }
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement, stopped: model.menuBarTilingStoppedReason)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, previous.stopped == state.stopped, lastModePresentation == model.modePresentation { return }
         lastIconState = state
         lastModePresentation = model.modePresentation
         let mode = model.isEnabled ? model.modePresentation : nil
         let dark = statusItem?.button?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         let color = mode?.color(dark: dark, increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
         let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
+        let arrangementName = state.arrangement.rawValue.capitalized
+        let arrangementDescription = " · \(arrangementName) layout" + (state.stopped.map { " · \($0)" } ?? "")
         if model.isEnabled && state.indicator == .workspace {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
             let title = NSMutableAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor])
             if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
+            if state.stopped != nil { title.append(NSAttributedString(string: " ⏸", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
             statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + modeDescription
-            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display" + modeDescription)
+            statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + arrangementDescription + modeDescription
+            statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display, \(arrangementName) layout" + modeDescription)
             return
         }
         statusItem?.length = NSStatusItem.squareLength
         statusItem?.button?.attributedTitle = NSAttributedString(string: "")
-        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux" + modeDescription : "WinMux disabled")
-        let image: NSImage?
-        if model.isEnabled {
-            let monochrome = model.menuBarConfiguration.iconAppearance != .color
-            image = NSImage(named: monochrome ? "MenuBarIconMonochrome" : "MenuBarIcon")?.copy() as? NSImage
-            image?.isTemplate = monochrome
-        } else {
-            image = NSImage(systemSymbolName: "pause.circle.fill", accessibilityDescription: "WinMuxX disabled")
-        }
+        statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux, \(arrangementName) layout" + modeDescription : "WinMux disabled")
+        let image = menuBarIconImage(
+            enabled: model.isEnabled && state.stopped == nil,
+            arrangement: state.arrangement,
+            appearance: model.menuBarConfiguration.iconAppearance,
+            keyboardTint: color,
+        )
         image?.size = NSSize(width: 18, height: 18)
-        if let color, let source = NSImage(named: "MenuBarIconMonochrome") {
-            let tinted = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-                source.draw(in: rect)
-                color.setFill()
-                rect.fill(using: .sourceIn)
-                return true
-            }
-            tinted.isTemplate = false
-            statusItem?.button?.image = tinted
-            statusItem?.button?.toolTip = "WinMuxX" + modeDescription
-            return
-        }
         statusItem?.button?.image = image
-        statusItem?.button?.toolTip = "WinMuxX" + modeDescription
+        statusItem?.button?.toolTip = "WinMuxX" + arrangementDescription + modeDescription
+    }
+
+    func menuWillOpen(_ menu: NSMenu) {
+        WorkspaceControlsPanelController.shared.dismiss()
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {
         menu.removeAllItems()
         menu.autoenablesItems = false
         bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
-        menu.addItem(NSMenuItem(title: "WinMuxX · Workspace \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
+        capturedRuleTarget = focus.windowOrNil.flatMap { window -> QuickFloatingRuleTarget? in
+            guard let app = window as? MacWindow, let bundleId = app.macApp.rawAppBundleId else { return nil }
+            return QuickFloatingRuleTarget(window: app, focus: focus, bundleId: bundleId,
+                pid: app.macApp.pid, launchDate: app.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
+        }
+        let native = runtime.workspaceBackend.kind == .native
+        let place = native ? nativeDesktopNumber(of: focus.workspace).map { nativeDesktopDisplayName($0) } ?? "Native Spaces"
+            : "Workspace \(workspaceDisplayName(focus.workspace.name))"
+        menu.addItem(NSMenuItem(title: "WinMuxX · \(place)", action: nil, keyEquivalent: ""))
+        if native, !runtime.workspaceBackend.native.tiling.ready {
+            let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Tiling off (observation only)"
+            menu.addItem(NSMenuItem(title: state, action: nil, keyEquivalent: ""))
+        }
         if activeMode != mainModeId {
             menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
         }
@@ -139,7 +158,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             addCommand("Next", script: "workspace next", to: workspacesMenu)
             addCommand("Back and Forth", script: "workspace-back-and-forth", to: workspacesMenu)
             for (workspace, target) in menuWorkspaceTargets() {
-                let item = addCommand(workspaceDisplayName(workspace.name), args: ["workspace", target], to: workspacesMenu)
+                let item = addCommand(menuWorkspaceTitle(workspace), args: ["workspace", target], to: workspacesMenu)
                 item?.state = workspace == focus.workspace ? .on : .off
             }
             workspacesMenu.addItem(.separator())
@@ -147,14 +166,14 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 addCommand("Previous", script: "move-node-to-workspace --focus-follows-window prev", to: submenu)
                 addCommand("Next", script: "move-node-to-workspace --focus-follows-window next", to: submenu)
                 for (workspace, target) in menuWorkspaceTargets() {
-                    addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", "--focus-follows-window", target], to: submenu)
+                    addCommand(menuWorkspaceTitle(workspace), args: ["move-node-to-workspace", "--focus-follows-window", target], to: submenu)
                 }
             }
             addSubmenu("Move Window to", to: workspacesMenu) { submenu in
                 addCommand("Previous", script: "move-node-to-workspace prev", to: submenu)
                 addCommand("Next", script: "move-node-to-workspace next", to: submenu)
                 for (workspace, target) in menuWorkspaceTargets() {
-                    addCommand(workspaceDisplayName(workspace.name), args: ["move-node-to-workspace", target], to: submenu)
+                    addCommand(menuWorkspaceTitle(workspace), args: ["move-node-to-workspace", target], to: submenu)
                 }
             }
         }
@@ -178,16 +197,33 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
-            addCommand("Dwindle", script: "workspace-layout dwindle", to: submenu)
-            addCommand("Master", script: "workspace-layout master", to: submenu)
+            for arrangement in [WorkspaceLayoutName.dwindle, .master, .scrolling] {
+                let item = addCommand(arrangement.rawValue.capitalized, script: "workspace-layout \(arrangement.rawValue)", to: submenu)
+                item?.image = MenuBarLayoutIcon.image(for: arrangement, monochrome: true)
+                item?.state = focus.workspace.arrangement == arrangement ? .on : .off
+            }
             submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
             addCommand("Swap with Master", script: "swap-with-master", to: submenu)
+            addCommand("Center Scrolling Column", script: "scrolling-center", to: submenu)
+            addCommand("Show Scrolling Minimap", script: "scrolling-minimap", to: submenu)
+            addCommand("Cycle Scrolling Width", script: "scrolling-width next", to: submenu)
+            addCommand("Pin Column Left", script: "scrolling-pin left", to: submenu)
+            addCommand("Pin Column Right", script: "scrolling-pin right", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
+            submenu.addItem(.separator())
+            addCommand("Undo Layout Change", script: "undo-layout", to: submenu)
+            addCommand("Retile", script: "retile", to: submenu, requiresWindow: false)
         }
         addCommand("Fullscreen", script: "fullscreen", to: menu)
+        addCommand("No Peek", script: "no-peek", to: menu, requiresWindow: false)?.state = InactiveWindowDimmer.shared.noPeek ? .on : .off
+        addCommand("Clean Space", script: "presentation toggle", to: menu)?.state = WorkspacePresentationController.shared.isActive ? .on : .off
+        if capturedRuleTarget != nil {
+            menu.addItem(callbackItem("Always Float This App…", #selector(alwaysFloatApp)))
+            menu.addItem(callbackItem("Create Floating Rule for This Window…", #selector(floatThisWindow)))
+        }
         addCommand("Balance Sizes", script: "balance-sizes", to: menu)
         if sortedMonitors.count > 1 {
             addSubmenu("Display", to: menu) { submenu in
@@ -208,6 +244,10 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
+        let controls = callbackItem("Workspace Controls…", #selector(openWorkspaceControls))
+        controls.isEnabled = !native
+        menu.addItem(controls)
+        if native { menu.addItem(callbackItem("Refresh Desktops", #selector(refreshNativeSpaces))) }
         addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
         if !PersistedAppMinimums.shared.isEmpty || MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
             menu.addItem(callbackItem("Clear Saved Minimum Sizes…", #selector(resetMinimumSizes)))
@@ -248,7 +288,9 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private func addCommand(_ title: String, command: any Command, to menu: NSMenu, requiresWindow: Bool? = nil, allowDisabled: Bool = false) -> NSMenuItem {
         let item = commandItem(title, commands: [command])
         let needsWindow = requiresWindow ?? menuCommandRequiresWindow(command)
-        item.isEnabled = (allowDisabled || TrayMenuModel.shared.isEnabled) && (!needsWindow || focus.windowOrNil != nil)
+        let accepted = runtime.workspaceBackend.accepts(command)
+        item.isEnabled = accepted && (allowDisabled || TrayMenuModel.shared.isEnabled) && (!needsWindow || focus.windowOrNil != nil)
+        if !accepted { item.toolTip = "Not available with native Spaces" }
         applyBindings(bindings.bindings(for: command), to: item)
         menu.addItem(item)
         return item
@@ -306,12 +348,122 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
     }
 
-    @objc private func openSettings() { ShortcutSettingsModel.shared.requestWindowOpen() }
+    @objc private func openSettings() {
+        WorkspaceControlsPanelController.shared.dismiss()
+        ShortcutSettingsModel.shared.requestWindowOpen()
+    }
+    @objc private func openWorkspaceControls() {
+        Task { @MainActor in WorkspaceControlsPanelController.shared.show() }
+    }
+    @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
+    @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }
+
+    func createQuickFloatingRule(for focus: LiveFocus, match: QuickFloatingRuleMatch?) {
+        guard let window = focus.windowOrNil as? MacWindow,
+              let bundleId = window.macApp.rawAppBundleId else { return }
+        capturedRuleTarget = QuickFloatingRuleTarget(window: window, focus: focus, bundleId: bundleId,
+            pid: window.macApp.pid, launchDate: window.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
+        createQuickFloatingRule(match: match)
+    }
+
+    private func createQuickFloatingRule(match requestedMatch: QuickFloatingRuleMatch?) {
+        guard let target = capturedRuleTarget else { return }
+        Task { @MainActor in
+            let title = (try? await target.window.title) ?? ""
+            let selectedMatch: QuickFloatingRuleMatch
+            if let requestedMatch { selectedMatch = requestedMatch }
+            else {
+                guard !title.isEmpty else {
+                    showQuickRuleMessage("This window has no title", details: "A title rule needs a nonempty window title.")
+                    return
+                }
+                let alert = NSAlert()
+                alert.messageText = "Create a floating rule for this window?"
+                alert.informativeText = "\(target.window.macApp.name ?? target.bundleId) · \(title)"
+                let matchPicker = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 220, height: 26), pullsDown: false)
+                matchPicker.addItems(withTitles: ["Exact title", "Title starts with"])
+                alert.accessoryView = matchPicker
+                alert.addButton(withTitle: "Cancel")
+                alert.addButton(withTitle: "Create Rule")
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+                selectedMatch = matchPicker.indexOfSelectedItem == 1 ? .titlePrefix(title) : .exactTitle(title)
+            }
+
+            let configText: String
+            do { configText = try ConfigFileStore.read(preferredEditableConfigUrl()) ?? "" }
+            catch { showQuickRuleMessage("Could not read window rules", details: error.localizedDescription); return }
+            if let conflict = QuickFloatingRuleDocument.conflict(in: configText, bundleId: target.bundleId,
+                                                                  appName: target.window.macApp.name, title: title) {
+                let details = conflict.actions.isEmpty ? "The earlier matching rule has no readable actions." : conflict.actions.joined(separator: " → ")
+                let alert = NSAlert()
+                alert.messageText = "An earlier window rule may match"
+                alert.informativeText = "Rule \(conflict.ruleIndex + 1) runs first and stops further callbacks. Existing actions: \(details)"
+                alert.addButton(withTitle: "Cancel")
+                alert.addButton(withTitle: "Open Configuration")
+                if alert.runModal() == .alertSecondButtonReturn { openConfig() }
+                return
+            }
+
+            let matchingWindows = MacWindow.allWindows.filter { $0.macApp.rawAppBundleId == target.bundleId }
+            var matchingTitles: [String] = []
+            for window in matchingWindows {
+                let currentTitle = (try? await window.title) ?? ""
+                guard !currentTitle.isEmpty else { continue }
+                if QuickFloatingRuleDocument.matchesTitle(currentTitle, with: selectedMatch) { matchingTitles.append(currentTitle) }
+            }
+            let matchDescription: String
+            switch selectedMatch {
+                case .application: matchDescription = "all windows from this app"
+                case .exactTitle(let value): matchDescription = "the exact title ‘\(value)’"
+                case .titlePrefix(let value): matchDescription = "titles starting with ‘\(value)’"
+            }
+            let review = NSAlert()
+            review.messageText = "Save floating rule?"
+            review.informativeText = "App: \(target.window.macApp.name ?? target.bundleId) (\(target.bundleId))\nRule: \(matchDescription)\nCurrently matching windows: \(matchingTitles.isEmpty ? "none" : matchingTitles.joined(separator: ", "))"
+            review.addButton(withTitle: "Cancel")
+            review.addButton(withTitle: "Save Rule")
+            guard review.runModal() == .alertSecondButtonReturn else { return }
+
+            let rule = QuickFloatingRuleDocument.rule(bundleId: target.bundleId, match: selectedMatch)
+            persistSettingsDocumentEdit(model: ShortcutSettingsModel.shared, settingIDs: ["on-window-detected"], onSaved: {
+                guard target.isStillCurrent else {
+                    self.showQuickRuleMessage("Rule saved", details: "The captured window changed before it could be floated. The rule will apply to future matching windows.")
+                    return
+                }
+                guard case .cmd(let command) = parseCommand("layout floating") else { return }
+                let environment = CmdEnv.defaultEnv.withFocus(target.focus)
+                Task {
+                    do {
+                        try await runLightSession(.menuBarButton, .forceRun, shouldSchedulePostRefresh: true) {
+                            _ = try await [command].runCmdSeq(environment, .emptyStdin)
+                        }
+                    } catch { self.showQuickRuleMessage("Rule saved, but the window could not be floated", details: error.localizedDescription) }
+                }
+            }, onFailure: { error in
+                self.showQuickRuleMessage("Could not save floating rule", details: error.localizedDescription)
+            }) { current in
+                guard QuickFloatingRuleDocument.conflict(in: current, bundleId: target.bundleId,
+                                                         appName: target.window.macApp.name, title: title) == nil else {
+                    throw SettingsDisplayError("An earlier stopping window rule now matches. Review the rules before saving.")
+                }
+                return try QuickFloatingRuleDocument.adding(rule, to: current)
+            }
+        }
+    }
+
+    private func showQuickRuleMessage(_ title: String, details: String) {
+        let alert = NSAlert()
+        alert.messageText = title
+        alert.informativeText = details
+        alert.runModal()
+    }
     @objc private func copyVersion() { "\(winMuxAppName) v\(winMuxAppVersion) \(gitHash)".copyToClipboard() }
     @objc private func openConfig() {
+        WorkspaceControlsPanelController.shared.dismiss()
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }
+    @objc private func refreshNativeSpaces() { runtime.workspaceBackend.native.observation?.requestRead() }
     @objc private func resetMinimumSizes() {
         let alert = NSAlert()
         alert.messageText = "Reset learned minimum window sizes?"
@@ -320,7 +472,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         alert.addButton(withTitle: "Reset")
         guard alert.runModal() == .alertSecondButtonReturn else { return }
         PersistedAppMinimums.shared.reset()
-        for window in MacWindow.allWindows { window.resetLearnedMinimum() }
     }
     @objc private func recoverWindows() {
         let alert = NSAlert()
@@ -341,6 +492,30 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
 }
 
+@MainActor
+private struct QuickFloatingRuleTarget {
+    let window: MacWindow
+    let focus: LiveFocus
+    let bundleId: String
+    let pid: Int32
+    let launchDate: Date?
+    let workspaceId: WorkspaceId
+
+    var isStillCurrent: Bool {
+        var node: TreeNode? = window
+        var currentWorkspace: Workspace?
+        while let current = node {
+            if let workspace = current as? Workspace { currentWorkspace = workspace; break }
+            node = current.parent
+        }
+        guard MacWindow.allWindowsMap[window.windowId] === window,
+              window.macApp.pid == pid, window.macApp.nsApp.launchDate == launchDate,
+              window.macApp.rawAppBundleId == bundleId, currentWorkspace?.id == workspaceId,
+              !window.macApp.nsApp.isTerminated else { return false }
+        return true
+    }
+}
+
 final class MenuCommandPayload {
     let commands: [any Command]
     init(commands: [any Command]) { self.commands = commands }
@@ -359,12 +534,10 @@ func menuCommandRequiresWindow(_ command: any Command) -> Bool {
 
 @MainActor
 func menuWorkspaceTargets() -> [(workspace: Workspace, target: String)] {
-    userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: focus.workspace)
-        .filter { $0.projectId == focus.workspace.projectId }
-        .map { workspace in
-            let target = workspace.usesAutomaticDisplayName
-                ? automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focus.workspace).map(String.init) ?? workspace.name
-                : workspace.name
-            return (workspace, target)
-        }
+    runtime.workspaceBackend.current.commandTargets()
+}
+
+@MainActor
+func menuWorkspaceTitle(_ workspace: Workspace) -> String {
+    runtime.workspaceBackend.current.title(ofWorkspaceNamed: workspace.name)
 }

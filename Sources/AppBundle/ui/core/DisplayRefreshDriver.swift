@@ -165,11 +165,6 @@ final class DisplayRefreshDriver {
 
 }
 
-func displayRefreshEaseInOut(_ progress: CGFloat) -> CGFloat {
-    let clamped = min(max(progress, 0), 1)
-    return clamped * clamped * (3 - 2 * clamped)
-}
-
 func displayRefreshInterpolate(_ start: CGFloat, _ end: CGFloat, progress: CGFloat) -> CGFloat {
     start + (end - start) * progress
 }

@@ -5,6 +5,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
     let notif = notif as String
     let windowId = ax.containingWindowId()
     Task { @MainActor in
+        if runtime.workspaceBackend.current.windowGeometryChanged(windowId, moved: false) { return }
         if let windowId, WindowMotion.shared.isAnimating(windowId), NSEvent.pressedMouseButtons & 1 == 0 {
             Window.get(byId: windowId)?.invalidateLastKnownNativeState()
             return
@@ -28,7 +29,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
         }
         if isContinuingManagedDragSessionForResizedEvent(windowId) { return }
         guard try await isManipulatedWithMouse(window) else {
-            scheduleRefreshSession(.ax(notif))
+            VirtualFrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
             return
         }
         guard window.parent is TilingContainer else {

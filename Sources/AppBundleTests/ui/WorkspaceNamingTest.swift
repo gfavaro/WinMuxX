@@ -53,7 +53,7 @@ final class WorkspaceNamingTest: XCTestCase {
         _ = second.focusWorkspace()
         try renameWorkspaceForSidebar(workspaceName: third.name, displayName: "Browser")
         oldWindow.unbindFromParent()
-        removeWorkspaceFromRegistry(first)
+        removeWorkspaceFromRegistry(first, forgetLabel: true)
         XCTAssertEqual(workspaceDisplayName(second.name), "Workspace 1")
         XCTAssertEqual(workspaceDefaultDisplayName(third.name), "Workspace 2")
         XCTAssertEqual(workspaceDisplayName(third.name), "Browser")
@@ -243,6 +243,30 @@ final class WorkspaceNamingTest: XCTestCase {
         XCTAssertEqual(workspaceDisplayName(first.name), "Workspace 1")
         XCTAssertEqual(workspaceDisplayName(second.name), "Workspace 2")
         XCTAssertTrue(Workspace.existing(byName: "3") === second)
+    }
+
+    func testDeletingAWorkspaceNeverFallsBackToOneShowingOnAnotherDisplay() throws {
+        // WinMux issue #45: two displays, workspace 2 on the secondary, delete 3 on the main.
+        let main = WorkspaceNamingTestMonitor(monitorAppKitNsScreenScreensId: 1, name: "Main",
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080), isMain: true)
+        let secondary = WorkspaceNamingTestMonitor(monitorAppKitNsScreenScreensId: 2, name: "Secondary",
+            rect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080), isMain: false)
+        setMonitorsForTests([main, secondary])
+        let two = Workspace.get(byName: "2")
+        _ = TestWindow.new(id: 211, parent: two.rootTilingContainer)
+        let three = Workspace.get(byName: "3")
+        XCTAssertTrue(secondary.setActiveWorkspace(two))
+        XCTAssertTrue(main.setActiveWorkspace(three))
+        _ = three.focusWorkspace()
+
+        let fallback = workspaceFallbackForDeletion(excluding: three, projectId: three.projectId, monitor: main)
+        XCTAssertFalse(fallback === two, "2 is showing on the secondary display")
+        try deleteWorkspaceForSidebar(workspaceName: three.name)
+
+        XCTAssertNil(Workspace.existing(byName: "3"))
+        XCTAssertTrue(runtime.workspaces.visibleWorkspace(for: secondary) === two, "The secondary keeps showing 2")
     }
 
     func testDeletingMiddleAutomaticWorkspaceCompactsNamesWithoutReorderingSurvivors() throws {

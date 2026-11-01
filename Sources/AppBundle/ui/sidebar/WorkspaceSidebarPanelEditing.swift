@@ -120,7 +120,8 @@ extension WorkspaceSidebarPanel {
         inlineTextEditingPointerEnteredVisibleRegion = false
         removeInlineTextEditingEventMonitors()
         removeInlineTextEditingKeyEventTap()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.04) { [weak self] in
+        // After the caller finishes tearing the editor down, not a guessed 40 ms later.
+        DispatchQueue.main.async { [weak self] in
             self?.updateHoverStateFromMousePosition()
         }
     }

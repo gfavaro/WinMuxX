@@ -22,7 +22,7 @@ func updatePendingWindowDragIntent(
         mouseLocation: mouseLocation,
         subject: subject,
         detachOrigin: detachOrigin,
-    ) else {
+    ), isWindowDragIntentKindEnabled(destination.kind) else {
         logWindowDragIntentIfNeeded(
             signature: "drag-live:no-destination:source=\(sourceWindow.windowId):subject=\(debugDescribe(subject)):origin=\(detachOrigin):bucket=\(debugDescribeDragPointBucket(mouseLocation))",
             "[drag-live] destination none source=\(sourceWindow.windowId) subject=\(debugDescribe(subject)) origin=\(detachOrigin) mouse=\(debugDescribe(mouseLocation)) bucket=\(debugDescribeDragPointBucket(mouseLocation)); clearing previews"

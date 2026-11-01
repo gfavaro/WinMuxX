@@ -6,6 +6,7 @@ import SwiftUI
 extension WorkspaceSidebarPanel {
     func animateVisibleSidebarWidth(_ width: CGFloat, animation: Animation) {
         guard !isRetired else { return }
+        loadContent()
         debugWorkspaceSidebarHoverLog("animateWidth panel=\(monitorScopeId) from=\(viewModel.workspaceSidebarVisibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(viewModel.isWorkspaceSidebarExpanded)")
         pendingBackingResize?.cancel()
         let resize = DispatchWorkItem { [weak self] in

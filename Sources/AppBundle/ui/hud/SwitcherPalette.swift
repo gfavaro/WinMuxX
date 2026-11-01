@@ -1,5 +1,6 @@
 import AppKit
 import Common
+import NativeSpaces
 import SwiftUI
 
 private let switcherPalettePanelId = "WinMux.switcherPalette"
@@ -68,6 +69,11 @@ final class SwitcherPaletteModel: ObservableObject {
 final class SwitcherPalettePanel: NSPanelHud {
     static let shared = SwitcherPalettePanel()
     private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+    /// Building the view took ~35 ms of each open, so a closed palette keeps its view and
+    /// rows for `heldContentLifetime`; reopening within it only updates what changed.
+    private var hasPaletteView = false
+    private let heldContentLifetime: Duration
+    private var pendingRelease: Task<Void, Never>?
     private let model: SwitcherPaletteModel
     private(set) var isPaletteActive = false
     private var outsideClickMonitors: [Any] = []
@@ -83,8 +89,10 @@ final class SwitcherPalettePanel: NSPanelHud {
          loadItems: (@MainActor () async -> [SwitcherPaletteItem])? = nil,
          nativePresentation: Bool = true,
          observeOutsideClicks: (@MainActor (@escaping @MainActor () -> Void) -> [Any])? = nil,
-         removeMonitor: @escaping @MainActor (Any) -> Void = { NSEvent.removeMonitor($0) }) {
+         removeMonitor: @escaping @MainActor (Any) -> Void = { NSEvent.removeMonitor($0) },
+         heldContentLifetime: Duration = .seconds(30)) {
         self.model = model
+        self.heldContentLifetime = heldContentLifetime
         self.loadItems = loadItems ?? { await buildSwitcherPaletteItems() }
         self.nativePresentation = nativePresentation
         self.observeOutsideClicks = observeOutsideClicks
@@ -109,6 +117,8 @@ final class SwitcherPalettePanel: NSPanelHud {
 
     func show(groupByWorkspace: Bool = false) async {
         guard !isPaletteActive else { return }
+        pendingRelease?.cancel()
+        pendingRelease = nil
         if nativePresentation { WorkspaceOverviewController.shared.dismiss(restoreFocus: false) }
         presentationGeneration &+= 1
         let generation = presentationGeneration
@@ -120,6 +130,7 @@ final class SwitcherPalettePanel: NSPanelHud {
         // toggle may have dismissed the palette in the meantime.
         guard isPaletteActive, presentationGeneration == generation else { return }
         model.items = items
+        model.objectWillChange.send()
         model.groupByWorkspace = groupByWorkspace
         model.query = ""
         model.selection = 0
@@ -141,10 +152,15 @@ final class SwitcherPalettePanel: NSPanelHud {
             display: true,
             animate: false,
         )
-        hostingView.rootView = AnyView(SwitcherPaletteView(model: model, dismiss: { [weak self] in self?.dismiss() }))
+        if !hasPaletteView {
+            hasPaletteView = true
+            hostingView.rootView = AnyView(SwitcherPaletteView(model: model, dismiss: { [weak self] in self?.dismiss() }))
+        }
         orderFrontRegardless()
         NSApp.activate(ignoringOtherApps: true)
         makeKey()
+        // A new field focuses itself once; a kept one is focused on every open.
+        if let field = hostingView.firstDescendant(ofType: NativeSearchField.self) { makeFirstResponder(field) }
         installOutsideClickMonitors()
     }
 
@@ -181,12 +197,27 @@ final class SwitcherPalettePanel: NSPanelHud {
             runtime.publicState.paletteVisible = false
             requestPublicStateUpdate()
             orderOut(nil)
-            hostingView.rootView = AnyView(EmptyView())
         }
-        model.items = []
         model.onSelect = nil
         if !model.query.isEmpty { model.query = "" }
         if model.selection != 0 { model.selection = 0 }
+        guard pendingRelease == nil, hasPaletteView || !model.items.isEmpty else { return }
+        let lifetime = heldContentLifetime
+        pendingRelease = Task { @MainActor [weak self] in
+            do { try await Task.sleep(for: lifetime) } catch { return }
+            self?.releaseHeldContent()
+        }
+    }
+
+    /// Drops the rows, their icons and the view tree of a palette not reopened in time.
+    func releaseHeldContent() {
+        pendingRelease?.cancel()
+        pendingRelease = nil
+        guard !isPaletteActive else { return }
+        model.items = []
+        model.objectWillChange.send()
+        hostingView.rootView = AnyView(EmptyView())
+        hasPaletteView = false
     }
 
     private func select(_ windowId: UInt32) {
@@ -194,10 +225,9 @@ final class SwitcherPalettePanel: NSPanelHud {
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
             try await runLightSession(.menuBarButton, token) {
-                guard let window = Window.get(byId: windowId), let liveFocus = window.toLiveFocusOrNil() else { return }
-                window.markAsMostRecentChild()
-                _ = setFocus(to: liveFocus)
-                window.nativeFocus()
+                if let error = try await runtime.workspaceBackend.current.bringForward(windowId) {
+                    MessageModel.shared.message = Message(description: "Palette", body: error)
+                }
             }
         }
     }
@@ -240,7 +270,11 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
     let focusedWindowId = focus.windowOrNil?.windowId
     let focusedWorkspace = focus.workspace
     // Focused workspace first, then the rest — so an empty query shows nearby windows on top.
-    let workspaces = [focusedWorkspace] + Workspace.all.filter { $0 != focusedWorkspace }
+    let candidates = runtime.workspaceBackend.current.listedWorkspaces(.all)
+    // A focused workspace outside the listing (a native fullscreen Space) adds nothing.
+    let workspaces = candidates.contains(focusedWorkspace)
+        ? [focusedWorkspace] + candidates.filter { $0 != focusedWorkspace }
+        : candidates
     let indexedWindows = workspaces.flatMap { workspace in
         workspace.allLeafWindowsRecursive.filter(\.isBound).map { (window: $0, workspaceName: workspace.name) }
     }
@@ -259,7 +293,22 @@ private func buildSwitcherPaletteItems() async -> [SwitcherPaletteItem] {
             items[index] = item
         }
     }
-    return items.compactMap { $0 }
+    return items.compactMap { $0 } + runtime.workspaceBackend.ui.extraPaletteItems()
+}
+
+/// Windows on desktops not showing yet; choosing one switches there first.
+@MainActor
+func nativeListedPaletteItems() -> [SwitcherPaletteItem] {
+    let displays = nativeObservedDisplays() ?? []
+    return NativeUnvisitedWindows.shared.bySpaceID.flatMap { space, windows -> [SwitcherPaletteItem] in
+        guard let number = NativeSpaceNavigation.desktopNumber(of: space, in: displays) else { return [] }
+        return windows.map { listed in
+            let app = NSRunningApplication(processIdentifier: listed.pid)
+            let appName = app?.localizedName ?? app?.bundleIdentifier ?? "Unknown"
+            return SwitcherPaletteItem(id: listed.windowId, title: listed.title ?? appName, appName: appName, icon: app?.icon,
+                workspaceName: "", isFocused: false, workspaceTitle: nativeDesktopDisplayName(number))
+        }
+    }
 }
 
 @MainActor
@@ -269,8 +318,9 @@ func makeSwitcherPaletteItem(
     focusedWindowId: UInt32?,
 ) async -> SwitcherPaletteItem {
     let appName = window.app.name ?? window.app.rawAppBundleId ?? "Unknown"
-    let workspaceTitle = workspaceDisplayName(workspaceName)
-    let projectName = Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) }
+    let backend = runtime.workspaceBackend.current
+    let workspaceTitle = backend.title(ofWorkspaceNamed: workspaceName)
+    let projectName = runtime.workspaceBackend.ui.hasProjects ? Workspace.existing(byName: workspaceName).map { workspaceProjectName($0.projectId) } : nil
     // A cold cache previously indexed every Finder window as only "Finder" until some other
     // UI happened to fetch its title. Fetch first-sight titles before showing the palette so
     // folder names are searchable immediately; known stale titles still return instantly and
@@ -456,5 +506,14 @@ private struct SwitcherPaletteRow: View {
         }
         .frame(minHeight: 26)
         .contentShape(Rectangle())
+    }
+}
+
+private extension NSView {
+    func firstDescendant<T: NSView>(ofType type: T.Type) -> T? {
+        for subview in subviews {
+            if let match = subview as? T ?? subview.firstDescendant(ofType: type) { return match }
+        }
+        return nil
     }
 }

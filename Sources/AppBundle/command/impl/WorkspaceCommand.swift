@@ -4,9 +4,10 @@ import Foundation
 
 struct WorkspaceCommand: Command {
     let args: WorkspaceCmdArgs
+    var nativeSpaceUUID: String? = nil
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
-    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+    func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
         let focusedMonitor = focus.workspace.workspaceMonitor
         let activationMonitor: Monitor
         if let description = args.monitorDescription {
@@ -99,22 +100,6 @@ struct WorkspaceCommand: Command {
         }
         return .focus(workspace)
     }
-}
-
-@MainActor
-private func focusOrReportNoop(
-    _ workspace: Workspace,
-    focusedWorkspace: Workspace,
-    io: CmdIo,
-    failIfNoop: Bool,
-) -> Bool {
-    if focusedWorkspace == workspace {
-        if !failIfNoop {
-            io.err("Workspace '\(workspaceDisplayName(workspace.name))' is already focused. Tip: use --fail-if-noop to exit with non-zero code")
-        }
-        return !failIfNoop
-    }
-    return workspace.focusWorkspace()
 }
 
 @MainActor

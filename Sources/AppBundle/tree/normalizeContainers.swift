@@ -1,5 +1,10 @@
 extension Workspace {
     @MainActor func normalizeContainers() {
+        if preservesTopLevelGroups {
+            rootTilingContainer.removeEmptyArrangementContainers()
+            normalizeMasterLayout()
+            return
+        }
         normalizeMasterLayout()
         materializeDwindleTree()
         rootTilingContainer.unbindEmptyAndAutoFlatten() // Beware! rootTilingContainer may change after this line of code
@@ -11,6 +16,13 @@ extension Workspace {
 }
 
 extension TilingContainer {
+    @MainActor fileprivate func removeEmptyArrangementContainers() {
+        for child in children {
+            (child as? TilingContainer)?.removeEmptyArrangementContainers()
+        }
+        if children.isEmpty && !isRootContainer { unbindFromParent() }
+    }
+
     @MainActor fileprivate func unbindEmptyAndAutoFlatten() {
         // Keep the dwindle root: it carries the insertion policy even when its only child is a tiles split.
         let preservesDwindleRoot = (isRootContainer && (layout == .dwindle || layout == .master)) || (parent as? TilingContainer)?.layout == .master

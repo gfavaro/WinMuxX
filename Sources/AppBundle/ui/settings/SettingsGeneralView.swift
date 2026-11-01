@@ -6,15 +6,46 @@ struct ShortcutGeneralSettingsView: View {
     @SettingsDraft("auto-reload-config", load: { config.autoReloadConfig }) private var autoReloadConfig: Bool
 
     @SettingsDraft("start-workspaces-on-main-monitor", load: { config.startWorkspacesOnMainMonitor }) private var startWorkspacesOnMain: Bool
+    @SettingsDraft("native-spaces.restore-layouts", load: { config.nativeSpaces.restoreLayouts }) private var restoreNativeLayouts: Bool
+    @SettingsDraft("native-spaces.restore-frames-on-quit", load: { config.nativeSpaces.restoreFramesOnQuit }) private var restoreFramesOnQuit: Bool
+    private let runsNative = runtime.workspaceBackend.kind == .native
+    /// Applied only by restarting: a running WinMuxX keeps its backend (see `reload-config`).
+    @State private var backendChoice = WorkspaceBackendChoice.running
 
     var body: some View {
         SettingsScrollView {
             SettingsSection("Startup") {
-                SettingsToggle("Start workspaces on main display", id: "start-workspaces-on-main-monitor", isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
-                    persistRootBool("start-workspaces-on-main-monitor", startWorkspacesOnMain)
+                if !runsNative {
+                    SettingsToggle("Start workspaces on main display", id: "start-workspaces-on-main-monitor", isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
+                        persistRootBool("start-workspaces-on-main-monitor", startWorkspacesOnMain)
+                    }
                 }
                 SettingsToggle("Start at login", id: "start-at-login", isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
                     persistRootBool("start-at-login", startAtLogin)
+                }
+            }
+            SettingsSection("Workspaces") {
+                Picker("Workspaces", selection: $backendChoice) {
+                    Text("WinMuxX workspaces").tag(WorkspaceBackendChoice.virtual)
+                    Text("macOS Spaces, tiled (experimental)").tag(WorkspaceBackendChoice.nativeTiled)
+                    Text("macOS Spaces, not tiled (experimental)").tag(WorkspaceBackendChoice.native)
+                }
+                Text("WinMuxX workspaces hide inactive windows off screen and move whole workspaces between displays. macOS Spaces keeps every window on a real desktop, so Mission Control and swipes between desktops work as usual.")
+                    .font(.caption).foregroundStyle(.secondary)
+                if runsNative {
+                    SettingsToggle("Restore desktop layouts", id: "native-spaces.restore-layouts", isOn: $restoreNativeLayouts, help: "Remember each desktop's layout and put it back after WinMuxX or the Mac restarts.") {
+                        persistSettingsConfig(section: "native-spaces", key: "restore-layouts", renderedValue: restoreNativeLayouts ? "true" : "false", model: model)
+                    }
+                    SettingsToggle("Put windows back on quit", id: "native-spaces.restore-frames-on-quit", isOn: $restoreFramesOnQuit, help: "Quitting WinMuxX or turning it off returns tiled windows on the desktops showing to where they were before tiling.") {
+                        persistSettingsConfig(section: "native-spaces", key: "restore-frames-on-quit", renderedValue: restoreFramesOnQuit ? "true" : "false", model: model)
+                    }
+                }
+                if backendChoice != .running {
+                    HStack {
+                        Text("Saves the choice and restarts WinMuxX.").font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Restart WinMuxX") { saveAndRestart(backendChoice) }
+                    }
                 }
             }
             SettingsSection("Configuration") {
@@ -22,12 +53,53 @@ struct ShortcutGeneralSettingsView: View {
                     persistRootBool("auto-reload-config", autoReloadConfig)
                 }
             }
+            SettingsSection("Setup Check") {
+                SetupCheckView()
+            }
+            SettingsSection("Troubleshooting") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Diagnostics")
+                        Text("Permissions, displays and tiling state, with a button to copy the report for a bug report.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Open Diagnostics…") { DiagnosticsWindowController.shared.show() }
+                }
+            }
         }
         .navigationTitle("General")
 
     }
 
+    private func saveAndRestart(_ choice: WorkspaceBackendChoice) {
+        do {
+            _ = try model.configAccess.edit { applyingSettingsConfigEdits(choice.configEdits, to: $0) }
+            relaunchApp()
+        } catch {
+            model.errorMessage = error.localizedDescription
+        }
+    }
+
     private func persistRootBool(_ key: String, _ value: Bool) {
         persistSettingsConfig(section: nil, key: key, renderedValue: value ? "true" : "false", model: model)
+    }
+}
+
+enum WorkspaceBackendChoice: Hashable {
+    case virtual, native, nativeTiled
+
+    var configEdits: [SettingsConfigEdit] {
+        [
+            SettingsConfigEdit(section: "workspace-backend", key: "type", renderedValue: self == .virtual ? "'virtual'" : "'native'"),
+            SettingsConfigEdit(section: "native-spaces", key: "tiling-enabled", renderedValue: self == .nativeTiled ? "true" : "false"),
+        ]
+    }
+
+    @MainActor static var running: Self {
+        switch runtime.workspaceBackend.kind {
+            case .virtual: .virtual
+            case .native: runtime.workspaceBackend.native.tilingEnabled ? .nativeTiled : .native
+        }
     }
 }

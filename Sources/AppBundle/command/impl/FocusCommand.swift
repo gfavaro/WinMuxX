@@ -6,11 +6,23 @@ struct FocusCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
+        let focused = try await focusInTree(env, io)
+        if focused { runtime.workspaceBackend.current.focusDidMove(to: focus.windowOrNil) }
+        return focused
+    }
+
+    @MainActor private func focusInTree(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
+        target.workspace.lastScrollingFocusWindowId = nil
         // todo bug: floating windows break mru
-        let floatingWindows = args.floatingAsTiling ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
+        // Native floating windows retain their ownership and physical geometry.
+        // Do not temporarily rebind them across asynchronous AX reads. Explicit
+        // --window-id focus still supports them without a tree mutation.
+        let includeFloating = args.floatingAsTiling && runtime.workspaceBackend.capabilities.arrangesFloatingWindows
+        let floatingWindows = includeFloating ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
         defer {
-            if args.floatingAsTiling {
+            if includeFloating {
                 restoreFloatingWindows(floatingWindows: floatingWindows, workspace: target.workspace)
             }
         }
@@ -18,13 +30,40 @@ struct FocusCommand: Command {
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil
-                if [Layout.dwindle, .master].contains(target.workspace.rootTilingContainer.layout), let window,
+                if target.workspace.arrangement == .scrolling, let window {
+                    let groups = target.workspace.workspaceLayoutUnits
+                    if direction.orientation == .h,
+                       let index = groups.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) {
+                        let next = index + direction.focusOffset
+                        if groups.indices.contains(next),
+                           let destination = groups[next].mostRecentWindowRecursive {
+                            return destination.focusWindow()
+                        }
+                        return hitWorkspaceBoundaries(target, io, args, direction)
+                    }
+                    if direction.orientation == .v,
+                       let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction,
+                            candidates: window.topLevelWorkspaceGroup.allLeafWindowsRecursive) {
+                        return neighbor.focusWindow()
+                    }
+                    if direction.orientation == .v {
+                        switch args.boundariesAction {
+                            case .stop: return true
+                            case .fail: return false
+                            case .wrapAroundTheWorkspace, .wrapAroundAllMonitors:
+                                return spatialWrapFocusTarget(in: target.workspace, from: window, direction: direction,
+                                    candidates: window.topLevelWorkspaceGroup.allLeafWindowsRecursive)?.focusWindow() ?? false
+                        }
+                    }
+                }
+                if target.workspace.usesSpatialFocus, let window,
                    let (group, index) = window.closestParent(hasChildrenInDirection: direction, withLayout: nil),
                    group.layout == .stacked,
+                   target.workspace.arrangement == .dwindle || group !== target.workspace.rootTilingContainer,
                    let neighbor = group.children.getOrNil(atIndex: index + direction.focusOffset)?.findLeafWindowRecursive(snappedTo: direction.opposite) {
                     return neighbor.focusWindow()
                 }
-                if [Layout.dwindle, .master].contains(target.workspace.rootTilingContainer.layout), let window {
+                if target.workspace.usesSpatialFocus, let window {
                     if let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction) {
                         return neighbor.focusWindow()
                     }
@@ -99,7 +138,10 @@ struct FocusCommand: Command {
             }
 
             if let targetMonitor = monitors.getOrNil(atIndex: index) {
-                return targetMonitor.activeWorkspace.focusWorkspace()
+                guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: targetMonitor) else {
+                    return io.err("\(targetMonitor.name) shows no desktop")
+                }
+                return shown.focusWorkspace()
             } else {
                 guard let wrapped = monitors.get(wrappingIndex: index) else { return false }
                 return hitAllMonitorsOuterFrameBoundaries(target, io, args, direction, wrapped)
@@ -122,13 +164,14 @@ struct FocusCommand: Command {
         case .wrapAroundTheWorkspace:
             return wrapAroundTheWorkspace(target, io, direction)
         case .wrapAroundAllMonitors:
-            wrappedMonitor.activeWorkspace.findLeafWindowRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
-            return wrappedMonitor.activeWorkspace.focusWorkspace()
+            guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: wrappedMonitor) else { return false }
+            shown.findLeafWindowRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
+            return shown.focusWorkspace()
     }
 }
 
 @MainActor private func wrapAroundTheWorkspace(_ target: LiveFocus, _ io: CmdIo, _ direction: CardinalDirection) -> Bool {
-    if [Layout.dwindle, .master].contains(target.workspace.rootTilingContainer.layout) {
+    if target.workspace.usesSpatialFocus {
         return spatialWrapFocusTarget(in: target.workspace, from: target.windowOrNil, direction: direction)?.focusWindow()
             ?? io.err(noWindowIsFocused)
     }

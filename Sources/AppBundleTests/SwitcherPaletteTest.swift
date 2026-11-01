@@ -29,7 +29,7 @@ final class SwitcherPaletteTest: XCTestCase {
     }
 
     @MainActor
-    func testDismissReleasesItemsIconsAndSelectionCallbackEvenWhenAlreadyHidden() {
+    func testDismissReleasesCallbackAndHeldItemsAndIconsAfterTheHoldEvenWhenAlreadyHidden() {
         let model = SwitcherPaletteModel()
         let panel = SwitcherPalettePanel(model: model)
         defer { panel.close() }
@@ -47,9 +47,11 @@ final class SwitcherPaletteTest: XCTestCase {
         XCTAssertNotNil(retainedIcon)
         XCTAssertNotNil(retainedCallbackOwner)
         panel.dismiss()
+        XCTAssertNil(retainedCallbackOwner)
+        XCTAssertNotNil(retainedIcon, "Rows are held briefly so a reopen does not rebuild them")
+        panel.releaseHeldContent()
         XCTAssertTrue(model.items.isEmpty)
         XCTAssertNil(retainedIcon)
-        XCTAssertNil(retainedCallbackOwner)
         panel.dismiss()
         XCTAssertTrue(model.results.isEmpty)
     }

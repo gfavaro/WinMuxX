@@ -4,11 +4,6 @@ let workspaceSidebarDefaultScopeId = "default"
 let workspaceSidebarFocusedScopeId = "focused"
 private let workspaceSidebarMonitorScopePrefix = "monitor:"
 
-func workspaceSidebarMonitorScopeIsSentinel(_ scopeId: String) -> Bool {
-    scopeId == workspaceSidebarDefaultScopeId ||
-        scopeId == workspaceSidebarFocusedScopeId
-}
-
 func workspaceSidebarMonitorScopeId(for monitor: Monitor) -> String {
     workspaceSidebarMonitorScopeId(for: monitor.rect.topLeftCorner)
 }

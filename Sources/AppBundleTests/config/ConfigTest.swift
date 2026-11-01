@@ -244,6 +244,7 @@ final class ConfigTest: XCTestCase {
         let proxy = OpaquePointer(bitPattern: 1)!
         let event = CGEvent(keyboardEventSource: nil, virtualKey: 48, keyDown: true)!
         event.flags = .maskAlternate
+        let fired = tapBindingTriggerCountForTests()
         for type: CGEventType in [.keyDown, .leftMouseDown] {
             noteTapBindingFlagsChanged(keyCode: 58, modifierFlags: optionDown)
             XCTAssertTrue(hasPendingTapBindingForTests())
@@ -252,9 +253,27 @@ final class ConfigTest: XCTestCase {
             noteTapBindingFlagsChanged(keyCode: 58, modifierFlags: [])
             XCTAssertFalse(hasPendingTapBindingForTests())
         }
+        XCTAssertEqual(tapBindingTriggerCountForTests(), fired)
+        // A clean tap fires on release, with no grace period.
         noteTapBindingFlagsChanged(keyCode: 58, modifierFlags: optionDown)
         noteTapBindingFlagsChanged(keyCode: 58, modifierFlags: [])
-        XCTAssertTrue(hasPendingTapBindingForTests())
+        XCTAssertEqual(tapBindingTriggerCountForTests(), fired + 1)
+        XCTAssertFalse(hasPendingTapBindingForTests())
+    }
+
+    func testHeldModifierIsNoTap() async throws {
+        resetHotKeys()
+        defer { resetHotKeys() }
+        config.modes = [mainModeId: Mode(bindings: [:], tapBindings: [
+            "right-alt": TapBinding(.rightAlt, [FocusCommand.new(direction: .left)]),
+        ])]
+        try await activateMode(mainModeId)
+        let down: NSEvent.ModifierFlags = [.option, TapModifierKey.rightAlt.deviceSpecificModifierFlag]
+        let fired = tapBindingTriggerCountForTests()
+        noteTapBindingFlagsChanged(keyCode: 61, modifierFlags: down)
+        try await Task.sleep(for: .milliseconds(350))
+        noteTapBindingFlagsChanged(keyCode: 61, modifierFlags: [])
+        XCTAssertEqual(tapBindingTriggerCountForTests(), fired)
     }
 
     func testBindingEqualityChecksCommandCount() {

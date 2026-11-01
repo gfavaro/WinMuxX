@@ -164,6 +164,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: focus,
             previousFocus: previousFocus,
@@ -176,6 +177,37 @@ final class WindowTabsTest: XCTestCase {
         )
 
         XCTAssertEqual(replacementFocus?.windowOrNil, expectedTab)
+    }
+
+    @MainActor
+    func testFocusAfterWindowClosureIgnoresClosureOfUnfocusedWindow() {
+        // From WinMux PR #32: a short-lived floating window the user never focused closes.
+        setUpWorkspacesForTests()
+        let workspace = Workspace.get(byName: "tabs")
+        let tabGroup = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, .v, .tabGroup, index: INDEX_BIND_LAST)
+        let working = TestWindow.new(id: 1, parent: tabGroup)
+        let older = TestWindow.new(id: 2, parent: tabGroup)
+        let viewer = TestWindow.new(id: 9, parent: workspace)
+        XCTAssertTrue(older.focusWindow())
+        let previousFocus = focus
+        XCTAssertTrue(working.focusWindow())
+
+        let replacementFocus = focusAfterWindowClosure(
+            closingWindow: viewer,
+            focusedWindowIdBeforeClosure: working.windowId,
+            deadWindowWorkspace: workspace,
+            currentFocus: focus,
+            previousFocus: previousFocus,
+            previousPreviousFocus: nil,
+            refreshSnapshotCloseFallback: previousFocus,
+            refreshSnapshotPreviousFocus: previousFocus,
+            refreshSnapshotPreviousPreviousFocus: nil,
+            previousFocusedWorkspace: prevFocusedWorkspace,
+            previousFocusedWorkspaceDate: .now,
+        )
+
+        XCTAssertNil(replacementFocus, "Focus stays on the window being worked in")
+        XCTAssertEqual(focus.windowOrNil, working)
     }
 
     @MainActor
@@ -198,6 +230,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: focus,
             previousFocus: closingWindow.toLiveFocusOrNil(),
@@ -230,6 +263,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: focus,
             previousFocus: closingWindow.toLiveFocusOrNil(),
@@ -264,6 +298,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: focus,
             previousFocus: nil,
@@ -289,6 +324,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: provisionalSameAppFocus.toLiveFocusOrNil().orDie(),
             previousFocus: nil,
@@ -316,6 +352,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: staleFallbackTab.toLiveFocusOrNil().orDie(),
             previousFocus: nil,
@@ -342,6 +379,7 @@ final class WindowTabsTest: XCTestCase {
 
         let replacementFocus = focusAfterWindowClosure(
             closingWindow: closingWindow,
+            focusedWindowIdBeforeClosure: closingWindow.windowId,
             deadWindowWorkspace: workspace,
             currentFocus: staleFallbackTab.toLiveFocusOrNil().orDie(),
             previousFocus: nil,

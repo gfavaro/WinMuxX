@@ -177,7 +177,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(snapshots.cache.count, 0)
     }
 
-    func testFreshWarmImageReplacesCacheWithoutResubmittingTheOverlay() async throws {
+    func testFreshWarmImageIsCachedForTheNextSwipeWithoutChangingTheSlide() async throws {
         let started = expectation(description: "refresh started")
         let delivered = expectation(description: "refresh delivered")
         let gate = controlledRenderer { _ in started.fulfill() }
@@ -201,6 +201,9 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(preview.timings.last?.submissionMs, firstSubmission)
         XCTAssertEqual(preview.timings.last?.workerMs, 120)
         XCTAssertTrue(snapshots.cache.image(for: request().key) === freshImage)
+        let panel = try XCTUnwrap(NSApplication.shared.windows.first { $0.isVisible && $0.level == .screenSaver })
+        let incoming = try XCTUnwrap(panel.contentView?.layer?.sublayers?.last)
+        XCTAssertTrue((incoming.contents as AnyObject?) === oldImage, "The slide keeps the image it started with")
     }
 
     func testColdFailureFallsBackAndWarmFailureKeepsItsPreview() async throws {
@@ -280,6 +283,53 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
             XCTAssertEqual(layer.transform.m41, 0)
         }
+        await gate.finish(WorkspaceId("target"), image: picture)
+    }
+
+    func testAScreenGrabbedAtTouchdownShowsThePreviewWithTheFirstMovement() async throws {
+        let captured = expectation(description: "touchdown capture started")
+        let gate = controlledRenderer { if $0 == WorkspaceId("source") { captured.fulfill() } }
+        let snapshots = WorkspaceSwipeSnapshots(renderer: { try await gate.render($0) })
+        let picture = try image()
+        snapshots.cache.insert(picture, for: request().key)
+        let preview = WorkspaceSwipePreview(snapshots: snapshots)
+        defer { preview.invalidate() }
+        let capture = WorkspaceSwipeSnapshotRequest(screenKey: request("source").key,
+            rect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+        preview.prepareFront(capture)
+        await fulfillment(of: [captured], timeout: 2)
+        await gate.finish(WorkspaceId("source"), image: picture)
+        for _ in 0..<100 where !preview.hasTouchdownFront { await Task.yield() }
+        XCTAssertTrue(preview.hasTouchdownFront)
+        preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+        XCTAssertNotNil(preview.timings.last?.submissionMs, "The direction shows the preview at once")
+        XCTAssertFalse(preview.hasTouchdownFront, "A grab is used once")
+        let requests = await gate.requests
+        XCTAssertEqual(requests.filter { $0 == WorkspaceId("source") }.count, 1, "The screen is not grabbed again")
+    }
+
+    func testADirectionChosenWhileTheTouchdownGrabRunsWaitsForItInsteadOfStartingAgain() async throws {
+        let captured = expectation(description: "touchdown capture started")
+        let gate = controlledRenderer { if $0 == WorkspaceId("source") { captured.fulfill() } }
+        let snapshots = WorkspaceSwipeSnapshots(renderer: { try await gate.render($0) })
+        let picture = try image()
+        snapshots.cache.insert(picture, for: request().key)
+        let preview = WorkspaceSwipePreview(snapshots: snapshots)
+        defer { preview.invalidate() }
+        let capture = WorkspaceSwipeSnapshotRequest(screenKey: request("source").key,
+            rect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+        preview.prepareFront(capture)
+        await fulfillment(of: [captured], timeout: 2)
+        preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+        XCTAssertTrue(preview.isActive)
+        XCTAssertNil(preview.timings.last?.submissionMs)
+        preview.update(0.3)
+        await gate.finish(WorkspaceId("source"), image: picture)
+        for _ in 0..<100 where preview.timings.last?.submissionMs == nil { await Task.yield() }
+        XCTAssertNotNil(preview.timings.last?.submissionMs, "The running grab completes the preview")
+        let requests = await gate.requests
+        XCTAssertEqual(requests.filter { $0 == WorkspaceId("source") }.count, 1)
+        preview.cancel()
         await gate.finish(WorkspaceId("target"), image: picture)
     }
 

@@ -25,17 +25,21 @@ static int contactFrame(void *device, const void *bytes, int count, double times
     int active = 0;
     double x = 0, y = 0;
     uint64_t identities = 0;
+    WinMuxTouchContact points[3] = {0};
     bool valid = count >= 0 && count <= 32 && isfinite(timestamp) && (count == 0 || bytes);
     if (valid) for (int i = 0; i < count; i++) {
         const char *contact = (const char *)bytes + i * 96;
         int32_t state, identifier;
         float px, py;
         memcpy(&state, contact + 20, sizeof(state));
-        if (state != 4) continue;
+        // Making (3), touching (4) and breaking (5) contacts are all on the pad: a finger
+        // still landing or already lifting must not read as two fingers mid-swipe.
+        if (state < 3 || state > 5) continue;
         memcpy(&identifier, contact + 16, sizeof(identifier));
         memcpy(&px, contact + 32, sizeof(px));
         memcpy(&py, contact + 36, sizeof(py));
         if (!isfinite(px) || !isfinite(py) || px < 0 || px > 1 || py < 0 || py > 1) { valid = false; break; }
+        if (active < 3) points[active] = (WinMuxTouchContact){identifier, py};
         active++;
         x += px; y += py;
         // Order-independent contact identity: changing fingers cancels recognition.
@@ -43,8 +47,17 @@ static int contactFrame(void *device, const void *bytes, int count, double times
         identity ^= identity >> 27;
         identities += identity * UINT64_C(0xbf58476d1ce4e5b9);
     }
+    // Stable ordering lets the recognizer compare each contact with its own
+    // starting position regardless of the driver's contact-array order.
+    if (valid && active == 3) {
+        for (int i = 0; i < 3; ++i) for (int j = i + 1; j < 3; ++j)
+            if (points[j].identifier < points[i].identifier) {
+                WinMuxTouchContact tmp = points[i]; points[i] = points[j]; points[j] = tmp;
+            }
+    }
     callback((uint64_t)(uintptr_t)context, (uint64_t)(uintptr_t)device, valid ? active : -1,
-             active ? x / active : 0, active ? y / active : 0, timestamp, identities);
+             active ? x / active : 0, active ? y / active : 0, timestamp, identities,
+             valid && active == 3 ? points : NULL);
     return 0;
 }
 

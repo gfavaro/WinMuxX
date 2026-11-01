@@ -1,0 +1,136 @@
+import XCTest
+import Common
+@testable import AppBundle
+
+@MainActor
+final class WorkspaceBackendConfigTest: WorkspaceTestCase {
+    func testNativeTilingIsSeparateExplicitOptInWithStrictConfiguration() {
+        XCTAssertFalse(parseConfig("[workspace-backend]\ntype = 'native'").config.nativeSpaces.tilingEnabled)
+        let enabled = parseConfig("[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true\nrestore-layouts = false")
+        XCTAssertTrue(enabled.errors.isEmpty, "\(enabled.errors)")
+        XCTAssertTrue(enabled.config.nativeSpaces.tilingEnabled)
+        XCTAssertFalse(enabled.config.nativeSpaces.restoreLayouts)
+        XCTAssertTrue(enabled.config.nativeSpaces.restoreFramesOnQuit, "On by default")
+        XCTAssertFalse(parseConfig("[native-spaces]\nrestore-frames-on-quit = false").config.nativeSpaces.restoreFramesOnQuit)
+        XCTAssertFalse(parseConfig("[native-spaces]\ntiling-enabled = 'yes'").errors.isEmpty)
+        XCTAssertFalse(parseConfig("[native-spaces]\nunknown = true").errors.isEmpty)
+        XCTAssertFalse(parseConfig("default-root-container-layout = 'tabbed'\n[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true").errors.isEmpty)
+    }
+    func testOmittedBackendRemainsVirtualAndNativeRequiresExplicitOptIn() {
+        XCTAssertEqual(parseConfig("").config.workspaceBackend, .virtual)
+        let native = parseConfig("[workspace-backend]\ntype = 'native'")
+        XCTAssertTrue(native.errors.isEmpty)
+        XCTAssertEqual(native.config.workspaceBackend, .native)
+        XCTAssertFalse(parseConfig("[workspace-backend]\ntype = 'automatic'").errors.isEmpty)
+        XCTAssertFalse(parseConfig("[workspace-backend]\nunknown = true").errors.isEmpty)
+        XCTAssertFalse(parseConfig("workspace-backend = 'native'").errors.isEmpty)
+    }
+
+    func testSettingsBackendChoiceWritesAConfigThatSelectsIt() {
+        let existing = "start-at-login = true\n"
+        for (choice, kind, tiled) in [(WorkspaceBackendChoice.virtual, WorkspaceBackendKind.virtual, false), (.native, .native, false), (.nativeTiled, .native, true)] {
+            let parsed = parseConfig(applyingSettingsConfigEdits(choice.configEdits, to: existing))
+            XCTAssertTrue(parsed.errors.isEmpty, "\(choice): \(parsed.errors)")
+            XCTAssertEqual(parsed.config.workspaceBackend, kind)
+            XCTAssertEqual(parsed.config.nativeSpaces.tilingEnabled, tiled)
+            XCTAssertTrue(parsed.config.startAtLogin, "Other settings are kept")
+        }
+    }
+
+    func testReloadRejectsBackendSwitchWithoutPublishingOrMutatingWorkspace() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'".write(to: file, atomically: true, encoding: .utf8)
+        let workspace = Workspace.get(byName: "retained")
+        let originalURL = configUrl
+        isWinMuxRuntimeReady = true
+        var output = ""
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertFalse(result)
+        XCTAssertTrue(output.contains("requires restarting"))
+        XCTAssertEqual(config.workspaceBackend, .virtual)
+        XCTAssertEqual(runtime.workspaceBackend.kind, .virtual)
+        XCTAssertEqual(configUrl, originalURL)
+        XCTAssertTrue(Workspace.existing(byName: "retained") === workspace)
+    }
+
+    func testReloadCannotTurnReadOnlyNativeStartupIntoTiling() async throws {
+        runtime.workspaceBackend.selectForStartup(.native)
+        runtime.workspaceBackend.lockSelection()
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'\n[native-spaces]\ntiling-enabled = true"
+            .write(to: file, atomically: true, encoding: .utf8)
+        var output = ""
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertFalse(result)
+        XCTAssertTrue(output.contains("requires restarting"))
+        XCTAssertFalse(runtime.workspaceBackend.native.tilingEnabled)
+        XCTAssertFalse(runtime.workspaceBackend.capabilities.tilesWindows)
+    }
+
+    func testDryRunCanValidateFutureBackendWithoutSelectingIt() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'".write(to: file, atomically: true, encoding: .utf8)
+        isWinMuxRuntimeReady = true
+        var output = ""
+        let result = try await reloadConfig(args: ReloadConfigCmdArgs(rawArgs: []).copy(\.dryRun, true),
+            forceConfigUrl: file, stdout: &output)
+        XCTAssertTrue(result)
+        XCTAssertEqual(config.workspaceBackend, .virtual)
+        XCTAssertEqual(runtime.workspaceBackend.kind, .virtual)
+    }
+
+    func testNativeStartupConfigurationDoesNotMaterializeVirtualWorkspaces() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "config-version = 2\npersistent-workspaces = ['should-not-exist']\n[workspace-backend]\ntype = 'native'"
+            .write(to: file, atomically: true, encoding: .utf8)
+        let count = Workspace.all.count
+        var output = ""
+        XCTAssertFalse(isWinMuxRuntimeReady)
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertTrue(result)
+        XCTAssertEqual(runtime.workspaceBackend.kind, .native)
+        XCTAssertEqual(config.workspaceBackend, .native)
+        XCTAssertNil(Workspace.existing(byName: "should-not-exist"))
+        XCTAssertEqual(Workspace.all.count, count)
+        XCTAssertNil(runtime.workspaceBackend.native.observation)
+    }
+
+    func testStartupHookCannotChangeBackendBeforeRuntimeIsReady() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".toml")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "[workspace-backend]\ntype = 'native'".write(to: file, atomically: true, encoding: .utf8)
+        runtime.workspaceBackend.lockSelection()
+        XCTAssertFalse(isWinMuxRuntimeReady)
+        var output = ""
+        let result = try await reloadConfig(forceConfigUrl: file, stdout: &output)
+        XCTAssertFalse(result)
+        XCTAssertEqual(runtime.workspaceBackend.kind, .virtual)
+        XCTAssertTrue(output.contains("requires restarting"))
+    }
+
+    func testNativeReadOnlyCommandsRejectVirtualQueriesAndMutation() async throws {
+        runtime.workspaceBackend.selectForStartup(.native)
+        let original = Workspace.all.count
+        for text in ["workspace web", "move-workspace-to-monitor next", "enable off"] {
+            let command = try XCTUnwrap(parseCommand(text).unwrap().0)
+            let result = try await command.run(.defaultEnv, .emptyStdin)
+            XCTAssertNotEqual(result.exitCode, 0)
+            XCTAssertTrue(result.stderr.joined().contains("unsupported"))
+        }
+        // Numbered targets are native navigation; a missing desktop must not create a workspace.
+        let navigation = try XCTUnwrap(parseCommand("workspace 99").unwrap().0)
+        let navigated = try await navigation.run(.defaultEnv, .emptyStdin)
+        XCTAssertNotEqual(navigated.exitCode, 0)
+        XCTAssertEqual(Workspace.all.count, original)
+        XCTAssertTrue(TrayMenuModel.shared.isEnabled)
+        let doctor = try XCTUnwrap(parseCommand("doctor").unwrap().0)
+        let result = try await doctor.run(.defaultEnv, .emptyStdin)
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stdout.joined().contains("Native Spaces"))
+        XCTAssertEqual(Workspace.all.count, original)
+    }
+}

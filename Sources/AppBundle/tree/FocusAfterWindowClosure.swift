@@ -3,6 +3,7 @@ import Foundation
 @MainActor
 func focusAfterWindowClosure(
     closingWindow: Window,
+    focusedWindowIdBeforeClosure: UInt32?,
     deadWindowWorkspace: Workspace?,
     currentFocus: LiveFocus,
     previousFocus: LiveFocus?,
@@ -15,6 +16,14 @@ func focusAfterWindowClosure(
     now: Date = .now,
 ) -> LiveFocus? {
     guard let deadWindowWorkspace else { return nil }
+    // Only closing the focused window may move focus. A window the user never focused
+    // (a short-lived viewer, a dialog an app or agent opens and closes) used to reach the
+    // history fallbacks below and pull focus to an older window, often another app.
+    // From WinMux PR #32 by Ilya Kudravets.
+    guard focusedWindowIdBeforeClosure == closingWindow.windowId else {
+        debugFocusLog("focusAfterWindowClosure closing=\(closingWindow.windowId) skippedNotFocused focusedBefore=\(focusedWindowIdBeforeClosure?.description ?? "nil")")
+        return nil
+    }
     guard deadWindowWorkspace == currentFocus.workspace ||
         deadWindowWorkspace == previousFocusedWorkspace && previousFocusedWorkspaceDate.distance(to: now) < 1
     else {

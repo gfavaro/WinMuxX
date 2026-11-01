@@ -5,7 +5,7 @@ struct MoveWorkspaceToMonitorCommand: Command {
     let args: MoveWorkspaceToMonitorCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
-    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+    func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         let focusedWorkspace = target.workspace
         let prevMonitor = focusedWorkspace.workspaceMonitor

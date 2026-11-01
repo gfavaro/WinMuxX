@@ -29,6 +29,7 @@ let projectRoot: URL = {
 @MainActor
 func setUpWorkspacesForTests() {
     layoutForNextDetectedWindow = nil
+    LayoutUndoHistory.shared.reset()
     for workspace in Workspace.all {
         for child in workspace.children {
             child.unbindFromParent()
@@ -57,7 +58,7 @@ func setUpWorkspacesForTests() {
     check(focus.workspace === Workspace.all.singleOrNil(), Workspace.all.map(\.description).joined(separator: ", "))
     check(mainMonitor.setActiveWorkspace(focus.workspace))
 
-    shouldSuppressChromeForNativeFullscreenContent = false
+    fullscreenContentDisplays = []
     setScheduledRefreshOverrideForTests(nil)
     setBlockingRefreshOverridesForTests()
     cancelManipulatedWithMouseState()

@@ -4,6 +4,7 @@ import Common
 extension TilingContainer {
     @MainActor
     func tileChildFrames(in rect: Rect, gaps: ResolvedGaps, weightAt: ((TreeNode) -> CGFloat)? = nil) -> [(physical: Rect, virtual: Rect, weight: CGFloat)] {
+        let children = frameLayoutChildren
         guard !children.isEmpty else { return [] }
         let axis = orientation
         let horizontal = axis == .h

@@ -36,7 +36,14 @@ func workspaceMonitorForUserActivation(_ workspace: Workspace, on requested: Mon
 func activateWorkspaceForUser(
     _ workspace: Workspace,
     on targetMonitor: Monitor,
+    focusing: Bool = true,
 ) -> Bool {
+    // macOS shows native desktops; UI actions run `workspace` so each backend switches its own way.
+    guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces else {
+        check(!isUnitTest, "activateWorkspaceForUser with native Spaces; run the workspace command instead")
+        print("WinMuxX: refused a virtual workspace activation with native Spaces")
+        return false
+    }
     // Ordinary selection never relocates an owned workspace, visible or hidden.
     if workspace.isVisible {
         guard workspace.visibleMonitor != nil else { return false }
@@ -51,9 +58,21 @@ func activateWorkspaceForUser(
 
     guard monitor.setActiveWorkspace(workspace) else { return false }
     WorkspaceMotionDiagnostics.selected(workspace)
+    guard focusing else {
+        recordUserWorkspaceSelectionForRestoration()
+        return true
+    }
     let focused = workspace.focusWorkspace()
     if focused { recordUserWorkspaceSelectionForRestoration() }
     return focused
+}
+
+/// A sidebar selection that changes what another display shows leaves focus on the
+/// display in use, as with native Spaces. One already showing elsewhere is focused there.
+@MainActor
+func sidebarSelectionKeepsFocus(_ workspace: Workspace, on targetMonitor: Monitor) -> Bool {
+    !workspace.isVisible && workspaceMonitorForUserActivation(workspace, on: targetMonitor).rect.topLeftCorner !=
+        focus.workspace.workspaceMonitor.rect.topLeftCorner
 }
 
 @MainActor
@@ -78,6 +97,7 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
     }
     guard targetMonitor.setActiveWorkspace(workspace) else { return false }
     reconcileSecondaryWorkspaceAssignments()
+    NotificationCenter.default.post(name: workspaceControlsOwnershipChanged, object: nil)
     return true
 }
 
@@ -109,8 +129,14 @@ extension CGPoint {
         guard !runtime.workspaces.isWorkspaceActive(workspace.id, outside: viewportId) else {
             return false
         }
+        if let monitor = sortedMonitors.first(where: { $0.rect.topLeftCorner == self }),
+           runtime.workspaces.visibleWorkspace(for: monitor) !== workspace {
+            WorkspaceScrollingGestureController.shared.cancelForMonitorOwnershipChange(self)
+            ScrollingWindowOrdering.shared.cancel()
+        }
         _ = runtime.workspaces.setActiveWorkspace(workspace, on: viewportId)
         checkWorkspaceHierarchyInvariants()
+        if isWinMuxRuntimeReady { WorkspaceGestureCoordinator.shared.overviewPresentationChanged() }
         return true
     }
 }

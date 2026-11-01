@@ -60,12 +60,4 @@ enum Json: Encodable, Equatable {
             case .uint32(let x): x
         }
     }
-
-    var asDictOrDie: [String: Json] {
-        if case .dict(let dict) = self {
-            dict
-        } else {
-            dieT("\(self) is not a dict")
-        }
-    }
 }

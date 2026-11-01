@@ -7,13 +7,14 @@ struct SwapWithMasterCommand: Command {
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io), let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
         let workspace = target.workspace
-        guard window.parent is TilingContainer, workspace.rootTilingContainer.layout == .master else {
+        guard window.parent is TilingContainer, workspace.arrangement == .master else {
             return io.err("swap-with-master requires a tiled window in a master workspace")
         }
         workspace.normalizeMasterLayout()
-        if workspace.promoteToMaster(window) { return true }
-        guard let stack = workspace.rootTilingContainer.children.compactMap({ $0 as? TilingContainer }).first(where: \.isMasterStack),
-              let next = stack.children.first?.mostRecentWindowRecursive else { return false }
+        let current = workspace.masterGroupIndex
+        guard let index = workspace.workspaceLayoutUnits.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) else { return false }
+        if index != current { return workspace.promoteToMaster(window) }
+        guard let next = workspace.workspaceLayoutUnits.enumerated().first(where: { $0.offset != current })?.element.mostRecentWindowRecursive else { return false }
         return workspace.promoteToMaster(next)
     }
 }

@@ -147,6 +147,7 @@ private func prepareRestartStateDirectory(_ url: URL) throws {
 
 @MainActor
 func persistFrozenWorldForRestartIfPossible() {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     recovery.pendingRestartSave?.cancel()
     recovery.pendingRestartSave = nil
     guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly else { return }
@@ -197,9 +198,10 @@ func loadRestartEnvelope(from url: URL) -> PersistedFrozenWorldEnvelope? {
 
 @MainActor
 func schedulePersistedFrozenWorldSave() {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly,
           TrayMenuModel.shared.isEnabled,
-          NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId else { return }
+          !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
     // Capture current titles without adding AX round trips to every focus/layout event.
     guard recovery.pendingRestartSave == nil else { return }
     recovery.pendingRestartSave = runtime.task {
@@ -215,7 +217,7 @@ func schedulePersistedFrozenWorldSave() {
             }
         }
         guard !Task.isCancelled,
-              NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId else {
+              !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else {
             recovery.pendingRestartSave = nil
             return
         }
@@ -232,6 +234,7 @@ func schedulePersistedFrozenWorldSave() {
 @discardableResult
 @MainActor
 func loadPersistedFrozenWorldForStartupIfPresent() -> Bool {
+    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return false }
     guard !serverArgs.isReadOnly, config.automaticallyTileNewWindows else { return false }
     do {
         let url = try persistedFrozenWorldUrl()
@@ -327,7 +330,7 @@ func trackPendingRestartWindow(_ window: Window) {
             recovery.restartWindowAttempts = recovery.restartWindowAttempts.filter { Date.now.timeIntervalSince($0.value.started) < 30 }
             guard !Task.isCancelled else { return }
             if !recovery.restartWindowAttempts.isEmpty, isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled,
-               NSWorkspace.shared.frontmostApplication?.bundleIdentifier != lockScreenAppBundleId {
+               !isLockScreenApp(NSWorkspace.shared.frontmostApplication) {
                 scheduleRefreshSession(.workspaceRestoration)
             }
         }

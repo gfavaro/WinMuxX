@@ -77,6 +77,9 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 ///                      (from nativeFocused to runtime.nativeFocus.lastKnownWindowID)
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
+    // AX can report a key-window change caused by stacking while a viewport
+    // gesture is in flight. A real click ends the gesture in GlobalObserver.
+    guard !WorkspaceScrollingGestureController.shared.isMotionActive else { return }
     if ignoresCrossWorkspaceActivation(nativeFocused) { return }
     if nativeFocused?.parent is MacosPopupWindowsContainer {
         return
@@ -94,8 +97,15 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         )
         return
     }
+    if nativeFocusHoldRejects(nativeFocused) {
+        runtime.nativeFocus.lastKnownWindowID = nil
+        debugFocusLog("updateFocusCache ignoredNativeFocusHold nativeFocused=\(nativeFocused?.windowId.description ?? "nil")")
+        return
+    }
     if nativeFocused?.windowId != runtime.nativeFocus.lastKnownWindowID {
-        _ = nativeFocused?.focusWindow()
+        if let nativeFocused, let live = nativeFocused.toLiveFocusOrNil() {
+            _ = setFocus(to: live, origin: .native)
+        }
         runtime.nativeFocus.lastKnownWindowID = nativeFocused?.windowId
     }
     (nativeFocused?.app as? MacApp)?.lastNativeFocusedWindowId = nativeFocused?.windowId

@@ -5,6 +5,8 @@
   "description": "Editor assistance for WinMuxX TOML. The app's Swift parser remains authoritative; command strings and monitor selectors need runtime validation.",
   "type": "object",
   "properties": {
+    "native-spaces": {"type": "object", "properties": {"tiling-enabled": {"type": "boolean", "default": false}, "restore-layouts": {"type": "boolean", "default": true}}, "additionalProperties": false},
+    "workspace-backend": {"type": "object", "properties": {"type": {"enum": ["virtual", "native"], "default": "virtual", "description": "native is experimental read-only observation; changing backend requires restart."}}, "additionalProperties": false},
     "config-version": {"type": "integer", "minimum": 1, "maximum": 2},
     "appearance": {"enum": ["system", "light", "dark"]},
     "after-login-command": {"type": "array", "maxItems": 0, "deprecated": true},
@@ -26,6 +28,7 @@
     "focus-follows-mouse": {"type": "boolean"},
     "focus-follows-mouse-dwell": {"type": "integer", "minimum": 0},
     "master": {"$ref": "#/$defs/master"},
+    "scrolling": {"$ref": "#/$defs/scrolling"},
     "follow-app-activation": {"oneOf": [{"type": "boolean"}, {"$ref": "#/$defs/followAppActivation"}]},
     "shortcuts-preset": {"type": "string", "deprecated": true, "description": "The removed rectangle preset is rejected by the parser."},
     "drag-stack-layout": {"enum": ["accordion", "tab-group", "tabbed"]},
@@ -45,6 +48,8 @@
     "menu-bar": {"type": "object", "properties": {"indicator": {"enum": ["icon", "workspace"]}, "icon-appearance": {"enum": ["color", "monochrome"]}}, "additionalProperties": false},
     "window-tabs": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "height": {"type": "integer", "exclusiveMinimum": 20}, "double-sided-windows": {"type": "boolean"}}, "additionalProperties": false},
     "borders": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "width": {"type": "number", "minimum": 0}, "active-color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"}, "inactive-color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"}, "order": {"enum": ["below", "above"]}, "exclude-apps": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
+    "dimming": {"type": "object", "properties": {"inactive-windows": {"type": "number", "minimum": 0, "maximum": 0.8}}, "additionalProperties": false},
+    "hover-bar": {"type": "object", "properties": {"enabled": {"type": "boolean"}}, "additionalProperties": false},
     "modifiers": {"type": "object", "patternProperties": {"^(alt|ctrl|cmd|shift)$": {"enum": ["both", "left", "right"]}}, "additionalProperties": false},
     "animations": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "duration-ms": {"type": "integer", "minimum": 0, "maximum": 2000}}, "additionalProperties": false},
     "workspace": {"type": "object", "description": "Dynamic keys are internal workspace names.", "patternProperties": {"^.+$": {"$ref": "#/$defs/workspaceLayout"}}, "additionalProperties": false},
@@ -58,17 +63,19 @@
   "additionalProperties": false,
   "$defs": {
     "layout": {"enum": ["dwindle", "master", "tiles", "accordion", "tab-group", "tabbed"]},
+    "workspaceArrangement": {"enum": ["dwindle", "master", "scrolling"]},
     "orientation": {"enum": ["horizontal", "vertical", "auto"]},
     "commands": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
     "dynamicNumber": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}}]},
-    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}, "stack-layout": {"enum": ["tiles", "accordion"]}}, "additionalProperties": false},
+    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}, "stack-layout": {"enum": ["tiles", "accordion"]}, "ultrawide-mains": {"enum": [1, 2]}}, "additionalProperties": false},
+    "scrolling": {"type": "object", "properties": {"column-width": {"type": "number", "minimum": 0.1, "maximum": 1.0}, "width-presets": {"type": "array", "minItems": 1, "items": {"type": "number", "minimum": 0.1, "maximum": 1.0}}, "gesture-enabled": {"type": "boolean"}, "gesture-sensitivity": {"type": "number", "exclusiveMinimum": 0}, "minimap-enabled": {"type": "boolean"}}, "additionalProperties": false},
     "followAppActivation": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "exclude-apps": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
     "dynamicInt": {"oneOf": [{"type": "integer"}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "integer"}}}]},
     "gaps": {"type": "object", "properties": {"inner": {"type": "object", "properties": {"horizontal": {"$ref": "#/$defs/dynamicInt"}, "vertical": {"$ref": "#/$defs/dynamicInt"}}, "additionalProperties": false}, "outer": {"type": "object", "properties": {"left": {"$ref": "#/$defs/dynamicInt"}, "right": {"$ref": "#/$defs/dynamicInt"}, "top": {"$ref": "#/$defs/dynamicInt"}, "bottom": {"$ref": "#/$defs/dynamicInt"}}, "additionalProperties": false}}, "additionalProperties": false},
     "workspaceSwipe": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "reverse-direction": {"type": "boolean"}, "animation-duration-ms": {"type": "integer", "minimum": 0, "maximum": 1000}}, "additionalProperties": false},
     "fullscreenWidth": {"type": "number", "minimum": 0.1, "maximum": 1.0},
     "windowWidthSettings": {"type": "object", "properties": {"fullscreen-width": {"$ref": "#/$defs/fullscreenWidth"}, "single-window-alignment": {"enum": ["center", "left", "right"]}}, "additionalProperties": false},
-    "workspaceLayout": {"type": "object", "properties": {"layout": {"$ref": "#/$defs/layout"}, "orientation": {"$ref": "#/$defs/orientation"}, "display": {"type": "object", "patternProperties": {"^.+$": {"type": "object", "properties": {"layout": {"$ref": "#/$defs/layout"}, "orientation": {"$ref": "#/$defs/orientation"}, "fullscreen-width": {"$ref": "#/$defs/fullscreenWidth"}, "single-window-alignment": {"enum": ["center", "left", "right"]}}, "additionalProperties": false}}, "additionalProperties": false}, "fullscreen-width": {"$ref": "#/$defs/fullscreenWidth"}, "single-window-alignment": {"enum": ["center", "left", "right"]}}, "additionalProperties": false},
+    "workspaceLayout": {"type": "object", "properties": {"layout": {"$ref": "#/$defs/workspaceArrangement"}, "orientation": {"$ref": "#/$defs/orientation"}, "display": {"type": "object", "patternProperties": {"^.+$": {"type": "object", "properties": {"layout": {"$ref": "#/$defs/workspaceArrangement"}, "orientation": {"$ref": "#/$defs/orientation"}, "fullscreen-width": {"$ref": "#/$defs/fullscreenWidth"}, "single-window-alignment": {"enum": ["center", "left", "right"]}}, "additionalProperties": false}}, "additionalProperties": false}, "fullscreen-width": {"$ref": "#/$defs/fullscreenWidth"}, "single-window-alignment": {"enum": ["center", "left", "right"]}}, "additionalProperties": false},
     "workspaceSidebar": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "enable-focus": {"type": "boolean"}, "auto-hide": {"type": "boolean"}, "always-expanded": {"type": "boolean"}, "hover-open-delay-ms": {"type": "integer", "minimum": 0, "maximum": 5000}, "collapsed-width": {"type": "integer", "minimum": 1}, "width": {"type": "integer", "minimum": 1}, "position": {"enum": ["left", "right"]}, "height-mode": {"enum": ["standard", "centered", "full"]}, "monitor": {"type": "array", "items": {"type": "string"}}, "show-status-pills": {"type": "boolean"}, "show-clock": {"type": "boolean"}, "show-seconds": {"type": "boolean"}, "show-date": {"type": "boolean"}, "show-weekday": {"type": "boolean"}, "menu-bar-background": {"type": "boolean"}, "chrome-style": {"enum": ["liquid-glass", "solid"]}, "solid-chrome-color": {"type": "string"}, "solid-chrome-custom-color": {"type": "string", "pattern": "^#?[0-9A-Fa-f]{6}$"}, "project-deletion-action": {"enum": ["close-windows", "move-windows-to-fallback"]}, "workspace-labels": {"type": "object", "additionalProperties": {"type": "string"}}, "project-labels": {"type": "object", "additionalProperties": {"type": "string"}}, "project-colors": {"type": "object", "additionalProperties": {"type": "string"}}, "appearance": {"enum": ["system", "custom"], "deprecated": true}, "background": {"enum": ["sidebar", "menu-bar", "transparent"], "deprecated": true}, "frosted-tint": {"enum": ["automatic", "white", "black", "cyan", "pink", "indigo", "purple", "ice", "aurora"], "deprecated": true}, "use-liquid-glass": {"type": "boolean", "deprecated": true}, "menu-bar-reserve-height": {"type": "integer", "minimum": 0, "deprecated": true}}, "additionalProperties": false}
   }
 }

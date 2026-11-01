@@ -60,6 +60,11 @@ below the table in compact windows and beside it when the page has at least
 and workspace actions are editable with guided
 controls only when their existing order and options are representable.
 
+Rules that send a window elsewhere (`move-node-to-workspace`, `move-node-to-monitor`,
+`move-node-to-project`) apply only to an app's ordinary windows. Its dialogs (save
+and print panels, format sheets) stay with the app, so a routing rule for a browser
+cannot hide the browser behind a modal; floating and tiling actions still apply.
+
 **Add rule** creates an unsaved draft. Save applies it to future window detections;
 existing windows are not reclassified. Revert discards the draft. Save or revert
 before switching rules. Move up/down changes rule order; deletion asks for
