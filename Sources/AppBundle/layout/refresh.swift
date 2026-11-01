@@ -91,6 +91,7 @@ private func shouldDropScheduledRefresh(_ newEvent: RefreshSessionEvent, activeE
 func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
     frontmostActivationPolicy: NSApplication.ActivationPolicy?,
+    frontmostPid: pid_t? = nil,
 ) -> Bool {
     if ignoresCrossWorkspaceActivation(nativeFocused) {
         switch refreshSessionEvent {
@@ -103,6 +104,11 @@ func shouldSyncFocusBackToMacOs(
         return false
     }
     if nativeFocused == nil && frontmostActivationPolicy == .accessory {
+        return false
+    }
+    // Another app was activated before it has a window, as when it launches: taking focus back
+    // would open its window behind the old one. Its window's own event focuses it once known.
+    if nativeFocused == nil, let frontmostPid, frontmostPid != focus.windowOrNil?.app.pid {
         return false
     }
     return true
@@ -289,7 +295,8 @@ private func performRefreshSession(
     try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
-                let frontmostActivationPolicy = NSWorkspace.shared.frontmostApplication?.activationPolicy
+                let frontmostApplication = NSWorkspace.shared.frontmostApplication
+                let frontmostActivationPolicy = frontmostApplication?.activationPolicy
                 let observation = try await observeAndRecordNativeFocusForSession()
                 let nativeFocused = observation.window
 
@@ -324,6 +331,7 @@ private func performRefreshSession(
                     if observation.known && shouldSyncFocusBackToMacOs(
                         nativeFocused: nativeFocused,
                         frontmostActivationPolicy: frontmostActivationPolicy,
+                        frontmostPid: frontmostApplication?.processIdentifier,
                     ) {
                         let logicalFocused = focus.windowOrNil
                         if logicalFocused?.windowId != nativeFocused?.windowId {

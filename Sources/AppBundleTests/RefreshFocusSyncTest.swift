@@ -235,6 +235,19 @@ final class RefreshFocusSyncTest: XCTestCase {
         XCTAssertFalse(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .accessory))
     }
 
+    /// System Settings opened behind Rex when launched: it was activated before it had a window,
+    /// and focus was taken back to Rex, which then covered the window as it appeared.
+    @MainActor
+    func testShouldNotTakeFocusBackFromAnotherAppThatHasNoWindowYet() {
+        setUpWorkspacesForTests()
+        let window = TestWindow.new(id: 1, parent: focus.workspace)
+        XCTAssertTrue(window.focusWindow())
+        let focusedPid = window.app.pid
+        XCTAssertFalse(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular, frontmostPid: focusedPid + 1))
+        XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: nil, frontmostActivationPolicy: .regular, frontmostPid: focusedPid),
+                      "The focused window's own app without a focused window still gets focus back")
+    }
+
     @MainActor
     func testShouldSyncFocusBackToRegularWorkspaceWindow() {
         setUpWorkspacesForTests()
