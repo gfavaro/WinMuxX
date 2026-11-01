@@ -12,16 +12,12 @@ func applyWindowSwapDragIntent(
     ) {
         return false
     }
-    let sourceNode = dragSubjectNode(for: sourceWindow, subject: sourceSubject)
-    let targetNode = dragIntentTargetNode(
+    guard case let (sourceNode, targetNode)? = validatedDragNodePair(
         sourceWindow: sourceWindow,
         targetWindow: targetWindow,
         subject: sourceSubject,
         detachOrigin: getCurrentMouseTabDetachOrigin(),
-    )
-    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
-          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: sourceSubject)
-    else { return false }
+    ) else { return false }
     swapNodes(sourceNode, targetNode)
     return sourceWindow.focusWindow()
 }

@@ -12,16 +12,7 @@ final class WindowTabStripPanel: NSPanelHud {
 
     init(id: ObjectIdentifier) {
         super.init()
-        identifier = NSUserInterfaceItemIdentifier(windowTabStripPanelPrefix + String(id.hashValue))
-        hasShadow = false
-        isFloatingPanel = false
-        isExcludedFromWindowsMenu = true
-        animationBehavior = .none
-        backgroundColor = .clear
-        applyWinMuxLayer(.windowChrome)
-        contentView = hostingView
-        hostingView.frame = contentView?.bounds ?? .zero
-        hostingView.autoresizingMask = [.width, .height]
+        configureWindowTabChromePanel(identifier: windowTabStripPanelPrefix + String(id.hashValue), hostingView: hostingView)
     }
 
     override var canBecomeKey: Bool { false }
@@ -46,5 +37,21 @@ final class WindowTabStripPanel: NSPanelHud {
     func setExternalIgnoresMouseEvents(_ ignoresMouseEvents: Bool) {
         externallyIgnoresMouseEvents = ignoresMouseEvents
         updateMousePolicy()
+    }
+}
+
+extension NSPanelHud {
+    /// Shared setup for non-activating, transparent tab chrome panels hosting SwiftUI content.
+    func configureWindowTabChromePanel(identifier: String, hostingView: NSView) {
+        self.identifier = NSUserInterfaceItemIdentifier(identifier)
+        hasShadow = false
+        isFloatingPanel = false
+        isExcludedFromWindowsMenu = true
+        animationBehavior = .none
+        backgroundColor = .clear
+        applyWinMuxLayer(.windowChrome)
+        contentView = hostingView
+        hostingView.frame = contentView?.bounds ?? .zero
+        hostingView.autoresizingMask = [.width, .height]
     }
 }

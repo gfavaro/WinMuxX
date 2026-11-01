@@ -10,17 +10,8 @@ final class WindowTabGroupVisualPanel: NSPanelHud {
 
     init(id: ObjectIdentifier) {
         super.init()
-        identifier = NSUserInterfaceItemIdentifier(windowTabVisualPanelPrefix + String(id.hashValue))
-        hasShadow = false
-        isFloatingPanel = false
-        isExcludedFromWindowsMenu = true
-        animationBehavior = .none
-        backgroundColor = .clear
+        configureWindowTabChromePanel(identifier: windowTabVisualPanelPrefix + String(id.hashValue), hostingView: hostingView)
         ignoresMouseEvents = true
-        applyWinMuxLayer(.windowChrome)
-        contentView = hostingView
-        hostingView.frame = contentView?.bounds ?? .zero
-        hostingView.autoresizingMask = [.width, .height]
     }
 
     override var canBecomeKey: Bool { false }

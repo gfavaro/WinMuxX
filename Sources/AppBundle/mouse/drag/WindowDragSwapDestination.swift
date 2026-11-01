@@ -19,15 +19,8 @@ func swapDestination(
     if shouldSuppressSwapDestination(sourceWindow: sourceWindow, subject: subject) {
         return nil
     }
-    let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
-    let targetNode = dragIntentTargetNode(
-        sourceWindow: sourceWindow,
-        targetWindow: targetWindow,
-        subject: subject,
-        detachOrigin: detachOrigin,
-    )
-    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
-          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: subject),
+    guard case let (_, targetNode)? = validatedDragNodePair(
+        sourceWindow: sourceWindow, targetWindow: targetWindow, subject: subject, detachOrigin: detachOrigin),
           let previewRect = targetNode.swapDropZoneRect
     else { return nil }
     let interactionRect = if subject == .group {

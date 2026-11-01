@@ -71,6 +71,28 @@ func isInvalidGroupSelfTarget(sourceNode: TreeNode, targetNode: TreeNode, subjec
     return targetNode.parentsWithSelf.contains(sourceNode)
 }
 
+/// Resolves the dragged and target nodes for swap or stack-split, rejecting pairs where
+/// one contains the other or a group targets itself.
+@MainActor
+func validatedDragNodePair(
+    sourceWindow: Window,
+    targetWindow: Window,
+    subject: WindowDragSubject,
+    detachOrigin: TabDetachOrigin,
+) -> (source: TreeNode, target: TreeNode)? {
+    let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
+    let targetNode = dragIntentTargetNode(
+        sourceWindow: sourceWindow,
+        targetWindow: targetWindow,
+        subject: subject,
+        detachOrigin: detachOrigin,
+    )
+    guard !isBlockedByDragTargetContainment(sourceNode: sourceNode, targetNode: targetNode),
+          !isInvalidGroupSelfTarget(sourceNode: sourceNode, targetNode: targetNode, subject: subject)
+    else { return nil }
+    return (sourceNode, targetNode)
+}
+
 @MainActor
 func sidebarDragSourceTitle(for sourceWindow: Window, subject: WindowDragSubject) -> String {
     let moveNode = dragSubjectNode(for: sourceWindow, subject: subject)
