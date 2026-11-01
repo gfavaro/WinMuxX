@@ -27,6 +27,20 @@ func workspaceParkingFrameIsAcceptable(_ observed: CGRect, requested: CGPoint, d
     }
 }
 
+/// Whether a parked window must be parked again. The first park is not counted. An app that
+/// keeps pulling its window back from the corner (iPhone Mirroring keeps part of itself on
+/// screen) would otherwise be re-parked on every refresh its own move causes, a loop of
+/// refreshes; it gets the same bounded tries as a tiled window its app keeps moving.
+func workspaceShouldRepark(
+    parked: CGRect?, requested: CGPoint, displays: [CGRect],
+    budget: inout FrameRecoveryBudget, now: ContinuousClock.Instant = .now,
+) -> Bool {
+    guard let parked else { return true }
+    if workspaceParkingFrameIsAcceptable(parked, requested: requested, displays: displays) { return false }
+    let target = Rect(topLeftX: requested.x, topLeftY: requested.y, width: parked.width, height: parked.height)
+    return budget.shouldReapply(tile: target, resting: false, now: now)
+}
+
 /// A failed or superseded reveal must not publish the window as visible.
 struct WorkspaceWindowRevealState {
     enum Phase { case visible, parked, restoring }

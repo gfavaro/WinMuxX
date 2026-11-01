@@ -3,6 +3,24 @@ import XCTest
 import AppKit
 
 final class WorkspaceWindowRevealTest: XCTestCase {
+    /// iPhone Mirroring kept pulling its parked window 17 pt left and 46 pt up, back on screen;
+    /// re-parking it on every refresh its move caused ran about 45 refreshes a second.
+    func testAppThatKeepsUnparkingItsWindowGetsBoundedRetries() {
+        let display = CGRect(x: 0, y: 0, width: 1710, height: 1112)
+        let requested = CGPoint(x: 1709, y: 1080)
+        let pulledBack = CGRect(x: 1692, y: 1034, width: 476, height: 1044)
+        var budget = FrameRecoveryBudget()
+        let start = ContinuousClock.now
+        func repark(_ parked: CGRect?, after seconds: Int = 0) -> Bool {
+            workspaceShouldRepark(parked: parked, requested: requested, displays: [display], budget: &budget,
+                                  now: start + .seconds(seconds))
+        }
+        XCTAssertTrue(repark(nil), "The first park is not counted")
+        XCTAssertFalse(repark(CGRect(origin: requested, size: pulledBack.size)), "Parked where asked")
+        XCTAssertEqual((0..<5).map { _ in repark(pulledBack) }, [true, true, true, false, false])
+        XCTAssertTrue(repark(pulledBack, after: 11), "Tries renew after the budget window, bounding the fight")
+    }
+
     func testWindowThatReappearedOnScreenIsNotConfirmedParked() {
         let parking = CGPoint(x: 1709, y: 1111)
         let display = CGRect(x: 0, y: 0, width: 1710, height: 1112)

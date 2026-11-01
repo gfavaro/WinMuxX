@@ -49,6 +49,8 @@ final class MacWindow: Window {
     /// monitor), the old corner position is wrong and the window must be re-parked even
     /// though the corner still matches. One value so the two can't desync.
     private var hiddenInCorner: (corner: OptimalHideCorner, monitorVisibleRect: Rect)?
+    /// Re-parking tries for an app that keeps moving its parked window back.
+    private var reparkBudget = FrameRecoveryBudget()
 
     @MainActor
     private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
@@ -357,8 +359,8 @@ final class MacWindow: Window {
         let p = workspaceParkingPoint(corner: effectiveCorner,
             visibleRect: CGRect(origin: nodeMonitor.visibleRect.topLeftCorner, size: nodeMonitor.visibleRect.size),
             windowSize: windowSize, zeroOffset: macApp.appId == .zoom)
-        if let parkedFrame, workspaceParkingFrameIsAcceptable(parkedFrame, requested: p,
-            displays: monitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) }) { return }
+        guard workspaceShouldRepark(parked: parkedFrame, requested: p,
+            displays: monitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) }, budget: &reparkBudget) else { return }
         // Complete parking before another workspace is revealed. AX frame writes
         // are otherwise queued, allowing outgoing windows to overlap the destination.
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
