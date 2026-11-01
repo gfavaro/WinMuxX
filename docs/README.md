@@ -35,6 +35,7 @@ These documents preserve observations and experiments. Earlier sections may refe
 to controls, filenames or implementations subsequently replaced. Use the current
 guides above for today's settings and development workflow.
 
+- [Window handling comparison](WINDOW_HANDLING_COMPARISON.md): WinMuxX, the original WinMux and Dinky on window and app identity, AX isolation, frame writes, hiding and failure visibility.
 - [Dinky native implementation comparison](NATIVE_SPACES_DINKY_COMPARISON.md): coordinator, lifecycle, event reliability, frame scheduling and policies to retain or change.
 - [Dinky fit and implementation plan](DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
 - [Dinky execution checklist](DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
