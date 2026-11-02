@@ -78,10 +78,11 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 /// Alternative names: takeFocusFromMacOs, syncFocusFromMacOs
 @MainActor func updateFocusCache(_ nativeFocused: Window?, now: Date = .now) {
     // Recorded with `debug-windows --events-start`: which refresh event delivered this focus and what was decided.
-    func note(_ decision: String) {
+    func note(_ decision: @autoclosure () -> String) {
+        guard runtime.events.isRecording else { return } // Nothing is formatted unless recording.
         runtime.events.record(.focusObserved, source: .refresh, generation: runtime.refresh.activationGeneration,
             windowID: nativeFocused?.windowId, workspaceID: nativeFocused?.nodeWorkspace?.id,
-            reason: "\(decision) event:\(refreshSessionEvent?.eventCode ?? "none")")
+            reason: "\(decision()) event:\(refreshSessionEvent?.eventCode ?? "none")")
     }
     // AX can report a key-window change caused by stacking while a viewport
     // gesture is in flight. A real click ends the gesture in GlobalObserver.
