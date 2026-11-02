@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" role="img" aria-labelledby="title desc">
+  <title id="title">Single window on an ultrawide display</title><desc id="desc">A centered single tile is narrower than the full ultrawide display, leaving balanced space on each side.</desc>
+  <rect width="800" height="300" rx="16" fill="#e2e8f0"/><rect x="160" y="34" width="480" height="232" rx="12" fill="#bfdbfe"/>
+  <g font-family="system-ui,sans-serif" font-size="20" font-weight="600" text-anchor="middle" fill="#172033"><text x="400" y="155">Single tiled window</text><text x="80" y="155" font-size="15">available space</text><text x="720" y="155" font-size="15">available space</text></g>
+</svg>

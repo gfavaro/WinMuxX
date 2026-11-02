@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+  <title id="title">Master with tiled stack</title><desc id="desc">A master window occupies the left side, with three tiled windows in a right-side stack.</desc>
+  <rect width="640" height="360" rx="16" fill="#f1f5f9"/><rect x="24" y="24" width="350" height="312" rx="10" fill="#bfdbfe"/><rect x="382" y="24" width="234" height="98" rx="10" fill="#bbf7d0"/><rect x="382" y="131" width="234" height="98" rx="10" fill="#fde68a"/><rect x="382" y="238" width="234" height="98" rx="10" fill="#fecdd3"/>
+  <g font-family="system-ui,sans-serif" font-size="20" font-weight="600" text-anchor="middle" fill="#172033"><text x="199" y="185">Master</text><text x="499" y="78">Stack 1</text><text x="499" y="185">Stack 2</text><text x="499" y="292">Stack 3</text></g>
+</svg>
