@@ -1,25 +1,27 @@
 import AppKit
 import Common
 
-/// Rest the pointer on a tiled window's title bar and a bar offers Main (in Master), Focus
+/// Rest the pointer on a tiled window's top edge and a bar offers Main (in Master), Focus
 /// and Float for that window where the pointer is, so they need no shortcut. Pointer
 /// moves only compare cached layout frames; which window is really on top is checked
 /// once the pointer has rested. Each button runs the ordinary command for that window.
 @MainActor
 final class WindowHoverBar {
     static let shared = WindowHoverBar()
-    /// A standard title bar's height, so the whole title bar summons the bar.
-    static let zoneHeight: CGFloat = 28
+    /// A thin band on the window's top edge: the whole title bar summoned the bar too readily.
+    static let zoneHeight: CGFloat = 8
+    /// How far the band reaches above the edge, so resting on the border itself counts.
+    static let zoneAboveEdge: CGFloat = 3
     static let dwell: Duration = .milliseconds(350)
     private var pending: (windowId: UInt32, task: Task<Void, Never>)?
     private var shown: UInt32?
     private lazy var panel = HoverBarPanel()
 
-    /// The band along a window's title bar that summons the bar: all of it but the corners,
+    /// The band along a window's top edge that summons the bar: all of it but the corners,
     /// which hold the window buttons and resize handles (80 pt each, a quarter on narrow windows).
     static func triggerZone(for frame: Rect) -> Rect {
         let corner = min(80, frame.width / 4)
-        return Rect(topLeftX: frame.minX + corner, topLeftY: frame.minY, width: frame.width - 2 * corner, height: zoneHeight)
+        return Rect(topLeftX: frame.minX + corner, topLeftY: frame.minY - zoneAboveEdge, width: frame.width - 2 * corner, height: zoneHeight)
     }
 
     /// The bar's place: centred on the pointer along the window's top edge, just inside the
