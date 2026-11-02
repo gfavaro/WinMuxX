@@ -55,7 +55,7 @@ on-focus-changed = []
 on-focused-monitor-changed = ['move-mouse monitor-lazy-center']
 # Workspace commands target the focused monitor unless --monitor is specified.
 # If the target workspace is visible elsewhere, focus follows it to that monitor;
-# neither workspace moves. Hidden targets still respect forced monitor assignments.
+# neither workspace moves. Hidden targets open on the display that owns them.
 
 automatically-unhide-macos-hidden-apps = false
 automatically-tile-new-windows = true
@@ -134,7 +134,8 @@ on-mode-changed = []
 #     "1" = "Terminal"
 #     "2" = "Editor"
 
-# Optional fixed monitor assignments. Leave commented for focused-monitor navigation.
+# Optional startup placement: each workspace starts on its display when WinMuxX launches,
+# then any workspace can show on any display.
 # [workspace-to-monitor-force-assignment]
 #     "1" = 'main'
 #     "2" = 'secondary'
