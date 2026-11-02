@@ -205,6 +205,16 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[0], "A focused workspace that moved keeps focus")
     }
 
+    func testStartOnMainStillMovesAnAssignmentThatLostItsDisplay() {
+        config.startWorkspacesOnMainMonitor = true
+        config.workspaceToMonitorForceAssignment = ["2": [.sequenceNumber(2)], "5": [.sequenceNumber(2)]]
+        applyStartupWorkspacePlacement(restoredWorld: false)
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertFalse(spaces[4].isVisible)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertTrue(displays[2].activeWorkspace.isEffectivelyEmpty)
+    }
+
     func testFocusGoesToTheAssignmentThatActuallyReplacedIt() {
         config.startWorkspacesOnMainMonitor = false
         config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(1)], "5": [.sequenceNumber(1)]]

@@ -110,7 +110,7 @@ func applyStartupWorkspacePlacement(restoredWorld: Bool) {
     }
     if config.startWorkspacesOnMainMonitor {
         // Snapshot first: the empty secondary viewports created below stay on their displays.
-        for workspace in Workspace.all where !assignedWorkspaces.contains(workspace) {
+        for workspace in Workspace.all where !assigned.contains(where: { $0.workspace == workspace }) {
             if let source = workspace.visibleMonitor,
                source.rect.topLeftCorner != main.rect.topLeftCorner {
                 let blank = createBlankWorkspace(projectId: workspace.projectId, monitor: source)
