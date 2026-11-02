@@ -1,51 +1,63 @@
 # Generates the WinMuxX app icon sources. Run from this directory: python3 gen.py
-# Round 3: a tiled workspace (five logo windows in one carrier) lifted from its origin.
+# Round 4: a display showing the sidebar and a Dwindle layout of real-looking windows.
 INK = "#151A1D"
-CW, CH = 600, 470            # carrier (workspace) size
-ORIGIN = (172, 334)          # where the workspace was
-MOVED = (252, 226)           # where it is going: +80, -108
-TILT = -5
+DX, DY, DW, DH = 160, 228, 704, 568   # display, on the 1024 grid
+COLOURS = ["#4CC9F0", "#FFB703", "#80ED99", "#F72585", "#C77DFF"]
 
-def windows(gutter, bar, small=False):
-    # Tiled layout inside the carrier: tall left, two stacked middle, two stacked right.
-    g = gutter; iw, ih = CW - 2*g, CH - 2*g
-    # Small sizes give the narrow right column more room so five panes survive at 16/32 px.
-    c1 = round(iw*(0.33 if small else 0.36)); c2 = round(iw*(0.30 if small else 0.34)); c3 = iw - c1 - c2 - 2*g
-    h2 = (ih - g)//2
-    cells = [
-        (g, g, c1, ih, "#4CC9F0"),
-        (g+c1+g, g, c2, h2, "#FFB703"),
-        (g+c1+g, g+h2+g, c2, ih-h2-g, "#80ED99"),
-        (g+c1+g+c2+g, g, c3, h2+20, "#F72585"),
-        (g+c1+g+c2+g, g+h2+g+20, c3, ih-h2-g-20, "#C77DFF"),
+def layout(g, rail):
+    # Sidebar rail, then Dwindle: tall left window, top-right window, bottom-right split in two.
+    x0 = g + rail + g; w = DW - x0 - g; h = DH - 2*g
+    w1 = (w - g)//2; xr = x0 + w1 + g; wr = w - w1 - g
+    h2 = (h - g)//2; yb = g + h2 + g; hb = h - h2 - g
+    w3 = (wr - g)//2
+    return [
+        (x0, g, w1, h, COLOURS[0]),
+        (xr, g, wr, h2, COLOURS[1]),
+        (xr, yb, w3, hb, COLOURS[2]),
+        (xr + w3 + g, yb, wr - w3 - g, hb, COLOURS[3]),
     ]
-    out = []
-    for i,(x,y,w,h,col) in enumerate(cells):
-        out.append(f'<clipPath id="w{i}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="30"/></clipPath>')
-    defs = "".join(out); body = []
-    for i,(x,y,w,h,col) in enumerate(cells):
-        band = f'<rect x="{x}" y="{y}" width="{w}" height="{bar}" fill="#000" fill-opacity="0.18"/>' if bar else ""
-        body.append(f'<g clip-path="url(#w{i})"><rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{col}"/>{band}</g>')
-    return defs, "".join(body)
 
-def origin_shape(small, opacity):
-    ox, oy = ORIGIN; tilt = 0 if small else TILT
-    return (f'<rect x="{ox}" y="{oy}" width="{CW}" height="{CH}" rx="64" transform="rotate({tilt} {ox+CW/2} {oy+CH/2})" '
-            f'fill="#FFFFFF" fill-opacity="{opacity}" stroke="#FFFFFF" stroke-opacity="{opacity+0.08}" stroke-width="{10 if small else 6}"/>')
+def window(i, x, y, w, h, col, small):
+    r = 34 if small else 26
+    clip = f'<clipPath id="w{i}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"/></clipPath>'
+    body = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{col}"/>']
+    if not small:
+        bar = 46
+        body.append(f'<rect x="{x}" y="{y}" width="{w}" height="{bar}" fill="#000" fill-opacity="0.20"/>')
+        for k in range(3):
+            body.append(f'<circle cx="{x+26+k*22}" cy="{y+bar/2}" r="7" fill="#FFF" fill-opacity="0.85"/>')
+        # Content lines: shorter on narrow windows, as many as the height allows.
+        ly = y + bar + 26
+        widths = [0.72, 0.52, 0.64, 0.40, 0.58, 0.46]
+        n = 0
+        while ly + 14 <= y + h - 22 and n < len(widths):
+            body.append(f'<rect x="{x+22}" y="{ly}" width="{round((w-44)*widths[n])}" height="14" rx="7" fill="#FFF" fill-opacity="0.45"/>')
+            ly += 32; n += 1
+    return clip, f'<g clip-path="url(#w{i})">{"".join(body)}</g>'
+
+def sidebar(g, rail, small):
+    out = [f'<rect x="{g}" y="{g}" width="{rail}" height="{DH-2*g}" rx="{rail/2 if small else 22}" fill="#FFF" fill-opacity="0.12"/>']
+    if not small:
+        cx = g + rail/2
+        out.append(f'<rect x="{cx-18}" y="{g+30}" width="36" height="14" rx="7" fill="{COLOURS[0]}"/>')
+        for k, col in enumerate(COLOURS[1:]):
+            out.append(f'<circle cx="{cx}" cy="{g+78+k*38}" r="8" fill="{col}" fill-opacity="0.85"/>')
+    return "".join(out)
+
+def display(small):
+    g = 26 if small else 16
+    rail = 64 if small else 60
+    defs, body = [], []
+    for i, cell in enumerate(layout(g, rail)):
+        d, b = window(i, *cell, small)
+        defs.append(d); body.append(b)
+    content = f'<rect width="{DW}" height="{DH}" rx="{64 if small else 56}" fill="{INK}"/>{sidebar(g, rail, small)}{"".join(body)}'
+    return "".join(defs), content
 
 def foreground(small, effects=True):
-    gutter = 26 if small else 18
-    wdefs, wbody = windows(gutter, 0 if small else 40, small)
-    tilt = 0 if small else TILT
+    defs, content = display(small)
     shadow = ' filter="url(#lift)"' if effects else ""
-    ox, oy = ORIGIN; mx, my = MOVED
-    origin_op = 0.20 if small else 0.13
-    return wdefs, f'''
-    {origin_shape(small, origin_op)}
-    <g transform="translate({mx} {my}) rotate({tilt} {CW/2} {CH/2})"{shadow}>
-      <rect width="{CW}" height="{CH}" rx="64" fill="{INK}"/>
-      {wbody}
-    </g>'''
+    return defs, f'<g transform="translate({DX} {DY})"{shadow}>{content}</g>'
 
 def legacy(small):
     rim = 8 if small else 4
@@ -67,7 +79,8 @@ def legacy(small):
   </defs>
   <g filter="url(#icon)"><rect x="100" y="100" width="824" height="824" rx="185" fill="url(#bg)"/></g>
   <g clip-path="url(#body)">
-    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>{fg}
+    <rect x="100" y="100" width="824" height="824" fill="url(#glow)"/>
+    {fg}
   </g>
   <!-- Rim stroke kept inside the body: inset by half the stroke width. -->
   <rect x="{100+rim/2}" y="{100+rim/2}" width="{824-rim}" height="{824-rim}" rx="{185-rim/2}" stroke="url(#rim)" stroke-width="{rim}"/>
@@ -91,9 +104,5 @@ def composer_layer(content, defs=""):
     return (f'<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">'
             f'<defs>{defs}</defs><g transform="scale({s:.5f}) translate(-100 -100)">{content}</g></svg>\n')
 
-# Opacity of the origin is set in Composer, so the layer is exported opaque.
-open("composer-origin.svg","w").write(composer_layer(origin_shape(False, 1.0).replace('stroke-opacity="1.08"', 'stroke-opacity="1"')))
-wdefs, wbody = windows(18, 40)
-mx, my = MOVED
-open("composer-workspace.svg","w").write(composer_layer(
-    f'<g transform="translate({mx} {my}) rotate({TILT} {CW/2} {CH/2})"><rect width="{CW}" height="{CH}" rx="64" fill="{INK}"/>{wbody}</g>', wdefs))
+wdefs, fg = foreground(False, effects=False)
+open("composer-display.svg","w").write(composer_layer(fg, wdefs))
