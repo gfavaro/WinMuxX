@@ -22,17 +22,9 @@ def window(i, x, y, w, h, col, small):
     clip = f'<clipPath id="w{i}"><rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{r}"/></clipPath>'
     body = [f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="{col}"/>']
     if not small:
-        bar = 46
-        body.append(f'<rect x="{x}" y="{y}" width="{w}" height="{bar}" fill="#000" fill-opacity="0.20"/>')
-        for k in range(3):
-            body.append(f'<circle cx="{x+26+k*22}" cy="{y+bar/2}" r="7" fill="#FFF" fill-opacity="0.85"/>')
-        # Content lines: shorter on narrow windows, as many as the height allows.
-        ly = y + bar + 26
-        widths = [0.72, 0.52, 0.64, 0.40, 0.58, 0.46]
-        n = 0
-        while ly + 14 <= y + h - 22 and n < len(widths):
-            body.append(f'<rect x="{x+22}" y="{ly}" width="{round((w-44)*widths[n])}" height="14" rx="7" fill="#FFF" fill-opacity="0.45"/>')
-            ly += 32; n += 1
+        # Shade only: a darker title bar over a light-to-dark wash.
+        body.append(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" fill="url(#shade)"/>')
+        body.append(f'<rect x="{x}" y="{y}" width="{w}" height="46" fill="#000" fill-opacity="0.20"/>')
     return clip, f'<g clip-path="url(#w{i})">{"".join(body)}</g>'
 
 def sidebar(g, rail, small):
@@ -51,6 +43,9 @@ def display(small):
     for i, cell in enumerate(layout(g, rail)):
         d, b = window(i, *cell, small)
         defs.append(d); body.append(b)
+    # objectBoundingBox: the wash follows each window's own height.
+    defs.append('<linearGradient id="shade" x1="0" y1="0" x2="0" y2="1">'
+                '<stop offset="0" stop-color="#FFF" stop-opacity="0.18"/><stop offset="1" stop-color="#000" stop-opacity="0.16"/></linearGradient>')
     content = f'<rect width="{DW}" height="{DH}" rx="{64 if small else 56}" fill="{INK}"/>{sidebar(g, rail, small)}{"".join(body)}'
     return "".join(defs), content
 
