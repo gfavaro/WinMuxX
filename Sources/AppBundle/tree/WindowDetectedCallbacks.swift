@@ -153,6 +153,19 @@ extension WindowDetectedCallback {
         if let workspace = matcher.workspace, workspace != window.nodeWorkspace?.name {
             return false
         }
+        if let wanted = matcher.appHasOtherWindows, wanted != appHasOtherWindows(window) {
+            return false
+        }
         return true
+    }
+}
+
+/// Whether WinMux manages another window of the window's app, on any workspace. A launching
+/// app's first window has none; a login or dialog window opened later has its main window.
+@MainActor
+func appHasOtherWindows(_ window: Window) -> Bool {
+    Workspace.all.contains { workspace in
+        workspace.allLeafWindowsRecursive.contains { $0 !== window && $0.app.pid == window.app.pid }
+            || workspace.floatingWindows.contains { $0 !== window && $0.app.pid == window.app.pid }
     }
 }

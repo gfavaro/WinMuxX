@@ -15,6 +15,8 @@ struct SettingsRuleRow: Identifiable, Equatable {
             var parts = [draft.appId, draft.appIdRegex, draft.appRegex, draft.titleRegex].filter { !$0.isEmpty }
             if !draft.workspace.isEmpty { parts.append("Workspace " + draft.workspace) }
             if draft.timing != "any" { parts.append(draft.timing.capitalized) }
+            if draft.appWindows == "first" { parts.append("First window") }
+            if draft.appWindows == "additional" { parts.append("Additional windows") }
             matches = parts.isEmpty ? "Any window" : parts.joined(separator: " · ")
         } else { matches = "Custom rule" }
         let row = (try? TOMLTable(string: block))?["on-window-detected"]?.array?.first?.table
@@ -60,6 +62,8 @@ struct SettingsRuleDraft: Equatable {
     var titleRegex = ""
     var workspace = ""
     var timing = "any"
+    /// `if.app-has-other-windows`: "first" (false), "additional" (true) or "any" (absent).
+    var appWindows = "any"
     var continues = false
     var guided: GuidedRuleActions?
 
@@ -74,6 +78,7 @@ struct SettingsRuleDraft: Equatable {
         titleRegex = match?["window-title-regex-substring"]?.string ?? ""
         workspace = match?["workspace"]?.string ?? ""
         timing = match?["during-winmux-startup"]?.bool.map { $0 ? "startup" : "runtime" } ?? "any"
+        appWindows = match?["app-has-other-windows"]?.bool.map { $0 ? "additional" : "first" } ?? "any"
         continues = row["check-further-callbacks"]?.bool ?? false
         let commands = row["run"]?.string.map { [$0] } ?? row["run"]?.array?.compactMap(\.string) ?? []
         guided = GuidedRuleActions(commands: commands)
@@ -92,6 +97,10 @@ struct SettingsRuleDraft: Equatable {
         }
         if timing != original.timing {
             edits.append(.init(section: "if", key: "during-winmux-startup", renderedValue: timing == "any" ? nil : String(timing == "startup")))
+        }
+        if appWindows != original.appWindows {
+            edits.append(.init(section: "if", key: "app-has-other-windows",
+                               renderedValue: appWindows == "any" ? nil : String(appWindows == "additional")))
         }
         if continues != original.continues {
             edits.append(.init(section: nil, key: "check-further-callbacks", renderedValue: String(continues)))
@@ -287,6 +296,12 @@ struct SettingsWindowRulesView: View {
                         Picker("Timing", selection: field(\.timing)) {
                             Text("Any").tag("any"); Text("Startup").tag("startup"); Text("Runtime").tag("runtime")
                         }
+                        Picker("App windows", selection: field(\.appWindows)) {
+                            Text("Any window").tag("any")
+                            Text("Only the app's first window").tag("first")
+                            Text("Only additional windows").tag("additional")
+                        }
+                        SettingsDescription("The first window is the one an app opens when it launches; additional windows include login and dialog windows opened later.")
                         SettingsDescription("Regex matchers are case-insensitive. Empty fields match any value; all specified matchers must match.")
                     }
                 }

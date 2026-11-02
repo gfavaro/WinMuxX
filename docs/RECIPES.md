@@ -64,3 +64,18 @@ on-display-changed = 'exec-and-forget echo "$WINMUX_PREV_DISPLAYS -> $WINMUX_DIS
 The hook receives display counts after a settled topology change. `exec-and-forget`
 puts the bundled `winmuxx` CLI on PATH. Remove the root key to undo the hook.
 See [the 0.19 adoption notes](DINKY_019_ADOPTION.md#configuration).
+
+## Send an app to a workspace only when it launches
+
+```toml
+[[on-window-detected]]
+if.app-id = 'net.imput.helium'
+if.app-has-other-windows = false
+run = 'move-node-to-workspace 5'
+```
+
+The rule moves only the window an app opens when it launches, while WinMuxX manages
+no other window of it. Windows the app opens later, such as login or dialog windows,
+open on the current workspace, next to the app, instead of following the rule.
+Settings › Window rules offers this as **App windows › Only the app's first window**.
+
