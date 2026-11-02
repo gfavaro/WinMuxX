@@ -19,11 +19,13 @@ import AppKit
     projectId: WorkspaceProjectId,
     for monitor: Monitor,
     excluding excludedWorkspace: Workspace?,
+    reserved: [Workspace] = [],
 ) -> Workspace {
     getOrCreateFallbackWorkspace(
         projectId: projectId,
         monitor: monitor,
         excluding: excludedWorkspace,
+        reserved: reserved,
     )
 }
 
@@ -42,11 +44,12 @@ func getOrCreateFallbackWorkspace(
     projectId: WorkspaceProjectId,
     monitor: Monitor,
     excluding excludedWorkspace: Workspace?,
+    reserved: [Workspace] = [],
 ) -> Workspace {
     let scope = WorkspaceScope(projectId: projectId)
     if let workspaceId = retainedEmptyWorkspaceId(in: scope),
        let workspace = runtime.workspaces.workspaceById[workspaceId],
-       workspace != excludedWorkspace,
+       workspace != excludedWorkspace, !reserved.contains(workspace),
        workspaceIsAvailableForMonitor(workspace, monitor: monitor)
     {
         return workspace
@@ -54,6 +57,7 @@ func getOrCreateFallbackWorkspace(
     if let workspace = projectWorkspaces(projectId: projectId)
         .first(where: {
             $0 != excludedWorkspace &&
+                !reserved.contains($0) &&
                 $0.isEffectivelyEmpty &&
                 !$0.isArchived &&
                 workspaceIsAvailableForMonitor($0, monitor: monitor)
@@ -61,7 +65,7 @@ func getOrCreateFallbackWorkspace(
     {
         return workspace
     }
-    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName(projectId: projectId))
+    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName())
     workspace.markAsAutomaticallyNamed()
     workspace.assignProject(projectId)
     workspace.seedMonitorIfNeeded(monitor)

@@ -9,7 +9,7 @@ func lowestUnusedPositiveIndex(_ usedIndices: Set<Int>) -> Int {
 }
 
 @MainActor
-func nextAutomaticWorkspaceName(projectId _: WorkspaceProjectId = workspaceProjectDefaultId) -> String {
+func nextAutomaticWorkspaceName() -> String {
     var candidate = 1
     while runtime.workspaces.workspaceIdByName[String(candidate)] != nil {
         candidate += 1

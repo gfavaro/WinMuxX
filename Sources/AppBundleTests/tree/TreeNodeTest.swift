@@ -302,7 +302,7 @@ final class TreeNodeTest: XCTestCase {
         Workspace.reconcileWorkspaceState()
 
         XCTAssertTrue(Workspace.existing(byName: workspace.name) === workspace)
-        XCTAssertNotEqual(nextSidebarCreatedWorkspaceName(), workspace.name)
+        XCTAssertNotEqual(nextAutomaticWorkspaceName(), workspace.name)
     }
 
     func testRestoredMinimizedWindowUsesCurrentWorkspaceWhenOriginalWorkspaceWasCollected() async throws {

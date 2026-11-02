@@ -14,7 +14,7 @@
 - [Configuration schema inventory](CONFIGURATION_SCHEMA_INVENTORY.md): parser-backed field map for editor completion maintenance.
 - [Configuration reload](CONFIG_RELOAD.md): file watching, debounce and what a failed reload keeps.
 - [Accessory windows](ACCESSORY_WINDOWS.md): how menu-bar apps' windows are classified and floated.
-- [Displays and window rules](SETTINGS_DISPLAYS_AND_RULES.md): live placement, saved constraints and rule editing.
+- [Displays and window rules](SETTINGS_DISPLAYS_AND_RULES.md): live placement, startup assignments and rule editing.
 - [Native Spaces](NATIVE_SPACES.md): the optional macOS Spaces backend, its tiling, limits and rollback; [workspace backend architecture](WORKSPACE_BACKEND_ARCHITECTURE.md), [technical assessment](NATIVE_SPACES_ASSESSMENT.md) and [decision record](NATIVE_SPACES_ADR.md).
 - [Workspace overview](WORKSPACE_OVERVIEW.md): behavior, resource limits and validation.
 - [Dinky 0.22 width and alignment](DINKY_022_ADOPTION.md): width percentages, display/workspace overrides and legacy configuration migration.

@@ -25,7 +25,7 @@ func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor
 
 @MainActor
 func createBlankWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace {
-    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName(projectId: projectId))
+    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName())
     workspace.markAsTransientBlank()
     workspace.assignProject(projectId)
     workspace.seedMonitorIfNeeded(monitor)

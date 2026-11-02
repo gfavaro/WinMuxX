@@ -74,7 +74,7 @@ import Foundation
         _ = Workspace.all.first?.focusWorkspace()
         try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
         try await runLightSession(.startup, .forceRun) {
-            applyStartupWorkspacePlacement()
+            applyStartupWorkspacePlacement(restoredWorld: didLoadPersistedFrozenWorld)
             applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
             _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
         }
@@ -87,18 +87,29 @@ import Foundation
 }
 
 /// Startup placement is separate from display ownership during normal switching.
-/// `workspace-to-monitor-force-assignment` takes effect only here: each assigned workspace
-/// starts on its display, and afterwards the user may show any workspace on any display.
+/// A restored world already says which workspace each display shows, so it is kept unless
+/// `start-workspaces-on-main-monitor` discards it. Otherwise `workspace-to-monitor-force-assignment`
+/// takes effect here: each assigned workspace that exists starts on its display, and
+/// afterwards the user may show any workspace on any display.
 @MainActor
-func applyStartupWorkspacePlacement() {
+func applyStartupWorkspacePlacement(restoredWorld: Bool) {
+    guard !restoredWorld || config.startWorkspacesOnMainMonitor else { return }
     let main = mainMonitor
     let focused = focus.workspace
-    let assigned = config.workspaceToMonitorForceAssignment.keys.sorted().compactMap { name in
-        resolvedForceAssignedMonitor(forWorkspaceName: name).map { (workspace: Workspace.get(byName: name), monitor: $0) }
+    let focusedDisplay = focused.isVisible ? focused.workspaceMonitor.rect.topLeftCorner : nil
+    // A secondary display shows one workspace, so the first name for it, in numeric order, wins.
+    var assigned: [(workspace: Workspace, monitor: Monitor)] = []
+    for name in config.workspaceToMonitorForceAssignment.keys.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
+        guard let workspace = Workspace.existing(byName: name),
+              let monitor = resolvedForceAssignedMonitor(forWorkspaceName: name) else { continue }
+        let point = monitor.rect.topLeftCorner
+        if point != main.rect.topLeftCorner, assigned.contains(where: { $0.monitor.rect.topLeftCorner == point }) { continue }
+        assigned.append((workspace, monitor))
     }
+    let assignedWorkspaces = assigned.map(\.workspace)
     if config.startWorkspacesOnMainMonitor {
         // Snapshot first: the empty secondary viewports created below stay on their displays.
-        for workspace in Workspace.all where !assigned.contains(where: { $0.workspace === workspace }) {
+        for workspace in Workspace.all where !assignedWorkspaces.contains(workspace) {
             if let source = workspace.visibleMonitor,
                source.rect.topLeftCorner != main.rect.topLeftCorner {
                 let blank = createBlankWorkspace(projectId: workspace.projectId, monitor: source)
@@ -111,12 +122,19 @@ func applyStartupWorkspacePlacement() {
         // A secondary display shows one workspace, so an assignment there shows it; main owns
         // its hidden workspaces, so one assigned there only needs to leave another display.
         if monitor.rect.topLeftCorner != main.rect.topLeftCorner || workspace.isVisible {
-            _ = activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: monitor)
+            _ = activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: monitor, reserved: assignedWorkspaces)
         } else {
             workspace.preferredMonitorPoint = main.rect.topLeftCorner
         }
     }
-    _ = focused.focusWorkspace()
+    // Focus stays on its display: an assignment that replaced the focused workspace takes focus.
+    if let focusedDisplay, !focused.isVisible,
+       let replacement = assigned.first(where: { $0.monitor.rect.topLeftCorner == focusedDisplay })?.workspace
+    {
+        _ = replacement.focusWorkspace()
+    } else {
+        _ = focused.focusWorkspace()
+    }
     syncClosedWindowsCacheToCurrentWorld()
 }
 

@@ -202,12 +202,12 @@ final class WorkspaceNamingTest: XCTestCase {
         thirdRaw.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 209, parent: thirdRaw.rootTilingContainer)
 
-        XCTAssertEqual(nextSidebarCreatedWorkspaceName(), "2")
+        XCTAssertEqual(nextAutomaticWorkspaceName(), "2")
     }
 
     func testConfiguredAssignmentDoesNotReserveAWorkspaceName() {
         config.workspaceToMonitorForceAssignment["1"] = [.sequenceNumber(2)]
-        XCTAssertEqual(nextSidebarCreatedWorkspaceName(), "1", "Assignments only place a workspace at startup")
+        XCTAssertEqual(nextAutomaticWorkspaceName(), "1", "Assignments only place a workspace at startup")
     }
 
     func testAutomaticNumericWorkspaceDisplayNamesCompactWithoutRenamingWorkspaceIds() {
@@ -395,7 +395,7 @@ final class WorkspaceNamingTest: XCTestCase {
         defaultWorkspace.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 12, parent: defaultWorkspace.rootTilingContainer)
         let project = createWorkspaceProject()
-        let projectWorkspace = Workspace.get(byName: nextSidebarCreatedWorkspaceName(projectId: project.id))
+        let projectWorkspace = Workspace.get(byName: nextAutomaticWorkspaceName())
         projectWorkspace.markAsAutomaticallyNamed()
         projectWorkspace.assignProject(project.id)
         projectWorkspace.seedMonitorIfNeeded(mainMonitor)

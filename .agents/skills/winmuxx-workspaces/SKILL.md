@@ -28,7 +28,7 @@ Inspect the relevant workspace identity, lifecycle and persistence code before
 changing ownership. Preserve the workspace tree and project identity; adapt frame
 geometry to the destination rather than rebuilding the user's organization.
 Account for source fallback, destination displacement, focus history, minimized
-windows and assignment constraints where the requested change affects them.
+windows and startup-only assignments where the requested change affects them.
 
 For fixture-based monitor assertions, compare the established monitor identifier or
 `rect.topLeftCorner` representation used by that suite. `Monitor` is a protocol;

@@ -134,7 +134,8 @@ on-mode-changed = []
 #     "1" = "Terminal"
 #     "2" = "Editor"
 
-# Optional startup placement: each workspace starts on its display when WinMuxX launches,
+# Optional startup placement: when WinMuxX launches without a saved arrangement (or with
+# start-workspaces-on-main-monitor), each existing workspace starts on its display;
 # then any workspace can show on any display.
 # [workspace-to-monitor-force-assignment]
 #     "1" = 'main'

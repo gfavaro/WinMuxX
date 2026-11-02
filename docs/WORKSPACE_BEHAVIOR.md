@@ -12,6 +12,7 @@ workspaces. Unless stated otherwise, no forced assignment applies.
 | A on M, B on S, C on T; explicitly bring A to S | A becomes visible on S; M receives a same-project fallback; B is hidden and returns to M ownership where allowed; T retains C | `testSidebarOverrideBringsWorkspaceToDestinationWithoutSwapping` |
 | A assigned to M in config; explicitly move A to T | A moves to T: assignments apply only at startup | `testOverrideUsesThirdDisplayDespiteAnAssignmentElsewhere` |
 | C assigned to S in config; WinMuxX starts, then the user shows B on S | C starts on S; B then replaces it, C returns to M ownership, and nothing reapplies the assignment | `testStartupShowsAnAssignedWorkspaceOnceAndTheUserCanReplaceIt` |
+| C assigned to S in config; WinMuxX restores a saved arrangement with B on S | B stays on S: a restored arrangement wins unless Start workspaces on main display is on | `testARestoredWorldKeepsItsDisplaysDespiteAssignments` |
 | Activate a sidebar row for a workspace on another display | The row may show bring-here confirmation; confirming or using its Bring Here context action explicitly relocates it | `WorkspaceSidebarWorkspaceSection.swift`; `WorkspaceSidebarOverrideTest` |
 | Disconnect and reconnect a display | Reconcile valid active viewports and preserve surviving display history; do not promise physical restoration beyond tested behavior | `testDisconnectAndReconnectPreservesSurvivingDisplayHistory`; desktop checks still required |
 

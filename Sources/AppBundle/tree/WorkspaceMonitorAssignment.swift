@@ -71,7 +71,8 @@ func sidebarSelectionKeepsFocus(_ workspace: Workspace, on targetMonitor: Monito
 }
 
 @MainActor
-func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, targetMonitor: Monitor) -> Bool {
+/// `reserved` workspaces are never chosen to fill the display the workspace leaves.
+func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, targetMonitor: Monitor, reserved: [Workspace] = []) -> Bool {
     // A later AX recovery must not undo an explicit display move from any entry point.
     resetClosedWindowsCache()
     let sourceMonitor = workspace.isVisible ? workspace.workspaceMonitor : nil
@@ -83,6 +84,7 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
             projectId: sourceProjectId,
             for: sourceMonitor,
             excluding: workspace,
+            reserved: reserved,
         )
         check(
             sourceMonitor.setActiveWorkspace(fallbackWorkspace),

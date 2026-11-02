@@ -7,11 +7,6 @@ func nextSidebarDraftWorkspaceName() -> String {
     return "\(sidebarDraftWorkspacePrefix)\(nextIndex)"
 }
 
-@MainActor
-func nextSidebarCreatedWorkspaceName(projectId: WorkspaceProjectId = workspaceProjectDefaultId) -> String {
-    nextAutomaticWorkspaceName(projectId: projectId)
-}
-
 func isSidebarDraftWorkspaceName(_ name: String) -> Bool {
     name.hasPrefix(sidebarDraftWorkspacePrefix)
 }

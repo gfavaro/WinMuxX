@@ -17,8 +17,10 @@ requires reviewing the move again.
 **Configured assignments** edits `[workspace-to-monitor-force-assignment]` using
 workspace and display pickers. Display labels retain their internal workspace IDs.
 Advanced entry supports future workspace names and custom selectors or ordered
-selector arrays. They take effect once, when WinMuxX starts: each assigned
-workspace starts on its display. Afterwards any workspace can show on any display,
+selector arrays. They take effect once, when WinMuxX starts without restoring a saved
+arrangement (a first launch, or with Start workspaces on main display): each assigned
+workspace that exists starts on its display, and the first name in numeric order wins
+a secondary display assigned more than once. A restored arrangement keeps its displays. Afterwards any workspace can show on any display,
 and neither navigation, reloads nor display changes reapply them. Native Spaces
 also use them to choose the display for each desktop they create. Existing assignments remain visible even when
 their display is unavailable.
