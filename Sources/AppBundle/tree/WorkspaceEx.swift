@@ -54,8 +54,4 @@ extension Workspace {
     @MainActor var macOsNativeHiddenAppsWindowsContainer: MacosHiddenAppsWindowsContainer {
         existingMacOsNativeHiddenAppsWindowsContainer ?? MacosHiddenAppsWindowsContainer(parent: self)
     }
-
-    @MainActor var forceAssignedMonitor: Monitor? {
-        resolvedForceAssignedMonitor(forWorkspaceName: name)
-    }
 }

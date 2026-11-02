@@ -9,17 +9,12 @@ func lowestUnusedPositiveIndex(_ usedIndices: Set<Int>) -> Int {
 }
 
 @MainActor
-func nextAutomaticWorkspaceName(projectId _: WorkspaceProjectId = workspaceProjectDefaultId, monitor: Monitor = mainMonitor) -> String {
+func nextAutomaticWorkspaceName(projectId _: WorkspaceProjectId = workspaceProjectDefaultId) -> String {
     var candidate = 1
-    while true {
-        let name = String(candidate)
-        if runtime.workspaces.workspaceIdByName[name] == nil,
-           isValidAssignment(workspaceName: name, screen: monitor.rect.topLeftCorner)
-        {
-            return name
-        }
+    while runtime.workspaces.workspaceIdByName[String(candidate)] != nil {
         candidate += 1
     }
+    return String(candidate)
 }
 
 func parsePositiveWorkspaceDisplayIndex(_ workspaceName: String) -> Int? {

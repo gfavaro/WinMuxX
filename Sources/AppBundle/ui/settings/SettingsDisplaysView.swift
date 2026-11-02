@@ -168,7 +168,7 @@ struct SettingsDisplaysView: View {
                     }
                 }
                 assignmentEditor
-                SettingsDescription("Saved assignments constrain placement, including after startup. Bring Here remains a separate one-time move.")
+                SettingsDescription("Saved assignments place each workspace on its display when WinMuxX starts. Afterwards you can show any workspace on any display; nothing reapplies them until the next launch.")
                 Button("Startup options…", action: onGeneral)
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }

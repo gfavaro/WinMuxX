@@ -8,8 +8,8 @@ func nextSidebarDraftWorkspaceName() -> String {
 }
 
 @MainActor
-func nextSidebarCreatedWorkspaceName(projectId: WorkspaceProjectId = workspaceProjectDefaultId, monitor: Monitor = mainMonitor) -> String {
-    nextAutomaticWorkspaceName(projectId: projectId, monitor: monitor)
+func nextSidebarCreatedWorkspaceName(projectId: WorkspaceProjectId = workspaceProjectDefaultId) -> String {
+    nextAutomaticWorkspaceName(projectId: projectId)
 }
 
 func isSidebarDraftWorkspaceName(_ name: String) -> Bool {

@@ -205,26 +205,9 @@ final class WorkspaceNamingTest: XCTestCase {
         XCTAssertEqual(nextSidebarCreatedWorkspaceName(), "2")
     }
 
-    func testNextAutomaticWorkspaceRawNameSkipsNamesForcedToAnotherMonitor() {
-        let main = WorkspaceNamingTestMonitor(
-            monitorAppKitNsScreenScreensId: 1,
-            name: "Main",
-            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
-            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
-            isMain: true,
-        )
-        let secondary = WorkspaceNamingTestMonitor(
-            monitorAppKitNsScreenScreensId: 2,
-            name: "Secondary",
-            rect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
-            visibleRect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
-            isMain: false,
-        )
-        setMonitorsForTests([main, secondary])
+    func testConfiguredAssignmentDoesNotReserveAWorkspaceName() {
         config.workspaceToMonitorForceAssignment["1"] = [.sequenceNumber(2)]
-
-        XCTAssertEqual(nextSidebarCreatedWorkspaceName(monitor: main), "2")
-        XCTAssertEqual(nextSidebarCreatedWorkspaceName(monitor: secondary), "1")
+        XCTAssertEqual(nextSidebarCreatedWorkspaceName(), "1", "Assignments only place a workspace at startup")
     }
 
     func testAutomaticNumericWorkspaceDisplayNamesCompactWithoutRenamingWorkspaceIds() {
@@ -412,7 +395,7 @@ final class WorkspaceNamingTest: XCTestCase {
         defaultWorkspace.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 12, parent: defaultWorkspace.rootTilingContainer)
         let project = createWorkspaceProject()
-        let projectWorkspace = Workspace.get(byName: nextSidebarCreatedWorkspaceName(projectId: project.id, monitor: mainMonitor))
+        let projectWorkspace = Workspace.get(byName: nextSidebarCreatedWorkspaceName(projectId: project.id))
         projectWorkspace.markAsAutomaticallyNamed()
         projectWorkspace.assignProject(project.id)
         projectWorkspace.seedMonitorIfNeeded(mainMonitor)

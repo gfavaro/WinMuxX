@@ -23,7 +23,6 @@ private func optimisticallyMarkWorkspaceFocusedInSidebar(_ workspaceName: String
     guard let workspace = Workspace.existing(byName: workspaceName) else { return }
     let requestedMonitor = targetMonitorScopeId.flatMap(workspaceSidebarMonitor(forScopeId:)) ?? focus.workspace.workspaceMonitor
     let monitor = workspaceMonitorForUserActivation(workspace, on: requestedMonitor)
-    guard isValidAssignment(workspace: workspace, screen: monitor.rect.topLeftCorner) else { return }
     let keepsFocus = sidebarSelectionKeepsFocus(workspace, on: requestedMonitor)
     let outgoing = monitor.activeWorkspace
     var visibleNames = Set(monitors.map { $0.activeWorkspace.name })

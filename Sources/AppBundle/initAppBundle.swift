@@ -87,19 +87,34 @@ import Foundation
 }
 
 /// Startup placement is separate from display ownership during normal switching.
+/// `workspace-to-monitor-force-assignment` takes effect only here: each assigned workspace
+/// starts on its display, and afterwards the user may show any workspace on any display.
 @MainActor
 func applyStartupWorkspacePlacement() {
-    guard config.startWorkspacesOnMainMonitor else { return }
     let main = mainMonitor
     let focused = focus.workspace
-    // Snapshot first: the empty secondary viewports created below stay on their displays.
-    for workspace in Workspace.all where workspace.forceAssignedMonitor == nil {
-        if let source = workspace.visibleMonitor,
-           source.rect.topLeftCorner != main.rect.topLeftCorner {
-            let blank = createBlankWorkspace(projectId: workspace.projectId, monitor: source)
-            check(source.setActiveWorkspace(blank))
+    let assigned = config.workspaceToMonitorForceAssignment.keys.sorted().compactMap { name in
+        resolvedForceAssignedMonitor(forWorkspaceName: name).map { (workspace: Workspace.get(byName: name), monitor: $0) }
+    }
+    if config.startWorkspacesOnMainMonitor {
+        // Snapshot first: the empty secondary viewports created below stay on their displays.
+        for workspace in Workspace.all where !assigned.contains(where: { $0.workspace === workspace }) {
+            if let source = workspace.visibleMonitor,
+               source.rect.topLeftCorner != main.rect.topLeftCorner {
+                let blank = createBlankWorkspace(projectId: workspace.projectId, monitor: source)
+                check(source.setActiveWorkspace(blank))
+            }
+            workspace.preferredMonitorPoint = main.rect.topLeftCorner
         }
-        workspace.preferredMonitorPoint = main.rect.topLeftCorner
+    }
+    for (workspace, monitor) in assigned {
+        // A secondary display shows one workspace, so an assignment there shows it; main owns
+        // its hidden workspaces, so one assigned there only needs to leave another display.
+        if monitor.rect.topLeftCorner != main.rect.topLeftCorner || workspace.isVisible {
+            _ = activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: monitor)
+        } else {
+            workspace.preferredMonitorPoint = main.rect.topLeftCorner
+        }
     }
     _ = focused.focusWorkspace()
     syncClosedWindowsCacheToCurrentWorld()

@@ -65,7 +65,7 @@ implementation. Current testing guidance takes precedence over old patterns.
   in cleanup. Bounded expectations establish completion without guessing via sleeps.
 - **Ownership and rejection:** read `Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift`,
   especially `testSidebarOverrideBringsWorkspaceToDestinationWithoutSwapping` and
-  `testOverrideUsesThirdDisplayAndRejectsInvalidAssignmentWithoutChanges`. Check
+  `testOverrideUsesThirdDisplayDespiteAnAssignmentElsewhere`. Check
   source, destination and unaffected displays, including rejected operations.
 
 For preservation tests, assert live state: captured objects can remain intact even

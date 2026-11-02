@@ -85,7 +85,7 @@ extension WorkspaceNamingTest {
         XCTAssertTrue(secondary.activeWorkspace !== projectWorkspace)
     }
 
-    func testWorkspaceToMonitorForceAssignmentRejectsWrongMonitor() {
+    func testConfiguredAssignmentDoesNotRestrictDisplaysAfterStartup() {
         let main = WorkspaceNamingTestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -104,12 +104,11 @@ extension WorkspaceNamingTest {
         config.workspaceToMonitorForceAssignment["forced"] = [.sequenceNumber(2)]
         let workspace = Workspace.get(byName: "forced")
 
-        XCTAssertFalse(main.setActiveWorkspace(workspace))
-        XCTAssertTrue(secondary.setActiveWorkspace(workspace))
-        XCTAssertTrue(secondary.activeWorkspace === workspace)
+        XCTAssertTrue(main.setActiveWorkspace(workspace), "Only startup places an assigned workspace")
+        XCTAssertTrue(main.activeWorkspace === workspace)
     }
 
-    func testReconcileMovesVisibleWorkspaceToNewForceAssignedMonitor() {
+    func testReconcileLeavesAnAssignedWorkspaceWhereItIsShown() {
         let main = WorkspaceNamingTestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -132,35 +131,8 @@ extension WorkspaceNamingTest {
 
         Workspace.reconcileWorkspaceState()
 
-        XCTAssertTrue(secondary.activeWorkspace === workspace)
-        XCTAssertFalse(main.activeWorkspace === workspace)
-        XCTAssertEqual(workspace.preferredMonitorPointForTesting, secondary.rect.topLeftCorner)
-    }
-
-    func testMonitorViewportFallbackIgnoresEmptyWorkspaceForcedToAnotherMonitor() {
-        let main = WorkspaceNamingTestMonitor(
-            monitorAppKitNsScreenScreensId: 1,
-            name: "Main",
-            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
-            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
-            isMain: true,
-        )
-        let secondary = WorkspaceNamingTestMonitor(
-            monitorAppKitNsScreenScreensId: 2,
-            name: "Secondary",
-            rect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
-            visibleRect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
-            isMain: false,
-        )
-        setMonitorsForTests([main, secondary])
-        _ = TestWindow.new(id: 213, parent: focus.workspace.rootTilingContainer)
-        let forcedElsewhere = Workspace.get(byName: "forced")
-        config.workspaceToMonitorForceAssignment[forcedElsewhere.name] = [.sequenceNumber(2)]
-
-        let fallback = getOrCreateMonitorViewportFallbackWorkspace(projectId: workspaceProjectDefaultId, for: main)
-
-        XCTAssertFalse(fallback === forcedElsewhere)
-        XCTAssertEqual(fallback.workspaceMonitor.rect.topLeftCorner, main.rect.topLeftCorner)
+        XCTAssertTrue(main.activeWorkspace === workspace, "A reload or topology change does not reapply the assignment")
+        XCTAssertFalse(secondary.activeWorkspace === workspace)
     }
 
     func testGcMonitorsReconcilesChangedMonitorPointsWithSameMonitorCount() {

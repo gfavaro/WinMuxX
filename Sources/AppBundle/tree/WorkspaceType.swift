@@ -127,7 +127,6 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
             workspace.refreshEmptyLifecycle()
         }
         runtime.workspaces.pruneProjectWorkspaceIndexes()
-        repairInvalidVisibleWorkspaceAssignments()
         rearrangeWorkspacesOnMonitors()
         reconcileSecondaryWorkspaceAssignments()
         ensureMinimumWorkspaceForAllProjects()
@@ -167,7 +166,7 @@ extension Workspace {
     @MainActor
     func seedMonitorIfNeeded(_ monitor: Monitor) {
         if preferredMonitorPoint == nil {
-            preferredMonitorPoint = (forceAssignedMonitor ?? monitor).rect.topLeftCorner
+            preferredMonitorPoint = monitor.rect.topLeftCorner
         }
     }
 
@@ -227,7 +226,7 @@ extension Workspace {
     }
     @MainActor
     var assignedMonitor: Monitor? {
-        visibleMonitor ?? forceAssignedMonitor ?? preferredMonitorPoint?.monitorApproximation
+        visibleMonitor ?? preferredMonitorPoint?.monitorApproximation
     }
 
     @MainActor
@@ -244,7 +243,7 @@ extension Workspace {
 
     @MainActor
     var preferredMonitorPointForTesting: CGPoint? {
-        visibleMonitor?.rect.topLeftCorner ?? forceAssignedMonitor?.rect.topLeftCorner ?? preferredMonitorPoint
+        visibleMonitor?.rect.topLeftCorner ?? preferredMonitorPoint
     }
 
     var isArchived: Bool {

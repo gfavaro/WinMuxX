@@ -87,7 +87,7 @@ final class MoveNodeToWorkspaceCommandTest: XCTestCase {
         XCTAssertEqual(Workspace.get(byName: "b").preferredMonitorPointForTesting, workspaceA.workspaceMonitor.rect.topLeftCorner)
     }
 
-    func testNewForceAssignedWorkspaceUsesForcedMonitorViewport() async throws {
+    func testAssignmentDoesNotPlaceAWorkspaceCreatedAfterStartup() async throws {
         let main = TestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -112,8 +112,7 @@ final class MoveNodeToWorkspaceCommandTest: XCTestCase {
         try await MoveNodeToWorkspaceCommand(args: MoveNodeToWorkspaceCmdArgs(workspace: "forced")).run(.defaultEnv, .emptyStdin)
 
         let forced = Workspace.get(byName: "forced")
-        XCTAssertEqual(forced.preferredMonitorPointForTesting, secondary.rect.topLeftCorner)
-        XCTAssertEqual(forced.workspaceMonitor.rect.topLeftCorner, secondary.rect.topLeftCorner)
+        XCTAssertEqual(forced.workspaceMonitor.rect.topLeftCorner, main.rect.topLeftCorner)
     }
 
     func testNewWorkspaceInheritsSourceProject() async throws {
