@@ -99,14 +99,15 @@ func applyStartupWorkspacePlacement(restoredWorld: Bool) {
     let focusedDisplay = focused.isVisible ? focused.workspaceMonitor.rect.topLeftCorner : nil
     // A secondary display shows one workspace, so the first name for it, in numeric order, wins.
     var assigned: [(workspace: Workspace, monitor: Monitor)] = []
+    var assignedWorkspaces: [Workspace] = []
     for name in config.workspaceToMonitorForceAssignment.keys.sorted(by: { $0.localizedStandardCompare($1) == .orderedAscending }) {
         guard let workspace = Workspace.existing(byName: name),
               let monitor = resolvedForceAssignedMonitor(forWorkspaceName: name) else { continue }
+        assignedWorkspaces.append(workspace)
         let point = monitor.rect.topLeftCorner
         if point != main.rect.topLeftCorner, assigned.contains(where: { $0.monitor.rect.topLeftCorner == point }) { continue }
         assigned.append((workspace, monitor))
     }
-    let assignedWorkspaces = assigned.map(\.workspace)
     if config.startWorkspacesOnMainMonitor {
         // Snapshot first: the empty secondary viewports created below stay on their displays.
         for workspace in Workspace.all where !assignedWorkspaces.contains(workspace) {
@@ -129,7 +130,8 @@ func applyStartupWorkspacePlacement(restoredWorld: Bool) {
     }
     // Focus stays on its display: an assignment that replaced the focused workspace takes focus.
     if let focusedDisplay, !focused.isVisible,
-       let replacement = assigned.first(where: { $0.monitor.rect.topLeftCorner == focusedDisplay })?.workspace
+       case let replacement = focusedDisplay.monitorApproximation.activeWorkspace,
+       assigned.contains(where: { $0.workspace == replacement })
     {
         _ = replacement.focusWorkspace()
     } else {

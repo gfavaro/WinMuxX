@@ -194,6 +194,26 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertFalse(spaces.contains(displays[1].activeWorkspace))
     }
 
+    func testAWorkspaceThatLosesItsDisplayStillCannotFillAnother() {
+        config.startWorkspacesOnMainMonitor = false
+        let empty = Workspace.get(byName: "6")
+        config.workspaceToMonitorForceAssignment = ["1": [.sequenceNumber(3)], "6": [.sequenceNumber(3)]]
+        applyStartupWorkspacePlacement(restoredWorld: false)
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[0])
+        XCTAssertNotEqual(displays[0].activeWorkspace, empty)
+        XCTAssertFalse(empty.isVisible)
+        XCTAssertEqual(focus.workspace, spaces[0], "A focused workspace that moved keeps focus")
+    }
+
+    func testFocusGoesToTheAssignmentThatActuallyReplacedIt() {
+        config.startWorkspacesOnMainMonitor = false
+        config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(1)], "5": [.sequenceNumber(1)]]
+        applyStartupWorkspacePlacement(restoredWorld: false)
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[4])
+        XCTAssertFalse(spaces[2].isVisible)
+        XCTAssertEqual(focus.workspace, spaces[4])
+    }
+
     func testLateTreeRestorationPreservesStartupDisplayChoice() async throws {
         let workspace = spaces[2]
         workspace.seedMonitorIfNeeded(displays[1])
