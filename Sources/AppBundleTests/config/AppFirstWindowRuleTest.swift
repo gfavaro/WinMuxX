@@ -36,6 +36,16 @@ final class AppFirstWindowRuleTest: XCTestCase {
         XCTAssertTrue(popupIsLater)
     }
 
+    func testAMinimizedWindowOfTheAppStillCounts() async throws {
+        setUpWorkspacesForTests()
+        _ = TestWindow.new(id: 1, parent: macosMinimizedWindowsContainer)
+        let later = TestWindow.new(id: 2, parent: focus.workspace.rootTilingContainer)
+        let laterIsFirst = try await rule(false).matches(later)
+        XCTAssertFalse(laterIsFirst, "The app's main window is only minimized, so this is not its first window")
+        let laterIsAdditional = try await rule(true).matches(later)
+        XCTAssertTrue(laterIsAdditional)
+    }
+
     func testRejectsANonBooleanValue() {
         let parsed = parseConfig("[[on-window-detected]]\nif.app-has-other-windows = 'no'\nrun = 'layout floating'")
         XCTAssertFalse(parsed.errors.isEmpty)

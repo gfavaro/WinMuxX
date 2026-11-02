@@ -160,12 +160,14 @@ extension WindowDetectedCallback {
     }
 }
 
-/// Whether WinMux manages another window of the window's app, on any workspace. A launching
-/// app's first window has none; a login or dialog window opened later has its main window.
+/// Whether WinMux manages another window of the window's app, on any workspace or minimized.
+/// A launching app's first window has none; a login or dialog window opened later has its main
+/// window, even while that window is minimized (minimized windows sit outside every workspace).
 @MainActor
 func appHasOtherWindows(_ window: Window) -> Bool {
-    Workspace.all.contains { workspace in
-        workspace.allLeafWindowsRecursive.contains { $0 !== window && $0.app.pid == window.app.pid }
-            || workspace.floatingWindows.contains { $0 !== window && $0.app.pid == window.app.pid }
-    }
+    func isOther(_ candidate: Window) -> Bool { candidate !== window && candidate.app.pid == window.app.pid }
+    return macosMinimizedWindowsContainer.children.contains { ($0 as? Window).map(isOther) ?? false }
+        || Workspace.all.contains { workspace in
+            workspace.allLeafWindowsRecursive.contains(where: isOther) || workspace.floatingWindows.contains(where: isOther)
+        }
 }
