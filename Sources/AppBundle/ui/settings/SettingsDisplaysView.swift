@@ -168,7 +168,7 @@ struct SettingsDisplaysView: View {
                     }
                 }
                 assignmentEditor
-                SettingsDescription("Saved assignments place each workspace on its display when WinMuxX starts. Afterwards you can show any workspace on any display; nothing reapplies them until the next launch.")
+                SettingsDescription("Saved assignments place each workspace on its display when WinMuxX starts. Afterwards you can show any workspace on any display; nothing reapplies them until the next launch. Native Spaces also use them to choose where new desktops are created.")
                 Button("Startup options…", action: onGeneral)
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }

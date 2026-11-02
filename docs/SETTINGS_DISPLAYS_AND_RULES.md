@@ -19,7 +19,8 @@ workspace and display pickers. Display labels retain their internal workspace ID
 Advanced entry supports future workspace names and custom selectors or ordered
 selector arrays. They take effect once, when WinMuxX starts: each assigned
 workspace starts on its display. Afterwards any workspace can show on any display,
-and neither navigation, reloads nor display changes reapply them. Existing assignments remain visible even when
+and neither navigation, reloads nor display changes reapply them. Native Spaces
+also use them to choose the display for each desktop they create. Existing assignments remain visible even when
 their display is unavailable.
 Choose Edit to change one, then Save changes. Merely opening the editor preserves
 the original value and formatting, including ordered alternatives. External
