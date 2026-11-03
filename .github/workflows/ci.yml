@@ -3,8 +3,6 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
-  push:
-    branches: [main]
 
 permissions:
   contents: read
@@ -61,30 +59,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Import persistent signing identity
-        timeout-minutes: 2
-        if: github.event_name == 'push' && github.repository == 'gfavaro/WinMuxX'
-        env:
-          SIGNING_P12: ${{ secrets.WINMUXX_SIGNING_P12 }}
-          SIGNING_PASSWORD: ${{ secrets.WINMUXX_SIGNING_PASSWORD }}
-          SIGNING_IDENTITY: ${{ secrets.WINMUXX_SIGNING_IDENTITY }}
-        run: bash script/import-signing-identity.sh
       - name: Build personal app
         if: github.repository == 'gfavaro/WinMuxX'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-          CODESIGN_IDENTITY: ${{ github.event_name == 'push' && secrets.WINMUXX_SIGNING_IDENTITY || '-' }}
+          CODESIGN_IDENTITY: '-'
         run: make fork-build BUILD_NUMBER="$BUILD_NUMBER"
-
-      - name: Upload personal build
-        if: github.event_name == 'push' && github.repository == 'gfavaro/WinMuxX'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: WinMuxX-${{ github.run_number }}
-          path: .release/WinMuxX-*.zip
-          include-hidden-files: true
-          if-no-files-found: error
-      - name: Remove signing keychain
-        if: always()
-        timeout-minutes: 2
-        run: python3 script/cleanup_signing_identity.py

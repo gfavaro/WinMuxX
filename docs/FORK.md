@@ -117,23 +117,24 @@ Outputs: `.release/WinMuxX.app` and a version/build-number ZIP. The build is not
 notarized. By default it uses an ad hoc signature. To keep macOS privacy permissions
 across local builds, the script reads a signing identity name from
 `${XDG_CONFIG_HOME:-~/.config}/winmuxx/signing-identity` (or `CODESIGN_IDENTITY`);
-the same certificate and bundle ID must be retained. PR builds use ad hoc signing;
-trusted main/release builds import the persistent identity from Actions secrets.
+the same certificate and bundle ID must be retained. CI builds use ad hoc signing;
+release builds import the persistent identity from Actions secrets.
 Quit the original window manager, then copy the app to `/Applications/WinMuxX.app`
 and open it. The build command does not install, launch, or replace any app.
 The old upstream `make install` target is intentionally disabled.
 
 ## CI and releases
 
-CI tests PRs and `main`; trusted `main` builds also upload the app ZIP as an artifact.
+CI runs on PRs and on demand; pushes to `main` do not build. Pushing a `gf-v*`
+tag runs the release workflow, which builds, signs and publishes the app ZIP.
 Signing import has a two-minute timeout. Hosted runners install certificate trust
 in the admin domain with passwordless, noninteractive `sudo -n`; user-domain trust
-can display a prompt and stall headless jobs. Both CI and release workflows call
+can display a prompt and stall headless jobs. The release workflow calls
 `script/cleanup_signing_identity.py` even after failed/canceled imports. It is
 restricted to disposable GitHub-hosted runners. It deletes only our temporary
 keychain, certificate/archive and database sidecars. Keychain API deletion has a
 30-second timeout and direct file removal as fallback; inability to remove files
-still fails cleanup. Both workflows also bound the cleanup step to two minutes.
+still fails cleanup. The workflow also bounds the cleanup step to two minutes.
 
 `remove-trusted-cert` is deliberately avoided: it can hang even with sudo, as
 reported in [runner-images#12116](https://github.com/actions/runner-images/issues/12116).
