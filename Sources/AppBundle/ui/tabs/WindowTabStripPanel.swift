@@ -47,6 +47,8 @@ extension NSPanelHud {
         hasShadow = false
         isFloatingPanel = false
         isExcludedFromWindowsMenu = true
+        // `.transient` lets the system hide tab chrome during Mission Control instead of showing it as a window.
+        collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
         animationBehavior = .none
         backgroundColor = .clear
         applyWinMuxLayer(.windowChrome)
