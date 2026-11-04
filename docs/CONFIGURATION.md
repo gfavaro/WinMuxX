@@ -221,10 +221,20 @@ gesture-sensitivity = 1.0
 minimap-enabled = true
 center-focused-column = 'never'   # never, on-overflow or always
 minimap-hold-modifiers = []       # e.g. ['ctrl', 'alt']
+keep-window-height = false        # a lone window keeps its opening height, at the top
 
 [workspace.'Code']
 layout = 'scrolling'
+
+# Scroll Code on the ultrawide, tile it on the laptop.
+[workspace.'Code'.display.'Built-in']
+layout = 'dwindle'
 ```
+
+With `keep-window-height`, a window alone in its column keeps the height it opened with,
+aligned to the top, instead of filling the column; stacked columns still share the full
+height. A display override in a workspace section chooses another arrangement while the
+workspace is on that display.
 
 Option plus a three-finger horizontal swipe pans a scrolling workspace. Plain three-finger swipes continue to switch workspaces. `scrolling-width next|previous|full` changes the focused column width, and `scrolling-center` centres it. The clickable minimap appears while navigating. Scrolled-out columns leave a 25-point edge preview; previews at display walls stay within their owning display.
 

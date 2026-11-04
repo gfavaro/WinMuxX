@@ -27,11 +27,14 @@ extension Workspace {
                                                                    visibility: .visible, stackingIndex: geometry.columns.count) }
                 }
                 return zip(scrollingStripUnits, geometry.columns).map { node, frame in
-                    WorkspaceGroupFrame(node: node,
+                    // With keep-window-height, a lone window keeps the height it opened with, at the top.
+                    let opened = config.scrolling.keepWindowHeight ? (node as? Window)?.lastFloatingSize?.height : nil
+                    let height = { (full: CGFloat) in opened.map { min(max($0, 1), full) } ?? full }
+                    return WorkspaceGroupFrame(node: node,
                         physical: Rect(topLeftX: frame.physicalFrame.minX, topLeftY: frame.physicalFrame.minY,
-                                       width: frame.physicalFrame.width, height: frame.physicalFrame.height),
+                                       width: frame.physicalFrame.width, height: height(frame.physicalFrame.height)),
                         virtual: Rect(topLeftX: frame.logicalFrame.minX, topLeftY: frame.logicalFrame.minY,
-                                      width: frame.logicalFrame.width, height: frame.logicalFrame.height),
+                                      width: frame.logicalFrame.width, height: height(frame.logicalFrame.height)),
                         visibility: frame.visibility, stackingIndex: geometry.stackingOrder.firstIndex(of: frame.index) ?? frame.index)
                 } + (pinned.map { [$0] } ?? [])
             case .master:

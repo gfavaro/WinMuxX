@@ -35,6 +35,39 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         XCTAssertFalse(parseConfig("[scrolling]\ncenter-focused-column = 'sometimes'").errors.isEmpty)
     }
 
+    func testKeepWindowHeightTopAlignsALoneWindowAtItsOpeningHeight() async throws {
+        let previous = config.scrolling.keepWindowHeight
+        defer { config.scrolling.keepWindowHeight = previous }
+        XCTAssertTrue(parseConfig("[scrolling]\nkeep-window-height = true").config.scrolling.keepWindowHeight)
+        let (workspace, windows) = try await strip()
+        let full = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        windows[0].lastFloatingSize = CGSize(width: 500, height: 300)
+        windows[1].lastFloatingSize = CGSize(width: 500, height: 5000)
+        config.scrolling.keepWindowHeight = true
+        try await workspace.layoutWorkspace()
+        let kept = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(kept.height, 300)
+        XCTAssertEqual(kept.minY, full.minY, "Aligned to the top")
+        XCTAssertEqual(kept.width, full.width, "Only the height changes")
+        XCTAssertEqual(windows[1].lastAppliedLayoutPhysicalRect?.height, full.height, "Never taller than the column")
+    }
+
+    func testBackgroundWindowNeitherScrollsTheStripNorTakesFocus() async throws {
+        let (workspace, windows) = try await strip()
+        _ = windows[3].focusWindow()
+        try await workspace.layoutWorkspace()
+        let focusedRect = try XCTUnwrap(windows[3].lastAppliedLayoutPhysicalRect)
+        // A background app opens a window: it is bound to the workspace but never focused.
+        let binding = bindingDataForNewRegularWindow(workspace, window: nil)
+        let background = TestWindow.new(id: 8199, parent: binding.parent, adaptiveWeight: binding.adaptiveWeight)
+        background.unbindFromParent()
+        background.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(focus.windowOrNil, windows[3], "The new window does not take focus")
+        XCTAssertEqual(windows[3].lastAppliedLayoutPhysicalRect, focusedRect, "The strip stays where it was")
+        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.contains(background))
+    }
+
     func testCentreModes() async throws {
         let (workspace, _) = try await strip()
         let metrics = workspace.scrollingMetrics

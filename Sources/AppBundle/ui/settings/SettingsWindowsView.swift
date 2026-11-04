@@ -18,6 +18,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("scrolling.gesture-enabled", load: { config.scrolling.gestureEnabled }) private var scrollingGestureEnabled: Bool
     @SettingsDraft("scrolling.gesture-sensitivity", load: { String(config.scrolling.gestureSensitivity) }) private var scrollingSensitivity: String
     @SettingsDraft("scrolling.minimap-enabled", load: { config.scrolling.minimapEnabled }) private var scrollingMinimapEnabled: Bool
+    @SettingsDraft("scrolling.keep-window-height", load: { config.scrolling.keepWindowHeight }) private var scrollingKeepWindowHeight: Bool
     @SettingsDraft("scrolling.center-focused-column", load: { config.scrolling.centerFocusedColumn }) private var scrollingCenterMode: ScrollingCenterMode
     @SettingsDraft("scrolling.minimap-hold-modifiers", load: { minimapHoldModifierNames(config.scrolling.minimapHoldModifiers) }) private var minimapHoldModifiers: String
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
@@ -285,8 +286,12 @@ struct ShortcutBehaviorSettingsView: View {
                     persistConfig(section: "scrolling", key: "gesture-sensitivity", value: String(value))
                 }
             }
+            SettingsToggle("Keep each window's opening height", id: "scrolling.keep-window-height", isOn: $scrollingKeepWindowHeight,
+                help: "A window alone in its column keeps the height it opened with, aligned to the top, instead of filling the column.") {
+                persistConfig(section: "scrolling", key: "keep-window-height", value: scrollingKeepWindowHeight ? "true" : "false")
+            }
             SettingsToggle("Show scrolling minimap", id: "scrolling.minimap-enabled", isOn: $scrollingMinimapEnabled,
-                help: "Show the workspace map while panning and allow it to be opened from Layout or a shortcut.") {
+                help: "Show the workspace map while panning and allow it to be opened from the menu or a shortcut.") {
                 persistConfig(section: "scrolling", key: "minimap-enabled", value: scrollingMinimapEnabled ? "true" : "false")
             }
             SettingsTextField("Hold to keep the minimap up", id: "scrolling.minimap-hold-modifiers", text: $minimapHoldModifiers,

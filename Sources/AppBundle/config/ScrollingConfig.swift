@@ -21,6 +21,8 @@ struct ScrollingConfig: ConvenienceCopyable, Equatable {
     var centerFocusedColumn = ScrollingCenterMode.never
     /// Holding exactly these keeps the minimap up; empty turns it off.
     var minimapHoldModifiers: NSEvent.ModifierFlags = []
+    /// A lone window in a column keeps the height it opened with, aligned to the top.
+    var keepWindowHeight = false
 }
 
 func parseScrolling(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ errors: inout [TomlParseError]) -> ScrollingConfig {
@@ -38,6 +40,7 @@ func parseScrolling(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ error
             parseDouble(raw, trace).filter(.semantic(trace, "Must be finite and greater than zero")) { $0.isFinite && $0 > 0 }
         },
         "minimap-enabled": Parser(\.minimapEnabled, parseBool),
+        "keep-window-height": Parser(\.keepWindowHeight, parseBool),
         "minimap-hold-modifiers": Parser(\.minimapHoldModifiers) { raw, trace in
             parseTomlArray(raw, trace).flatMap { values in
                 values.enumerated().mapAllOrFailure { index, value in
