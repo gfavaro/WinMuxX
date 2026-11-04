@@ -144,7 +144,17 @@ final class WindowHoverBar {
         }
         let bar = Self.barFrame(for: frame, size: size, pointerX: pointerX)
         panel.setFrame(CGRect(x: bar.minX, y: mainMonitor.height - bar.maxY, width: bar.width, height: bar.height), display: true)
-        panel.orderFrontRegardless()
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            panel.alphaValue = 1
+            panel.orderFrontRegardless()
+        } else {
+            panel.alphaValue = 0
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.12
+                panel.animator().alphaValue = 1
+            }
+        }
         shown = window.windowId
     }
 
@@ -159,164 +169,4 @@ final class WindowHoverBar {
         shown = nil
         panel.orderOut(nil)
     }
-}
-
-@MainActor
-final class HoverBarPanel: NSPanelHud {
-    private let stack = NSStackView()
-    /// The accent wash and border that set the bar apart from window content.
-    private let highlight = NSView()
-    private var run: ((String) -> Void)?
-
-    override init() {
-        super.init()
-        level = .floating
-        hasShadow = true
-        isOpaque = false
-        backgroundColor = .clear
-        animationBehavior = .none
-        isExcludedFromWindowsMenu = true
-        collectionBehavior = [.transient, .ignoresCycle, .fullScreenAuxiliary]
-        let effect = NSVisualEffectView()
-        effect.material = .hudWindow
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 10
-        effect.layer?.masksToBounds = true
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 2
-        stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        highlight.wantsLayer = true
-        highlight.layer?.cornerRadius = 10
-        highlight.layer?.borderWidth = 1
-        highlight.translatesAutoresizingMaskIntoConstraints = false
-        effect.addSubview(highlight)
-        effect.addSubview(stack)
-        NSLayoutConstraint.activate([
-            highlight.leadingAnchor.constraint(equalTo: effect.leadingAnchor), highlight.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
-            highlight.topAnchor.constraint(equalTo: effect.topAnchor), highlight.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: effect.leadingAnchor), stack.trailingAnchor.constraint(equalTo: effect.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: effect.topAnchor), stack.bottomAnchor.constraint(equalTo: effect.bottomAnchor),
-        ])
-        contentView = effect
-    }
-
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-
-    static let maximumTabRowWidth: CGFloat = 520
-
-    /// Lays out the tab row (for a tabbed window) above one button per action, each with its
-    /// configured shortcut beneath, and returns the bar's size.
-    func configure(_ actions: [HoverBarAction], hints: [String?] = [], tabs: [HoverBarTab] = [],
-                   run: @escaping (String) -> Void) -> CGSize {
-        self.run = run
-        let increasedContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        // Graphite has no hue, so the bar would not stand out; use blue then.
-        let color = NSColor.currentControlTint == .graphiteControlTint ? NSColor.systemBlue : NSColor.controlAccentColor
-        effect(appearance: contentView?.effectiveAppearance) {
-            highlight.layer?.backgroundColor = color.withAlphaComponent(increasedContrast ? 0.32 : 0.22).cgColor
-            highlight.layer?.borderColor = color.withAlphaComponent(increasedContrast ? 1 : 0.65).cgColor
-        }
-        stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-
-        let actionRow = NSStackView()
-        actionRow.orientation = .horizontal
-        actionRow.spacing = 4
-        for (index, action) in actions.enumerated() {
-            let button = HoverBarButton(title: action.title, target: self, action: #selector(pressed(_:)))
-            button.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)
-            button.imagePosition = .imageLeading
-            button.bezelStyle = .recessed
-            button.controlSize = .regular
-            button.font = .systemFont(ofSize: 13, weight: .medium)
-            button.identifier = NSUserInterfaceItemIdentifier(action.command)
-            let column = NSStackView(views: [button])
-            column.orientation = .vertical
-            column.spacing = 0
-            if let hint = hints.indices.contains(index) ? hints[index] : nil {
-                let label = NSTextField(labelWithString: hint)
-                label.font = .systemFont(ofSize: 10, weight: .medium)
-                label.textColor = .secondaryLabelColor
-                column.addArrangedSubview(label)
-                button.setAccessibilityHelp("Shortcut \(hint)")
-            }
-            actionRow.addArrangedSubview(column)
-        }
-        actionRow.layoutSubtreeIfNeeded()
-
-        if !tabs.isEmpty {
-            let tabRow = NSStackView()
-            tabRow.orientation = .horizontal
-            tabRow.spacing = 2
-            for tab in tabs {
-                let button = HoverBarButton(title: tab.title, target: self, action: #selector(pressed(_:)))
-                button.image = tab.appBundlePath.map { NSWorkspace.shared.icon(forFile: $0) }
-                button.image?.size = NSSize(width: 16, height: 16)
-                button.imagePosition = .imageLeading
-                button.bezelStyle = .recessed
-                button.showsBorderOnlyWhileMouseInside = !tab.isActive
-                button.state = tab.isActive ? .on : .off
-                button.setButtonType(.pushOnPushOff)
-                button.font = .systemFont(ofSize: 12, weight: tab.isActive ? .semibold : .regular)
-                button.lineBreakMode = .byTruncatingTail
-                button.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
-                button.identifier = NSUserInterfaceItemIdentifier("focus --window-id \(tab.windowId)")
-                button.setAccessibilityLabel(tab.isActive ? "\(tab.title), current tab" : tab.title)
-                tabRow.addArrangedSubview(button)
-            }
-            tabRow.layoutSubtreeIfNeeded()
-            let width = min(tabRow.fittingSize.width, max(Self.maximumTabRowWidth, actionRow.fittingSize.width))
-            let scroll = NSScrollView()
-            scroll.drawsBackground = false
-            scroll.hasHorizontalScroller = false
-            scroll.horizontalScrollElasticity = .allowed
-            scroll.documentView = tabRow
-            tabRow.frame = NSRect(origin: .zero, size: tabRow.fittingSize)
-            scroll.translatesAutoresizingMaskIntoConstraints = false
-            scroll.widthAnchor.constraint(equalToConstant: width).isActive = true
-            scroll.heightAnchor.constraint(equalToConstant: tabRow.fittingSize.height).isActive = true
-            stack.addArrangedSubview(scroll)
-            // Keep the current tab in view when the row scrolls.
-            if let active = tabs.firstIndex(where: \.isActive), tabRow.arrangedSubviews.indices.contains(active) {
-                tabRow.arrangedSubviews[active].scrollToVisible(tabRow.arrangedSubviews[active].bounds)
-            }
-        }
-        stack.addArrangedSubview(actionRow)
-        stack.layoutSubtreeIfNeeded()
-        return stack.fittingSize
-    }
-
-    @objc private func pressed(_ sender: NSButton) {
-        guard let command = sender.identifier?.rawValue else { return }
-        run?(command)
-    }
-}
-
-struct HoverBarAction: Equatable {
-    let title: String
-    let symbol: String
-    let command: String
-    /// The command a key binding would run for this action, without a window id.
-    let shortcut: String
-}
-
-struct HoverBarTab: Equatable {
-    let windowId: UInt32
-    let title: String
-    let appBundlePath: String?
-    let isActive: Bool
-}
-
-private final class HoverBarButton: NSButton {
-    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
-}
-
-/// Resolves dynamic colors such as the accent color for the given appearance.
-@MainActor
-private func effect(appearance: NSAppearance?, _ body: () -> Void) {
-    if let appearance { appearance.performAsCurrentDrawingAppearance(body) } else { body() }
 }
