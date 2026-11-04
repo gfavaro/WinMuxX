@@ -11,6 +11,19 @@ Rows or Side; when a screen is full, a new window joins the active tile as a sta
 It has up to four workspaces, Setups (saved app arrangements), Clean Space (a plain
 screen for sharing) and No peek mode.
 
+## Shoji's weak point: workspaces
+
+Shoji arranges each screen well but organizes work poorly. Its workspaces are at most
+four numbered sets of windows ("A separate set of windows, like Coding or Writing.
+Up to 4."), switched with ⌃⌥1–4 or receiving a window with "Send to workspace". It
+ignores macOS Spaces beyond the current one ("Apps on other desktops can't be seen
+from here"), pauses under Stage Manager, and has no projects, no per-display
+ownership and no way to bring a workspace to another display with its layout.
+
+That is WinMuxX's defining capability ([core principles](PRINCIPLES.md)). Adopt
+Shoji's presentation (pills, panel, Settings style) on top of WinMuxX's workspace
+model, not its model.
+
 ## Already in WinMuxX
 
 - The hover bar on a window's top edge with Main, Focus and Float
