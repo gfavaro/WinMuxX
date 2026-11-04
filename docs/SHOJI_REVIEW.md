@@ -24,16 +24,42 @@ That is WinMuxX's defining capability ([core principles](PRINCIPLES.md)). Adopt
 Shoji's presentation (pills, panel, Settings style) on top of WinMuxX's workspace
 model, not its model.
 
-## Already in WinMuxX
+## Compared with WinMuxX
 
-- The hover bar on a window's top edge with Main, Focus and Float
-  (`Sources/AppBundle/ui/WindowHoverBar.swift`).
-- Dimming of inactive windows and No peek (`Sources/AppBundle/ui/InactiveWindowDimmer.swift`).
-- Borders, focus follows pointer, tab groups with swap/stack by drag, learned
-  application minimum sizes, floating rules and a window switcher.
-- A menu warning when some keyboard shortcuts are unavailable.
-- Tab groups inside Dwindle and Master: `stack-with`, `layout tab-group` or dragging
-  a window onto another; Dwindle keeps the group whole and Master treats it as one unit.
+Checked against the code and WinMuxX's running menu and Settings window on the same day.
+
+| Area | Shoji | WinMuxX | Take |
+| --- | --- | --- | --- |
+| Workspaces and displays | Four numbered sets, current Space only | Projects, persistent workspaces, display ownership, whole-workspace moves | Keep WinMuxX |
+| Stacks and tabs | Pill rail at rest, tabs in the hover bar | Full strip with titles, reordering and two-sided windows; new windows can join the current tab group | Pill rail at rest (proposal below) |
+| Hover bar | Tabs plus Primary, Focus, Next screen, Float; ⌥-click Float adds a rule | Main, Focus, Float | Merge with the tab strip; ⌥-click Float |
+| Menu bar | Panel with state, mini-map, toggles, frontmost-app switch | Long command menu, Enabled, warnings, recovery | Panel |
+| Settings layout | About 25 options on intent pages, pictogram choices | Nine pages with effect descriptions, deep display and workspace controls; many menus | Pictograms; move workspace layout mode out of Displays |
+| Settings search | Every setting, with synonyms | Shortcuts only | Add |
+| Previews | Captioned layout and highlight previews | Spacing preview | Extend and caption |
+| Setup and permissions | One "Allowed" row | Setup Check with Check Again, Diagnostics | WinMuxX is ahead |
+| Shortcuts | Keycaps, named owner of a conflict, free-key suggestions, one prefix | Search, modes, modifier sides, presets, focus direction pad, workspace modifier pattern, shortcut diagnostics | Show conflicts per shortcut |
+| Learned minimum sizes | Listed with Forget | Listed with Forget on Windows | Equal |
+| Floating rules | Built-in exclusions shown as Default; always-float list | Always Float This App, title-prefix rule from the menu | Equal |
+| Retile | Reports what moved | Reports what moved ("Put 2 windows back") | Equal |
+| Dimming and No peek | Yes | Yes | Equal |
+| Space for other bars | Drag editor per screen | Per-display outer gaps in TOML | Optional UI |
+| Portrait displays | Special layouts | Dwindle splits along the longer axis | Not needed |
+| Switcher | By screen, minimized section, key-hint footer | Palette grouped by workspace with search | Key-hint footer |
+| Teaching | Mouse gestures page, Try next, tour | None | Mouse gestures list |
+
+Found while comparing: the menu header reads "WinMuxX · Workspace Workspace 3".
+`Sources/AppBundle/ui/menubar/NativeActionMenu.swift` prefixes "Workspace " to
+`workspaceDisplayName`, whose default for a numbered persistent workspace is already
+"Workspace 3" (`Sources/AppBundle/tree/WorkspaceSidebarLabels.swift`).
+
+WinMuxX Settings expose some configuration shapes directly: persistent workspaces as a
+comma-separated list, the workspace layout mode as a "Choose workspace, Save workspace
+mode" form under Displays, and UUID and hardware-selector buttons for each display.
+These could move behind disclosures, with the common choice as pictograms.
+
+Tab groups already work inside Dwindle and Master: `stack-with`, `layout tab-group` or
+dragging a window onto another; Dwindle keeps the group whole and Master treats it as one unit.
 
 ## Stacks: pills and the hover bar
 
@@ -115,9 +141,8 @@ pointer focus and tab strips, a "Stop tiling" switch for the frontmost app, and 
 shortcut and window-manager warnings the native menu already shows. Keep every action
 reachable from the keyboard.
 
-First picks: the mini-map with the frontmost-app switch, and pictogram pickers with
-effect descriptions in Settings. This comparison used WinMuxX's code and README; its
-Settings window was not open during the session.
+First picks: the mini-map with the frontmost-app switch, and pictogram pickers in
+Settings. WinMuxX already describes the effect of most controls.
 
 ## Other ideas
 
@@ -148,27 +173,19 @@ In rough order of value:
    screen plain (Graphite, Stone or Mist background) with one key; Setups saves the
    open apps and their arrangement and reopens them, hiding other apps.
 
-Smaller ideas, not yet checked against WinMuxX:
+Smaller ideas:
 
 - **Stack instead of shrinking.** When another window would push a tile below an
   application's learned minimum size, stack it in the active tile rather than floating
   it or overflowing. Shoji's equivalent is "When a screen is full: stack in the active tile".
-- **One-click "always float".** Option-clicking Float in the hover bar adds a rule for
-  windows like this one (same app and title prefix); the app's other windows still tile.
-- **Frontmost-app switch.** "Tile Rex Beta" in the menu stops tiling the current app
-  without opening Settings.
-- **Retile feedback.** Retile reports "3 windows were put back in their places" or
-  "Everything was already in place".
-- **Pause without moving.** Turning Shoji off leaves windows where they are; turning
-  it on again rearranges them.
-- **Edge space for other apps' bars.** Per-screen space kept free for third-party docks,
-  set by dragging an edge while a blue strip marks it.
-- **Portrait monitors.** Columns become rows, and Grid puts one window on top with the
-  others below, when a screen is taller than wide.
-- **Hover focus delay.** A short delay so passing over windows does not change focus.
-- **Gap-only highlights.** Borders and glows are drawn in the gap, never over content.
-- **Private diagnostics.** The problem report names apps "App A, App B" and omits
-  monitor and Mac model names.
+- **⌥-click Float.** In the hover bar, add the title-prefix rule the menu already
+  offers ("Create Floating Rule for This Window…").
+- **Frontmost-app switch.** A toggle for the current app in a future menu-bar panel,
+  using the existing "Always Float This App" rule.
+- **Private diagnostics.** Shoji's report names apps "App A, App B" and omits monitor
+  and Mac model names; no redaction was found in WinMuxX's diagnostics.
+- Not checked: whether pointer focus waits before switching, whether borders stay in
+  the gap, and what disabling WinMuxX does to window positions.
 
 Not worth copying: activity counts, "time saved" and alternative app icons.
 
