@@ -44,8 +44,8 @@ These are the defaults and features maintained here:
   Sidebar clicks on another display ask before bringing the workspace there.
 - Learned application minimum sizes constrain layouts. Borders use an AppKit
   fallback when the private renderer is unavailable.
-- The native menu includes diagnostics and recovery of original window frames
-  after an interrupted session.
+- The native menu includes diagnostics, recovery of original window frames
+  after an interrupted session, and About WinMuxX with the version, build and credits.
 
 The app has its own identity, CLI, configuration and recovery state. On first
 launch, it can copy your original WinMux configuration while leaving that file

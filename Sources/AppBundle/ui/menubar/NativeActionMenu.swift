@@ -231,6 +231,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         if !PersistedAppMinimums.shared.isEmpty || MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
             menu.addItem(callbackItem("Clear Saved Minimum Sizes…", #selector(resetMinimumSizes)))
         }
+        menu.addItem(callbackItem("About WinMuxX", #selector(showAbout)))
         menu.addItem(callbackItem("Settings…", #selector(openSettings)))
         let enabled = addCommand("Enabled", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
         enabled?.state = TrayMenuModel.shared.isEnabled ? .on : .off
@@ -329,6 +330,12 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         ShortcutSettingsModel.shared.requestWindowOpen()
+    }
+    /// The standard panel reads name, icon, version and build from the bundle; an accessory
+    /// app must activate first or the panel opens behind the frontmost app.
+    @objc private func showAbout() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: aboutPanelCredits()])
     }
     @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
     @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }
@@ -506,4 +513,21 @@ func menuWorkspaceTargets() -> [(workspace: Workspace, target: String)] {
 @MainActor
 func menuWorkspaceTitle(_ workspace: Workspace) -> String {
     runtime.workspaceBackend.current.title(ofWorkspaceNamed: workspace.name)
+}
+
+/// Credits under the version in the About panel: the fork, its upstream and the repository.
+func aboutPanelCredits() -> NSAttributedString {
+    let repository = "https://github.com/gfavaro/WinMuxX"
+    let text = NSMutableAttributedString(
+        string: "Personal fork by gfavaro of WinMux by Zimeng Xiong, MIT License.\n",
+        attributes: [.font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize), .foregroundColor: NSColor.secondaryLabelColor],
+    )
+    text.append(NSAttributedString(string: "github.com/gfavaro/WinMuxX", attributes: [
+        .font: NSFont.systemFont(ofSize: NSFont.smallSystemFontSize),
+        .link: URL(string: repository)!,
+    ]))
+    let paragraph = NSMutableParagraphStyle()
+    paragraph.alignment = .center
+    text.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: text.length))
+    return text
 }

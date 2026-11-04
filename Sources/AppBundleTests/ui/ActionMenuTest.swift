@@ -85,6 +85,19 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertFalse(header.contains("Workspace Workspace"), header)
     }
 
+    func testAboutItemSitsAboveSettingsAndCreditsTheFork() throws {
+        let menu = NSMenu()
+        NativeActionMenu().menuNeedsUpdate(menu)
+        let titles = menu.items.map(\.title)
+        let about = try XCTUnwrap(titles.firstIndex(of: "About WinMuxX"))
+        XCTAssertEqual(titles[about + 1], "Settings…")
+        XCTAssertTrue(menu.items[about].isEnabled)
+        let credits = aboutPanelCredits()
+        XCTAssertTrue(credits.string.contains("WinMux by Zimeng Xiong"), credits.string)
+        let link = credits.attribute(.link, at: credits.length - 1, effectiveRange: nil) as? URL
+        XCTAssertEqual(link?.absoluteString, "https://github.com/gfavaro/WinMuxX")
+    }
+
     func testEssentialMenuOmitsRareCommandsRatherThanNestingThem() throws {
         let previousMode = activeMode
         defer { activeMode = previousMode }

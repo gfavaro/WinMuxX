@@ -145,6 +145,33 @@ reachable from the keyboard.
 First picks: the mini-map with the frontmost-app switch, and pictogram pickers in
 Settings. WinMuxX already describes the effect of most controls.
 
+### Simplified native menu (proposal)
+
+Preferred over a drawn panel: keep `NSMenu`, but let the top level show state and
+quick switches while commands move into one submenu. Not yet agreed.
+
+```
+Workspace 3 · Dwindle · 4 windows          status line
+⚠ warnings, only when present
+● Dwindle / Master / Scrolling             workspace layout
+  layout-specific items                    Swap with Master; scrolling items
+Retile · Balance Sizes · Fullscreen
+✓ Tile "<front app>"                       off adds Always Float This App;
+                                           ⌥ alternate: Float Windows Titled "…"
+✓ No Peek · ✓ Borders · Focus Follows Pointer
+Commands ▸                                 Focus, Move, Join, Resize, workspaces,
+                                           displays, Reload Config
+Recover N Windows… (only when present)
+About WinMuxX · Settings… · ✓ Tiling Enabled · Quit
+```
+
+"Clear Saved Minimum Sizes…" leaves the menu; Settings → Windows already has Forget.
+Open questions: may Borders and Focus Follows Pointer write the configuration as
+Settings does, and should the layout items keep their small icons?
+
+About WinMuxX shipped first: it opens the standard About panel (name, icon, version,
+build) with credits for the fork, upstream WinMux and the repository link.
+
 ## Backlog, sorted
 
 Ordered by value for the effort. Effort: S is a day or less, M a few days, L a week
