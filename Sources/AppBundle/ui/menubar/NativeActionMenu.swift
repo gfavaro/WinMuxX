@@ -117,7 +117,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
         let native = runtime.workspaceBackend.kind == .native
         let place = native ? nativeDesktopNumber(of: focus.workspace).map { nativeDesktopDisplayName($0) } ?? "Native Spaces"
-            : "Workspace \(workspaceDisplayName(focus.workspace.name))"
+            : workspaceDisplayName(focus.workspace.name)
         menu.addItem(NSMenuItem(title: "WinMuxX · \(place)", action: nil, keyEquivalent: ""))
         if native, !runtime.workspaceBackend.native.tiling.ready {
             let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Tiling off (observation only)"

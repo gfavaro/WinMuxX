@@ -248,7 +248,7 @@ struct ShortcutBehaviorSettingsView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(issue.kind == .tiledGroup ? "Tiled group minimum exceeds its layout area" : "Scrolling column minimum exceeds the viewport")
                             .font(.body)
-                        Text("Workspace \(workspaceDisplayName(runtime.workspaces.workspaceById[issue.workspaceId]?.name ?? issue.workspaceId.rawValue)) · minimum \(minimumSizeDescription(issue.minimumSize)) · available \(minimumSizeDescription(issue.availableSize))")
+                        Text("\(workspaceDisplayName(runtime.workspaces.workspaceById[issue.workspaceId]?.name ?? issue.workspaceId.rawValue)) · minimum \(minimumSizeDescription(issue.minimumSize)) · available \(minimumSizeDescription(issue.availableSize))")
                             .font(.caption).foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 4)

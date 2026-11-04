@@ -77,6 +77,14 @@ final class ActionMenuTest: XCTestCase {
         }
     }
 
+    func testMenuHeaderNamesWorkspaceOnce() throws {
+        let menu = NSMenu()
+        NativeActionMenu().menuNeedsUpdate(menu)
+        let header = try XCTUnwrap(menu.items.first).title
+        XCTAssertEqual(header, "WinMuxX · \(workspaceDisplayName(focus.workspace.name))")
+        XCTAssertFalse(header.contains("Workspace Workspace"), header)
+    }
+
     func testEssentialMenuOmitsRareCommandsRatherThanNestingThem() throws {
         let previousMode = activeMode
         defer { activeMode = previousMode }
