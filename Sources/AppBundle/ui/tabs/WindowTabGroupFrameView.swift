@@ -28,12 +28,8 @@ struct WindowTabGroupFrameView: View {
                 .fill(colors.separator)
                 .frame(height: StrokeToken.hairline)
                 .offset(y: tabHeight - StrokeToken.hairline)
-
-            WindowTabGroupInnerBoundaryShape(
-                tabBarHeight: tabHeight,
-                activeWindowCornerRadius: strip.activeWindowCornerRadius,
-            )
-            .stroke(mattePanelInsetShadow, lineWidth: windowTabGroupFrameInnerStrokeWidth)
+            // No line along the inner boundary: the window draws its own edge there, and a second
+            // stroke doubled it into two concentric lines at the corners.
         }
         .frame(width: groupSize.width, height: groupSize.height)
         .allowsHitTesting(false)

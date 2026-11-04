@@ -22,6 +22,8 @@ let windowTabStripScrollOriginTolerance: CGFloat = 0.5
 let windowTabStripGroupDragMinimumDistance: CGFloat = 1
 let windowTabGroupFrameStrokeWidth: CGFloat = 0.5
 let windowTabGroupFrameInnerStrokeWidth: CGFloat = 0.5
+/// Resting tab titles recede further than other secondary text so the active tab reads first.
+let windowTabRestingTextOpacity: Double = 0.6
 // Must be >= the OS standard window corner radius (26pt on macOS 26, unified system-wide on
 // macOS 27), otherwise the chrome frame's inner cutout clamps below the real window corners
 // and visibly mismatches them. The actual radius comes from per-window measurement; this only

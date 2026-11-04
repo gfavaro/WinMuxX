@@ -634,10 +634,6 @@ private struct MarketingMeasuredTabGroupFrameView: View {
         let outerShape = WindowTabGroupOuterShape(
             activeWindowCornerRadius: strip.activeWindowCornerRadius
         )
-        let innerShape = MarketingMeasuredWindowBoundaryShape(
-            tabBarHeight: tabHeight,
-            cornerRadius: strip.activeWindowCornerRadius
-        )
         let shellShape = MarketingMeasuredWindowShellShape(
             tabBarHeight: tabHeight,
             cornerRadius: strip.activeWindowCornerRadius
@@ -662,8 +658,6 @@ private struct MarketingMeasuredTabGroupFrameView: View {
                 .frame(height: StrokeToken.hairline)
                 .offset(y: tabHeight - StrokeToken.hairline)
 
-            innerShape
-                .stroke(mattePanelInsetShadow, lineWidth: windowTabGroupFrameInnerStrokeWidth)
         }
         .frame(width: groupSize.width, height: groupSize.height)
         .allowsHitTesting(false)

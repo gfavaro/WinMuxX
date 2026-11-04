@@ -23,7 +23,7 @@ struct WindowTabItemView: View {
         .frame(width: width, height: height, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: windowTabStripInnerCornerRadius, style: .continuous)
-                .fill(colors.foreground.opacity(tab.isActive ? GlassToken.fillActive : isHovered ? GlassToken.fillHover : GlassToken.fillFaint))
+                .fill(tabFill)
         }
         .overlay {
             RoundedRectangle(cornerRadius: windowTabStripInnerCornerRadius, style: .continuous)
@@ -33,14 +33,22 @@ struct WindowTabItemView: View {
         .contentShape(Rectangle())
     }
 
+    // Only the active tab is a raised pill; resting tabs sit on the bar, as in Safari. With a pill
+    // on every tab, the active one differed by a slightly lighter grey and was hard to pick out.
+    private var tabFill: Color {
+        if tab.isActive { return colors.foreground.opacity(GlassToken.fillActive) }
+        return isHovered ? colors.foreground.opacity(GlassToken.fillFaint) : .clear
+    }
+
     private var tabForegroundStyle: Color {
         if tab.isActive { return colors.text(opacity: GlassToken.textPrimary) }
         if isDragSource { return colors.text(opacity: GlassToken.textSecondary) }
-        return colors.text(opacity: isHovered ? GlassToken.textPrimary : GlassToken.textSecondary)
+        return colors.text(opacity: isHovered ? GlassToken.textPrimary : windowTabRestingTextOpacity)
     }
 
     private var tabStrokeStyle: Color {
         if tab.isActive { return colors.foreground.opacity(colors.increasedContrast ? 1 : GlassToken.strokeActive) }
-        return colors.foreground.opacity(colors.increasedContrast ? 0.6 : isHovered ? GlassToken.strokeHover : GlassToken.strokeResting)
+        if colors.increasedContrast { return colors.foreground.opacity(0.6) }
+        return isHovered ? colors.foreground.opacity(GlassToken.strokeResting) : .clear
     }
 }
