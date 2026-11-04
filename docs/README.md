@@ -50,6 +50,7 @@ guides above for today's settings and development workflow.
 - [Scrolling workspaces validation](SCROLLING_WORKSPACES_COMPLETION.md)
 - [AeroSpork comparison](AEROSPORK_REVIEW.md) and the [Settings ideas it led to](SETTINGS_AND_CLEANUP_PLAN.md), shipped in build 73.
 - [prateek/winmux fork review](PRATEEK_FORK_REVIEW.md)
+- [Shoji review](SHOJI_REVIEW.md): hands-on notes, pill tab strips and other ideas; not yet reviewed.
 - [Test suite review](TEST_SUITE_REVIEW.md)
 - [Appearance settings review](APPEARANCE_SETTINGS_REVIEW.md)
 - [Menu-bar appearance investigation](MENU_BAR_APPEARANCE_INVESTIGATION.md)
