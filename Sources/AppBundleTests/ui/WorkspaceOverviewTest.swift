@@ -422,7 +422,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         controller.dismiss(animated: false)
         XCTAssertFalse(panel.isVisible)
         XCTAssertTrue(model.images.isEmpty)
-        XCTAssertTrue(model.cards.isEmpty)
+        XCTAssertFalse(model.cards.isEmpty, "The reused panel keeps its card views for the next opening")
         XCTAssertNil(model.selectedWindow)
         XCTAssertNil(model.activate)
         XCTAssertTrue(controller.show(gestureProgress: 0.3))

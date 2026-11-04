@@ -237,12 +237,17 @@ final class WorkspaceOverviewController {
         let retiredPanels = panels, retiredModels = models
         panels.removeAll(); models.removeAll()
         for (panel, model) in zip(retiredPanels, retiredModels) {
+            var reused = false
             if let native = panel as? WorkspaceOverviewPanel, let id = model.monitor {
                 native.hideForReuse()
                 reusablePanels[id]?.dismissOverview()
                 reusablePanels[id] = native
+                reused = true
             } else { panel.dismissOverview() }
-            model.images.removeAll(); model.cards.removeAll()
+            model.images.removeAll()
+            // A reused panel keeps its cards: emptying them tore down every card's SwiftUI views,
+            // and the next opening built them all again before the panel could appear.
+            if !reused { model.cards.removeAll() }
             model.page = 0; model.selection = 0; model.selectedWindow = nil
             model.activate = nil; model.pageChanged = nil; model.dismiss = nil; model.switchDisplay = nil
             model.canSwitchDisplay = false
