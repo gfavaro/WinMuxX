@@ -404,7 +404,9 @@ void winmux_border_hide(WinMuxBorderHandle border) {
     if (!transaction) return;
     for (int i = 0; i < WINMUX_BORDER_PIECES; ++i)
         if (border->windows[i]) SYM("SLSTransactionOrderWindow", Order)(transaction, border->windows[i], 0, 0);
-    SYM("SLSTransactionCommit", Commit)(transaction, true);
+    // Nothing reads the result back, so this does not wait for WindowServer: every switch hides
+    // the parked windows' borders. Later transactions on this connection still apply after it.
+    SYM("SLSTransactionCommit", Commit)(transaction, false);
     CFRelease(transaction);
 }
 
