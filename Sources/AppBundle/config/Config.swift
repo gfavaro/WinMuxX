@@ -311,6 +311,17 @@ struct WindowTabsConfig: ConvenienceCopyable, Equatable, Sendable {
     var doubleSidedWindows: Bool = false
     var enabled: Bool = true
     var height: Int = 36
+    var style: WindowTabStyle = .pills
+}
+
+/// How a tab group shows its tabs.
+enum WindowTabStyle: String, CaseIterable, Identifiable, Sendable {
+    /// Pills on the group's top edge; the tabs open in the hover bar.
+    case pills
+    /// A tab strip above the group, always visible, taking its height from the tile.
+    case tabs
+
+    var id: String { rawValue }
 }
 
 extension WorkspaceSidebarConfig {

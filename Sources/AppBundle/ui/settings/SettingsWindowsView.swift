@@ -8,6 +8,7 @@ struct ShortcutBehaviorSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
+    @SettingsDraft("window-tabs.style", load: { config.windowTabs.style }) private var tabStyle: WindowTabStyle
     @SettingsDraft("drag-stack-layout", load: { config.dragStackLayout }) private var dragStackLayout: Layout
     @SettingsDraft("workspace-swipe.animation-duration-ms", load: { config.workspaceSwipe.animationDurationMs }) private var swipeAnimationDuration: Int
     @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
@@ -166,7 +167,12 @@ struct ShortcutBehaviorSettingsView: View {
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
                 SettingsToggle("Show tab strips", id: "window-tabs.enabled", isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
-                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
+                SettingsPicker("Tab style", id: "window-tabs.style", selection: $tabStyle, help: "Pills sit on a group's top edge and take no space; resting the pointer there shows the tabs in the hover bar. A tab strip stays above the group and takes its height.") {
+                    Text("Pills").tag(WindowTabStyle.pills)
+                    Text("Tab strip").tag(WindowTabStyle.tabs)
+                } onChange: { persistConfig(section: "window-tabs", key: "style", value: "'\(tabStyle.rawValue)'") }
+                .disabled(!tabEnabled)
+                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the tab strip, and of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
 

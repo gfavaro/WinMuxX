@@ -101,16 +101,22 @@ extension WindowTabStripPanelController {
         }
     }
 
-    /// A group shows its outline and pills; its tabs open in the hover bar.
+    /// A group shows its outline and either pills (its tabs open in the hover bar) or a tab strip.
     func refreshInteractiveChrome(strips: [WindowTabStripViewModel], activeIds: Set<ObjectIdentifier>) {
+        let showsStrip = config.windowTabs.style == .tabs
         for strip in strips {
             guard !hiddenPassiveTabGroupChromeIds.contains(strip.id) else {
                 orderOutPanels(id: strip.id)
                 continue
             }
             visualPanel(for: strip.id).update(with: strip)
-            pillPanel(for: strip.id).update(with: strip)
-            orderOutIfVisible(stripPanels[strip.id])
+            if showsStrip {
+                stripPanel(for: strip.id).update(with: strip)
+                orderOutIfVisible(pillPanels[strip.id])
+            } else {
+                pillPanel(for: strip.id).update(with: strip)
+                orderOutIfVisible(stripPanels[strip.id])
+            }
         }
         removeStalePanels(activeIds: activeIds)
     }
@@ -135,7 +141,11 @@ extension WindowTabStripPanelController {
                 continue
             }
             visualPanel(for: strip.id).update(with: strip)
-            pillPanel(for: strip.id).update(with: strip)
+            if config.windowTabs.style == .pills {
+                pillPanel(for: strip.id).update(with: strip)
+            } else {
+                orderOutIfVisible(pillPanels[strip.id])
+            }
             orderOutIfVisible(stripPanels[strip.id])
         }
         removeStalePanels(activeIds: activeIds)
@@ -168,6 +178,7 @@ extension WindowTabStripPanelController {
             tabs: baseStrip.tabs,
             occludingFloatingWindowFrames: baseStrip.occludingFloatingWindowFrames,
             shownWindowIds: baseStrip.shownWindowIds,
+            headerHeight: baseStrip.headerHeight,
         )
     }
 }

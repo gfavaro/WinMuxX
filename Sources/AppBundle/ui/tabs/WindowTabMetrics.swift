@@ -23,7 +23,9 @@ func resolvedWindowTabBarHeight() -> CGFloat {
     max(CGFloat(config.windowTabs.height), windowTabBarMinimumHeightValue)
 }
 
-/// A tab group reserves no height above its windows: its pills sit in the gap, straddling the
-/// group's top edge, and resting on that edge opens the hover bar with the tabs.
+/// With pills a tab group reserves no height: they sit in the gap, straddling the group's top
+/// edge, and resting there opens the hover bar with the tabs. A tab strip takes its height.
 @MainActor
-func resolvedWindowTabReservedHeight() -> CGFloat { 0 }
+func resolvedWindowTabReservedHeight() -> CGFloat {
+    config.windowTabs.style == .tabs ? resolvedWindowTabBarHeight() : 0
+}

@@ -6,8 +6,8 @@ struct WindowTabGroupFrameView: View {
     let groupSize: CGSize
 
     var body: some View {
-        // No header: the group's pills sit in the gap above it, in their own panel.
-        let tabHeight: CGFloat = 0
+        // With pills there is no header: they sit in the gap above, in their own panel.
+        let tabHeight = min(strip.headerHeight, groupSize.height)
         let outerShape = WindowTabGroupOuterShape(activeWindowCornerRadius: strip.activeWindowCornerRadius)
         let shellShape = WindowTabGroupShellShape(
             tabBarHeight: tabHeight,
@@ -25,6 +25,12 @@ struct WindowTabGroupFrameView: View {
                 .stroke(colors.foreground.opacity(GlassToken.borderOpacity), lineWidth: windowTabGroupFrameStrokeWidth)
                 .glassShadow(.raised)
 
+            if tabHeight > 0 {
+                Rectangle()
+                    .fill(colors.separator)
+                    .frame(height: StrokeToken.hairline)
+                    .offset(y: tabHeight - StrokeToken.hairline)
+            }
             // No line along the inner boundary: the window draws its own edge there, and a second
             // stroke doubled it into two concentric lines at the corners.
         }

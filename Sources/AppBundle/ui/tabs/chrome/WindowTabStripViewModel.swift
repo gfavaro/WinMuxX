@@ -11,6 +11,8 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     let occludingFloatingWindowFrames: [CGRect]
     /// Windows on screen: the active tab, or every column a strip shows.
     var shownWindowIds: Set<UInt32> = []
+    /// The header the group reserves above its windows: the strip's height, or none with pills.
+    var headerHeight: CGFloat = 0
 
     var tabStripIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(frame) }

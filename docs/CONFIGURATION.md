@@ -84,7 +84,8 @@ icon-appearance = 'color'  # color or monochrome
 
 [window-tabs]
 enabled = true
-height = 36                 # drop zone for dragging a window into a group
+style = 'pills'             # pills (on the top edge, tabs in the hover bar) or tabs (a strip above the group)
+height = 36                 # the tab strip's height, and the drop zone for adding a window to a group
 double-sided-windows = false
 ```
 

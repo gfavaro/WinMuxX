@@ -13,6 +13,7 @@ extension WindowTabStripViewModel {
             tabs: tabs,
             occludingFloatingWindowFrames: occludingFloatingWindowFrames,
             shownWindowIds: shownWindowIds,
+            headerHeight: headerHeight,
         )
     }
 }

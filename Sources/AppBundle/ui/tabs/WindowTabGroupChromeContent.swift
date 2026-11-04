@@ -12,9 +12,11 @@ struct WindowTabGroupChromeContent: Equatable {
     let solidChromeCustomColor: String
     let frostedTint: WorkspaceSidebarFrostedTint
     let shownWindowIds: Set<UInt32>
+    let headerHeight: CGFloat
 
     @MainActor init(strip: WindowTabStripViewModel) {
         shownWindowIds = strip.shownWindowIds
+        headerHeight = strip.headerHeight
         theme = config.appearance
         workspaceName = strip.workspaceName
         activeWindowId = strip.activeWindowId
