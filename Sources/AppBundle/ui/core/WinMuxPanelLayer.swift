@@ -2,6 +2,9 @@ import AppKit
 
 enum WinMuxPanelLayer: CaseIterable {
     case windowChrome
+    /// Small marks drawn over a window's edge, such as a tab group's pills; they must stay
+    /// visible when the window comes to the front.
+    case windowIndicator
     case windowIntentPreview
     case overlay
     case dragCursorProxy
@@ -11,6 +14,8 @@ enum WinMuxPanelLayer: CaseIterable {
         switch self {
             case .windowChrome:
                 .normal
+            case .windowIndicator:
+                .floating
             case .windowIntentPreview:
                 .statusBar
             case .overlay:

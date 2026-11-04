@@ -27,6 +27,13 @@ final class WindowTabPillRailTest: XCTestCase {
         XCTAssertGreaterThan(windowTabPillWidth(isActive: false, isShown: true), windowTabPillWidth(isActive: false, isShown: false))
     }
 
+    func testPillsStayAboveWindowsButBelowOverlays() {
+        let pills = WinMuxPanelLayer.windowIndicator.level.rawValue
+        XCTAssertGreaterThan(pills, NSWindow.Level.normal.rawValue, "A window coming to the front must not hide its pills")
+        XCTAssertLessThan(pills, WinMuxPanelLayer.overlay.level.rawValue)
+        XCTAssertLessThan(pills, WinMuxPanelLayer.workspaceSidebar.level.rawValue)
+    }
+
     func testHoverBarListsTheGroupsTabsForATabbedWindow() {
         config.windowTabs.enabled = true
         let workspace = Workspace.get(byName: name)

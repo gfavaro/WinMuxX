@@ -45,7 +45,11 @@ struct WindowTabPillRail: View {
     }
 
     private func fill(for tab: WindowTabItemViewModel) -> Color {
-        if tab.isActive { return .accentColor }
+        // SwiftUI's accentColor greys out in a panel that never becomes active; Graphite has no
+        // hue, so blue stands in, as in the hover bar.
+        if tab.isActive {
+            return Color(nsColor: NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor)
+        }
         return Color(nsColor: .systemGray).opacity(shownWindowIds.contains(tab.windowId) ? 0.95 : 0.7)
     }
 }
@@ -74,6 +78,9 @@ final class WindowTabPillPanel: NSPanelHud {
         }
         current = (strip.tabs, strip.shownWindowIds, frame)
         setWindowTabChromePanelFrame(frame, on: self)
-        applyWindowTabVisualStackingPolicy(for: strip, to: self)
+        // Half the pills lie over the window's top edge; ordered relative to the window, they
+        // would disappear whenever the window came to the front, so they sit a level above.
+        applyWinMuxLayer(.windowIndicator)
+        orderFrontRegardless()
     }
 }
