@@ -52,6 +52,10 @@ test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$fork_pli
 if /usr/libexec/PlistBuddy -c 'Print SUFeedURL' "$fork_plist" >/dev/null 2>&1; then
   echo 'Refusing to package an app with an update feed' >&2; exit 1
 fi
+# ditto merges into an existing bundle: a resource removed since the last build would
+# stay behind, unsealed, and the copy would fail signature verification.
+rm -rf .release/WinMuxX.app
 ditto "$fork_app" .release/WinMuxX.app
+codesign --verify --deep --strict .release/WinMuxX.app
 ditto -c -k --sequesterRsrc --keepParent "$fork_app" ".release/WinMuxX-$fork_version-$fork_build_number.zip"
 echo "Built .release/WinMuxX.app (identity: $fork_signing_identity; not notarized)."
