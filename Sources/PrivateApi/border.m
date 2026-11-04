@@ -336,9 +336,10 @@ static bool placeBorder(WinMuxBorderHandle border, uint32_t target, CGPoint orig
             placePiece(transaction, border->windows[i], target, point, above);
         }
     }
-    int result = SYM("SLSTransactionCommit", Commit)(transaction, synchronous);
+    // The commit's return value is not a status: current macOS leaves an arbitrary value in
+    // it. The placement check below is what decides success.
+    SYM("SLSTransactionCommit", Commit)(transaction, synchronous);
     CFRelease(transaction);
-    if (result != 0) return false;
     // Small edge windows can be constrained independently at display boundaries.
     // A successful transaction does not guarantee the requested placement.
     for (int i = 0; i < WINMUX_BORDER_PIECES; ++i) {
@@ -376,6 +377,12 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
         // Allocate only this edge's backing surface, after reshaping.
         CGContextRef context = SYM("SLWindowContextCreate", Context)(cid(), border->windows[i], NULL);
         if (!context) { success = false; break; }
+        // Pieces are laid out top-down, like the AppKit fallback's flipped view. Current macOS
+        // hands out window contexts whose y axis points up, which drew each piece upside down.
+        if (CGContextGetCTM(context).d > 0) {
+            CGContextTranslateCTM(context, 0, piece.size.height);
+            CGContextScaleCTM(context, 1, -1);
+        }
         winmux_border_draw_path(context, piece, path, rgba);
         CGContextFlush(context);
         CGContextRelease(context);
