@@ -238,7 +238,7 @@ A fitting strip is centered. An overflowing strip clamps at both ends; explicit 
 
 With `minimap-hold-modifiers` set, holding exactly those keys keeps the minimap up over a focused scrolling workspace, and releasing them lets it fade. Dragging a minimap tile sideways reorders the strip's columns; a click still focuses the column.
 
-Run `scrolling-minimap toggle` (the argument is optional) or choose **Layout → Show Scrolling Minimap** to keep it open without a gesture. Use Left/Right to select, Return to activate, and Escape to dismiss. Narrow columns retain at least 32-point targets; the map scrolls horizontally when needed. Fresh configurations bind Control–Option–M; existing configurations can assign it in Settings → Shortcuts or add a binding:
+Run `scrolling-minimap toggle` (the argument is optional) or choose **Show Minimap** in the menu while the workspace scrolls to keep it open without a gesture. Use Left/Right to select, Return to activate, and Escape to dismiss. Narrow columns retain at least 32-point targets; the map scrolls horizontally when needed. Fresh configurations bind Control–Option–M; existing configurations can assign it in Settings → Shortcuts or add a binding:
 
 ```toml
 [mode.main.binding]

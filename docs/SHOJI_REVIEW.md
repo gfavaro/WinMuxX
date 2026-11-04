@@ -148,7 +148,10 @@ Settings. WinMuxX already describes the effect of most controls.
 ### Simplified native menu (proposal)
 
 Preferred over a drawn panel: keep `NSMenu`, but let the top level show state and
-quick switches while commands move into one submenu. Not yet agreed.
+quick switches while commands move into one submenu. Agreed and built; the status
+line and a front-app tiling checkbox were left out (the header already names the
+workspace and the layout items show it; floating rules cannot be read back reliably),
+so the floating row is "Always Float “App”…" with the title rule on Option.
 
 ```
 Workspace 3 · Dwindle · 4 windows          status line
@@ -166,8 +169,8 @@ About WinMuxX · Settings… · ✓ Tiling Enabled · Quit
 ```
 
 "Clear Saved Minimum Sizes…" leaves the menu; Settings → Windows already has Forget.
-Open questions: may Borders and Focus Follows Pointer write the configuration as
-Settings does, and should the layout items keep their small icons?
+Borders and Focus Follows Pointer write the configuration as Settings does, and the
+layout items keep their small icons.
 
 About WinMuxX shipped first: it opens the standard About panel (name, icon, version,
 build) with credits for the fork, upstream WinMux and the repository link.
@@ -201,7 +204,8 @@ Later or uncertain:
 - **Private diagnostics.** Name apps "App A, App B" in shared reports; no redaction
   was found in WinMuxX's diagnostics.
 - **Edge space editor.** Per-display outer gaps already exist in TOML.
-- Not checked: whether pointer focus waits before switching, whether borders stay in
+- Pointer focus already waits before switching (`focus-follows-mouse-dwell`).
+- Not checked: whether borders stay in
   the gap, and what disabling WinMuxX does to window positions.
 
 Not worth copying: activity counts, "time saved" and alternative app icons.

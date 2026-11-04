@@ -38,16 +38,19 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
         XCTAssertEqual(titles.first, "WinMuxX · Mail")
-        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes",
-                      "Refresh Desktops", "Reload Config", "Settings…", "Enabled", "Quit WinMuxX"] {
+        for title in ["Dwindle", "Fullscreen", "Balance Sizes", "Commands", "Settings…", "Enabled", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
-        let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
+        let commands = try XCTUnwrap(menu.items.first { $0.title == "Commands" }?.submenu)
+        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Container Layout", "Refresh Desktops", "Reload Config"] {
+            XCTAssertTrue(commands.items.contains { $0.title == title }, title)
+        }
+        let workspaces = try XCTUnwrap(commands.items.first { $0.title == "Workspaces" }?.submenu)
         let mail = try XCTUnwrap(workspaces.items.first { $0.title == "Mail" })
         XCTAssertEqual(mail.state, .on)
         XCTAssertEqual(mail.keyEquivalent, "2")
         XCTAssertTrue(workspaces.items.contains { $0.title == "Desktop 1" })
-        let layout = try XCTUnwrap(menu.items.first { $0.title == "Layout" }?.submenu)
+        let layout = try XCTUnwrap(commands.items.first { $0.title == "Container Layout" }?.submenu)
         XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "layout accordion", "Accordion overlaps natively")
         XCTAssertNil(menu.items.first { $0.title == "Enabled" }?.toolTip.flatMap { $0 == "Not available with native Spaces" ? $0 : nil },
             "enable pauses and resumes native tiling")

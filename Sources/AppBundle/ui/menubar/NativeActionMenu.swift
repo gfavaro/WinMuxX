@@ -135,7 +135,59 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))
             menu.addItem(callbackItem("Window management may conflict — view diagnostics…", #selector(openDiagnostics)))
         }
+        // The top level shows state and quick switches; every other command lives in Commands.
         menu.addItem(.separator())
+        let arrangement = focus.workspace.arrangement
+        for layout in [WorkspaceLayoutName.dwindle, .master, .scrolling] {
+            let item = addCommand(layout.rawValue.capitalized, script: "workspace-layout \(layout.rawValue)", to: menu)
+            item?.image = MenuBarLayoutIcon.image(for: layout, monochrome: true)
+            item?.state = arrangement == layout ? .on : .off
+        }
+        switch arrangement {
+            case .master:
+                addCommand("Swap with Master", script: "swap-with-master", to: menu)
+            case .scrolling:
+                addCommand("Center Column", script: "scrolling-center", to: menu)
+                addCommand("Show Minimap", script: "scrolling-minimap", to: menu)
+                addCommand("Cycle Column Width", script: "scrolling-width next", to: menu)
+                addCommand("Pin Column Left", script: "scrolling-pin left", to: menu)
+                addCommand("Pin Column Right", script: "scrolling-pin right", to: menu)
+            case .dwindle:
+                break
+        }
+        menu.addItem(.separator())
+        addCommand("Retile", script: "retile", to: menu, requiresWindow: false)
+        addCommand("Balance Sizes", script: "balance-sizes", to: menu)
+        addCommand("Fullscreen", script: "fullscreen", to: menu)
+        menu.addItem(.separator())
+        if let target = capturedRuleTarget {
+            let appName = target.window.macApp.name ?? "This App"
+            menu.addItem(callbackItem("Always Float “\(appName)”…", #selector(alwaysFloatApp)))
+            let titleRule = callbackItem("Float Windows by Title…", #selector(floatThisWindow))
+            titleRule.isAlternate = true
+            titleRule.keyEquivalentModifierMask = .option
+            menu.addItem(titleRule)
+        }
+        addCommand("No Peek", script: "no-peek", to: menu, requiresWindow: false)?.state = InactiveWindowDimmer.shared.noPeek ? .on : .off
+        menu.addItem(configToggleItem("Borders", isOn: config.windowBorders.enabled, #selector(toggleBorders)))
+        menu.addItem(configToggleItem("Focus Follows Pointer", isOn: config.focusFollowsMouse, #selector(toggleFocusFollowsPointer)))
+        menu.addItem(.separator())
+        addSubmenu("Commands", to: menu) { addCommandsMenu(to: $0, native: native) }
+        menu.addItem(.separator())
+        let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
+        if recoverableCount > 0 {
+            let item = callbackItem("Recover \(recoverableCount) Windows from Previous Session…", #selector(recoverWindows))
+            item.isEnabled = !WindowRecoveryController.shared.isRecovering
+            menu.addItem(item)
+        }
+        menu.addItem(callbackItem("About WinMuxX", #selector(showAbout)))
+        menu.addItem(callbackItem("Settings…", #selector(openSettings)))
+        let enabled = addCommand("Enabled", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
+        enabled?.state = TrayMenuModel.shared.isEnabled ? .on : .off
+        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+    }
+
+    private func addCommandsMenu(to menu: NSMenu, native: Bool) {
         addSubmenu("Workspaces", to: menu) { workspacesMenu in
             addCommand("Previous", script: "workspace prev", to: workspacesMenu)
             addCommand("Next", script: "workspace next", to: workspacesMenu)
@@ -160,6 +212,16 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 }
             }
         }
+        if sortedMonitors.count > 1 {
+            addSubmenu("Display", to: menu) { submenu in
+                addCommand("Focus Previous", script: "focus-monitor prev", to: submenu)
+                addCommand("Focus Next", script: "focus-monitor next", to: submenu)
+                submenu.addItem(.separator())
+                for (index, monitor) in sortedMonitors.enumerated() {
+                    addCommand("Move Window to \(monitor.name)", args: ["move-node-to-monitor", String(index + 1)], to: submenu)
+                }
+            }
+        }
         menu.addItem(.separator())
         for (title, command) in [("Focus", "focus"), ("Move Window", "move"), ("Join With", "join-with")] {
             addSubmenu(title, to: menu) { submenu in
@@ -174,48 +236,17 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 addCommand(title, script: script, to: submenu)
             }
         }
-        addSubmenu("Layout", to: menu) { submenu in
+        addSubmenu("Container Layout", to: menu) { submenu in
             for (title, script) in [("Tiles", "layout tiles"),
                                     ("Tabbed", "layout tab-group"), ("Accordion", "layout accordion")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
-            for arrangement in [WorkspaceLayoutName.dwindle, .master, .scrolling] {
-                let item = addCommand(arrangement.rawValue.capitalized, script: "workspace-layout \(arrangement.rawValue)", to: submenu)
-                item?.image = MenuBarLayoutIcon.image(for: arrangement, monochrome: true)
-                item?.state = focus.workspace.arrangement == arrangement ? .on : .off
-            }
-            submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
-            addCommand("Swap with Master", script: "swap-with-master", to: submenu)
-            addCommand("Center Scrolling Column", script: "scrolling-center", to: submenu)
-            addCommand("Show Scrolling Minimap", script: "scrolling-minimap", to: submenu)
-            addCommand("Cycle Scrolling Width", script: "scrolling-width next", to: submenu)
-            addCommand("Pin Column Left", script: "scrolling-pin left", to: submenu)
-            addCommand("Pin Column Right", script: "scrolling-pin right", to: submenu)
             addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
-            submenu.addItem(.separator())
             addCommand("Undo Layout Change", script: "undo-layout", to: submenu)
-            addCommand("Retile", script: "retile", to: submenu, requiresWindow: false)
-        }
-        addCommand("Fullscreen", script: "fullscreen", to: menu)
-        addCommand("No Peek", script: "no-peek", to: menu, requiresWindow: false)?.state = InactiveWindowDimmer.shared.noPeek ? .on : .off
-        if capturedRuleTarget != nil {
-            menu.addItem(callbackItem("Always Float This App…", #selector(alwaysFloatApp)))
-            menu.addItem(callbackItem("Create Floating Rule for This Window…", #selector(floatThisWindow)))
-        }
-        addCommand("Balance Sizes", script: "balance-sizes", to: menu)
-        if sortedMonitors.count > 1 {
-            addSubmenu("Display", to: menu) { submenu in
-                addCommand("Focus Previous", script: "focus-monitor prev", to: submenu)
-                addCommand("Focus Next", script: "focus-monitor next", to: submenu)
-                submenu.addItem(.separator())
-                for (index, monitor) in sortedMonitors.enumerated() {
-                    addCommand("Move Window to \(monitor.name)", args: ["move-node-to-monitor", String(index + 1)], to: submenu)
-                }
-            }
         }
         if config.modes.count > 1 {
             addSubmenu("Mode", to: menu) { submenu in
@@ -228,20 +259,12 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         if native { menu.addItem(callbackItem("Refresh Desktops", #selector(refreshNativeSpaces))) }
         addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
-        if !PersistedAppMinimums.shared.isEmpty || MacWindow.allWindows.contains(where: { !$0.learnedMinimum.isEmpty }) {
-            menu.addItem(callbackItem("Clear Saved Minimum Sizes…", #selector(resetMinimumSizes)))
-        }
-        menu.addItem(callbackItem("About WinMuxX", #selector(showAbout)))
-        menu.addItem(callbackItem("Settings…", #selector(openSettings)))
-        let enabled = addCommand("Enabled", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
-        enabled?.state = TrayMenuModel.shared.isEnabled ? .on : .off
-        let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
-        if recoverableCount > 0 {
-            let item = callbackItem("Recover \(recoverableCount) Windows from Previous Session…", #selector(recoverWindows))
-            item.isEnabled = !WindowRecoveryController.shared.isRecovering
-            menu.addItem(item)
-        }
-        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+    }
+
+    private func configToggleItem(_ title: String, isOn: Bool, _ action: Selector) -> NSMenuItem {
+        let item = callbackItem(title, action)
+        item.state = isOn ? .on : .off
+        return item
     }
 
     private func addSubmenu(_ title: String, to menu: NSMenu, build: (NSMenu) -> Void) {
@@ -437,14 +460,18 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }
     @objc private func refreshNativeSpaces() { runtime.workspaceBackend.native.observation?.requestRead() }
-    @objc private func resetMinimumSizes() {
-        let alert = NSAlert()
-        alert.messageText = "Reset learned minimum window sizes?"
-        alert.informativeText = "This clears saved per-app minimum sizes and current observations. Window positions and your configuration are unchanged."
-        alert.addButton(withTitle: "Cancel")
-        alert.addButton(withTitle: "Reset")
-        guard alert.runModal() == .alertSecondButtonReturn else { return }
-        PersistedAppMinimums.shared.reset()
+    @objc private func toggleBorders() {
+        persistMenuToggle(SettingsConfigEdit(section: "borders", key: "enabled", renderedValue: config.windowBorders.enabled ? "false" : "true"))
+    }
+    @objc private func toggleFocusFollowsPointer() {
+        persistMenuToggle(SettingsConfigEdit(section: nil, key: "focus-follows-mouse", renderedValue: config.focusFollowsMouse ? "false" : "true"))
+    }
+    /// Writes the configuration as the matching Settings control does, then reloads it.
+    private func persistMenuToggle(_ edit: SettingsConfigEdit) {
+        let id = [edit.section, edit.key].compactMap { $0 }.joined(separator: ".")
+        persistSettingsDocumentEdit(model: ShortcutSettingsModel.shared, settingIDs: [id], onFailure: { error in
+            self.showQuickRuleMessage("Could not save the setting", details: error.localizedDescription)
+        }) { applyingSettingsConfigEdits([edit], to: $0) }
     }
     @objc private func recoverWindows() {
         let alert = NSAlert()

@@ -44,8 +44,10 @@ These are the defaults and features maintained here:
   Sidebar clicks on another display ask before bringing the workspace there.
 - Learned application minimum sizes constrain layouts. Borders use an AppKit
   fallback when the private renderer is unavailable.
-- The native menu includes diagnostics, recovery of original window frames
-  after an interrupted session, and About WinMuxX with the version, build and credits.
+- The native menu shows the workspace layout and quick switches (Retile, No Peek,
+  Borders, Focus Follows Pointer, floating rules), keeps other commands under
+  Commands, and offers recovery of original window frames after an interrupted
+  session and About WinMuxX with the version, build and credits.
 
 The app has its own identity, CLI, configuration and recovery state. On first
 launch, it can copy your original WinMux configuration while leaving that file
@@ -456,7 +458,7 @@ automatically-tile-new-windows = false
 
 This applies to windows discovered when WinMux starts and windows opened later. You can still tile an individual floating window with `winmux layout tiling` or the configured `layout floating tiling` shortcut.
 
-The WinMuxX menu bar actions **Always Float This App…** and **Create Floating Rule for This Window…** save an ordered `on-window-detected` rule in your configuration. Window rules run in file order; if an earlier stopping rule may match, WinMuxX opens the configuration for review instead of silently changing its behavior. Restored windows keep their saved placement.
+The WinMuxX menu's **Always Float “App”…** (hold Option for **Float Windows by Title…**) saves an ordered `on-window-detected` rule in your configuration. Window rules run in file order; if an earlier stopping rule may match, WinMuxX opens the configuration for review instead of silently changing its behavior. Restored windows keep their saved placement.
 
 While dragging a window by its title bar, shake it horizontally to toggle between floating and tiling. The gesture requires several deliberate direction changes in quick succession, and does not activate during resize, sidebar, tab-strip, or tab-group drags. Disable it with:
 
@@ -554,8 +556,7 @@ bindings keep their explicitly configured sides. Accessibility access is require
 
 Confirmed application minimum sizes persist across restarts. Settings → Windows
 lists each app and its known width and height; unknown axes are shown explicitly.
-Forget an app or all evidence there, or use **Clear Saved Minimum Sizes…** in the
-menu to clear saved and current observations. When an explicit resize reaches a
+Forget an app there, or use **Forget All…** to clear saved and current observations. When an explicit resize reaches a
 confirmed app minimum, WinMuxX shows a brief nonactivating notice.
 
 ### Window search palette
