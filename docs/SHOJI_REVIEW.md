@@ -51,7 +51,8 @@ Checked against the code and WinMuxX's running menu and Settings window on the s
 Found while comparing: the menu header reads "WinMuxX · Workspace Workspace 3".
 `Sources/AppBundle/ui/menubar/NativeActionMenu.swift` prefixes "Workspace " to
 `workspaceDisplayName`, whose default for a numbered persistent workspace is already
-"Workspace 3" (`Sources/AppBundle/tree/WorkspaceSidebarLabels.swift`).
+"Workspace 3" (`Sources/AppBundle/tree/WorkspaceSidebarLabels.swift`). The minimum-size
+issues on Settings → Windows did the same. Both now use the display name alone.
 
 WinMuxX Settings expose some configuration shapes directly: persistent workspaces as a
 comma-separated list, the workspace layout mode as a "Choose workspace, Save workspace
@@ -144,46 +145,35 @@ reachable from the keyboard.
 First picks: the mini-map with the frontmost-app switch, and pictogram pickers in
 Settings. WinMuxX already describes the effect of most controls.
 
-## Other ideas
+## Backlog, sorted
 
-In rough order of value:
+Ordered by value for the effort. Effort: S is a day or less, M a few days, L a week
+or more with layout or new UI surfaces.
 
-1. **Menu-bar panel.** A popover instead of a plain menu: a live mini-map of the
-   current screen (tiles as cards with app icon and name, focused one outlined),
-   layout and window-count pictograms, large toggles for Retile, Borders and Hover
-   focus, and a switch to stop tiling the frontmost app. WinMuxX uses
-   `Sources/AppBundle/ui/menubar/NativeActionMenu.swift`.
-2. **Settings search with synonyms.** Typing "gap" finds "Space between windows ·
-   Layout"; every setting carries extra keywords. WinMuxX searches only Shortcuts.
-3. **Live previews with a caption.** Layout and Highlight pages open with a mock
-   arrangement captioned "3 windows · 8 pt apart · border on the active window".
-4. **Per-shortcut conflicts.** Shoji names the owner of a clashing key (macOS, an
-   open app's menus, another copy of itself), suggests free keys nearby, draws
-   shortcuts as keycaps, and has one prefix choice (⌃⌥, ⌥⌘ or ⌃⇧) for all of them.
-5. **Switcher details.** Tab View (⌥Tab) groups windows by screen, shows titles, has
-   a "Nothing minimized" section and a footer: "Tab next · ⇧Tab back · arrows move ·
-   let go of ⌥ to switch · Esc". WinMuxX groups by workspace.
-6. **Teaching.** The Mouse page lists the gestures that always work; Activity shows
-   a "Try next" card for an unused feature; Apps lists built-in exclusions with a
-   "Default" label that can be removed.
-7. **Fit explanations.** From Shoji's strings, not observed: "Xcode needs more room
-   than 3 windows leave here", "can't be narrower than 900 pt, so it floats",
-   "Screen 2 has room for it", with learned minimum sizes listed per app.
-8. **Clean Space and Setups.** Locked during the trial. Clean Space makes the current
-   screen plain (Graphite, Stone or Mist background) with one key; Setups saves the
-   open apps and their arrangement and reopens them, hiding other apps.
+| # | Feature | Effort | Why |
+| --- | --- | --- | --- |
+| 1 | **Pill tab strip:** pills at rest, full strip with hover actions on hover (proposal above) | L | The Shoji idea that was liked most; returns about 26 pt to every tab group |
+| 2 | **⌥-click Float in the hover bar** adds the title-prefix rule the menu already offers | S | Reuses `Sources/AppBundle/ui/settings/QuickFloatingRule.swift`; removes a trip to the menu |
+| 3 | **Switcher key-hint footer:** "Tab next · ⇧Tab back · arrows move · Esc" | S | Teaches the palette without documentation |
+| 4 | **Settings search across all pages,** with synonym keywords | M | Nine deep pages; search exists only on Shortcuts |
+| 5 | **Workspace layout as pictograms on Windows** (Dwindle, Master, Scrolling), replacing the form under Displays; UUIDs and hardware selectors behind a disclosure | M | The most used choice is hard to find today |
+| 6 | **Menu-bar panel:** mini-map of the current workspace with tab groups as pills, layout pictograms, toggles for borders, dimming, No peek, pointer focus and tab strips, a float switch for the frontmost app, existing warnings | L | Shows state the command menu cannot; keep the command menu reachable from the keyboard |
+| 7 | **Per-shortcut conflicts** on Shortcuts: name the owner, suggest free keys | M | Builds on the existing shortcut diagnostics |
+| 8 | **Captioned previews** for borders and tab strips, next to the spacing preview | M | Makes appearance choices visible before they apply |
+| 9 | **Stack instead of shrinking:** when a tile would fall below an app's learned minimum size, join the active tab group | M | Pairs with pill strips; needs a policy decision before code |
+| 10 | **Mouse gestures list** in Settings (drag to swap, stack, resize, move between displays) | S | Gestures exist but are undiscoverable |
 
-Smaller ideas:
+Later or uncertain:
 
-- **Stack instead of shrinking.** When another window would push a tile below an
-  application's learned minimum size, stack it in the active tile rather than floating
-  it or overflowing. Shoji's equivalent is "When a screen is full: stack in the active tile".
-- **⌥-click Float.** In the hover bar, add the title-prefix rule the menu already
-  offers ("Create Floating Rule for This Window…").
-- **Frontmost-app switch.** A toggle for the current app in a future menu-bar panel,
-  using the existing "Always Float This App" rule.
-- **Private diagnostics.** Shoji's report names apps "App A, App B" and omits monitor
-  and Mac model names; no redaction was found in WinMuxX's diagnostics.
+- **Fit explanations.** From Shoji's strings, not observed: "Xcode needs more room
+  than 3 windows leave here", "Screen 2 has room for it". WinMuxX already lists
+  minimum-size issues on Settings → Windows.
+- **Clean Space.** One key makes the current screen plain for sharing; overlaps the
+  [screen-sharing plan](SCREEN_SHARING_PICKER_PLAN.md).
+- **Setups.** Saved app sets reopened in one click; projects already cover part of it.
+- **Private diagnostics.** Name apps "App A, App B" in shared reports; no redaction
+  was found in WinMuxX's diagnostics.
+- **Edge space editor.** Per-display outer gaps already exist in TOML.
 - Not checked: whether pointer focus waits before switching, whether borders stay in
   the gap, and what disabling WinMuxX does to window positions.
 
