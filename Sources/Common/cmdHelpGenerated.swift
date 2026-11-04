@@ -62,10 +62,12 @@ let join_with_help_generated = """
     """
 let layout_help_generated = """
     USAGE: layout [-h|--help] [--window-id <window-id>]
-                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|accordion|horizontal|vertical|auto|tiling|floating)...
+                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|strip|accordion|horizontal|vertical|auto|tiling|floating)...
        OR: layout [-h|--help] --for-next-detected-window (tiling|floating)
 
     Change the focused window's container, or float/tile the window.
+    'strip' shows a tab group's windows side by side as columns that scroll
+    within it; 'tab-group' shows them as tabs again.
     In master layout this changes the focused window's own container; use
     [master] stack-layout to arrange the stack.
     Multiple choices cycle after the last matching state, wrapping to the first.

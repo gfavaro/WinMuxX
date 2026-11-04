@@ -42,6 +42,8 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: .v, window: window)
             case .tabGroup:
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: nil, window: window)
+            case .strip:
+                return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: .h, window: window, strip: true)
             case .stacked:
                 return changeTilingLayout(io, targetLayout: .stacked, targetOrientation: nil, window: window)
             case .tiles:
@@ -89,7 +91,9 @@ struct LayoutCommand: Command {
 
 @MainActor var layoutForNextDetectedWindow: LayoutCmdArgs.LayoutDescription?
 
-@MainActor private func changeTilingLayout(_ io: CmdIo, targetLayout: Layout?, targetOrientation: Orientation?, window: Window) -> Bool {
+/// A tab-group target shows tabs unless `strip` asks for columns; orientation-only changes keep the presentation.
+@MainActor private func changeTilingLayout(_ io: CmdIo, targetLayout: Layout?, targetOrientation: Orientation?, window: Window,
+                                           strip: Bool = false) -> Bool {
     guard let parent = window.parent else { return false }
     switch parent.cases {
         case .tilingContainer(let immediateParent):
@@ -99,6 +103,9 @@ struct LayoutCommand: Command {
             let targetLayout = targetLayout ?? parent.layout
             if targetLayout == .dwindle, let requestedOrientation {
                 parent.dwindleOrientation = requestedOrientation
+            }
+            if targetLayout != parent.layout || targetLayout == .tabGroup {
+                parent.presentsAsStrip = targetLayout == .tabGroup && strip
             }
             parent.layout = targetLayout
             parent.changeOrientation(targetOrientation)
@@ -114,7 +121,8 @@ extension Window {
         let layoutParent = parent as? TilingContainer
         return switch layout {
             case .stacked: layoutParent?.layout == .stacked
-            case .tabGroup:   layoutParent?.layout == .tabGroup
+            case .tabGroup:   layoutParent.map { $0.layout == .tabGroup && !$0.presentsAsStrip } == true
+            case .strip:      layoutParent.map { $0.layout == .tabGroup && $0.presentsAsStrip } == true
             case .tiles:       layoutParent?.layout == .tiles
             case .auto: layoutParent.map { $0.layout == .dwindle && $0.dwindleOrientation == nil } == true
             case .horizontal: layoutParent.map { ($0.layout == .dwindle ? $0.dwindleOrientation : $0.orientation) == .h } == true

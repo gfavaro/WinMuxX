@@ -18,6 +18,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
     let scrollingColumnWidth: CGFloat?
+    let presentsAsStrip: Bool?
 
     @MainActor init(_ container: TilingContainer) {
         let children: [FrozenTreeNode] = container.children.map {
@@ -72,6 +73,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         self.dwindleOrientation = dwindleOrientation
         self.dwindleChildRatios = dwindleChildRatios
         scrollingColumnWidth = container.scrollingColumnWidth
+        presentsAsStrip = container.presentsAsStrip ? true : nil
     }
 }
 

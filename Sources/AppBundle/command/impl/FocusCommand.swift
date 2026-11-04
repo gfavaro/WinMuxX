@@ -30,6 +30,12 @@ struct FocusCommand: Command {
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil
+                // Inside a strip, left and right step through its columns, scrolling hidden ones in.
+                if direction.orientation == .h, let window, let strip = window.nearestWindowTabGroup, strip.isWindowStrip,
+                   let column = window.directChild(in: strip), let index = column.ownIndex,
+                   let neighbor = strip.children.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive {
+                    return neighbor.focusWindow()
+                }
                 if target.workspace.arrangement == .scrolling, let window {
                     let groups = target.workspace.workspaceLayoutUnits
                     if direction.orientation == .h,

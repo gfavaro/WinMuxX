@@ -320,6 +320,30 @@ extension TilingContainer {
                 height: max(virtual.height - tabBarHeight - shellTopInset - shellBottomInset, 0),
             )
             guard let activeChild = mostRecentChild else { return }
+            if isWindowStrip {
+                let content = Rect(topLeftX: contentPoint.x, topLeftY: contentPoint.y, width: contentWidth, height: contentHeight)
+                let strip = windowStripGeometry(in: content, gaps: context.resolvedGaps)
+                stripFirstVisibleIndex = strip.visible.lowerBound
+                func virtualFrame(_ frame: Rect) -> Rect {
+                    Rect(topLeftX: contentVirtual.topLeftX + frame.topLeftX - content.topLeftX,
+                        topLeftY: contentVirtual.topLeftY, width: frame.width, height: contentVirtual.height)
+                }
+                for (child, frame) in zip(children[strip.visible], strip.frames) {
+                    try await child.layoutRecursive(frame.topLeftCorner, width: frame.width, height: frame.height,
+                        virtual: virtualFrame(frame), context)
+                }
+                for (index, child) in children.enumerated() where !strip.visible.contains(index) {
+                    if runtime.workspaceBackend.kind == .native, let first = strip.frames.first, let last = strip.frames.last {
+                        // Native never parks windows: hidden columns wait behind the nearest visible one.
+                        let frame = index < strip.visible.lowerBound ? first : last
+                        try await child.layoutRecursive(frame.topLeftCorner, width: frame.width, height: frame.height,
+                            virtual: virtualFrame(frame), context)
+                    } else {
+                        try await child.hideTabbedWindows(context.workspace)
+                    }
+                }
+                return
+            }
 
             // Switch tabs by placing the newly active child first, then parking the old visible tabs.
             try await activeChild.layoutRecursive(

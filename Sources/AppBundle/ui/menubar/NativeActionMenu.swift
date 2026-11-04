@@ -238,7 +238,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
         addSubmenu("Container Layout", to: menu) { submenu in
             for (title, script) in [("Tiles", "layout tiles"),
-                                    ("Tabbed", "layout tab-group"), ("Accordion", "layout accordion")] {
+                                    ("Tabbed", "layout tab-group"), ("Strip", "layout strip"), ("Accordion", "layout accordion")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())

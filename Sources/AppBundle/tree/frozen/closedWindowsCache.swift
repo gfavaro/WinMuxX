@@ -277,6 +277,7 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
 
     container.isMasterStack = frozenContainer.isMasterStack ?? false
     container.scrollingColumnWidth = frozenContainer.scrollingColumnWidth
+    container.presentsAsStrip = frozenContainer.presentsAsStrip ?? false
     container.masterRatio = frozenContainer.masterRatio
     container.masterStackLayout = frozenContainer.masterStackLayout
     container.dwindleOrientation = frozenContainer.dwindleOrientation

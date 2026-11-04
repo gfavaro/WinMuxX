@@ -33,6 +33,15 @@ through its neighbours. Run `layout tiles accordion` to cycle these choices.
 In master mode, this applies to the stack. A tab group keeps its windows together;
 see the [tab group diagram](assets/layouts/tabs.svg).
 
+`layout strip` shows a tab group as a strip instead: its windows sit side by side as
+columns inside the group's tile, in Dwindle, Master or a scrolling column. Each column
+takes `[scrolling] column-width` of the group (gaps included, so 0.5 shows two), and the
+columns that fit fill the tile. The others wait hidden; focus left or right steps through
+the columns and scrolls hidden ones in, leaving the strip at either end. `layout tab-group`
+shows the same group as tabs again. The choice is saved with the layout. Make a group with
+`stack-with` or by dragging a window onto another, then choose Commands → Container Layout →
+Strip in the menu or bind Stacked: Strip in Settings → Shortcuts.
+
 `layout floating` and `layout tiling` change the selected window's state. These
 commands target the focused window and do not select a workspace layout.
 `flatten-workspace-tree` rebuilds the workspace tree from its configured defaults.

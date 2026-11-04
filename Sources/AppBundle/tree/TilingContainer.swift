@@ -8,6 +8,11 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
     var appliedMasterConfig: MasterConfig?
     var masterRatio: CGFloat?
     var masterStackLayout: Layout?
+    /// A tab group shown as a strip: its children sit side by side as columns that scroll
+    /// within the group instead of one tab at a time.
+    var presentsAsStrip = false
+    /// The first column the strip showed last; focus moves it only as far as needed.
+    var stripFirstVisibleIndex = 0
     var layout: Layout {
         didSet {
             if oldValue != layout, oldValue == .master || layout == .master {

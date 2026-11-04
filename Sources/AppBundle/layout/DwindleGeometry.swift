@@ -31,7 +31,14 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                             topLeftY: rect.topLeftY + resolvedWindowTabBarHeight() + windowTabGroupShellTopInset(),
                             width: max(rect.width - 2 * windowTabGroupShellHorizontalInset(), 0),
                             height: max(rect.height - resolvedWindowTabBarHeight() - windowTabGroupShellTopInset() - windowTabGroupShellBottomInset(), 0)) : rect
-                    visit(active, content)
+                    if container.isWindowStrip {
+                        let strip = container.windowStripGeometry(in: content, gaps: gaps)
+                        for (child, frame) in zip(container.children[strip.visible], strip.frames) {
+                            visit(child, physical ? (child.lastAppliedLayoutPhysicalRect ?? frame) : frame)
+                        }
+                    } else {
+                        visit(active, content)
+                    }
                 }
             case .dwindle:
                 var ratios: [CGFloat] = []
