@@ -27,16 +27,17 @@ final class HoverBarPanel: NSPanelHud {
         effectView.material = .hudWindow
         effectView.blendingMode = .behindWindow
         effectView.state = .active
-        effectView.wantsLayer = true
-        effectView.layer?.cornerRadius = Self.cornerRadius
-        effectView.layer?.cornerCurve = .continuous
-        effectView.layer?.masksToBounds = true
+        // A mask image, unlike a layer corner radius, shapes the window itself, so its corners
+        // and shadow are rounded too rather than leaving square blanks behind the curve.
+        effectView.maskImage = Self.roundedMask(radius: Self.cornerRadius)
         stack.orientation = .vertical
         stack.alignment = .centerX
         stack.spacing = 4
         stack.edgeInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
         tint.wantsLayer = true
+        tint.layer?.cornerRadius = Self.cornerRadius
+        tint.layer?.cornerCurve = .continuous
         tint.translatesAutoresizingMaskIntoConstraints = false
         effectView.addSubview(tint)
         effectView.addSubview(stack)
@@ -58,9 +59,12 @@ final class HoverBarPanel: NSPanelHud {
                    run: @escaping (String) -> Void) -> CGSize {
         self.run = run
         let increasedContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
-        effectView.layer?.borderWidth = increasedContrast ? 1 : 0.5
-        effectView.layer?.borderColor = NSColor.white.withAlphaComponent(increasedContrast ? 0.5 : 0.16).cgColor
-        tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(increasedContrast ? 0.6 : 0.45).cgColor
+        // Dark, with a touch of the accent in the wash and the border.
+        let accent = Self.accentColor
+        tint.layer?.backgroundColor = NSColor.black.withAlphaComponent(increasedContrast ? 0.6 : 0.45)
+            .blended(withFraction: 0.18, of: accent)?.cgColor
+        tint.layer?.borderWidth = 1
+        tint.layer?.borderColor = accent.withAlphaComponent(increasedContrast ? 1 : 0.6).cgColor
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         let actionRow = Self.row()
@@ -124,6 +128,29 @@ final class HoverBarPanel: NSPanelHud {
         stack.addArrangedSubview(actionRow)
         stack.layoutSubtreeIfNeeded()
         return stack.fittingSize
+    }
+
+    /// The window's shadow is computed from its shape; recompute it once the bar has its size.
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+        invalidateShadow()
+    }
+
+    /// Graphite has no hue, so the accent would not show; blue stands in, as for the pills.
+    static var accentColor: NSColor {
+        NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor
+    }
+
+    private static func roundedMask(radius: CGFloat) -> NSImage {
+        let edge = radius * 2 + 1
+        let image = NSImage(size: NSSize(width: edge, height: edge), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: radius, left: radius, bottom: radius, right: radius)
+        image.resizingMode = .stretch
+        return image
     }
 
     private static func row() -> NSStackView {
@@ -195,8 +222,10 @@ private final class HoverBarButton: NSButton {
     override func mouseEntered(with event: NSEvent) { isHovered = true }
     override func mouseExited(with event: NSEvent) { isHovered = false }
 
+    /// The current tab is marked in the accent colour; others light up under the pointer.
     private func updateHighlight() {
-        let alpha: CGFloat = isCurrent ? 0.2 : isHovered ? 0.12 : 0
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(alpha).cgColor
+        layer?.backgroundColor = isCurrent
+            ? HoverBarPanel.accentColor.withAlphaComponent(isHovered ? 0.6 : 0.45).cgColor
+            : NSColor.white.withAlphaComponent(isHovered ? 0.12 : 0).cgColor
     }
 }
