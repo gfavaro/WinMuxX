@@ -46,7 +46,7 @@ import XCTest
 
         let groupFrame = try XCTUnwrap(tabGroup.lastAppliedLayoutPhysicalRect)
         let activeFrame = try XCTUnwrap(active.lastAppliedLayoutPhysicalRect)
-        let tabBarHeight = resolvedWindowTabBarHeight()
+        let tabBarHeight = resolvedWindowTabReservedHeight()
 
         XCTAssertEqual(activeFrame.topLeftX, groupFrame.topLeftX + windowTabGroupShellHorizontalInset())
         XCTAssertEqual(activeFrame.topLeftY, groupFrame.topLeftY + tabBarHeight)
@@ -61,12 +61,13 @@ import XCTest
         let groupFrame = windowTabGroupFrameRect(forActiveWindowContentRect: activeContentFrame)
         let tabBarFrame = windowTabBarRect(forGroupFrameRect: groupFrame)
 
+        // The group reserves the 12-point pill rail; the 36-point strip opens over the window from the same top.
         XCTAssertEqual(groupFrame.topLeftX, 40)
-        XCTAssertEqual(groupFrame.topLeftY, 60)
+        XCTAssertEqual(groupFrame.topLeftY, 84)
         XCTAssertEqual(groupFrame.width, 500)
-        XCTAssertEqual(groupFrame.height, 300)
+        XCTAssertEqual(groupFrame.height, 276)
         XCTAssertEqual(tabBarFrame.topLeftX, 40)
-        XCTAssertEqual(tabBarFrame.topLeftY, 60)
+        XCTAssertEqual(tabBarFrame.topLeftY, 84)
         XCTAssertEqual(tabBarFrame.width, 500)
         XCTAssertEqual(tabBarFrame.height, 36)
     }

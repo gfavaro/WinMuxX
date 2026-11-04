@@ -4,7 +4,7 @@ import Common
 @MainActor
 func windowTabGroupFrameRect(forActiveWindowContentRect contentRect: Rect) -> Rect {
     let horizontalInset = windowTabGroupShellHorizontalInset()
-    let topInset = resolvedWindowTabBarHeight() + windowTabGroupShellTopInset()
+    let topInset = resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset()
     let bottomInset = windowTabGroupShellBottomInset()
     return Rect(
         topLeftX: contentRect.topLeftX - horizontalInset,

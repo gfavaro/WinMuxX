@@ -51,7 +51,7 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
         let children = container.frameLayoutChildren
         let chrome = container.layout == .tabGroup && container.showsWindowTabs
             ? CGSize(width: 2 * windowTabGroupShellHorizontalInset(),
-                     height: resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset())
+                     height: resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset())
             : .zero
         let dwindle = container.layout == .dwindle
             ? DwindleMinimumSettings(orientationHorizontal: container.dwindleOrientation.map { $0 == .h },

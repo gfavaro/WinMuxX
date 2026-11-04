@@ -16,4 +16,5 @@ struct WindowTabChromeItem: Equatable, Identifiable {
     let contentFrame: CGRect
     let visibleFrame: CGRect?
     let tabs: [WindowTabChromeTabItem]
+    var shownWindowIds: Set<UInt32> = []
 }

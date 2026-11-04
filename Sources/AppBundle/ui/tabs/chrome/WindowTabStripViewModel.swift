@@ -9,6 +9,12 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     let activeWindowCornerRadius: CGFloat
     let tabs: [WindowTabItemViewModel]
     let occludingFloatingWindowFrames: [CGRect]
+    /// Windows on screen: the active tab, or every column a strip shows.
+    var shownWindowIds: Set<UInt32> = []
+    /// The pill rail the group reserves above its windows.
+    var railHeight: CGFloat = 0
+    /// The full strip is open over the window, so the rail hides its pills.
+    var isExpanded = false
 
     var tabStripIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(frame) }

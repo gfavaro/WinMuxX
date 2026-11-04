@@ -22,8 +22,9 @@ final class WindowTabGroupBorderTest: WorkspaceTestCase {
         for frame in [CGRect(x: 103, y: 242, width: 800, height: 600),
                       CGRect(x: -900, y: -700, width: 1200, height: 850)] {
             let target = try XCTUnwrap(windowBorderTarget(for: active, nativeFrame: frame))
-            XCTAssertEqual(target.frame, CGRect(x: frame.minX - 3, y: frame.minY - 42,
-                width: frame.width + 6, height: frame.height + 45))
+            // The border encloses the pill rail; the 42-point strip opens over the window on hover.
+            XCTAssertEqual(target.frame, CGRect(x: frame.minX - 3, y: frame.minY - windowTabPillRailHeight,
+                width: frame.width + 6, height: frame.height + windowTabPillRailHeight + 3))
             XCTAssertEqual(target.corners.top, windowTabStripCornerRadius)
             XCTAssertEqual(target.corners.bottom,
                 windowTabGroupAppCornerRadius(activeWindowId: active.windowId) + 3)

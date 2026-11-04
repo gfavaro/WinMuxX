@@ -26,6 +26,9 @@ private func makeWindowTabChromeItem(
     else { return nil }
     let tabs = await makeWindowTabChromeTabs(container: container, activeWindowId: activeWindow.windowId)
     guard !tabs.isEmpty else { return nil }
+    let visible = container.isWindowStrip ? container.stripVisibleColumns.clamped(to: container.children.indices) : 0 ..< 0
+    let shown = visible.isEmpty ? [activeWindow.windowId]
+        : Set(container.children[visible].compactMap { $0.tabRepresentativeWindow?.windowId })
     return WindowTabChromeItem(
         id: ObjectIdentifier(container),
         workspaceName: workspace.name,
@@ -34,5 +37,6 @@ private func makeWindowTabChromeItem(
         contentFrame: contentFrame.toAppKitScreenRect.alignedToBackingPixels(),
         visibleFrame: container.windowTabGroupFrameRect?.toAppKitScreenRect.alignedToBackingPixels(),
         tabs: tabs,
+        shownWindowIds: shown,
     )
 }

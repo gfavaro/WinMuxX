@@ -56,6 +56,6 @@ extension TilingContainer {
         let fallback = CGFloat(config.scrolling.columnWidth)
         return .calculate(in: rect, shares: children.map { $0.scrollingColumnWidth ?? fallback },
             gap: CGFloat(gaps.inner.horizontal), focused: mostRecentChild?.ownIndex ?? 0,
-            firstVisible: stripFirstVisibleIndex)
+            firstVisible: stripVisibleColumns.lowerBound)
     }
 }

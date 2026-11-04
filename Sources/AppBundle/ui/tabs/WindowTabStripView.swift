@@ -135,6 +135,8 @@ extension WindowTabStripView {
         .padding(.trailing, 8)
         .padding(.vertical, 2)
         .frame(width: stripWidth, height: stripHeight)
+        // The strip opens over the top of the active window, so it carries its own surface.
+        .background { OverlaySurface() }
         .clipShape(UnevenRoundedRectangle(
             topLeadingRadius: windowTabStripCornerRadius,
             bottomLeadingRadius: 0,

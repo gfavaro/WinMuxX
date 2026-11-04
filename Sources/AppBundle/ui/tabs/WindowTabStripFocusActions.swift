@@ -47,6 +47,9 @@ func focusWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
                     )
                 },
                 occludingFloatingWindowFrames: strip.occludingFloatingWindowFrames,
+                shownWindowIds: strip.shownWindowIds.contains(windowId) ? strip.shownWindowIds : [windowId],
+                railHeight: strip.railHeight,
+                isExpanded: strip.isExpanded,
             )
         }
         if strips != TrayMenuModel.shared.windowTabStrips {

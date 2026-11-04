@@ -306,7 +306,7 @@ extension TilingContainer {
     @MainActor
     fileprivate func layoutTabGroup(_ point: CGPoint, width: CGFloat, height: CGFloat, virtual: Rect, _ context: LayoutContext) async throws {
         if usesWindowTabBehavior {
-            let tabBarHeight = showsWindowTabs ? windowTabBarHeight : 0
+            let tabBarHeight = windowTabReservedHeight
             let shellHorizontalInset = showsWindowTabs ? windowTabGroupShellHorizontalInset() : 0
             let shellTopInset = showsWindowTabs ? windowTabGroupShellTopInset() : 0
             let shellBottomInset = showsWindowTabs ? windowTabGroupShellBottomInset() : 0
@@ -323,7 +323,7 @@ extension TilingContainer {
             if isWindowStrip {
                 let content = Rect(topLeftX: contentPoint.x, topLeftY: contentPoint.y, width: contentWidth, height: contentHeight)
                 let strip = windowStripGeometry(in: content, gaps: context.resolvedGaps)
-                stripFirstVisibleIndex = strip.visible.lowerBound
+                stripVisibleColumns = strip.visible
                 func virtualFrame(_ frame: Rect) -> Rect {
                     Rect(topLeftX: contentVirtual.topLeftX + frame.topLeftX - content.topLeftX,
                         topLeftY: contentVirtual.topLeftY, width: frame.width, height: contentVirtual.height)
@@ -426,7 +426,7 @@ extension TreeNode {
                     }
                     let chrome = container.showsWindowTabs
                         ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()
-                            : resolvedWindowTabBarHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0
+                            : resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0
                     return (minimums.max() ?? 0) + chrome
                 }
                 return container.orientation == axis

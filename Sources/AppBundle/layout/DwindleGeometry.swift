@@ -28,9 +28,9 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                     let showsWindowTabs = container.showsWindowTabs
                     let content = physical && showsWindowTabs
                         ? Rect(topLeftX: rect.topLeftX + windowTabGroupShellHorizontalInset(),
-                            topLeftY: rect.topLeftY + resolvedWindowTabBarHeight() + windowTabGroupShellTopInset(),
+                            topLeftY: rect.topLeftY + resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset(),
                             width: max(rect.width - 2 * windowTabGroupShellHorizontalInset(), 0),
-                            height: max(rect.height - resolvedWindowTabBarHeight() - windowTabGroupShellTopInset() - windowTabGroupShellBottomInset(), 0)) : rect
+                            height: max(rect.height - resolvedWindowTabReservedHeight() - windowTabGroupShellTopInset() - windowTabGroupShellBottomInset(), 0)) : rect
                     if container.isWindowStrip {
                         let strip = container.windowStripGeometry(in: content, gaps: gaps)
                         for (child, frame) in zip(container.children[strip.visible], strip.frames) {

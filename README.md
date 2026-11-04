@@ -421,6 +421,12 @@ absolute keybindings to navigate the group.
 Drag a tab into another window's [intent zone](#managed-tiling-mode) or move it to
 another workspace through the sidebar.
 
+A tab group reserves only a thin rail above its windows, with one pill per tab: the
+active window's is longest and uses the accent colour, and in a strip the other columns
+on screen are lighter. Resting the pointer on the rail opens the full tab strip over the
+top of the window; it closes when the pointer leaves. Switching to a hidden tab shows the
+strip for a moment so the new tab is named. `window-tabs.height` sets that strip's height.
+
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
 keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace
 the strip for two-window groups when enabled; three or more windows continue to
@@ -435,8 +441,10 @@ is not ready within 80 ms, the window switches without a delayed animation.
 
 ### Stacked layouts
 
-Stacked windows have two variants: **Tabbed** keeps the current tab strip and
-shows one window at a time; **Accordion** keeps overlapping windows visible with
+Stacked windows have three variants: **Tabbed** keeps the current tab strip and
+shows one window at a time; **Strip** (`layout strip`) shows them side by side as
+columns that scroll within the group, see [layouts](docs/LAYOUTS.md#container-modes-and-tabs);
+**Accordion** keeps overlapping windows visible with
 peeking edges, like AeroSpace. Choose either in Settings → Windows for new roots,
 or use `winmuxx layout tabbed accordion` to toggle the focused container.
 `layout tab-group` remains supported. `layout horizontal` and `layout vertical`

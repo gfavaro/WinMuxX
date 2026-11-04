@@ -6,7 +6,7 @@ func expectedTabbedWindowRect(targetWindow: Window, targetRect: Rect) -> Rect {
     let isAlreadyTabbed = (targetWindow.parent as? TilingContainer)?.layout == .tabGroup
     guard !isAlreadyTabbed else { return targetRect }
 
-    let tabBarHeight = min(resolvedWindowTabBarHeight(), targetRect.height)
+    let tabBarHeight = min(resolvedWindowTabReservedHeight(), targetRect.height)
     return Rect(
         topLeftX: targetRect.topLeftX,
         topLeftY: targetRect.topLeftY + tabBarHeight,
@@ -39,7 +39,7 @@ private extension TilingContainer {
         else {
             return tabActiveWindow?.lastAppliedLayoutPhysicalRect
         }
-        let tabBarHeight = showsWindowTabs ? windowTabBarHeight : 0
+        let tabBarHeight = windowTabReservedHeight
         let shellHorizontalInset = showsWindowTabs ? windowTabGroupShellHorizontalInset() : 0
         let shellTopInset = showsWindowTabs ? windowTabGroupShellTopInset() : 0
         let shellBottomInset = showsWindowTabs ? windowTabGroupShellBottomInset() : 0

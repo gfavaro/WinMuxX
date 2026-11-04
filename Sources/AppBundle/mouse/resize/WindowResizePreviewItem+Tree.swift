@@ -20,7 +20,7 @@ extension WindowResizePreviewItem {
         let windows = container.childrenByMostRecentUse.compactMap(\.tabRepresentativeWindow)
         let representative = windows.first ?? container.tabRepresentativeWindow
         let icons = windows.map(WindowResizePreviewIcon.init(window:))
-        let headerHeight = drawsFrameOnly ? windowTabBarRect(forGroupFrameRect: rect).height : 0
+        let headerHeight = drawsFrameOnly ? min(resolvedWindowTabReservedHeight(), rect.height) : 0
         self.init(
             id: representative?.windowId ?? UInt32(abs(ObjectIdentifier(container).hashValue) % Int(UInt32.max)),
             frame: rect.toAppKitScreenRect.alignedToBackingPixels(),

@@ -12,7 +12,16 @@ extension WindowTabStripViewModel {
             activeWindowCornerRadius: activeWindowCornerRadius,
             tabs: tabs,
             occludingFloatingWindowFrames: occludingFloatingWindowFrames,
+            shownWindowIds: shownWindowIds,
+            railHeight: railHeight,
+            isExpanded: isExpanded,
         )
+    }
+
+    func expanded(_ isExpanded: Bool) -> WindowTabStripViewModel {
+        var copy = self
+        copy.isExpanded = isExpanded
+        return copy
     }
 }
 

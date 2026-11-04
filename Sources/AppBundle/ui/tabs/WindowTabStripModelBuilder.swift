@@ -21,6 +21,8 @@ func buildWindowTabStripViewModelsFromChromeItems() async -> [WindowTabStripView
             activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: item.activeWindowId),
             tabs: item.tabs.map { $0.legacyTabItem(workspaceName: item.workspaceName) },
             occludingFloatingWindowFrames: occlusions,
+            shownWindowIds: item.shownWindowIds,
+            railHeight: resolvedWindowTabReservedHeight(),
         ))
     }
     return strips

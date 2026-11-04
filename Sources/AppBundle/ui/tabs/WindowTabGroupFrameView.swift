@@ -6,7 +6,7 @@ struct WindowTabGroupFrameView: View {
     let groupSize: CGSize
 
     var body: some View {
-        let tabHeight = min(strip.frame.height, groupSize.height)
+        let tabHeight = min(strip.railHeight > 0 ? strip.railHeight : strip.frame.height, groupSize.height)
         let outerShape = WindowTabGroupOuterShape(activeWindowCornerRadius: strip.activeWindowCornerRadius)
         let shellShape = WindowTabGroupShellShape(
             tabBarHeight: tabHeight,
@@ -30,6 +30,11 @@ struct WindowTabGroupFrameView: View {
                 .offset(y: tabHeight - StrokeToken.hairline)
             // No line along the inner boundary: the window draws its own edge there, and a second
             // stroke doubled it into two concentric lines at the corners.
+
+            if !strip.isExpanded {
+                WindowTabPillRail(tabs: strip.tabs, shownWindowIds: strip.shownWindowIds)
+                    .frame(width: groupSize.width, height: tabHeight)
+            }
         }
         .frame(width: groupSize.width, height: groupSize.height)
         .allowsHitTesting(false)

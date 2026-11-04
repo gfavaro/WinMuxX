@@ -162,7 +162,7 @@ func windowResizePreviewRenderedTabGroupRect(
         return windowResizePreviewRenderedRect(for: container, proposedRect: proposedGroupRect)
     }
 
-    let tabBarHeight = min(container.windowTabBarHeight, proposedGroupRect.height)
+    let tabBarHeight = min(container.windowTabReservedHeight, proposedGroupRect.height)
     let horizontalInset = windowTabGroupShellHorizontalInset()
     let topInset = tabBarHeight + windowTabGroupShellTopInset()
     let bottomInset = windowTabGroupShellBottomInset()

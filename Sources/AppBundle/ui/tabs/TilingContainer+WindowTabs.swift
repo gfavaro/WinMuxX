@@ -22,6 +22,12 @@ extension TilingContainer {
         showsWindowTabs ? min(resolvedWindowTabBarHeight(), windowTabBarReferenceRect?.height ?? 0) : 0
     }
 
+    /// What the group takes from its tile above the windows: the pill rail, not the full strip.
+    @MainActor
+    var windowTabReservedHeight: CGFloat {
+        showsWindowTabs ? min(resolvedWindowTabReservedHeight(), windowTabBarReferenceRect?.height ?? 0) : 0
+    }
+
     @MainActor
     var windowTabBarRect: Rect? {
         guard showsWindowTabs, let rect = windowTabBarReferenceRect else { return nil }

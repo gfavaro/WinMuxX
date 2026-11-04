@@ -84,7 +84,7 @@ icon-appearance = 'color'  # color or monochrome
 
 [window-tabs]
 enabled = true
-height = 36
+height = 36                 # the strip that opens over the window from the pill rail
 double-sided-windows = false
 ```
 
