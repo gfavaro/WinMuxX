@@ -307,11 +307,11 @@ private struct WinMuxAppsProofCanvas: View {
 private struct WinMuxSafariPlasticityProofCanvas: View {
     private let canvasHeight: CGFloat = 928
     private let sidebarWidth: CGFloat = 280
-    private let reservedSidebarWidth: CGFloat = 50
     private let topMargin: CGFloat = 56
     private let sidebarTopMargin: CGFloat = 35
     private let gutter: CGFloat = 8
-    // Expansion overlays the tiles; only the collapsed rail reserves layout space.
+    // Laid out as an always-expanded sidebar, which reserves its width, so the tiles sit beside it.
+    private var reservedSidebarWidth: CGFloat { sidebarWidth }
     private var safariAspect: CGFloat { captureAspect("helium-current-retina.png") }
     private var plasticityAspect: CGFloat { captureAspect("plasticity-current-retina.png") }
     private var contentHeight: CGFloat {
@@ -328,7 +328,7 @@ private struct WinMuxSafariPlasticityProofCanvas: View {
             + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()
     }
     private var tileHeight: CGFloat { contentHeight + chromeHeight }
-    // Keep the right and inter-window gaps fixed. Extra space stays beneath the sidebar.
+    // Keep the right and inter-window gaps fixed. Extra width stays between the sidebar and the tiles.
     private var tilesLeading: CGFloat { 1_600 - 2 * gutter - safariWidth - plasticityWidth }
 
     private func captureAspect(_ name: String) -> CGFloat {
