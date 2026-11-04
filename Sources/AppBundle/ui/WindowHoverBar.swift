@@ -42,16 +42,41 @@ final class WindowHoverBar {
         return window.isFullscreen ? window.lastAppliedLayoutVirtualRect : window.lastAppliedLayoutPhysicalRect
     }
 
-    /// The actions offered for a window, as titles and commands.
-    static func actions(for window: Window) -> [(title: String, symbol: String, command: String)] {
+    /// The actions offered for a window. `shortcut` is the plain command a binding would run,
+    /// so the bar can print its configured keys.
+    static func actions(for window: Window) -> [HoverBarAction] {
         let id = window.windowId
-        if window.isFullscreen { return [("Unfocus", "arrow.down.right.and.arrow.up.left", "fullscreen off --window-id \(id)")] }
-        if window.parent is Workspace { return [("Tile", "rectangle.split.2x1", "layout tiling --window-id \(id)")] }
-        var actions: [(String, String, String)] = []
-        if window.nodeWorkspace?.arrangement == .master { actions.append(("Main", "rectangle.lefthalf.inset.filled", "swap-with-master --window-id \(id)")) }
-        actions.append(("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)"))
-        actions.append(("Float", "macwindow.on.rectangle", "layout floating tiling --window-id \(id)"))
+        if window.isFullscreen {
+            return [HoverBarAction(title: "Unfocus", symbol: "arrow.down.right.and.arrow.up.left", command: "fullscreen off --window-id \(id)", shortcut: "fullscreen")]
+        }
+        if window.parent is Workspace {
+            return [HoverBarAction(title: "Tile", symbol: "rectangle.split.2x1", command: "layout tiling --window-id \(id)", shortcut: "layout floating tiling")]
+        }
+        var actions: [HoverBarAction] = []
+        if window.nodeWorkspace?.arrangement == .master {
+            actions.append(HoverBarAction(title: "Main", symbol: "rectangle.lefthalf.inset.filled", command: "swap-with-master --window-id \(id)", shortcut: "swap-with-master"))
+        }
+        actions.append(HoverBarAction(title: "Focus", symbol: "arrow.up.left.and.arrow.down.right", command: "fullscreen --window-id \(id)", shortcut: "fullscreen"))
+        actions.append(HoverBarAction(title: "Float", symbol: "macwindow.on.rectangle", command: "layout floating tiling --window-id \(id)", shortcut: "layout floating tiling"))
         return actions
+    }
+
+    /// The configured keys for an action in the current mode, as macOS menus print them.
+    static func shortcutHint(for action: HoverBarAction) -> String? {
+        guard case .cmd(let command) = parseCommand(action.shortcut) else { return nil }
+        var bindings = ActionMenuBindings(mode: activeMode.flatMap { config.modes[$0] })
+        return bindings.bindings(for: command).first.map(shortcutHintText)
+    }
+
+    /// The tabs of the group a tabbed window belongs to, from the published tab models.
+    static func tabs(for window: Window) -> [HoverBarTab] {
+        guard let group = window.nearestWindowTabGroup, group.showsWindowTabs,
+              let strip = TrayMenuModel.shared.windowTabStrips.first(where: { $0.id == ObjectIdentifier(group) })
+        else { return [] }
+        return strip.tabs.map { tab in
+            HoverBarTab(windowId: tab.windowId, title: tab.title.isEmpty ? tab.appName : tab.title,
+                appBundlePath: tab.appBundlePath, isActive: tab.isActive)
+        }
     }
 
     /// The managed window whose top-edge zone holds the point, from cached frames.
@@ -73,9 +98,12 @@ final class WindowHoverBar {
     func pointerMoved(_ point: CGPoint) {
         // Over the bar, a press is a click on it.
         if shown != nil, panelRect.insetBy(dx: -12, dy: -12).contains(point) { return }
-        guard config.hoverBar.enabled, TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive else { return hide() }
+        guard TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive else { return hide() }
         if shown != nil { hide() }
-        guard let window = Self.candidate(at: point) else { return cancelPending() }
+        // A tab group's bar is its only tab chooser, so it shows even with quick actions off.
+        guard let window = Self.candidate(at: point),
+              config.hoverBar.enabled || window.nearestWindowTabGroup?.showsWindowTabs == true
+        else { return cancelPending() }
         if pending?.windowId == window.windowId { return }
         cancelPending()
         let id = window.windowId
@@ -100,7 +128,8 @@ final class WindowHoverBar {
     private func show(for window: Window, pointerX: CGFloat) {
         guard let frame = Self.frame(of: window) else { return }
         let id = window.windowId
-        let size = panel.configure(Self.actions(for: window)) { [weak self] command in
+        let actions = Self.actions(for: window)
+        let size = panel.configure(actions, hints: actions.map(Self.shortcutHint), tabs: Self.tabs(for: window)) { [weak self] command in
             self?.hide()
             // Act as a click on the window would: focus (and raise) it first, so a window
             // floated from the bar is not left behind the tiles it came from.
@@ -155,8 +184,9 @@ final class HoverBarPanel: NSPanelHud {
         effect.wantsLayer = true
         effect.layer?.cornerRadius = 10
         effect.layer?.masksToBounds = true
-        stack.orientation = .horizontal
-        stack.spacing = 4
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 2
         stack.edgeInsets = NSEdgeInsets(top: 4, left: 6, bottom: 4, right: 6)
         stack.translatesAutoresizingMaskIntoConstraints = false
         highlight.wantsLayer = true
@@ -177,8 +207,12 @@ final class HoverBarPanel: NSPanelHud {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Lays out one button per action and returns the bar's size.
-    func configure(_ actions: [(title: String, symbol: String, command: String)], run: @escaping (String) -> Void) -> CGSize {
+    static let maximumTabRowWidth: CGFloat = 520
+
+    /// Lays out the tab row (for a tabbed window) above one button per action, each with its
+    /// configured shortcut beneath, and returns the bar's size.
+    func configure(_ actions: [HoverBarAction], hints: [String?] = [], tabs: [HoverBarTab] = [],
+                   run: @escaping (String) -> Void) -> CGSize {
         self.run = run
         let increasedContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         // Graphite has no hue, so the bar would not stand out; use blue then.
@@ -188,7 +222,11 @@ final class HoverBarPanel: NSPanelHud {
             highlight.layer?.borderColor = color.withAlphaComponent(increasedContrast ? 1 : 0.65).cgColor
         }
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for action in actions {
+
+        let actionRow = NSStackView()
+        actionRow.orientation = .horizontal
+        actionRow.spacing = 4
+        for (index, action) in actions.enumerated() {
             let button = HoverBarButton(title: action.title, target: self, action: #selector(pressed(_:)))
             button.image = NSImage(systemSymbolName: action.symbol, accessibilityDescription: nil)
             button.imagePosition = .imageLeading
@@ -196,8 +234,58 @@ final class HoverBarPanel: NSPanelHud {
             button.controlSize = .regular
             button.font = .systemFont(ofSize: 13, weight: .medium)
             button.identifier = NSUserInterfaceItemIdentifier(action.command)
-            stack.addArrangedSubview(button)
+            let column = NSStackView(views: [button])
+            column.orientation = .vertical
+            column.spacing = 0
+            if let hint = hints.indices.contains(index) ? hints[index] : nil {
+                let label = NSTextField(labelWithString: hint)
+                label.font = .systemFont(ofSize: 10, weight: .medium)
+                label.textColor = .secondaryLabelColor
+                column.addArrangedSubview(label)
+                button.setAccessibilityHelp("Shortcut \(hint)")
+            }
+            actionRow.addArrangedSubview(column)
         }
+        actionRow.layoutSubtreeIfNeeded()
+
+        if !tabs.isEmpty {
+            let tabRow = NSStackView()
+            tabRow.orientation = .horizontal
+            tabRow.spacing = 2
+            for tab in tabs {
+                let button = HoverBarButton(title: tab.title, target: self, action: #selector(pressed(_:)))
+                button.image = tab.appBundlePath.map { NSWorkspace.shared.icon(forFile: $0) }
+                button.image?.size = NSSize(width: 16, height: 16)
+                button.imagePosition = .imageLeading
+                button.bezelStyle = .recessed
+                button.showsBorderOnlyWhileMouseInside = !tab.isActive
+                button.state = tab.isActive ? .on : .off
+                button.setButtonType(.pushOnPushOff)
+                button.font = .systemFont(ofSize: 12, weight: tab.isActive ? .semibold : .regular)
+                button.lineBreakMode = .byTruncatingTail
+                button.widthAnchor.constraint(lessThanOrEqualToConstant: 170).isActive = true
+                button.identifier = NSUserInterfaceItemIdentifier("focus --window-id \(tab.windowId)")
+                button.setAccessibilityLabel(tab.isActive ? "\(tab.title), current tab" : tab.title)
+                tabRow.addArrangedSubview(button)
+            }
+            tabRow.layoutSubtreeIfNeeded()
+            let width = min(tabRow.fittingSize.width, max(Self.maximumTabRowWidth, actionRow.fittingSize.width))
+            let scroll = NSScrollView()
+            scroll.drawsBackground = false
+            scroll.hasHorizontalScroller = false
+            scroll.horizontalScrollElasticity = .allowed
+            scroll.documentView = tabRow
+            tabRow.frame = NSRect(origin: .zero, size: tabRow.fittingSize)
+            scroll.translatesAutoresizingMaskIntoConstraints = false
+            scroll.widthAnchor.constraint(equalToConstant: width).isActive = true
+            scroll.heightAnchor.constraint(equalToConstant: tabRow.fittingSize.height).isActive = true
+            stack.addArrangedSubview(scroll)
+            // Keep the current tab in view when the row scrolls.
+            if let active = tabs.firstIndex(where: \.isActive), tabRow.arrangedSubviews.indices.contains(active) {
+                tabRow.arrangedSubviews[active].scrollToVisible(tabRow.arrangedSubviews[active].bounds)
+            }
+        }
+        stack.addArrangedSubview(actionRow)
         stack.layoutSubtreeIfNeeded()
         return stack.fittingSize
     }
@@ -206,6 +294,21 @@ final class HoverBarPanel: NSPanelHud {
         guard let command = sender.identifier?.rawValue else { return }
         run?(command)
     }
+}
+
+struct HoverBarAction: Equatable {
+    let title: String
+    let symbol: String
+    let command: String
+    /// The command a key binding would run for this action, without a window id.
+    let shortcut: String
+}
+
+struct HoverBarTab: Equatable {
+    let windowId: UInt32
+    let title: String
+    let appBundlePath: String?
+    let isActive: Bool
 }
 
 private final class HoverBarButton: NSButton {

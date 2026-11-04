@@ -110,7 +110,6 @@ enum GlobalObserver {
             }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             WindowHoverBar.shared.pointerMoved(point)
-            WindowTabRailHover.shared.pointerMoved(point)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)
             WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
@@ -280,7 +279,6 @@ enum GlobalObserver {
         runOnMainActor {
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             WindowHoverBar.shared.pointerMoved(point)
-            WindowTabRailHover.shared.pointerMoved(point)
             WorkspaceSidebarPanel.noteHoverPointerButtonEvent(type: eventType, screenPoint: screenPoint)
             WorkspaceSidebarPanel.trapCursorForVisiblePanelsIfNeeded()
             WorkspaceSidebarPanel.noteHoverPointerActivityForVisiblePanels(timestamp: timestamp)

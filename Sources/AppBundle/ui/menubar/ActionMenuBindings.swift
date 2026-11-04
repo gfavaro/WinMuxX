@@ -42,6 +42,22 @@ struct ActionMenuBindings {
     var unshown: [ActionMenuBinding] { entries.indices.filter { !shown.contains($0) }.map { entries[$0] } }
 }
 
+/// A binding as macOS menus print shortcuts: ⌃⌥⇧⌘, then the key.
+func shortcutHintText(_ binding: ActionMenuBinding) -> String {
+    guard let key = binding.keyEquivalent, let scalar = key.unicodeScalars.first else { return binding.notation }
+    let modifiers: [(NSEvent.ModifierFlags, String)] = [(.control, "⌃"), (.option, "⌥"), (.shift, "⇧"), (.command, "⌘")]
+    let prefix = modifiers.filter { binding.modifiers.contains($0.0) }.map(\.1).joined()
+    let names: [Int: String] = [
+        0x20: "Space", 0x0D: "↩", 0x09: "⇥", 0x1B: "⎋", 0x08: "⌫",
+        NSLeftArrowFunctionKey: "←", NSRightArrowFunctionKey: "→", NSUpArrowFunctionKey: "↑", NSDownArrowFunctionKey: "↓",
+        NSDeleteFunctionKey: "⌦", NSHomeFunctionKey: "↖", NSEndFunctionKey: "↘", NSPageUpFunctionKey: "⇞", NSPageDownFunctionKey: "⇟",
+    ]
+    let code = Int(scalar.value)
+    if let name = names[code] { return prefix + name }
+    if (NSF1FunctionKey...NSF35FunctionKey).contains(code) { return prefix + "F\(code - NSF1FunctionKey + 1)" }
+    return prefix + key.uppercased()
+}
+
 func menuKeyEquivalent(_ key: Key) -> String? {
     let name = key.toString()
     let special: [String: String] = [

@@ -61,13 +61,13 @@ import XCTest
         let groupFrame = windowTabGroupFrameRect(forActiveWindowContentRect: activeContentFrame)
         let tabBarFrame = windowTabBarRect(forGroupFrameRect: groupFrame)
 
-        // The group reserves the 12-point pill rail; the 36-point strip opens over the window from the same top.
+        // The group reserves no header above the window; its 36-point drop zone starts at the same top.
         XCTAssertEqual(groupFrame.topLeftX, 40)
-        XCTAssertEqual(groupFrame.topLeftY, 84)
+        XCTAssertEqual(groupFrame.topLeftY, 96)
         XCTAssertEqual(groupFrame.width, 500)
-        XCTAssertEqual(groupFrame.height, 276)
+        XCTAssertEqual(groupFrame.height, 264)
         XCTAssertEqual(tabBarFrame.topLeftX, 40)
-        XCTAssertEqual(tabBarFrame.topLeftY, 84)
+        XCTAssertEqual(tabBarFrame.topLeftY, 96)
         XCTAssertEqual(tabBarFrame.width, 500)
         XCTAssertEqual(tabBarFrame.height, 36)
     }

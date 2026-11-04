@@ -150,7 +150,7 @@ final class DwindleParityTest: XCTestCase {
         let gaps = ResolvedGaps(gaps: .zero, monitor: focus.workspace.workspaceMonitor)
         XCTAssertEqual(root.minimumLayoutExtent(along: .h, gaps: gaps, rect: rect), 706)
         XCTAssertEqual(root.minimumLayoutExtent(along: .v, gaps: gaps, rect: rect), 200 + resolvedWindowTabReservedHeight() + 3,
-            "A tab group reserves only its pill rail")
+            "A tab group reserves no header; its pills sit in the gap")
         root.setDwindleSplitRatio(0.9, at: 0)
         let frames = root.dwindleChildFrames(in: rect, gaps: gaps)
         XCTAssertEqual(frames[1].width, 406)

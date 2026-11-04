@@ -421,11 +421,13 @@ absolute keybindings to navigate the group.
 Drag a tab into another window's [intent zone](#managed-tiling-mode) or move it to
 another workspace through the sidebar.
 
-A tab group reserves only a thin rail above its windows, with one pill per tab: the
-active window's is longest and uses the accent colour, and in a strip the other columns
-on screen are lighter. Resting the pointer on the rail opens the full tab strip over the
-top of the window; it closes when the pointer leaves. Switching to a hidden tab shows the
-strip for a moment so the new tab is named. `window-tabs.height` sets that strip's height.
+A tab group reserves no space above its windows. Its pills sit in the gap, centred on the
+group's top edge, one per tab: the active window's is longest and uses the accent colour,
+and in a strip the other columns on screen are lighter. Resting the pointer on that edge
+opens the hover bar with a row of tabs (icon and title; click one to switch) above the
+window's actions, each with its configured shortcut. A tab group's bar shows even when
+quick actions are off. `window-tabs.height` sets the drop zone for dragging a window into
+a group.
 
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
 keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace

@@ -84,7 +84,7 @@ icon-appearance = 'color'  # color or monochrome
 
 [window-tabs]
 enabled = true
-height = 36                 # the strip that opens over the window from the pill rail
+height = 36                 # drop zone for dragging a window into a group
 double-sided-windows = false
 ```
 

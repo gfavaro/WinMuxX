@@ -79,16 +79,15 @@ Entries show only the app icon and name, so several Finder windows all read "Fin
 
 ### Proposal for WinMuxX tab strips
 
-Not yet agreed; review before building.
+Built as Shoji does it, after comparing the two side by side:
 
-- At rest, a tab group shows only the pill rail on its top edge. Windows regain
-  most of the strip's height (`window-tabs.height`, minimum 36 pt).
-- After resting on the rail (350 ms, as the hover bar), the existing strip opens
-  over the active window's top edge with titles, reordering and close buttons. The
-  hover bar actions join it as a second row.
-- During a window drag and after keyboard tab switching, the full strip shows so
-  drop targets and the new tab remain visible.
-- A default, not a new setting.
+- A tab group reserves no space. Its pills sit in the gap, centred on the group's
+  top edge.
+- Resting on that edge opens the hover bar: a tab row (icon and title, the current
+  tab highlighted) above Main · Focus · Float, each with its configured shortcut.
+- The first version (a 12-point rail whose full strip opened on hover) was replaced.
+  The tab strip's own drag-to-reorder and close buttons no longer show; windows still
+  join and leave groups by dragging, and move commands reorder tabs.
 
 Code to change: the reserved height in `layoutTabGroup`
 (`Sources/AppBundle/layout/layoutRecursive.swift`), tab bar geometry in

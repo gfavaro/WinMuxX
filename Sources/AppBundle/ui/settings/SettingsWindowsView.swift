@@ -139,7 +139,7 @@ struct ShortcutBehaviorSettingsView: View {
             scrollingSettingsSection
             SettingsSection("Hover bar") {
                 SettingsToggle("Show quick actions above windows", id: "hover-bar.enabled", isOn: $hoverBarEnabled,
-                    help: "Rest the pointer on the middle of a tiled window's top edge for Main (Master), Focus and Float; a focused window offers Unfocus.") {
+                    help: "Rest the pointer on the middle of a tiled window's top edge for Main (Master), Focus and Float, with their shortcuts; a focused window offers Unfocus. Tab groups always show their tabs there.") {
                     persistConfig(section: "hover-bar", key: "enabled", value: hoverBarEnabled ? "true" : "false")
                 }
             }
@@ -166,7 +166,7 @@ struct ShortcutBehaviorSettingsView: View {
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
                 SettingsToggle("Show tab strips", id: "window-tabs.enabled", isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
-                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the tab strip that opens over the window when you rest the pointer on a tab group's pills.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
+                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
 
