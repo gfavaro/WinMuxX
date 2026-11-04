@@ -4,8 +4,8 @@ import Common
 /// Darkens everything but the focused window: lightly with `[dimming] inactive-windows`,
 /// or fully and blurred while No peek is on, so others can't read your other windows.
 /// One click-through panel per screen sits directly below the focused window. It
-/// follows the border refresh, which already tracks focus, Mission Control, native
-/// fullscreen and presentation.
+/// follows the border refresh, which already tracks focus, Mission Control and native
+/// fullscreen.
 @MainActor
 final class InactiveWindowDimmer {
     static let shared = InactiveWindowDimmer()
@@ -27,8 +27,7 @@ final class InactiveWindowDimmer {
         guard !isUnitTest else { return }
         guard chromeAllowed, TrayMenuModel.shared.isEnabled,
               let style = Self.style(noPeek: noPeek, inactive: config.dimming.inactiveWindows),
-              let focused = focus.windowOrNil, !focused.isFullscreen,
-              !WorkspacePresentationController.shared.suppressesChrome(for: focused) else { return hide() }
+              let focused = focus.windowOrNil, !focused.isFullscreen else { return hide() }
         let screens = NSScreen.screens
         let live = Set(screens.map(ObjectIdentifier.init))
         for (id, panel) in panels where !live.contains(id) { panel.close(); panels[id] = nil }

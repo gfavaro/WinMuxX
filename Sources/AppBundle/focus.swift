@@ -127,7 +127,6 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
         newFocus.windowOrNil?.markAsMostRecentChild()
         return true
     }
-    WorkspacePresentationController.shared.cancelForFocusChange(to: newFocus)
     if origin == .explicit {
         ScrollingWindowOrdering.shared.cancel()
         let interruptedMotion = WorkspaceScrollingGestureController.shared.isMotionActive

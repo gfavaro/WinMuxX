@@ -116,10 +116,6 @@ extension [Command] {
             if NativeTilingCommandScope.validateTarget?() == false {
                 return io.err("Native command target changed during execution")
             }
-            await WorkspacePresentationController.shared.cancelForCommand(command)
-            if NativeTilingCommandScope.validateTarget?() == false {
-                return io.err("Native command target changed during execution")
-            }
             if NativeCommandPolicy.isNativeNavigation(command), !NativeTilingCommandScope.active {
                 await runtime.workspaceBackend.native.awaitCurrentObservation()
             }

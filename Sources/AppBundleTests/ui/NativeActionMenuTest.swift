@@ -51,13 +51,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "layout accordion", "Accordion overlaps natively")
         XCTAssertNil(menu.items.first { $0.title == "Enabled" }?.toolTip.flatMap { $0 == "Not available with native Spaces" ? $0 : nil },
             "enable pauses and resumes native tiling")
-        for title in ["No Peek", "Clean Space"] {
-            XCTAssertNotEqual(menu.items.first { $0.title.hasPrefix(title) }?.toolTip, "Not available with native Spaces", title)
-        }
-        let present = try XCTUnwrap(parseCommand("presentation toggle").cmdOrNil)
-        XCTAssertTrue(runtime.workspaceBackend.accepts(present))
-        XCTAssertTrue(NativeCommandPolicy.runsOutsideNativeTilingFence(present),
-                      "Clean Space focuses first, which revokes permits inside the fence")
+        XCTAssertNotEqual(menu.items.first { $0.title.hasPrefix("No Peek") }?.toolTip, "Not available with native Spaces")
         XCTAssertTrue(NativeCommandPolicy.runsOutsideNativeTilingFence(try XCTUnwrap(parseCommand("no-peek").cmdOrNil)))
         XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("no-peek").cmdOrNil)))
         XCTAssertTrue(runtime.workspaceBackend.accepts(try XCTUnwrap(parseCommand("retile").cmdOrNil)))

@@ -221,7 +221,6 @@ final class WindowBorderController {
         var reusable = borders.keys.filter { !onVisibleWorkspaces.contains($0) }
         for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
             for window in workspace.allLeafWindowsRecursive {
-                if WorkspacePresentationController.shared.suppressesChrome(for: window) { continue }
                 if let bundle = window.app.rawAppBundleId, settings.excludeApps.contains(bundle) { continue }
                 guard window.participatesInWorkspaceFocus, !window.isHiddenInCorner, !window.isFullscreen, !window.isInactiveWindowTab,
                       let snapshot = frames[window.windowId], snapshot.width > 0, snapshot.height > 0 else { continue }

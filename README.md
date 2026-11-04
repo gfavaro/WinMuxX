@@ -210,13 +210,6 @@ extra container operations, utilities and maintenance tools stay in Settings or 
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
 
-Use `presentation [on|off|toggle] [--window-id <id>]` to enlarge one visible,
-managed window over a dark backdrop. The command has no default key binding.
-The target stays above the opaque nonactivating backdrop, and WinMuxX keeps the
-workspace's groups, tabs, and scrolling position intact. Escape, clicking the
-backdrop, switching focus on the same display, or changing the layout ends the
-session and restores the window's prior tiled or floating placement.
-
 Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,
 and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).

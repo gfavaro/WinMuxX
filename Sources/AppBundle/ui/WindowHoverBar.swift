@@ -73,8 +73,7 @@ final class WindowHoverBar {
     func pointerMoved(_ point: CGPoint) {
         // Over the bar, a press is a click on it.
         if shown != nil, panelRect.insetBy(dx: -12, dy: -12).contains(point) { return }
-        guard config.hoverBar.enabled, TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive,
-              !WorkspacePresentationController.shared.isActive else { return hide() }
+        guard config.hoverBar.enabled, TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive else { return hide() }
         if shown != nil { hide() }
         guard let window = Self.candidate(at: point) else { return cancelPending() }
         if pending?.windowId == window.windowId { return }

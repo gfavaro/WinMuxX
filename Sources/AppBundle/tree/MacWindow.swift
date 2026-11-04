@@ -120,12 +120,6 @@ final class MacWindow: Window {
             }
         }
         if window.parent is MacosPopupWindowsContainer { WindowDetectionOperations.shared.schedulePopupChecks(window) }
-        if let workspace = window.nodeWorkspace {
-            NotificationCenter.default.post(name: managedWindowDetected, object: nil, userInfo: [
-                "projectId": workspace.projectId,
-                "viewportId": MonitorViewportId(workspace.workspaceMonitor),
-            ])
-        }
         return window
     }
 
@@ -205,14 +199,10 @@ final class MacWindow: Window {
     }
 
     func setNativeFullscreen(_ value: Bool) {
-        if value { NotificationCenter.default.post(name: managedWindowInvalidated, object: nil, userInfo: ["windowId": windowId]) }
-        else { NotificationCenter.default.post(name: managedWindowRestored, object: nil, userInfo: ["windowId": windowId]) }
         macApp.setNativeFullscreen(windowId, value)
     }
 
     func setNativeMinimized(_ value: Bool) {
-        if value { NotificationCenter.default.post(name: managedWindowInvalidated, object: nil, userInfo: ["windowId": windowId]) }
-        else { NotificationCenter.default.post(name: managedWindowRestored, object: nil, userInfo: ["windowId": windowId]) }
         macApp.setNativeMinimized(windowId, value)
     }
 
@@ -227,7 +217,6 @@ final class MacWindow: Window {
             if parent != nil { _ = unbindFromParent() }
             return
         }
-        NotificationCenter.default.post(name: managedWindowClosed, object: nil, userInfo: ["windowId": windowId])
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
         if macApp.nsApp.isTerminated, MacWindow.allWindowsMap[windowId] != nil {

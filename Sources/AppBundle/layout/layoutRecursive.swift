@@ -4,8 +4,6 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
-        await WorkspacePresentationController.shared.restorePendingFloatingFrames(in: self)
-        if WorkspacePresentationController.shared.preservesLayout(for: self) { return }
         var pinIndicatorShown = false
         defer { if !pinIndicatorShown { ScrollingPinIndicator.shared.hide(self) } }
         applyConfiguredLayout()
