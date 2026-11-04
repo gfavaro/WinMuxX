@@ -64,6 +64,48 @@ Open questions:
   One option is a Stack action in the hover bar, so stacking does not need a command.
 - Should the pill rail sit in the gap above the group, or inside the group frame?
 
+## Settings and menu bar
+
+These are the most polished part of Shoji, more than its tiling.
+
+### Settings
+
+- Pages follow intent rather than configuration structure: Layout, Highlight, Mouse,
+  Keyboard, Apps. No key names appear.
+- Main choices are pictogram cards (layout, window count, highlight style, Clean
+  Space background). Menus are kept for secondary policies.
+- Each control states its effect, often with the shortcut in the sentence: "A new
+  window joins the tile you're in, on top. Switch with ⌃⌥` or the grip."
+- Layout and Highlight open with a captioned preview of the current choices.
+- Search matches synonyms, and the Mouse page documents the gestures that always work.
+
+It works because there are about 25 options. WinMuxX has displays, per-workspace
+overrides, projects, automation and a TOML editor, so the structure does not transfer;
+the style does: pictogram pickers, effect descriptions, captioned previews and synonym
+search. Activity, License and About are clutter.
+
+### Menu-bar panel
+
+- Status at a glance: "Tiling 2 windows", a master switch, and a mini-map of the
+  current screen with the focused tile outlined. Its strings say tiles can be dragged
+  there to move windows; not tried.
+- One click for frequent changes: layout, window count, Retile, Borders, Hover focus
+  and No peek.
+- "Tile Rex Beta" follows the frontmost app and replaces a visit to the Apps page.
+- Weaknesses: the trial notice takes the top, it covers one screen only, and Clean
+  Space and Setups appear as upgrade prompts.
+
+For WinMuxX, the sidebar already owns workspaces and displays, so a panel should
+cover the current workspace: a mini-map with tab groups drawn as pills, a pictogram
+choice of Dwindle, Master or Scrolling, toggles for borders, dimming and No peek,
+pointer focus and tab strips, a "Stop tiling" switch for the frontmost app, and the
+shortcut and window-manager warnings the native menu already shows. Keep every action
+reachable from the keyboard.
+
+First picks: the mini-map with the frontmost-app switch, and pictogram pickers with
+effect descriptions in Settings. This comparison used WinMuxX's code and README; its
+Settings window was not open during the session.
+
 ## Other ideas
 
 In rough order of value:
