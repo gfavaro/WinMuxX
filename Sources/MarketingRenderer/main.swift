@@ -1,4 +1,3 @@
-import AppBundle
 import Foundation
 
 @main

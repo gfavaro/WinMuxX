@@ -1,28 +1,29 @@
 import AppKit
 import SwiftUI
+@testable import AppBundle
 
 /// Exports a deterministic marketing composition that embeds WinMux's production SwiftUI views.
 /// The renderer does not capture the screen or read pixels from application windows.
 @MainActor
-public func renderWinMuxMarketingImage(to outputURL: URL) throws {
+func renderWinMuxMarketingImage(to outputURL: URL) throws {
     try renderMarketingView(WinMuxMarketingCanvas(), to: outputURL)
 }
 
 /// Exports a focused proof containing one real Safari surface and two WinMux tabs.
 @MainActor
-public func renderWinMuxSafariProofImage(to outputURL: URL) throws {
+func renderWinMuxSafariProofImage(to outputURL: URL) throws {
     try renderMarketingView(WinMuxSafariProofCanvas(), to: outputURL)
 }
 
 /// Exports a collage of native Helium, Ghostty, and Finder window surfaces.
 @MainActor
-public func renderWinMuxAppsProofImage(to outputURL: URL) throws {
+func renderWinMuxAppsProofImage(to outputURL: URL) throws {
     try renderMarketingView(WinMuxAppsProofCanvas(), to: outputURL)
 }
 
 /// Exports a tiled Safari and Plasticity workspace using their measured split ratio.
 @MainActor
-public func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
+func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
     try renderMarketingView(
         WinMuxSafariPlasticityProofCanvas(),
         to: outputURL,
@@ -32,7 +33,7 @@ public func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
 }
 
 @MainActor
-public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
+func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
     let application = NSApplication.shared
     application.setActivationPolicy(.accessory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -122,7 +123,8 @@ public func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
             colorScheme: scheme,
             reduceTransparency: reduceTransparency,
             increasedContrast: contrast,
-            isOpaque: false
+            isOpaque: false,
+            backdrop: backdrop
         )
     }
 }
@@ -136,7 +138,8 @@ private func renderMarketingView<Content: View>(
     colorScheme: ColorScheme = .dark,
     reduceTransparency: Bool = false,
     increasedContrast: Bool = false,
-    isOpaque: Bool = true
+    isOpaque: Bool = true,
+    backdrop: NSWindow? = nil
 ) throws {
     let renderSize = CGSize(width: size.width * renderScale, height: size.height * renderScale)
     let content = rootView
@@ -194,13 +197,13 @@ private func renderMarketingView<Content: View>(
     hostingView.displayIfNeeded()
     RunLoop.main.run(until: Date().addingTimeInterval(0.8))
 
-    let windowNumber = CGWindowID(window.windowNumber)
-    guard let image = CGWindowListCreateImage(
-        .null,
-        .optionIncludingWindow,
-        windowNumber,
-        [.boundsIgnoreFraming, .bestResolution]
-    ) else {
+    // The backdrop is part of the picture: without it, translucent materials export
+    // as nearly transparent pixels. Both windows are the renderer's own.
+    let windowNumbers = [window, backdrop].compactMap { $0.map { CGWindowID($0.windowNumber) } }
+    var windowPointers = windowNumbers.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+    guard let windowArray = CFArrayCreate(nil, &windowPointers, windowPointers.count, nil),
+          let image = CGImage(windowListFromArrayScreenBounds: .null, windowArray: windowArray,
+                              imageOption: [.boundsIgnoreFraming, .bestResolution]) else {
         window.orderOut(nil)
         throw WinMuxMarketingRenderError.renderFailed
     }

@@ -112,5 +112,21 @@ installed: install
 fork-build:
 	VERSION="$(VERSION)" BUILD_NUMBER="$(BUILD_NUMBER)" bash script/fork-build.sh
 
+# Renders site/README images from the real sidebar and tab views; see docs/MARKETING.md.
+MARKETING_DIR ?= $(RELEASE_DIR)/marketing
+.PHONY: marketing-images
+marketing-images:
+	/bin/bash -lc 'cd "$(CURDIR)" && \
+	set -euo pipefail && \
+	source ./script/setup.sh && \
+	swift build --force-resolved-versions --product winmux-marketing-renderer && \
+	renderer="$$(swift build --show-bin-path)/winmux-marketing-renderer" && \
+	mkdir -p "$(MARKETING_DIR)" && \
+	"$$renderer" "$(MARKETING_DIR)/collage.png" && \
+	"$$renderer" --safari-proof "$(MARKETING_DIR)/safari-tabs.png" && \
+	"$$renderer" --apps-proof "$(MARKETING_DIR)/tiled-apps.png" && \
+	"$$renderer" --safari-plasticity-proof "$(MARKETING_DIR)/safari-plasticity.png" && \
+	"$$renderer" --sidebar-appearance-proof "$(MARKETING_DIR)/sidebar"'
+
 clean:
 	/bin/bash -lc 'cd "$(CURDIR)" && rm -rf .build .debug .deps .derived "$(RELEASE_DIR)" WinMux.xcodeproj'

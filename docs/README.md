@@ -20,6 +20,7 @@
 - [Dinky 0.22 width and alignment](DINKY_022_ADOPTION.md): width percentages, display/workspace overrides and legacy configuration migration.
 - [Dinky 0.21 command migration](DINKY_021_ADOPTION.md): workspace/container commands and format output.
 - [HACKING](../HACKING.md): architecture, development, checks, builds and installation.
+- [Marketing images](MARKETING.md): rendering site, README and promotional pictures, and publishing the GitHub Pages site.
 - [Dependencies](DEPENDENCIES.md): package inventory, removal decisions and Swift toolchain.
 - [Reliability](RELIABILITY.md): AX failures, retries, UUID targeting, config backups and IPC limits.
 - [Runtime efficiency](RUNTIME_EFFICIENCY.md): persistence, native notifications, queries, subscribers and capture limits.

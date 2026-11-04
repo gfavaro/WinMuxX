@@ -18,6 +18,10 @@ For workspace lifecycle, display assignment, selection, summon or whole-workspac
 movement, read [.agents/skills/winmuxx-workspaces/SKILL.md](.agents/skills/winmuxx-workspaces/SKILL.md).
 For unrelated tasks, use the relevant subsystem guidance in HACKING.
 
+For the product site (GitHub Pages), README pictures or promotional images, read
+[marketing images](docs/MARKETING.md): render with `make marketing-images`, not
+screen recordings.
+
 Use the [task map](docs/CONTRIBUTOR_TASKS.md) for code owners, completion criteria
 and failure handling. Read [workspace examples](docs/WORKSPACE_BEHAVIOR.md) when
 selection or movement is affected. [Agent evaluation](docs/AGENT_EVALUATION.md)
