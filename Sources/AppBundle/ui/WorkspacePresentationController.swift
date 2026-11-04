@@ -44,15 +44,15 @@ final class WorkspacePresentationController {
         backdrop.onBackdropClick = { [weak self] in
             Task { @MainActor in await self?.end(reason: .explicit) }
         }
-        observers.append(NotificationCenter.default.addObserver(forName: workspaceControlsWindowClosed, object: nil, queue: .main) { [weak self] note in
+        observers.append(NotificationCenter.default.addObserver(forName: managedWindowClosed, object: nil, queue: .main) { [weak self] note in
             guard let id = note.userInfo?["windowId"] as? UInt32 else { return }
             Task { @MainActor in if self?.session?.windowId == id { await self?.end(reason: .invalidated) } }
         })
-        observers.append(NotificationCenter.default.addObserver(forName: workspaceControlsWindowInvalidated, object: nil, queue: .main) { [weak self] note in
+        observers.append(NotificationCenter.default.addObserver(forName: managedWindowInvalidated, object: nil, queue: .main) { [weak self] note in
             guard let id = note.userInfo?["windowId"] as? UInt32 else { return }
             Task { @MainActor in if self?.session?.windowId == id { await self?.end(reason: .invalidated) } }
         })
-        observers.append(NotificationCenter.default.addObserver(forName: workspaceControlsWindowDetected, object: nil, queue: .main) { [weak self] note in
+        observers.append(NotificationCenter.default.addObserver(forName: managedWindowDetected, object: nil, queue: .main) { [weak self] note in
             let projectId = note.userInfo?["projectId"] as? WorkspaceProjectId
             let viewportId = note.userInfo?["viewportId"] as? MonitorViewportId
             Task { @MainActor in
@@ -89,7 +89,7 @@ final class WorkspacePresentationController {
                 for id in ids { await self.restorePendingFloatingFrame(windowId: id) }
             }
         })
-        observers.append(NotificationCenter.default.addObserver(forName: workspaceControlsWindowRestored, object: nil, queue: .main) { [weak self] note in
+        observers.append(NotificationCenter.default.addObserver(forName: managedWindowRestored, object: nil, queue: .main) { [weak self] note in
             guard let id = note.userInfo?["windowId"] as? UInt32 else { return }
             Task { @MainActor in await self?.restorePendingFloatingFrame(windowId: id) }
         })
@@ -167,7 +167,6 @@ final class WorkspacePresentationController {
         WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(workspace)
         ScrollingWindowOrdering.shared.cancel()
         WorkspaceScrollingMinimap.shared.dismiss()
-        WorkspaceControlsPanelController.shared.dismiss()
         WorkspaceSidebarPanel.visiblePanels.forEach { $0.orderOut(nil) }
         WindowBorderController.shared.remove(windowId: window.windowId)
         WindowTabStripPanelController.shared.hideAll()
@@ -395,3 +394,8 @@ private func isMutatingPresentationTarget(_ command: any Command) -> Bool {
         command is MacosNativeFullscreenCommand || command is MacosNativeMinimizeCommand ||
         command is OpenSidebarCommand || command is ScrollingMinimapCommand
 }
+
+let managedWindowClosed = Notification.Name("WinMuxManagedWindowClosed")
+let managedWindowInvalidated = Notification.Name("WinMuxManagedWindowInvalidated")
+let managedWindowDetected = Notification.Name("WinMuxManagedWindowDetected")
+let managedWindowRestored = Notification.Name("WinMuxManagedWindowRestored")

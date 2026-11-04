@@ -39,7 +39,7 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         let titles = menu.items.map(\.title)
         XCTAssertEqual(titles.first, "WinMuxX · Mail")
         for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Layout", "Fullscreen", "Balance Sizes",
-                      "Workspace Controls…", "Refresh Desktops", "Reload Config", "Settings…", "Enabled", "Quit WinMuxX"] {
+                      "Refresh Desktops", "Reload Config", "Settings…", "Enabled", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
         let workspaces = try XCTUnwrap(menu.items.first { $0.title == "Workspaces" }?.submenu)
@@ -51,7 +51,6 @@ final class NativeActionMenuTest: WorkspaceTestCase {
         XCTAssertEqual(layout.items.first { $0.title == "Accordion" }?.toolTip, "layout accordion", "Accordion overlaps natively")
         XCTAssertNil(menu.items.first { $0.title == "Enabled" }?.toolTip.flatMap { $0 == "Not available with native Spaces" ? $0 : nil },
             "enable pauses and resumes native tiling")
-        XCTAssertEqual(menu.items.first { $0.title == "Workspace Controls…" }?.isEnabled, false)
         for title in ["No Peek", "Clean Space"] {
             XCTAssertNotEqual(menu.items.first { $0.title.hasPrefix(title) }?.toolTip, "Not available with native Spaces", title)
         }

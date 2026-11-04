@@ -33,7 +33,6 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
 
 @MainActor
 public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
-    WorkspaceControlsPanelController.shared.dismiss()
     ShortcutSettingsModel.shared.reload()
     ShortcutSettingsModel.shared.isWindowShown = true
     _ = releaseSettingsPagesOnClose

@@ -181,8 +181,7 @@ reduce the mandatory system reservation.
 Settings → Appearance → Menu bar offers Icon or Workspace. Workspace follows the
 focused monitor and shows the label initial, or the workspace number when there
 is no label. Icon supports color or monochrome appearance. Clicking the status
-item opens the native action menu. Choose **Workspace Controls…** to open the
-optional visual panel.
+item opens the native action menu.
 Settings saves these choices to TOML:
 
 ```toml
@@ -210,11 +209,6 @@ Reload Config, Enabled and Quit remain directly accessible. Projects, tab contro
 extra container operations, utilities and maintenance tools stay in Settings or the CLI.
 Shortcuts come from the effective configuration for the active mode, and the menu updates whenever
 it opens. Actions without shortcuts remain clickable. Custom command chains, modifier taps and key sequences remain available through configuration.
-
-The optional **Workspace Controls…** panel shows the current workspace, project, display, applied group
-frames, and controls for arrangement, floating, fullscreen, scrolling width, and
-fit issues. It uses the displayed workspace's current frames, so opening it does not
-change scrolling position. Choose **More Actions…** to return to the full menu.
 
 Use `presentation [on|off|toggle] [--window-id <id>]` to enlarge one visible,
 managed window over a dark backdrop. The command has no default key binding.
