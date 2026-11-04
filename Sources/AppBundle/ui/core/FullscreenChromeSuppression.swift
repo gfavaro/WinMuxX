@@ -41,19 +41,24 @@ func fullscreenWindowDisplays(onScreen frames: [UInt32: CGRect]) -> Set<String> 
 /// The on-screen frames of just these windows. WindowServer describes only the windows
 /// asked about rather than every window on screen.
 func onScreenWindowFrames(_ ids: [UInt32]) -> [UInt32: CGRect] {
-    guard !ids.isEmpty else { return [:] }
-    // The array holds the window numbers themselves, not objects.
-    var numbers = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
-    guard let array = CFArrayCreate(nil, &numbers, numbers.count, nil) else { return [:] }
-    let rows = CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]] ?? []
     var frames: [UInt32: CGRect] = [:]
-    for row in rows where (row[kCGWindowIsOnscreen as String] as? Bool) == true {
+    for row in windowDescriptions(ids) where (row[kCGWindowIsOnscreen as String] as? Bool) == true {
         guard let id = (row[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
               let bounds = row[kCGWindowBounds as String] as? NSDictionary,
               let frame = CGRect(dictionaryRepresentation: bounds) else { continue }
         frames[id] = frame
     }
     return frames
+}
+
+/// WindowServer's description of just these windows, on screen or not. Windows that no
+/// longer exist are left out.
+func windowDescriptions(_ ids: [UInt32]) -> [[String: Any]] {
+    guard !ids.isEmpty else { return [] }
+    // The array holds the window numbers themselves, not objects.
+    var numbers = ids.map { UnsafeRawPointer(bitPattern: UInt($0)) }
+    guard let array = CFArrayCreate(nil, &numbers, numbers.count, nil) else { return [] }
+    return CGWindowListCreateDescriptionFromArray(array) as? [[String: Any]] ?? []
 }
 
 @MainActor

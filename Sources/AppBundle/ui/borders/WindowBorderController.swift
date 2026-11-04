@@ -27,6 +27,11 @@ final class WindowBorderController {
     private var missionControlState = MissionControlBorderState()
     var isMissionControlActive: Bool { missionControlState.active }
     private(set) var missionControlWindowIds = Set<UInt32>()
+    /// Windows named by events since the last check whose owner is not known yet.
+    private var unseenWindowIds = Set<UInt32>()
+    /// Windows already found not to belong to Mission Control.
+    private var otherWindowIds = Set<UInt32>()
+    private var nativeRefreshNeedsFullScan = false
     var backendDiagnosticSummary: String {
         let native = borders.values.filter(\.usesNativeBackend).count
         let fallback = borders.count - native
@@ -77,6 +82,12 @@ final class WindowBorderController {
                     controller.nativeBorderRefreshRequested = true
                 } else {
                     controller.nativeRefreshNeedsScan = true
+                    if windowId == 0 {
+                        controller.nativeRefreshNeedsFullScan = true
+                    } else if MacWindow.allWindowsMap[windowId] == nil, !controller.missionControlWindowIds.contains(windowId),
+                              !controller.otherWindowIds.contains(windowId) {
+                        controller.unseenWindowIds.insert(windowId)
+                    }
                 }
                 if controller.nativeRefreshTrigger == nil {
                     controller.nativeRefreshTrigger = windowId == 0 ? "space"
@@ -88,12 +99,14 @@ final class WindowBorderController {
                     let refreshBorders = controller.nativeBorderRefreshRequested
                     let trigger = controller.nativeRefreshTrigger ?? "other window"
                     let scan = controller.nativeRefreshNeedsScan
+                    let fullScan = controller.nativeRefreshNeedsFullScan
                     controller.nativeBorderRefreshRequested = false
                     controller.nativeRefreshTrigger = nil
                     controller.nativeRefreshNeedsScan = false
+                    controller.nativeRefreshNeedsFullScan = false
                     let start = CACurrentMediaTime()
                     if scan || controller.missionControlState.active {
-                        controller.missionControlChanged(refreshBorders: refreshBorders)
+                        controller.missionControlChanged(refreshBorders: refreshBorders, fullScan: fullScan)
                         WorkspaceMotionDiagnostics.record("Window scan after \(trigger) event", milliseconds: (CACurrentMediaTime() - start) * 1000)
                     } else {
                         // Moving a managed window cannot open Mission Control: only its border needs
@@ -110,10 +123,20 @@ final class WindowBorderController {
         missionControlChanged()
     }
 
-    func missionControlChanged(refreshBorders: Bool = false) {
+    /// `fullScan` lists every window on the system, ordered out or not, to find Mission Control's.
+    /// Otherwise only its known windows and the windows events named since are described: the
+    /// system has over a thousand windows, and listing them took most of each check.
+    func missionControlChanged(refreshBorders: Bool = false, fullScan: Bool = true) {
         guard !isUnitTest else { return }
-        // Include ordered-out windows so exit notifications are subscribed too.
-        let all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+        let all: [[String: Any]]
+        if fullScan {
+            // Include ordered-out windows so exit notifications are subscribed too.
+            all = CGWindowListCopyWindowInfo(.optionAll, kCGNullWindowID) as? [[String: Any]] ?? []
+            otherWindowIds.removeAll()
+        } else {
+            all = windowDescriptions(Array(missionControlWindowIds.union(unseenWindowIds).union(borderCandidateWindowIds)))
+        }
+        unseenWindowIds.removeAll()
         // Runs after every WindowServer window event; only Mission Control's owner matters.
         var bundles: [pid_t: String?] = [:]
         func bundleIdentifier(_ pid: pid_t) -> String? {
@@ -122,12 +145,17 @@ final class WindowBorderController {
             bundles[pid] = bundle
             return bundle
         }
-        let ids = Set(all.compactMap { entry -> UInt32? in
-            guard let pid = entry[kCGWindowOwnerPID as String] as? NSNumber,
-                  bundleIdentifier(pid.int32Value) == "com.apple.WindowManager",
-                  let id = entry[kCGWindowNumber as String] as? NSNumber else { return nil }
-            return id.uint32Value
-        })
+        var ids = Set<UInt32>()
+        for entry in all {
+            guard let id = (entry[kCGWindowNumber as String] as? NSNumber)?.uint32Value,
+                  let pid = entry[kCGWindowOwnerPID as String] as? NSNumber else { continue }
+            if bundleIdentifier(pid.int32Value) == "com.apple.WindowManager" {
+                ids.insert(id)
+            } else if !fullScan, MacWindow.allWindowsMap[id] == nil {
+                if otherWindowIds.count > 4096 { otherWindowIds.removeAll() }
+                otherWindowIds.insert(id)
+            }
+        }
         missionControlWindowIds = ids
         synchronizeNativeWindowSubscriptions()
         let onscreen = all.filter { ($0[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue == true }
