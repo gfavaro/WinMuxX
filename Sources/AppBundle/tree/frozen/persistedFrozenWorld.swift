@@ -51,6 +51,7 @@ private let persistedFrozenWorldVersion = 2
 /// an excluded process eligible again during delayed AX retries.
 @MainActor
 func recordUserWorkspaceSelectionForRestoration(at date: Date = .now) {
+    forgetClosedWindowsCacheVisibility()
     guard _isStartup != true, isWinMuxRuntimeReady || isUnitTest else { return }
     if recovery.firstUserWorkspaceSelectionDate == nil {
         recovery.firstUserWorkspaceSelectionDate = date

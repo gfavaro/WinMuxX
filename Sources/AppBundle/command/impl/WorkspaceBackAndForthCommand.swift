@@ -3,7 +3,7 @@ import Common
 
 struct WorkspaceBackAndForthCommand: Command {
     let args: WorkspaceBackAndForthCmdArgs
-    /*conforms*/ let shouldResetClosedWindowsCache = true
+    /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async -> Bool {
         return activatePreviousWorkspace(on: focus.workspace.workspaceMonitor)

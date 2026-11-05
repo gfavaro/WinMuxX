@@ -447,6 +447,14 @@ private func collectFrozenWindowsRecursive(_ frozenContainer: FrozenContainer, r
 //
 // That's why we have to refresh the cache every time layout or visible workspace assignment changes. Those changes can
 // be caused by running commands and with mouse manipulations.
+/// Selection changes what a display shows, not where windows belong: windows missing
+/// during sleep or lock still return to their workspaces, without undoing the selection.
+@MainActor func forgetClosedWindowsCacheVisibility() {
+    let cache = runtime.recovery.closedWindows
+    guard !cache.monitors.isEmpty else { return }
+    runtime.recovery.closedWindows = FrozenWorld(workspaces: cache.workspaces, monitors: [], windowIds: cache.windowIds)
+}
+
 @MainActor func resetClosedWindowsCache() {
     invalidateLateRestartTreeRestoration()
     runtime.recovery.closedWindows = FrozenWorld(workspaces: [], monitors: [], windowIds: [])

@@ -104,6 +104,32 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(workspaceSwipeTarget(on: displays[0], isNext: true), moved)
     }
 
+    func testSelectionWhileWindowIsMissingKeepsItsWorkspaceAndTheSelection() async throws {
+        let selections: [(String, () async throws -> Void)] = [
+            ("swipe", { XCTAssertTrue(navigateWorkspaceBySwipe(on: self.displays[0], isNext: true)) }),
+            ("command", { try await self.run("workspace 3") }),
+        ]
+        for (name, select) in selections {
+            fixture.cleanUp()
+            fixture = WorkspaceNavigationFixture()
+            resetClosedWindowsCache()
+            defer { resetClosedWindowsCache() }
+            // Sleep or lock: AX loses a hidden workspace's window after the world was cached.
+            replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+            try XCTUnwrap(spaces[3].allLeafWindowsRecursive.first).unbindFromParent()
+            try await select()
+            XCTAssertEqual(displays[0].activeWorkspace, spaces[2], name)
+            // It reappears as a new window of the focused workspace.
+            let window = TestWindow.new(id: 904, parent: focus.workspace.rootTilingContainer)
+            let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
+            XCTAssertTrue(restored, name)
+            // A refresh may collect the emptied workspace; restoration recreates it by name.
+            XCTAssertEqual(window.nodeWorkspace?.name, spaces[3].name, name)
+            XCTAssertEqual(spaces[2].allLeafWindowsRecursive.map(\.windowId), [903], name)
+            XCTAssertEqual(displays.map { $0.activeWorkspace.id }, [spaces[2], spaces[1], spaces[4]].map(\.id), name)
+        }
+    }
+
     func testReplacingSecondaryWorkspaceReturnsPreviousOwnerToMainForSwipes() {
         XCTAssertTrue(spaces[0].focusWorkspace())
         XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[2], targetMonitor: displays[1]))

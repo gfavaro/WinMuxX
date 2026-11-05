@@ -236,7 +236,6 @@ final class WorkspaceSwipeController {
                     guard !Task.isCancelled, self.generation == currentGeneration, self.canNavigate,
                           let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == gesture.displayPoint }),
                           monitor.activeWorkspace === gesture.source, self.gestureIsValid(gesture, on: monitor) else { return false }
-                    resetClosedWindowsCache()
                     return activateWorkspaceForUser(gesture.target, on: monitor)
                 }
                 guard generation == currentGeneration else { return }
@@ -263,7 +262,6 @@ final class WorkspaceSwipeController {
 @discardableResult
 func navigateWorkspaceBySwipe(on monitor: Monitor, isNext: Bool) -> Bool {
     guard let target = workspaceSwipeTarget(on: monitor, isNext: isNext) else { return false }
-    resetClosedWindowsCache()
     return activateWorkspaceForUser(target, on: monitor)
 }
 
