@@ -53,6 +53,31 @@ final class ClosedWindowReuseTest: XCTestCase {
         XCTAssertTrue(reused.nodeWorkspace === focus.workspace, "Restoring the others leaves the reused ID where it is")
     }
 
+    func testLayoutChangeWhileWindowsAreMissingKeepsTheirWorkspaces() async throws {
+        let home = Workspace.get(byName: "home")
+        let solo = Workspace.get(byName: "solo")
+        let elsewhere = Workspace.get(byName: "elsewhere")
+        let staying = TestWindow.new(id: 906, parent: home.rootTilingContainer)
+        let missing = TestWindow.new(id: 907, parent: home.rootTilingContainer)
+        let alone = TestWindow.new(id: 908, parent: solo.rootTilingContainer)
+        let moved = TestWindow.new(id: 909, parent: home.rootTilingContainer)
+        replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+        missing.unbindFromParent()
+        alone.unbindFromParent()
+        // A layout change while they are missing, e.g. moving another window.
+        moved.bind(to: elsewhere.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        syncClosedWindowsCacheToCurrentWorld()
+
+        for (id, workspaceName) in [(UInt32(907), home.name), (908, solo.name)] {
+            let returned = TestWindow.new(id: id, parent: focus.workspace.rootTilingContainer)
+            let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: returned)
+            XCTAssertTrue(restored, "\(id)")
+            XCTAssertEqual(returned.nodeWorkspace?.name, workspaceName, "\(id)")
+        }
+        XCTAssertEqual(moved.nodeWorkspace?.name, elsewhere.name, "The newer move wins")
+        XCTAssertEqual(staying.nodeWorkspace?.name, home.name)
+    }
+
     func testUnrelatedNativeCloseDoesNotDiscardRecoverableAxSnapshot() async throws {
         let window = TestWindow.new(id: 903, parent: focus.workspace.rootTilingContainer)
         replaceClosedWindowsCache(snapshotCurrentFrozenWorld())

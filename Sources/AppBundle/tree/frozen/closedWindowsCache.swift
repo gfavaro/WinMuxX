@@ -31,9 +31,9 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let namingStyle: WorkspaceNamingStyle
     let displayIndex: Int?
     let monitor: FrozenMonitor // todo drop this property, once monitor to workspace assignment migrates to TreeNode
-    let rootTilingNode: FrozenContainer
-    let floatingWindows: [FrozenWindow]
-    let macosUnconventionalWindows: [FrozenWindow]
+    var rootTilingNode: FrozenContainer
+    var floatingWindows: [FrozenWindow]
+    var macosUnconventionalWindows: [FrozenWindow]
     let arrangement: WorkspaceLayoutName?
     let preservesTopLevelGroups: Bool?
     let scrollingOffset: CGFloat?
@@ -153,7 +153,56 @@ func replaceClosedWindowsCache(_ frozenWorld: FrozenWorld) {
 func syncClosedWindowsCacheToCurrentWorld() {
     guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     invalidateLateRestartTreeRestoration()
-    runtime.recovery.closedWindows = snapshotCurrentFrozenWorld()
+    runtime.recovery.closedWindows = keepingMissingWindows(of: runtime.recovery.closedWindows, in: snapshotCurrentFrozenWorld())
+}
+
+/// A layout change must not forget windows that are briefly missing during sleep or lock:
+/// each keeps its workspace, after that workspace's current windows.
+func keepingMissingWindows(of old: FrozenWorld, in current: FrozenWorld) -> FrozenWorld {
+    let missing = old.windowIds.subtracting(current.windowIds)
+    guard !missing.isEmpty else { return current }
+    var workspaces = current.workspaces
+    for oldWorkspace in old.workspaces {
+        guard let kept = oldWorkspace.keepingOnly(missing) else { continue }
+        if let index = workspaces.firstIndex(where: { $0.name == oldWorkspace.name }) {
+            workspaces[index].floatingWindows += kept.floatingWindows
+            workspaces[index].macosUnconventionalWindows += kept.macosUnconventionalWindows
+            workspaces[index].rootTilingNode.children += kept.rootTilingNode.children
+        } else {
+            workspaces.append(kept)
+        }
+    }
+    return FrozenWorld(workspaces: workspaces, monitors: current.monitors, windowIds: current.windowIds.union(missing))
+}
+
+extension FrozenWorkspace {
+    /// Nil when none of `ids` is in this workspace.
+    func keepingOnly(_ ids: Set<UInt32>) -> FrozenWorkspace? {
+        var result = self
+        result.floatingWindows = floatingWindows.filter { ids.contains($0.id) }
+        result.macosUnconventionalWindows = macosUnconventionalWindows.filter { ids.contains($0.id) }
+        result.rootTilingNode = rootTilingNode.keepingOnly(ids) ?? rootTilingNode.withoutChildren
+        return collectFrozenWindows(result).isEmpty ? nil : result
+    }
+}
+
+extension FrozenContainer {
+    var withoutChildren: FrozenContainer {
+        var result = self
+        result.children = []
+        return result
+    }
+
+    func keepingOnly(_ ids: Set<UInt32>) -> FrozenContainer? {
+        var result = self
+        result.children = children.compactMap {
+            switch $0 {
+                case .window(let window): ids.contains(window.id) ? $0 : nil
+                case .container(let container): container.keepingOnly(ids).map(FrozenTreeNode.container)
+            }
+        }
+        return result.children.isEmpty ? nil : result
+    }
 }
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {

@@ -7,7 +7,7 @@ enum FrozenTreeNode: Codable, Equatable, Sendable {
 }
 
 struct FrozenContainer: Codable, Equatable, Sendable {
-    let children: [FrozenTreeNode]
+    var children: [FrozenTreeNode]
     let layout: Layout
     let orientation: Orientation
     let weight: CGFloat
