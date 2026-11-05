@@ -444,6 +444,49 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[0])
     }
 
+    private func identifiedDisplays(secondaryAt x: Double = 1920) -> [TestMonitor] {
+        displays.enumerated().map { index, display in
+            let rect = index == 1 ? Rect(topLeftX: x, topLeftY: 0, width: 1920, height: 1080) : display.rect
+            var monitor = TestMonitor(monitorAppKitNsScreenScreensId: display.monitorAppKitNsScreenScreensId, name: display.name,
+                                      rect: rect, visibleRect: rect, isMain: display.isMain)
+            monitor.displayUUID = "display-\(index)"
+            return monitor
+        }
+    }
+
+    func testReconnectedDisplayShowsItsWorkspaceAgainEvenWhenRearranged() {
+        for secondaryX: Double in [1920, 5760] {
+            fixture.cleanUp()
+            fixture = WorkspaceNavigationFixture()
+            let connected = identifiedDisplays()
+            setMonitorsForTests(connected)
+            rearrangeWorkspacesOnMonitors()
+            setMonitorsForTests([connected[0], connected[2]])
+            rearrangeWorkspacesOnMonitors()
+            XCTAssertFalse(spaces[1].isVisible)
+            let returned = identifiedDisplays(secondaryAt: secondaryX)
+            setMonitorsForTests(returned)
+            rearrangeWorkspacesOnMonitors()
+            checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+            XCTAssertEqual(returned.map { $0.activeWorkspace.id }, [spaces[0], spaces[1], spaces[4]].map(\.id), "x=\(secondaryX)")
+        }
+    }
+
+    func testReconnectedDisplayLeavesItsWorkspaceWhereTheUserShowedItMeanwhile() {
+        let connected = identifiedDisplays()
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        setMonitorsForTests([connected[0], connected[2]])
+        rearrangeWorkspacesOnMonitors()
+        XCTAssertTrue(activateWorkspaceForUser(spaces[1], on: connected[0]))
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+        XCTAssertEqual(connected[0].activeWorkspace, spaces[1])
+        XCTAssertNotEqual(connected[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(connected[2].activeWorkspace, spaces[4])
+    }
+
     func testDisconnectAndReconnectPreservesSurvivingDisplayHistory() async throws {
         try await run("workspace --name 3")
         setMonitorsForTests([displays[0]])

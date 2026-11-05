@@ -158,6 +158,9 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
 
 @MainActor
 func rearrangeWorkspacesOnMonitors() {
+    let displayUUIDById = Dictionary(monitors.map { (MonitorViewportId($0), $0.displayUUID) }, uniquingKeysWith: { first, _ in first })
+    // Remember which physical display each viewport shows while it is connected.
+    for (id, uuid) in displayUUIDById { runtime.workspaces.monitorViewportsById[id]?.displayUUID = uuid }
     let oldViewportsById = runtime.workspaces.monitorViewportsById
     let currentMonitorIds = Set(monitors.map(MonitorViewportId.init))
     let activeViewportIds = Set(oldViewportsById.compactMap { viewportId, viewport -> MonitorViewportId? in
@@ -177,24 +180,44 @@ func rearrangeWorkspacesOnMonitors() {
 
     let newMonitors = monitors.map(MonitorViewportId.init)
     var newMonitorToOldMonitorMapping: [MonitorViewportId: MonitorViewportId] = [:]
-    for newMonitor in newMonitors where oldVisibleMonitors.contains(newMonitor) {
+    // A display keeps its viewport by identity even when the arrangement moves it.
+    for newMonitor in newMonitors {
+        guard let uuid = displayUUIDById[newMonitor] ?? nil,
+              let oldMonitor = oldVisibleMonitors.first(where: { oldViewportsById[$0]?.displayUUID == uuid }) else { continue }
+        oldVisibleMonitors.remove(oldMonitor)
+        newMonitorToOldMonitorMapping[newMonitor] = oldMonitor
+    }
+    for newMonitor in newMonitors where newMonitorToOldMonitorMapping[newMonitor] == nil && oldVisibleMonitors.contains(newMonitor) {
         check(oldVisibleMonitors.remove(newMonitor) != nil)
         newMonitorToOldMonitorMapping[newMonitor] = newMonitor
     }
+    // A reconnected display shows the workspace it showed before it was disconnected.
+    var reconnectedViewports: [MonitorViewportId: MonitorViewport] = [:]
+    for newMonitor in newMonitors where newMonitorToOldMonitorMapping[newMonitor] == nil {
+        guard let uuid = displayUUIDById[newMonitor] ?? nil,
+              let viewport = runtime.workspaces.disconnectedViewportsByDisplay.removeValue(forKey: uuid) else { continue }
+        reconnectedViewports[newMonitor] = viewport
+    }
     for newMonitor in newMonitors {
-        if newMonitorToOldMonitorMapping[newMonitor] != nil { continue }
+        if newMonitorToOldMonitorMapping[newMonitor] != nil || reconnectedViewports[newMonitor] != nil { continue }
         if let oldMonitor = oldVisibleMonitors.minBy({ ($0.topLeftCorner - newMonitor.topLeftCorner).vectorLength }) {
             check(oldVisibleMonitors.remove(oldMonitor) != nil)
             newMonitorToOldMonitorMapping[newMonitor] = oldMonitor
         }
     }
+    for oldMonitor in oldVisibleMonitors {
+        guard let viewport = oldViewportsById[oldMonitor], let uuid = viewport.displayUUID else { continue }
+        runtime.workspaces.disconnectedViewportsByDisplay[uuid] = viewport
+    }
 
     runtime.workspaces.monitorViewportsById = [:]
 
     for newMonitor in newMonitors {
+        defer { runtime.workspaces.monitorViewportsById[newMonitor]?.displayUUID = displayUUIDById[newMonitor] ?? nil }
         let newScreen = newMonitor.topLeftCorner
         let mappedOldMonitor = newMonitorToOldMonitorMapping[newMonitor]
-        let preservedViewport = mappedOldMonitor.flatMap { oldViewportsById[$0] } ?? oldViewportsById[newMonitor]
+        let reconnected = reconnectedViewports[newMonitor]
+        let preservedViewport = mappedOldMonitor.flatMap { oldViewportsById[$0] } ?? reconnected ?? oldViewportsById[newMonitor]
         if var preservedViewport {
             preservedViewport = MonitorViewport(
                 id: newMonitor,
@@ -204,8 +227,8 @@ func rearrangeWorkspacesOnMonitors() {
             )
             runtime.workspaces.monitorViewportsById[newMonitor] = preservedViewport
         }
-        let existingVisibleWorkspace = mappedOldMonitor
-            .flatMap { oldViewportsById[$0]?.activeWorkspaceId }
+        // A workspace the user showed elsewhere meanwhile stays there: setActiveWorkspace refuses it.
+        let existingVisibleWorkspace = (mappedOldMonitor.flatMap { oldViewportsById[$0]?.activeWorkspaceId } ?? reconnected?.activeWorkspaceId)
             .flatMap { runtime.workspaces.workspaceById[$0] }
         if let existingVisibleWorkspace,
            newScreen.setActiveWorkspace(existingVisibleWorkspace)

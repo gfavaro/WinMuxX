@@ -6,6 +6,8 @@ struct MonitorViewport {
     var activeWorkspaceId: WorkspaceId?
     var previousWorkspaceId: WorkspaceId?
     var lastActiveWorkspaceByProject: [WorkspaceProjectId: WorkspaceId] = [:]
+    /// The physical display, recorded while connected; coordinates change with arrangement.
+    var displayUUID: String? = nil
 }
 
 @MainActor
@@ -30,6 +32,9 @@ struct WinMuxWorkspaceState {
         workspaceProjectDefaultId: WorkspaceProject(id: workspaceProjectDefaultId, name: "Default", order: 0),
     ]
     var monitorViewportsById: [MonitorViewportId: MonitorViewport] = [:]
+    /// Viewports of disconnected displays by display UUID, so a reconnected display shows its
+    /// workspace again instead of a fallback.
+    var disconnectedViewportsByDisplay: [String: MonitorViewport] = [:]
 
     private var nextWorkspaceCounter = 1
     private var nextProjectCounter = 1
