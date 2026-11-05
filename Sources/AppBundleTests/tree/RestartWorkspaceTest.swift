@@ -29,6 +29,22 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertTrue(current.nodeWorkspace === selected)
     }
 
+    func testSavedPlacementNeverBindsSystemAuthenticationPromptIntoWorkspace() async throws {
+        let workspace = Workspace.get(byName: "4")
+        let old = TestWindow.new(id: 1, parent: workspace)
+        old.restartIdentity = identity("", app: KnownBundleId.securityAgent.rawValue)
+        let saved = snapshotCurrentFrozenWorld()
+        old.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(.init(version: 2, world: saved, pending: nil))
+        // Unit-test window lookup only sees workspace windows, so the prompt is detected in another workspace.
+        let other = Workspace.get(byName: "2")
+        let prompt = TestWindow.new(id: 1, parent: other)
+        prompt.restartIdentity = identity("", app: KnownBundleId.securityAgent.rawValue)
+        let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: prompt)
+        XCTAssertFalse(restored)
+        XCTAssertTrue(prompt.nodeWorkspace === other)
+    }
+
     func testWorkspaceSelectionStillRestoresExistingProcessWindowWithChangedTitle() async throws {
         let workspace = Workspace.get(byName: "4")
         let old = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)

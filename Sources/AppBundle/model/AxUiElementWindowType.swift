@@ -109,6 +109,8 @@ extension AxUiElementMock {
         _ windowLevel: MacOsWindowLevel?,
     ) -> Bool {
         if isBrowserFocusOverlay(app: id, level: windowLevel) { return false }
+        // A workspace-owned prompt would be parked whenever its workspace is hidden.
+        if id?.isSystemAuthenticationAgent == true { return false }
         if windowLevel != .normalWindow &&
             // Slowly roll out windowLevel for applications for which we have the appropriate dumps
             (id == .slack || id == .chrome || id?.isFirefox == true || id == .braveBrowser || id == .screenstudio || id == .cleanshotx || id == .iterm2)

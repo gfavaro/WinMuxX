@@ -59,6 +59,8 @@ func recordUserWorkspaceSelectionForRestoration(at date: Date = .now) {
 
 @MainActor
 private func allowsSavedPlacement(_ identity: RestartWindowIdentity) -> Bool {
+    // Snapshots from before these prompts became popups must not bind them into a workspace.
+    if KnownBundleId(rawValue: identity.bundleId)?.isSystemAuthenticationAgent == true { return false }
     guard let selection = recovery.firstUserWorkspaceSelectionDate else { return true }
     guard let launch = identity.launchDate else { return false }
     return launch <= selection

@@ -17,9 +17,11 @@ enum KnownBundleId: String, Equatable {
     case iphonesimulator = "com.apple.iphonesimulator"
     case iterm2 = "com.googlecode.iterm2"
     case kitty = "net.kovidgoyal.kitty"
+    case localAuthenticationUIAgent = "com.apple.LocalAuthentication.UIAgent"
     case photoBooth = "com.apple.PhotoBooth"
     case qutebrowser = "org.qutebrowser.qutebrowser"
     case screenstudio = "com.timpler.screenstudio"
+    case securityAgent = "com.apple.SecurityAgent"
     case slack = "com.tinyspeck.slackmacgap"
     case steam = "com.valvesoftware.steam.helper"
     case windowsApp = "com.microsoft.rdc.macos"
@@ -49,5 +51,10 @@ enum KnownBundleId: String, Equatable {
 
     var isVscode: Bool {
         self == .vscode || self == .vscodium
+    }
+
+    /// macOS password and Touch ID prompts. macOS places them above every window on its chosen display.
+    var isSystemAuthenticationAgent: Bool {
+        self == .securityAgent || self == .localAuthenticationUIAgent
     }
 }

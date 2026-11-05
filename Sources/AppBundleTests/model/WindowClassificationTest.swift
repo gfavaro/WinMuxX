@@ -137,4 +137,15 @@ final class WindowClassificationTest: XCTestCase {
         dialog.attributes[kAXSubroleAttribute] = kAXDialogSubrole
         XCTAssertEqual(dialog.getWindowType(axApp: Element(), nil, .regular, .normalWindow, accessory: false), .dialog)
     }
+
+    func testSystemAuthenticationPromptsAreUnmanagedAtAnyWindowLevel() {
+        let prompt = Element.window(fullscreen: nil)
+        for app: KnownBundleId in [.securityAgent, .localAuthenticationUIAgent] {
+            for level: MacOsWindowLevel? in [.normalWindow, .unknown(windowLevel: 1000), nil] {
+                for policy: NSApplication.ActivationPolicy in [.regular, .accessory] {
+                    XCTAssertEqual(prompt.getWindowType(axApp: Element(), app, policy, level, accessory: true), .popup, app.rawValue)
+                }
+            }
+        }
+    }
 }
