@@ -120,4 +120,28 @@ final class LearnedWindowMinimumTest: XCTestCase {
         XCTAssertTrue(minimum.isEmpty)
     }
 
+
+    func testDisplayChangeForgetsASingleRefusalButKeepsEstablishedFloors() {
+        var minimum = LearnedWindowMinimum()
+        minimum.observe(requested: CGSize(width: 300, height: 600), first: CGSize(width: 500, height: 600),
+                        confirmed: CGSize(width: 500, height: 600))
+        minimum.forgetProvisionalEvidence()
+        minimum.observe(requested: CGSize(width: 350, height: 600), first: CGSize(width: 500, height: 600),
+                        confirmed: CGSize(width: 500, height: 600))
+        XCTAssertEqual(minimum.size.width, 0, "One refusal on each side of a display change is not a floor")
+        minimum.observe(requested: CGSize(width: 320, height: 600), first: CGSize(width: 500, height: 600),
+                        confirmed: CGSize(width: 500, height: 600))
+        XCTAssertEqual(minimum.size.width, 500, "Two refusals after the change are")
+        minimum.forgetProvisionalEvidence()
+        XCTAssertEqual(minimum.size.width, 500, "Established floors survive a display change")
+    }
+
+    @MainActor
+    func testWindowMotionReportsDisplayChangesUntilTheySettle() {
+        XCTAssertFalse(WindowMotion.shared.screensChanging)
+        WindowMotion.shared.screensChanged()
+        XCTAssertTrue(WindowMotion.shared.screensChanging)
+        WindowMotion.shared.screensSettled()
+        XCTAssertFalse(WindowMotion.shared.screensChanging)
+    }
 }

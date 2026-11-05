@@ -35,5 +35,12 @@ struct LearnedWindowMinimum {
         previous = (asked, stable)
     }
 
+    /// A display change makes an earlier single refusal incomparable with later ones;
+    /// established floors stay until a smaller resize succeeds.
+    mutating func forgetProvisionalEvidence() {
+        previousWidth = nil
+        previousHeight = nil
+    }
+
     var isEmpty: Bool { size == .zero }
 }

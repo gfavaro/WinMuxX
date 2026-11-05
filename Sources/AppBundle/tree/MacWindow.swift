@@ -35,6 +35,9 @@ final class MacWindow: Window {
     }
 
     @MainActor
+    func forgetProvisionalMinimumEvidence() { learnedMinimum.forgetProvisionalEvidence() }
+
+    @MainActor
     func restoreLearnedMinimum(_ size: CGSize?, savedBundleId: String?, generation: MinimumEvidenceGeneration) {
         guard let size, size.width.isFinite, size.height.isFinite,
               size.width >= 0, size.height >= 0, size != .zero,
@@ -572,6 +575,7 @@ final class MacWindow: Window {
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
             !isFullscreen && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
             !isConcealedByScrolling && nodeWorkspace?.scrollingGestureMotionActive != true &&
+            !WindowMotion.shared.screensChanging &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites
     }

@@ -57,10 +57,14 @@ final class WindowMotion: NSObject {
         for window in MacWindow.allWindows {
             window.lastAppliedLayoutPhysicalRect = nil
             window.suspendMinimumObservationForMotion()
+            window.forgetProvisionalMinimumEvidence()
         }
     }
 
     func screensSettled() { displayPolicy.screensSettled() }
+
+    /// Between a display change and its settled refresh; sizes refused then are not evidence.
+    var screensChanging: Bool { displayPolicy.isChanging }
 
     func forget(_ id: UInt32) {
         cancel(id)
@@ -323,6 +327,8 @@ struct WindowMotionDisplayPolicy {
     }
 
     mutating func screensSettled() { changing = false }
+
+    var isChanging: Bool { changing }
 
     mutating func forget(_ id: UInt32) { pending.remove(id) }
 
