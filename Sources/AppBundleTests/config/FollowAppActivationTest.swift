@@ -81,6 +81,21 @@ final class FollowAppActivationTest: XCTestCase {
         XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: fromHere), "Excluded apps are left alone")
     }
 
+    func testReselectingTheCurrentWorkspaceKeepsAPendingActivationButLeavingDoesNot() throws {
+        setUpWorkspacesForTests()
+        let here = focus.workspace
+        _ = TestWindow.new(id: 1, parent: here.rootTilingContainer).focusWindow()
+        let floating = TestWindow.new(id: 2, parent: Workspace.get(byName: "other"))
+        XCTAssertTrue(activateWorkspaceForUser(here, on: mainMonitor))
+        recordRefreshActivation(workspaceName: here.name, pid: floating.app.pid)
+        let activation = try XCTUnwrap(pendingRefreshActivationForTests())
+        XCTAssertTrue(activateWorkspaceForUser(here, on: mainMonitor))
+        XCTAssertTrue(shouldBringActivatedWindowHere(floating, activation: activation), "Reselecting is not leaving")
+        XCTAssertTrue(activateWorkspaceForUser(Workspace.get(byName: "away"), on: mainMonitor))
+        XCTAssertTrue(activateWorkspaceForUser(here, on: mainMonitor))
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: activation), "A new visit")
+    }
+
     /// The rule allowed the move but a double-optional check skipped it; exercise the move itself.
     func testActivatingAFloatingWindowOnAHiddenWorkspaceMovesItHereAndFocusesIt() {
         setUpWorkspacesForTests()
