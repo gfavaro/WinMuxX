@@ -31,6 +31,28 @@ final class ClosedWindowReuseTest: XCTestCase {
         XCTAssertFalse(new.isFullscreen)
     }
 
+    func testNativeCloseOfOneMissingWindowStillReturnsTheOthers() async throws {
+        let home = Workspace.get(byName: "home")
+        let other = Workspace.get(byName: "other")
+        let missing = TestWindow.new(id: 904, parent: home.rootTilingContainer)
+        let closed = TestWindow.new(id: 905, parent: other.rootTilingContainer)
+        replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+        missing.unbindFromParent()
+        closed.unbindFromParent()
+        invalidateClosedWindowsCacheForNativeClosure(closed.windowId)
+
+        let reused = TestWindow.new(id: 905, parent: focus.workspace.rootTilingContainer)
+        let reusedRestored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: reused)
+        XCTAssertFalse(reusedRestored)
+        XCTAssertTrue(reused.nodeWorkspace === focus.workspace)
+
+        let returned = TestWindow.new(id: 904, parent: focus.workspace.rootTilingContainer)
+        let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: returned)
+        XCTAssertTrue(restored)
+        XCTAssertEqual(returned.nodeWorkspace?.name, home.name)
+        XCTAssertTrue(reused.nodeWorkspace === focus.workspace, "Restoring the others leaves the reused ID where it is")
+    }
+
     func testUnrelatedNativeCloseDoesNotDiscardRecoverableAxSnapshot() async throws {
         let window = TestWindow.new(id: 903, parent: focus.workspace.rootTilingContainer)
         replaceClosedWindowsCache(snapshotCurrentFrozenWorld())

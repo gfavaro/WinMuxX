@@ -164,14 +164,21 @@ func syncClosedWindowsCacheToCurrentWorld() {
 }
 
 /// AX disappearing during screen lock is recoverable; a native close is not.
-/// Invalidate old ID-only snapshots so a reused ID never inherits the closed window's state.
+/// Forget only the closed window, so a reused ID never inherits its state while the
+/// other windows of the snapshot can still return to their workspaces.
 @MainActor func invalidateClosedWindowsCacheForNativeClosure(_ windowId: UInt32) {
-    if runtime.recovery.closedWindows.windowIds.contains(windowId) { resetClosedWindowsCache() }
+    let cache = runtime.recovery.closedWindows
+    guard cache.windowIds.contains(windowId) else { return }
+    let remaining = cache.windowIds.subtracting([windowId])
+    guard !remaining.isEmpty else { return resetClosedWindowsCache() }
+    runtime.recovery.closedWindows = FrozenWorld(workspaces: cache.workspaces, monitors: cache.monitors, windowIds: remaining)
 }
 
 @MainActor
 func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow: Window, matchedWindows: [UInt32: Window]? = nil, restoreVisibleWorkspaces: Bool = true) async throws -> Bool {
-    let windowsById = matchedWindows ?? Dictionary(uniqueKeysWithValues: Workspace.all.flatMap { $0.allLeafWindowsRecursive }.map { ($0.windowId, $0) })
+    // Windows closed since the snapshot leave windowIds; a reused ID must not take their place.
+    let windowsById = matchedWindows ?? Dictionary(uniqueKeysWithValues: Workspace.all.flatMap { $0.allLeafWindowsRecursive }
+        .filter { frozenWorld.windowIds.isEmpty || frozenWorld.windowIds.contains($0.windowId) }.map { ($0.windowId, $0) })
     if !frozenWorld.windowIds.isEmpty {
         guard frozenWorld.workspaces.contains(where: {
             collectFrozenWindows($0).keys.contains { windowsById[$0] === newlyDetectedWindow }
