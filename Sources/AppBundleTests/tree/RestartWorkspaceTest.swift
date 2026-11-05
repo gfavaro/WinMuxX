@@ -45,6 +45,48 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertTrue(prompt.nodeWorkspace === other)
     }
 
+    func testRelaunchedAppKeepsOnlyItsNewestIndistinguishablePlacement() {
+        let oldWorkspace = Workspace.get(byName: "2")
+        let calendar = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
+        calendar.restartIdentity = identity("Calendar", app: "com.apple.iCal")
+        let notes = TestWindow.new(id: 2, parent: oldWorkspace.rootTilingContainer)
+        notes.restartIdentity = identity("Notes", pid: 11, app: "com.apple.Notes")
+        let older = PendingRestartSnapshot(world: snapshotCurrentFrozenWorld(), remainingWindowIds: [1, 2])
+        calendar.unbindFromParent()
+        notes.unbindFromParent()
+        let newWorkspace = Workspace.get(byName: "3")
+        for id: UInt32 in [7, 8] {
+            let relaunched = TestWindow.new(id: id, parent: newWorkspace.rootTilingContainer)
+            relaunched.restartIdentity = identity("Calendar", pid: 20, launch: 20, app: "com.apple.iCal")
+        }
+        let newer = PendingRestartSnapshot(world: snapshotCurrentFrozenWorld(), remainingWindowIds: [7, 8])
+        let result = discardSupersededRestartAssignments([older, newer])
+        XCTAssertEqual(result[0].remainingWindowIds, [2], "Only the unrelated window survives in the older snapshot")
+        XCTAssertEqual(result[1].remainingWindowIds, [7, 8], "Identical windows of one snapshot are distinct windows")
+    }
+
+    func testRestartSnapshotsExpireAfterAWeekAndUndatedOnesStartTheirLifetimeWhenLoaded() throws {
+        let workspace = Workspace.get(byName: "2")
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.restartIdentity = identity("Report", app: "com.apple.Preview")
+        let world = snapshotCurrentFrozenWorld()
+        window.unbindFromParent()
+        let day: TimeInterval = 24 * 60 * 60
+        preparePersistedFrozenWorldForStartup(.init(version: 2, world: FrozenWorld(workspaces: [], monitors: [], windowIds: []), pending: [
+            PendingRestartSnapshot(world: world, remainingWindowIds: [1], savedAt: .now - 8 * day),
+            PendingRestartSnapshot(world: world, remainingWindowIds: [1], savedAt: .now - 6 * day),
+        ]))
+        XCTAssertEqual(runtime.recovery.pendingRestartSnapshots.map { Int((Date.now.timeIntervalSince($0.savedAt) / day).rounded()) }, [6, 0])
+
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            PendingRestartSnapshot(world: world, remainingWindowIds: [1]))) as? [String: Any])
+        json.removeValue(forKey: "savedAt")
+        let undated = try JSONDecoder().decode(PendingRestartSnapshot.self, from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(undated.remainingWindowIds, [1])
+        XCTAssertFalse(undated.isExpired())
+        XCTAssertTrue(undated.isExpired(at: .now + 8 * day))
+    }
+
     func testWorkspaceSelectionStillRestoresExistingProcessWindowWithChangedTitle() async throws {
         let workspace = Workspace.get(byName: "4")
         let old = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)

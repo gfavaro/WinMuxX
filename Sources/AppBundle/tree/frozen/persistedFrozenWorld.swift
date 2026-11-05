@@ -85,7 +85,7 @@ func compactPendingRestartSnapshots() {
     guard recovery.restartRestorationsInFlight == 0, _isStartup != true,
           recovery.lateRestartTreeDeadline == nil else { return }
     let snapshots = discardSupersededRestartAssignments(recovery.pendingRestartSnapshots)
-    recovery.pendingRestartSnapshots = snapshots.filter { !$0.remainingWindowIds.isEmpty }
+    recovery.pendingRestartSnapshots = snapshots.filter { !$0.remainingWindowIds.isEmpty && !$0.isExpired() }
     recovery.restartMatchedWindows = recovery.pendingRestartSnapshots.map { _ in [:] }
 }
 struct RestartWindowAttempt {
@@ -94,9 +94,31 @@ struct RestartWindowAttempt {
     var lastAttempt: Date = .distantPast
 }
 
+/// Windows that never reappear, such as one-off documents, are forgotten after a week.
+let restartSnapshotLifetime: TimeInterval = 7 * 24 * 60 * 60
+
 struct PendingRestartSnapshot: Codable, Equatable, Sendable {
     let world: FrozenWorld
     var remainingWindowIds: Set<UInt32>
+    let savedAt: Date
+
+    private enum CodingKeys: String, CodingKey { case world, remainingWindowIds, savedAt }
+
+    init(world: FrozenWorld, remainingWindowIds: Set<UInt32>, savedAt: Date = .now) {
+        self.world = world
+        self.remainingWindowIds = remainingWindowIds
+        self.savedAt = savedAt
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        world = try container.decode(FrozenWorld.self, forKey: .world)
+        remainingWindowIds = try container.decode(Set<UInt32>.self, forKey: .remainingWindowIds)
+        // Older files have no date: their lifetime starts when they are loaded.
+        savedAt = try container.decodeIfPresent(Date.self, forKey: .savedAt) ?? .now
+    }
+
+    func isExpired(at date: Date = .now) -> Bool { date.timeIntervalSince(savedAt) > restartSnapshotLifetime }
 }
 
 private struct RestartProcessWindowKey: Hashable {
@@ -106,16 +128,35 @@ private struct RestartProcessWindowKey: Hashable {
     let windowId: UInt32
 }
 
+private struct RestartContentKey: Hashable {
+    let bundleId: String
+    let title: String
+    let documentURL: String?
+    let accessibilityIdentifier: String?
+}
+
 /// Snapshots are ordered oldest to newest. A verified process/window identity
 /// has only one current placement, regardless of changing terminal titles.
+/// A window indistinguishable from one in a newer snapshot is superseded too: matching
+/// needs a unique candidate, so relaunched apps would otherwise accumulate dead entries.
 @MainActor
 func discardSupersededRestartAssignments(_ snapshots: [PendingRestartSnapshot]) -> [PendingRestartSnapshot] {
     var result = snapshots
     var seen: Set<RestartProcessWindowKey> = []
+    var newerContent: Set<RestartContentKey> = []
     for index in result.indices.reversed() {
+        var content: Set<RestartContentKey> = []
         for workspace in result[index].world.workspaces {
             for window in collectFrozenWindows(workspace).values {
-                guard let identity = window.restartIdentity, let launchDate = identity.launchDate else { continue }
+                guard let identity = window.restartIdentity else { continue }
+                let contentKey = RestartContentKey(bundleId: identity.bundleId, title: identity.title,
+                    documentURL: identity.documentURL, accessibilityIdentifier: identity.accessibilityIdentifier)
+                content.insert(contentKey)
+                if newerContent.contains(contentKey) {
+                    result[index].remainingWindowIds.remove(window.id)
+                    continue
+                }
+                guard let launchDate = identity.launchDate else { continue }
                 let key = RestartProcessWindowKey(bundleId: identity.bundleId, pid: identity.pid,
                     launchDate: launchDate, windowId: window.id)
                 if !seen.insert(key).inserted {
@@ -123,6 +164,7 @@ func discardSupersededRestartAssignments(_ snapshots: [PendingRestartSnapshot]) 
                 }
             }
         }
+        newerContent.formUnion(content)
     }
     return result
 }
@@ -171,7 +213,7 @@ func makeRestartEnvelope() -> PersistedFrozenWorldEnvelope {
     let snapshots = discardSupersededRestartAssignments(recovery.pendingRestartSnapshots +
         [PendingRestartSnapshot(world: world, remainingWindowIds: world.windowIds)])
     return PersistedFrozenWorldEnvelope(version: persistedFrozenWorldVersion, world: world,
-        pending: snapshots.dropLast().filter { !$0.remainingWindowIds.isEmpty })
+        pending: snapshots.dropLast().filter { !$0.remainingWindowIds.isEmpty && !$0.isExpired() })
 }
 
 @discardableResult
@@ -264,7 +306,7 @@ func preparePersistedFrozenWorldForStartup(_ envelope: PersistedFrozenWorldEnvel
             compactPendingRestartSnapshots()
         }
     }
-    recovery.pendingRestartSnapshots = (envelope.pending ?? []) + [PendingRestartSnapshot(world: envelope.world,
+    recovery.pendingRestartSnapshots = (envelope.pending ?? []).filter { !$0.isExpired() } + [PendingRestartSnapshot(world: envelope.world,
         remainingWindowIds: envelope.world.windowIds)]
     for index in recovery.pendingRestartSnapshots.indices {
         let identifiable = recovery.pendingRestartSnapshots[index].world.workspaces.flatMap { collectFrozenWindows($0).values }

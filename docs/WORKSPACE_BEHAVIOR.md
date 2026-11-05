@@ -15,6 +15,7 @@ workspaces. Unless stated otherwise, no forced assignment applies.
 | C assigned to S in config; WinMuxX restores a saved arrangement with B on S | B stays on S: a restored arrangement wins unless Start workspaces on main display is on | `testARestoredWorldKeepsItsDisplaysDespiteAssignments` |
 | Activate a sidebar row for a workspace on another display | The row may show bring-here confirmation; confirming or using its Bring Here context action explicitly relocates it | `WorkspaceSidebarWorkspaceSection.swift`; `WorkspaceSidebarOverrideTest` |
 | Disconnect and reconnect a display | Reconcile valid active viewports and preserve surviving display history; do not promise physical restoration beyond tested behavior | `testDisconnectAndReconnectPreservesSurvivingDisplayHistory`; desktop checks still required |
+| A window of hidden C is missing after sleep or lock; the user selects B, then the window reappears | It returns to C, not the focused B; B stays selected | `testSelectionWhileWindowIsMissingKeepsItsWorkspaceAndTheSelection` |
 
 Unnamed test classes above refer to `Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift`.
 `WorkspaceCommandTest.swift` is in that directory. `WorkspaceSidebarOverrideTest.swift`
