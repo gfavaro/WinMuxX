@@ -159,15 +159,25 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
 @MainActor
 func rearrangeWorkspacesOnMonitors() {
     let displayUUIDById = Dictionary(monitors.map { (MonitorViewportId($0), $0.displayUUID) }, uniquingKeysWith: { first, _ in first })
-    // Remember which physical display each viewport shows while it is connected.
-    for (id, uuid) in displayUUIDById { runtime.workspaces.monitorViewportsById[id]?.displayUUID = uuid }
+    // Record the display of viewports that have none yet. A recorded one is never overwritten
+    // here: displays that swapped positions must keep their own workspaces.
+    for (id, uuid) in displayUUIDById where runtime.workspaces.monitorViewportsById[id]?.displayUUID == nil {
+        runtime.workspaces.monitorViewportsById[id]?.displayUUID = uuid
+    }
     let oldViewportsById = runtime.workspaces.monitorViewportsById
+    runtime.workspaces.disconnectedViewportsByDisplay = runtime.workspaces.disconnectedViewportsByDisplay.filter {
+        $0.value.activeWorkspaceId.flatMap { runtime.workspaces.workspaceById[$0] } != nil
+    }
     let currentMonitorIds = Set(monitors.map(MonitorViewportId.init))
     let activeViewportIds = Set(oldViewportsById.compactMap { viewportId, viewport -> MonitorViewportId? in
         guard let workspaceId = viewport.activeWorkspaceId, runtime.workspaces.workspaceById[workspaceId] != nil else { return nil }
         return viewportId
     })
-    if activeViewportIds == currentMonitorIds {
+    let displaysMoved = displayUUIDById.contains { id, uuid in
+        guard let uuid, let recorded = oldViewportsById[id]?.displayUUID else { return false }
+        return recorded != uuid
+    }
+    if activeViewportIds == currentMonitorIds && !displaysMoved {
         return
     }
 

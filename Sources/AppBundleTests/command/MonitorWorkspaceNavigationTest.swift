@@ -472,6 +472,23 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         }
     }
 
+    func testDisplaysThatSwapPositionsKeepTheirOwnWorkspaces() {
+        let connected = identifiedDisplays()
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        var swapped = connected
+        for (index, other) in [(0, 1), (1, 0)] {
+            let rect = connected[other].rect
+            swapped[index] = TestMonitor(monitorAppKitNsScreenScreensId: connected[index].monitorAppKitNsScreenScreensId,
+                                         name: connected[index].name, rect: rect, visibleRect: rect, isMain: connected[index].isMain)
+            swapped[index].displayUUID = connected[index].displayUUID
+        }
+        setMonitorsForTests(swapped)
+        rearrangeWorkspacesOnMonitors()
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+        XCTAssertEqual(swapped.map { $0.activeWorkspace.id }, [spaces[0], spaces[1], spaces[4]].map(\.id))
+    }
+
     func testReconnectedDisplayLeavesItsWorkspaceWhereTheUserShowedItMeanwhile() {
         let connected = identifiedDisplays()
         setMonitorsForTests(connected)

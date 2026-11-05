@@ -16,6 +16,7 @@ workspaces. Unless stated otherwise, no forced assignment applies.
 | Activate a sidebar row for a workspace on another display | The row may show bring-here confirmation; confirming or using its Bring Here context action explicitly relocates it | `WorkspaceSidebarWorkspaceSection.swift`; `WorkspaceSidebarOverrideTest` |
 | Disconnect and reconnect a display | Reconcile valid active viewports and preserve surviving display history; do not promise physical restoration beyond tested behavior | `testDisconnectAndReconnectPreservesSurvivingDisplayHistory`; desktop checks still required |
 | B on S; S disconnects and reconnects, possibly elsewhere in the arrangement | S shows B again, matched by display UUID; if the user showed B elsewhere meanwhile, B stays there and S gets a fallback | `testReconnectedDisplayShowsItsWorkspaceAgainEvenWhenRearranged`, `testReconnectedDisplayLeavesItsWorkspaceWhereTheUserShowedItMeanwhile` |
+| A on M, B on S; M and S swap positions in the arrangement | Each display keeps its workspace | `testDisplaysThatSwapPositionsKeepTheirOwnWorkspaces` |
 | A window of hidden C is missing after sleep or lock; the user selects B, then the window reappears | It returns to C, not the focused B; B stays selected | `testSelectionWhileWindowIsMissingKeepsItsWorkspaceAndTheSelection` |
 
 Unnamed test classes above refer to `Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift`.
