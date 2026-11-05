@@ -43,6 +43,7 @@ struct RefreshActivationContext: Equatable, Sendable {
     let generation: UInt64
     let workspaceName: String
     let pid: Int32
+    var selectionGeneration: UInt64 = 0
 
     func shouldRaise(currentWorkspace: String, nativeWindowId: UInt32?, logicalWindowId: UInt32?,
                      frontmostPid: Int32?, targetPid: Int32?) -> Bool {
@@ -65,7 +66,8 @@ private var pendingActivation: RefreshActivationContext? {
 @MainActor
 func recordRefreshActivation(workspaceName: String, pid: Int32) {
     activationGeneration += 1
-    pendingActivation = RefreshActivationContext(generation: activationGeneration, workspaceName: workspaceName, pid: pid)
+    pendingActivation = RefreshActivationContext(generation: activationGeneration, workspaceName: workspaceName, pid: pid,
+                                                 selectionGeneration: runtime.refresh.workspaceSelectionGeneration)
     if runtime.events.isRecording {
         runtime.events.record(.activationRecorded, source: .refresh, generation: activationGeneration,
                               workspaceID: Workspace.existing(byName: workspaceName)?.id, reason: "pid:\(pid)")

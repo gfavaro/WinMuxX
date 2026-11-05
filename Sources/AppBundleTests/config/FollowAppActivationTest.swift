@@ -58,16 +58,24 @@ final class FollowAppActivationTest: XCTestCase {
         let floating = TestWindow.new(id: 2, parent: hidden)
         let tiled = TestWindow.new(id: 3, parent: hidden.rootTilingContainer)
         XCTAssertFalse(hidden.isVisible)
-        let fromHere = RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid)
+        let selection = runtime.refresh.workspaceSelectionGeneration
+        let fromHere = RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid,
+                                                selectionGeneration: selection)
 
         XCTAssertTrue(shouldBringActivatedWindowHere(floating, activation: fromHere))
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating,
+            activation: RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid,
+                                                 selectionGeneration: selection &- 1)),
+            "The user left and returned since the activation; it is not from this visit")
         XCTAssertFalse(shouldBringActivatedWindowHere(tiled, activation: fromHere), "Tiled windows keep their layout")
         XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: nil), "No activation, as when focus lags a workspace switch")
         XCTAssertFalse(shouldBringActivatedWindowHere(floating,
-            activation: RefreshActivationContext(generation: 1, workspaceName: hidden.name, pid: floating.app.pid)),
+            activation: RefreshActivationContext(generation: 1, workspaceName: hidden.name, pid: floating.app.pid,
+                                                 selectionGeneration: selection)),
             "Activated from another workspace than the current one")
         XCTAssertFalse(shouldBringActivatedWindowHere(floating,
-            activation: RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid + 1)),
+            activation: RefreshActivationContext(generation: 1, workspaceName: here.name, pid: floating.app.pid + 1,
+                                                 selectionGeneration: selection)),
             "Another app was activated")
         config.followAppActivation.excludeApps = [floating.app.rawAppBundleId ?? ""]
         XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: fromHere), "Excluded apps are left alone")

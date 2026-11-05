@@ -156,7 +156,9 @@ func bringActivatedWindowHereVerdict(_ window: Window, activation: RefreshActiva
     guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return "nativeBackend" }
     guard let activation else { return "noActivation" }
     guard activation.pid == window.app.pid else { return "otherAppActivated" }
-    guard activation.workspaceName == focus.workspace.name else { return "activatedFromOtherWorkspace" }
+    guard activation.workspaceName == focus.workspace.name,
+          activation.selectionGeneration == runtime.refresh.workspaceSelectionGeneration
+    else { return "activatedFromOtherWorkspace" }
     guard window.isFloating else { return "notFloating" }
     guard let source = window.nodeWorkspace, source !== focus.workspace else { return "alreadyHere" }
     guard !source.isVisible else { return "sourceVisible" }
