@@ -51,6 +51,8 @@ final class WorkspaceSwipePreview {
         var mainMs: Double
         var submissionMs: Double?
         var workerMs: Double?
+        /// Why a preview ended before submission, for doctor.
+        var endReason: String? = nil
     }
     static let timingSampleLimit = 128
     private(set) var timings: [Timing] = []
@@ -144,7 +146,7 @@ final class WorkspaceSwipePreview {
                 return begin(request: request, front: image, rect: rect, slidesLeft: slidesLeft, started: started, isValid: isValid)
             }
             // Still capturing: take that capture over rather than starting the same one again.
-            clear()
+            clear(reason: "superseded")
             let cached = snapshots.cache.image(for: request.key)
             prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: nil,
                     requestMs: (CACurrentMediaTime() - started) * 1000)
@@ -390,11 +392,12 @@ final class WorkspaceSwipePreview {
     func cancel() {
         snapshots.cancel()
         touchdownFront = nil
-        clear()
+        clear(reason: "cancelled")
     }
 
     /// Ends the presentation; a capture still running for the next swipe is left alone.
-    private func clear() {
+    private func clear(reason: String) {
+        updateTiming { if $0.submissionMs == nil, $0.endReason == nil { $0.endReason = reason } }
         slideEndedAt = nil
         generation += 1
         completion?.cancel(); completion = nil

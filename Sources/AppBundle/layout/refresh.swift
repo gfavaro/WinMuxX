@@ -671,6 +671,9 @@ private func layoutWorkspaces() async throws {
         monitorToOptimalHideCorner[monitor.rect.topLeftCorner] = corner
     }
 
+    // Stage timings count only refreshes that park or reveal something, as workspace switches do.
+    let parkingStarted = CACurrentMediaTime()
+    var parked = 0
     for workspace in Workspace.all where !workspace.isVisible {
         let corner = monitorToOptimalHideCorner[workspace.workspaceMonitor.rect.topLeftCorner] ?? .bottomRightCorner
         let shouldReassertHiddenWindows = refreshSessionEvent?.requiresHiddenWindowsReassertion == true
@@ -692,10 +695,17 @@ private func layoutWorkspaces() async throws {
             // Geometry invalidation also follows our own parking notifications. Let
             // hideInCorner confirm native placement, including safe OS clamping,
             // instead of forcing the same rejected position on every refresh.
+            if !macWindow.isHiddenInCorner { parked += 1 }
             try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows)
         }
     }
+    if parked > 0 { WorkspaceMotionDiagnostics.record("Park outgoing windows", milliseconds: (CACurrentMediaTime() - parkingStarted) * 1000) }
     // Reveal incoming windows only after outgoing workspaces are parked.
+    let revealStarted = CACurrentMediaTime()
+    var revealed = 0
+    defer {
+        if revealed > 0 { WorkspaceMotionDiagnostics.record("Reveal and lay out incoming windows", milliseconds: (CACurrentMediaTime() - revealStarted) * 1000) }
+    }
     for monitor in monitors {
         let workspace = monitor.activeWorkspace
         for window in workspace.allLeafWindowsRecursive {
@@ -704,6 +714,7 @@ private func layoutWorkspaces() async throws {
             if shouldKeepWindowHiddenForVisibleWorkspaceLayout(window) {
                 continue
             }
+            if macWindow.isHiddenInCorner { revealed += 1 }
             try await macWindow.unhideFromCorner()
         }
         try await workspace.layoutWorkspace()

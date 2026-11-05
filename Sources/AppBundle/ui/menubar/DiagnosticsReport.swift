@@ -80,7 +80,9 @@ func buildDiagnosticsReport() async -> String {
                       timing.cacheHit ? "hit" : "miss", timing.mainMs, timing.requestMs, capture,
                       captureReady, panel, submission, worker, preview.surfaceCreations))
         let warm = preview.timings.filter { $0.cacheHit && $0.submissionMs != nil }
-        io.out("Preview sample window: total=\(preview.timings.count) notSubmitted=\(preview.timings.filter { $0.submissionMs == nil }.count) capacity=\(WorkspaceSwipePreview.timingSampleLimit)")
+        let unsubmitted = Dictionary(grouping: preview.timings.filter { $0.submissionMs == nil }) { $0.endReason ?? "pendingOrFailed" }
+            .sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value.count)" }.joined(separator: " ")
+        io.out("Preview sample window: total=\(preview.timings.count) notSubmitted: \(unsubmitted.isEmpty ? "none" : unsubmitted) capacity=\(WorkspaceSwipePreview.timingSampleLimit)")
         let stages: [(String, [Double])] = [
             ("Warm preview submissions", warm.compactMap(\.submissionMs)),
             ("Warm main setup", warm.map(\.mainMs)),
@@ -91,15 +93,11 @@ func buildDiagnosticsReport() async -> String {
             ("Cold preview submissions", preview.timings.filter { !$0.cacheHit }.compactMap(\.submissionMs)),
         ]
         for (label, samples) in stages where !samples.isEmpty {
-            let sorted = samples.sorted()
-            io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms", label,
-                          sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
+            io.out("\(label): \(percentileSummary(samples))")
         }
     }
     for (stage, samples) in WorkspaceMotionDiagnostics.samples.sorted(by: { $0.key < $1.key }) where !samples.isEmpty {
-        let sorted = samples.sorted()
-        io.out(String(format: "%@: count=%d p50=%.1fms p95=%.1fms (submission/layout, not screen presentation)", stage,
-            sorted.count, sorted[(sorted.count - 1) / 2], sorted[Int(ceil(Double(sorted.count) * 0.95)) - 1]))
+        io.out("\(stage): \(percentileSummary(samples)) (submission/layout, not screen presentation)")
     }
     diagnosticsPermissionLines().forEach { io.out($0) }
     io.out("")
@@ -167,6 +165,13 @@ func buildDiagnosticsReport() async -> String {
 }
 
 /// Normal-layer windows WindowServer holds, on screen or not, read once per report.
+/// Nearest-rank percentiles; p99 shows the rare stalls p95 hides.
+func percentileSummary(_ samples: [Double]) -> String {
+    let sorted = samples.sorted()
+    func rank(_ p: Double) -> Double { sorted[max(0, Int(ceil(Double(sorted.count) * p)) - 1)] }
+    return String(format: "count=%d p50=%.1fms p95=%.1fms p99=%.1fms", sorted.count, sorted[(sorted.count - 1) / 2], rank(0.95), rank(0.99))
+}
+
 private func windowServerWindows() -> [(pid: pid_t, summary: WindowServerWindowSummary)] {
     let info = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     return info.compactMap { entry in
