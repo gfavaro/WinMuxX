@@ -305,8 +305,9 @@ final class MacWindow: Window {
     }
 
     override func closeAxWindow() {
+        // Recovery forgets the window only once the close is confirmed (native notification or
+        // WindowServer): a cancelled save dialog leaves it open.
         garbageCollect(skipClosedWindowsCache: true)
-        invalidateClosedWindowsCacheForNativeClosure(windowId)
         macApp.closeAndUnregisterAxWindow(windowId)
     }
 
