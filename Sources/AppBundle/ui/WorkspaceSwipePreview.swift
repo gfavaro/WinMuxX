@@ -176,7 +176,9 @@ final class WorkspaceSwipePreview {
                     }
                     self.prepareIncoming(request, front: front.image, cached: cached, rect: rect,
                                          started: started, isValid: isValid)
-                case .failure: self.cancel()
+                case .failure:
+                    self.updateTiming { $0.endReason = "captureFailed" }
+                    self.cancel()
             }
         }
         updateTiming { $0.mainMs = (CACurrentMediaTime() - started) * 1000 }
@@ -229,7 +231,10 @@ final class WorkspaceSwipePreview {
                         self.show(front: front, back: snapshot.image, rect: rect, started: started)
                     }
                 case .failure:
-                    if self.phase == .preparing { self.cancel() }
+                    if self.phase == .preparing {
+                        self.updateTiming { $0.endReason = "captureFailed" }
+                        self.cancel()
+                    }
             }
         }
     }
