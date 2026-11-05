@@ -111,7 +111,16 @@ final class WorkspaceSwipePreview {
         touchdownFront = TouchdownFront(key: key, at: CACurrentMediaTime())
         snapshots.request(capture) { [weak self] result in
             guard let self, self.touchdownFront?.key == key, self.touchdownFront?.image == nil else { return }
-            guard case .success(let front) = result else { self.touchdownFront = nil; return }
+            guard case .success(let front) = result else {
+                // A preview already waiting for this capture ends now rather than at its deadline.
+                let waiting = self.touchdownFront?.arrived != nil
+                self.touchdownFront = nil
+                if waiting, self.phase == .preparing {
+                    self.updateTiming { $0.endReason = "captureFailed" }
+                    self.cancel()
+                }
+                return
+            }
             if let arrived = self.touchdownFront?.arrived {
                 self.touchdownFront = nil
                 arrived(front.image)
