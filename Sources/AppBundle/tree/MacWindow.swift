@@ -74,6 +74,8 @@ final class MacWindow: Window {
         // Never let the fast focus path recreate its layout node.
         if !isUnitTest && !winmux_window_exists(windowId) {
             allWindowsMap[windowId]?.garbageCollect(skipClosedWindowsCache: false)
+            // WindowServer confirms it is gone: closed, not missing.
+            invalidateClosedWindowsCacheForNativeClosure(windowId)
             return nil
         }
         if let existing = allWindowsMap[windowId] {
@@ -230,6 +232,8 @@ final class MacWindow: Window {
         WindowRecoveryController.shared.forget(self)
         resetLearnedMinimum()
         if !skipClosedWindowsCache { cacheClosedWindowIfNeeded() }
+        // A quit app's windows are closed, not missing; relaunch placement is the restart snapshot's job.
+        if macApp.nsApp.isTerminated { invalidateClosedWindowsCacheForNativeClosure(windowId) }
         // Read before unbinding, which drops this window out of `focus`. A refresh session's
         // snapshot predates macOS' own post-close focus change, so it wins when there is one.
         let focusedWindowIdBeforeClosure = refreshSessionFocusSnapshot?.focus.windowId ?? focus.windowOrNil?.windowId
@@ -302,6 +306,7 @@ final class MacWindow: Window {
 
     override func closeAxWindow() {
         garbageCollect(skipClosedWindowsCache: true)
+        invalidateClosedWindowsCacheForNativeClosure(windowId)
         macApp.closeAndUnregisterAxWindow(windowId)
     }
 

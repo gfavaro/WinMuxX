@@ -527,6 +527,8 @@ func refreshModel() {
         }
         for window in MacWindow.allWindows where !winmux_window_exists(window.windowId) {
             window.garbageCollect(skipClosedWindowsCache: false)
+            // WindowServer confirms it is gone, as when the native close notification was missed.
+            invalidateClosedWindowsCacheForNativeClosure(window.windowId)
         }
     }
     Workspace.reconcileWorkspaceState()
@@ -704,7 +706,7 @@ private func layoutWorkspaces() async throws {
     let revealStarted = CACurrentMediaTime()
     var revealed = 0
     defer {
-        if revealed > 0 { WorkspaceMotionDiagnostics.record("Reveal and lay out incoming windows", milliseconds: (CACurrentMediaTime() - revealStarted) * 1000) }
+        if revealed > 0 { WorkspaceMotionDiagnostics.record("Reveal and lay out visible workspaces", milliseconds: (CACurrentMediaTime() - revealStarted) * 1000) }
     }
     for monitor in monitors {
         let workspace = monitor.activeWorkspace

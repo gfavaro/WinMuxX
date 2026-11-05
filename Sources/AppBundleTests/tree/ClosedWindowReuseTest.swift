@@ -53,6 +53,25 @@ final class ClosedWindowReuseTest: XCTestCase {
         XCTAssertTrue(reused.nodeWorkspace === focus.workspace, "Restoring the others leaves the reused ID where it is")
     }
 
+    func testReusedIdInTheRestoredWorkspaceDoesNotInheritTheClosedWindowsState() async throws {
+        let shared = Workspace.get(byName: "shared")
+        let closed = TestWindow.new(id: 910, parent: shared.rootTilingContainer)
+        closed.isFullscreen = true
+        let missing = TestWindow.new(id: 911, parent: shared.rootTilingContainer)
+        replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+        closed.unbindFromParent()
+        missing.unbindFromParent()
+        invalidateClosedWindowsCacheForNativeClosure(closed.windowId)
+        let reused = TestWindow.new(id: 910, parent: shared.rootTilingContainer)
+
+        let returned = TestWindow.new(id: 911, parent: focus.workspace.rootTilingContainer)
+        let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: returned)
+        XCTAssertTrue(restored)
+        XCTAssertEqual(returned.nodeWorkspace?.name, shared.name)
+        XCTAssertEqual(reused.nodeWorkspace?.name, shared.name)
+        XCTAssertFalse(reused.isFullscreen, "The reused ID must not inherit the closed window's fullscreen state")
+    }
+
     func testLayoutChangeWhileWindowsAreMissingKeepsTheirWorkspaces() async throws {
         let home = Workspace.get(byName: "home")
         let solo = Workspace.get(byName: "solo")

@@ -292,7 +292,8 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
             workspace.masterGroupIndex = frozenWorkspace.masterGroupIndex ?? 0
         }
         for window in (potentialOrphans - workspace.rootTilingContainer.allLeafWindowsRecursive) {
-            if matchedWindows == nil, let frozenWindow = frozenWindowById[window.windowId] {
+            if matchedWindows == nil, frozenWorld.windowIds.isEmpty || frozenWorld.windowIds.contains(window.windowId),
+               let frozenWindow = frozenWindowById[window.windowId] {
                 if case .macos = frozenWindow.layoutReason {
                     try await restoreFrozenUnconventionalWindow(window, frozenWindow, on: workspace)
                     continue
