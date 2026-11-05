@@ -376,7 +376,10 @@ bool winmux_border_update(WinMuxBorderHandle border, uint32_t target, CGRect fra
         CFTypeRef region = NULL;
         success = !SYM("CGSNewRegionWithRect", Region)(&local, &region) && region;
         if (!success) break;
-        success = !SYM("SLSSetWindowShape", Shape)(cid(), border->windows[i], 0, 0, region);
+        // The shape's offset is the window's origin: reshape in place, or the piece shows at
+        // the display corner until the move below.
+        success = !SYM("SLSSetWindowShape", Shape)(cid(), border->windows[i],
+            outer.origin.x + piece.origin.x, outer.origin.y + piece.origin.y, region);
         CFRelease(region);
         if (!success) break;
         // Allocate only this edge's backing surface, after reshaping.
