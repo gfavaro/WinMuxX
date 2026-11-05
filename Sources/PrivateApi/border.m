@@ -89,7 +89,12 @@ bool winmux_window_exists(uint32_t window) {
     Connection connection = sky() ? SYM("SLSMainConnectionID", Connection) : NULL;
     if (!bounds || !connection) return true; // Preserve AX fallback on unsupported systems.
     CGRect frame;
-    return bounds(connection(), window, &frame) == kCGErrorSuccess;
+    CGError error = bounds(connection(), window, &frame);
+    // A window that no longer exists reports kCGErrorFailure. Other errors, such as a
+    // connection failure, say nothing about the window, so it is kept and the code logged.
+    if (error != kCGErrorSuccess && error != kCGErrorFailure)
+        NSLog(@"WinMuxX: window %u bounds query failed with %d; keeping it", window, error);
+    return error != kCGErrorFailure;
 }
 
 bool winmux_window_frame(uint32_t window, CGRect *frame) {
