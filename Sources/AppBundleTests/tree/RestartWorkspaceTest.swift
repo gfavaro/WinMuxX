@@ -60,9 +60,11 @@ final class RestartWorkspaceTest: XCTestCase {
             relaunched.restartIdentity = identity("Calendar", pid: 20, launch: 20, app: "com.apple.iCal")
         }
         let newer = PendingRestartSnapshot(world: snapshotCurrentFrozenWorld(), remainingWindowIds: [7, 8])
-        let result = discardSupersededRestartAssignments([older, newer])
+        let result = discardSupersededRestartAssignments([older, newer], isRunning: { _ in false })
         XCTAssertEqual(result[0].remainingWindowIds, [2], "Only the unrelated window survives in the older snapshot")
         XCTAssertEqual(result[1].remainingWindowIds, [7, 8], "Identical windows of one snapshot are distinct windows")
+        let stillRunning = discardSupersededRestartAssignments([older, newer], isRunning: { $0.pid == 10 })
+        XCTAssertEqual(stillRunning[0].remainingWindowIds, [1, 2], "A running process's window may only be missing")
     }
 
     func testRestartSnapshotsExpireAfterAWeekAndUndatedOnesStartTheirLifetimeWhenLoaded() throws {

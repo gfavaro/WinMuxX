@@ -128,6 +128,13 @@ private struct RestartProcessWindowKey: Hashable {
     let windowId: UInt32
 }
 
+@MainActor
+func restartProcessIsRunning(_ identity: RestartWindowIdentity) -> Bool {
+    guard let launchDate = identity.launchDate,
+          let app = NSRunningApplication(processIdentifier: identity.pid) else { return false }
+    return app.bundleIdentifier == identity.bundleId && app.launchDate == launchDate
+}
+
 private struct RestartContentKey: Hashable {
     let bundleId: String
     let title: String
@@ -139,8 +146,12 @@ private struct RestartContentKey: Hashable {
 /// has only one current placement, regardless of changing terminal titles.
 /// A window indistinguishable from one in a newer snapshot is superseded too: matching
 /// needs a unique candidate, so relaunched apps would otherwise accumulate dead entries.
+/// An entry whose process still runs is kept; its window may only be missing for now.
 @MainActor
-func discardSupersededRestartAssignments(_ snapshots: [PendingRestartSnapshot]) -> [PendingRestartSnapshot] {
+func discardSupersededRestartAssignments(
+    _ snapshots: [PendingRestartSnapshot],
+    isRunning: @MainActor (RestartWindowIdentity) -> Bool = restartProcessIsRunning,
+) -> [PendingRestartSnapshot] {
     var result = snapshots
     var seen: Set<RestartProcessWindowKey> = []
     var newerContent: Set<RestartContentKey> = []
@@ -152,7 +163,7 @@ func discardSupersededRestartAssignments(_ snapshots: [PendingRestartSnapshot]) 
                 let contentKey = RestartContentKey(bundleId: identity.bundleId, title: identity.title,
                     documentURL: identity.documentURL, accessibilityIdentifier: identity.accessibilityIdentifier)
                 content.insert(contentKey)
-                if newerContent.contains(contentKey) {
+                if newerContent.contains(contentKey), !isRunning(identity) {
                     result[index].remainingWindowIds.remove(window.id)
                     continue
                 }
