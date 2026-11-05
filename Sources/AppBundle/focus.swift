@@ -21,6 +21,7 @@ struct LiveFocus: WinMuxAny, Equatable {
         return FrozenFocus(
             windowId: windowOrNil?.windowId,
             workspaceName: workspace.name,
+            workspaceId: workspace.id,
             monitorId_oneBased: workspace.workspaceMonitor.monitorId_oneBased ?? 0,
         )
     }
@@ -33,12 +34,14 @@ struct LiveFocus: WinMuxAny, Equatable {
 struct FrozenFocus: WinMuxAny, Equatable, Sendable {
     let windowId: UInt32?
     let workspaceName: String
+    /// Names are reused when a workspace is recreated; the ID tells the incarnations apart.
+    let workspaceId: WorkspaceId
     // monitorId is not part of the focus. We keep it here only for 'on-focused-monitor-changed' to work
     let monitorId_oneBased: Int
 
     @MainActor var liveOrNil: LiveFocus? { // Important: don't access focus.monitorId here. monitorId is not part of the focus. Always prefer workspace
         let window: Window? = windowId.flatMap { Window.get(byId: $0) }
-        guard let workspace = Workspace.existing(byName: workspaceName) else { return nil }
+        guard let workspace = Workspace.existing(byName: workspaceName), workspace.id == workspaceId else { return nil }
 
         let workspaceFocus = workspace.toLiveFocus()
         let windowFocus = window?.takeIf(\.participatesInWorkspaceFocus)?.toLiveFocusOrNil() ?? workspaceFocus
@@ -93,7 +96,7 @@ func debugDescribe(_ snapshot: RefreshSessionFocusSnapshot?) -> String {
 final class WorkspaceFocusState {
     lazy var requested: FrozenFocus = {
         let monitor = mainMonitor
-        return FrozenFocus(windowId: nil, workspaceName: monitor.activeWorkspace.name,
+        return FrozenFocus(windowId: nil, workspaceName: monitor.activeWorkspace.name, workspaceId: monitor.activeWorkspace.id,
                            monitorId_oneBased: monitor.monitorId_oneBased ?? 0)
     }()
     lazy var lastKnown: FrozenFocus = requested
@@ -135,6 +138,8 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
     } else if WorkspaceScrollingGestureController.shared.isMotionActive {
         return false
     }
+    // By identity, before resolving: a deleted workspace may already resolve to its fallback.
+    let leavingWorkspace = runtime.focus.requested.workspaceId != newFocus.workspace.id
     if runtime.focus.requested == newFocus.frozen {
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
@@ -146,10 +151,10 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
     // Normalize mruWindow when focus away from a workspace
     if oldFocus.workspace != newFocus.workspace {
         oldFocus.windowOrNil?.markAsMostRecentChild()
-        runtime.refresh.workspaceSelectionGeneration &+= 1
     }
 
     runtime.focus.requested = newFocus.frozen
+    if leavingWorkspace { runtime.refresh.workspaceSelectionGeneration &+= 1 }
     newFocus.windowOrNil?.markAsMostRecentChild()
     return true
 }

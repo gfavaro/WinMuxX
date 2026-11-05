@@ -111,6 +111,20 @@ final class FollowAppActivationTest: XCTestCase {
                        "Focus followed a moved window away, so returning is a new visit")
     }
 
+    func testDeletingTheFocusedWorkspaceStartsANewVisitAndHistoryIgnoresARecreatedName() throws {
+        setUpWorkspacesForTests()
+        let temporary = Workspace.get(byName: "temporary")
+        _ = TestWindow.new(id: 1, parent: Workspace.get(byName: "kept").rootTilingContainer)
+        XCTAssertTrue(activateWorkspaceForUser(temporary, on: mainMonitor))
+        let history = runtime.focus.requested
+        let generation = runtime.refresh.workspaceSelectionGeneration
+        try deleteWorkspace(temporary)
+        XCTAssertNotEqual(runtime.refresh.workspaceSelectionGeneration, generation, "Focus left the deleted workspace")
+        let recreated = Workspace.get(byName: "temporary")
+        XCTAssertFalse(recreated === temporary)
+        XCTAssertNil(history.liveOrNil, "History of the deleted workspace must not resolve to its namesake")
+    }
+
     /// The rule allowed the move but a double-optional check skipped it; exercise the move itself.
     func testActivatingAFloatingWindowOnAHiddenWorkspaceMovesItHereAndFocusesIt() {
         setUpWorkspacesForTests()
