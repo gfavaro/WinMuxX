@@ -51,12 +51,6 @@ private let persistedFrozenWorldVersion = 2
 /// an excluded process eligible again during delayed AX retries.
 @MainActor
 func recordUserWorkspaceSelectionForRestoration(at date: Date = .now) {
-    // Only a selection that changes the focused workspace starts a new visit; reselecting it, or
-    // showing a workspace on another display without focusing it, keeps pending activations.
-    if runtime.refresh.workspaceSelectionGenerationFocus != focus.workspace.id {
-        runtime.refresh.workspaceSelectionGenerationFocus = focus.workspace.id
-        runtime.refresh.workspaceSelectionGeneration &+= 1
-    }
     forgetClosedWindowsCacheVisibility()
     guard _isStartup != true, isWinMuxRuntimeReady || isUnitTest else { return }
     if recovery.firstUserWorkspaceSelectionDate == nil {

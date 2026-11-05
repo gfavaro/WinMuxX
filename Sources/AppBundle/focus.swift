@@ -146,6 +146,7 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
     // Normalize mruWindow when focus away from a workspace
     if oldFocus.workspace != newFocus.workspace {
         oldFocus.windowOrNil?.markAsMostRecentChild()
+        runtime.refresh.workspaceSelectionGeneration &+= 1
     }
 
     runtime.focus.requested = newFocus.frozen

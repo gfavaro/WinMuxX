@@ -96,6 +96,21 @@ final class FollowAppActivationTest: XCTestCase {
         XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: activation), "A new visit")
     }
 
+    func testFocusLeavingByAMoveStartsANewVisitOnReturn() throws {
+        setUpWorkspacesForTests()
+        let here = focus.workspace
+        let moved = TestWindow.new(id: 1, parent: here.rootTilingContainer)
+        _ = moved.focusWindow()
+        let floating = TestWindow.new(id: 2, parent: Workspace.get(byName: "other"))
+        recordRefreshActivation(workspaceName: here.name, pid: floating.app.pid)
+        let activation = try XCTUnwrap(pendingRefreshActivationForTests())
+        XCTAssertTrue(moveWindowToWorkspace(moved, Workspace.get(byName: "away"), CmdIo(stdin: .emptyStdin),
+                                            focusFollowsWindow: true, failIfNoop: false))
+        XCTAssertTrue(activateWorkspaceForUser(here, on: mainMonitor))
+        XCTAssertFalse(shouldBringActivatedWindowHere(floating, activation: activation),
+                       "Focus followed a moved window away, so returning is a new visit")
+    }
+
     /// The rule allowed the move but a double-optional check skipped it; exercise the move itself.
     func testActivatingAFloatingWindowOnAHiddenWorkspaceMovesItHereAndFocusesIt() {
         setUpWorkspacesForTests()
