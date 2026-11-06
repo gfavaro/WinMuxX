@@ -58,8 +58,7 @@ Hidden workspaces also retain their assigned display during ordinary selection.
 Only unassigned/new workspaces use the requested/focused display. Explicit move
 and summon commands relocate workspaces. With WinMuxX workspaces, forced assignments
 hold as in AeroSpace: an assigned workspace shows only on its display while it is
-connected, and moving it elsewhere is refused. Native Spaces use them only to choose
-where new desktops are created.
+connected, and moving it elsewhere is refused.
 
 ### Border compatibility
 

@@ -4,7 +4,6 @@ import Common
 open class Window: TreeNode, Hashable {
     let windowId: UInt32
     let app: any AbstractApp
-    var nativeLayoutEligible = true
     var restartIdentity: RestartWindowIdentity?
     /// Scrolling concealment is independent of inactive-workspace corner parking.
     @MainActor private var scrollingColumnConcealed = false

@@ -65,12 +65,6 @@ func initTerminationHandler() {
 
 private struct AppServerTerminationHandler: TerminationHandler {
     func beforeTermination() async throws {
-        // Native windows were never parked; tiled ones go back to where they started.
-        if !runtime.workspaceBackend.capabilities.usesVirtualRecovery {
-            await stopNativeTilingAndRestoreFrames()
-            runtime.workspaceBackend.stop()
-            return
-        }
         await terminationCoordinator.run {
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()

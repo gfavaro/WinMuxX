@@ -3,8 +3,7 @@ import AppKit
 /// Reads the current frame first and returns before the AXEnhancedUserInterface round-trip when
 /// the frame already matches: layout re-asserts frames constantly and the vast majority of these
 /// calls are no-ops, so the no-op path must not pay the disableAnimations read.
-func setFrame(_ window: any AxUiElementMock, app: any AxUiElementMock, _ topLeft: CGPoint?, _ size: CGSize?, _ job: RunLoopJob, positionFirst: Bool = false, traceWindowId: UInt32? = nil,
-              validateWrite: (() throws -> Void)? = nil) throws {
+func setFrame(_ window: any AxUiElementMock, app: any AxUiElementMock, _ topLeft: CGPoint?, _ size: CGSize?, _ job: RunLoopJob, positionFirst: Bool = false, traceWindowId: UInt32? = nil) throws {
     let topLeft = topLeft.map { CGPoint(x: $0.x.rounded(), y: $0.y.rounded()) }
     let size = size.map { CGSize(width: $0.width.rounded(), height: $0.height.rounded()) }
     func trace(_ stage: String, accepted: Bool? = nil) {
@@ -14,7 +13,6 @@ func setFrame(_ window: any AxUiElementMock, app: any AxUiElementMock, _ topLeft
     }
     func write<Attr: WritableAttr>(_ attr: Attr, _ value: Attr.T, stage: String) throws {
         try job.checkCancellation()
-        try validateWrite?()
         trace("\(stage)-begin")
         let accepted = window.set(attr, value)
         trace("\(stage)-end", accepted: accepted)
@@ -28,7 +26,6 @@ func setFrame(_ window: any AxUiElementMock, app: any AxUiElementMock, _ topLeft
     if positionMatches && sizeMatches {
         return
     }
-    try validateWrite?()
     try disableAnimations(app: app, job) {
         // A restored workspace window is still parked in a screen corner. Resizing
         // there can make the app clamp it onscreen before the destination move.

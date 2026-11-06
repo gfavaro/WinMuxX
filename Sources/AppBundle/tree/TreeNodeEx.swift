@@ -134,7 +134,6 @@ extension TreeNode {
 
 extension Window {
     var participatesInWorkspaceFocus: Bool {
-        if !nativeLayoutEligible { return false }
         guard let parent else { return false }
         return switch getChildParentRelation(child: self, parent: parent) {
             case .floatingWindow, .tiling:
@@ -158,5 +157,13 @@ extension Window {
 extension TilingContainer {
     var isWindowTabGroup: Bool {
         layout == .tabGroup && children.count > 1
+    }
+}
+
+extension Window {
+    /// A tab other than its group's active one.
+    @MainActor var isInactiveWindowTab: Bool {
+        guard let group = nearestWindowTabGroup, group.usesWindowTabBehavior else { return false }
+        return group.tabActiveWindow !== self
     }
 }

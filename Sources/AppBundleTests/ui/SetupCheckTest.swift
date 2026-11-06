@@ -2,8 +2,7 @@
 import XCTest
 
 final class SetupCheckTest: XCTestCase {
-    private let healthy = SetupCheckInput(backend: .virtual, accessibilityGranted: true, otherWindowManagers: [],
-                                          separateSpaces: true, rearrangesSpaces: false, workspaceSwipe: true,
+    private let healthy = SetupCheckInput(accessibilityGranted: true, otherWindowManagers: [], workspaceSwipe: true,
                                           overviewThreeFingerUp: false, macThreeFingerHorizontalSwipe: false,
                                           macThreeFingerVerticalSwipe: false)
 
@@ -11,9 +10,6 @@ final class SetupCheckTest: XCTestCase {
 
     func testHealthySetupsPass() {
         XCTAssertEqual(failing(healthy), [])
-        var native = healthy
-        native.backend = .native
-        XCTAssertEqual(failing(native), [])
     }
 
     func testEachProblemIsReportedWithAFix() {
@@ -23,17 +19,6 @@ final class SetupCheckTest: XCTestCase {
         XCTAssertEqual(failing(input), ["accessibility", "other-window-managers"])
         XCTAssertTrue(setupCheckItems(input).first { $0.id == "other-window-managers" }!.detail.contains("yabai"))
         XCTAssertNotNil(setupCheckItems(input).first { $0.id == "accessibility" }?.fixURL)
-    }
-
-    func testChecksFollowTheBackend() {
-        var input = healthy
-        input.backend = .native
-        input.separateSpaces = false
-        input.rearrangesSpaces = true
-        input.macThreeFingerHorizontalSwipe = true // macOS owns desktop swipes in native mode.
-        XCTAssertEqual(failing(input), ["separate-spaces", "rearrange-spaces"])
-        input.backend = .virtual
-        XCTAssertEqual(failing(input), [], "Spaces settings do not matter to WinMuxX workspaces")
     }
 
     func testEitherThreeFingerSwipeSettingWorksAndMacOSRecognitionIsSuggested() {

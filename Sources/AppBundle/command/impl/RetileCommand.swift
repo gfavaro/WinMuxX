@@ -2,8 +2,7 @@ import AppKit
 import Common
 
 /// Counts the tiled windows on showing workspaces that are off their tiles, then lets
-/// the layout pass that follows every command put them back (in native mode, the read
-/// native tiling requests once a command completes). Each mode's put-back budget is
+/// the layout pass that follows every command put them back. The put-back budget is
 /// renewed, so windows it had given up on are tried again.
 struct RetileCommand: Command {
     let args: RetileCmdArgs
@@ -16,7 +15,6 @@ struct RetileCommand: Command {
         // A command's layout pass skips windows whose tile did not change; these are off it.
         for window in candidates { window.lastAppliedLayoutPhysicalRect = nil }
         let moved = candidates.count
-        NativeFrameRecovery.shared.reset()
         VirtualFrameRecovery.shared.reset()
         let message = moved == 0 ? "Nothing had moved" : "Put \(moved) \(moved == 1 ? "window" : "windows") back"
         NoticePanel.shared.show(title: "Retile", body: message, seconds: 1.5)

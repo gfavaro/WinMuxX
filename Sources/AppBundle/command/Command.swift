@@ -100,32 +100,11 @@ extension [Command] {
 
     @MainActor
     func runCmdSeq(_ env: CmdEnv, _ io: sending CmdIo) async throws -> Bool {
-        if runtime.workspaceBackend.kind == .native, runtime.workspaceBackend.native.tilingEnabled,
-           !NativeTilingCommandScope.active, contains(where: {
-               !NativeCommandPolicy.runsOutsideNativeTilingFence($0)
-           }) {
-            return try await runtime.workspaceBackend.native.tiling.run(self, env: env, io: io)
-        }
         var isSucc = true
         for command in self {
-            if !runtime.workspaceBackend.accepts(command) {
-                io.err("Command '\(command.args)' is unsupported by the experimental native backend. Use doctor for native Space diagnostics; native gestures remain owned by macOS.")
-                return false
-            }
             try WindowDetectionOperations.current?.check()
-            if NativeTilingCommandScope.validateTarget?() == false {
-                return io.err("Native command target changed during execution")
-            }
-            if NativeCommandPolicy.isNativeNavigation(command), !NativeTilingCommandScope.active {
-                await runtime.workspaceBackend.native.awaitCurrentObservation()
-            }
             let undoState = LayoutUndoHistory.shared.before(command)
-            let commandSucc: Bool
-            if let handled = try await runtime.workspaceBackend.current.run(command, env: env, io: io) {
-                commandSucc = handled
-            } else {
-                commandSucc = try await command.run(env, io)
-            }
+            let commandSucc = try await command.run(env, io)
             if let undoState { LayoutUndoHistory.shared.commandFinished(undoState) }
             isSucc = commandSucc && isSucc
             if !command.isQuery && !command.isPresentation {

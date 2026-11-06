@@ -38,12 +38,6 @@ func activateWorkspaceForUser(
     on targetMonitor: Monitor,
     focusing: Bool = true,
 ) -> Bool {
-    // macOS shows native desktops; UI actions run `workspace` so each backend switches its own way.
-    guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces else {
-        check(!isUnitTest, "activateWorkspaceForUser with native Spaces; run the workspace command instead")
-        print("WinMuxX: refused a virtual workspace activation with native Spaces")
-        return false
-    }
     // Ordinary selection never relocates an owned workspace, visible or hidden.
     if workspace.isVisible {
         guard workspace.visibleMonitor != nil else { return false }
@@ -64,7 +58,7 @@ func activateWorkspaceForUser(
 }
 
 /// A sidebar selection that changes what another display shows leaves focus on the
-/// display in use, as with native Spaces. One already showing elsewhere is focused there.
+/// display in use. One already showing elsewhere is focused there.
 @MainActor
 func sidebarSelectionKeepsFocus(_ workspace: Workspace, on targetMonitor: Monitor) -> Bool {
     !workspace.isVisible && workspaceMonitorForUserActivation(workspace, on: targetMonitor).rect.topLeftCorner !=

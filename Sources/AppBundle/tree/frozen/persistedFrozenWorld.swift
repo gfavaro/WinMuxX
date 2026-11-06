@@ -203,7 +203,6 @@ private func prepareRestartStateDirectory(_ url: URL) throws {
 
 @MainActor
 func persistFrozenWorldForRestartIfPossible() {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     recovery.pendingRestartSave?.cancel()
     recovery.pendingRestartSave = nil
     guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly else { return }
@@ -254,7 +253,6 @@ func loadRestartEnvelope(from url: URL) -> PersistedFrozenWorldEnvelope? {
 
 @MainActor
 func schedulePersistedFrozenWorldSave() {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly,
           TrayMenuModel.shared.isEnabled,
           !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
@@ -290,7 +288,6 @@ func schedulePersistedFrozenWorldSave() {
 @discardableResult
 @MainActor
 func loadPersistedFrozenWorldForStartupIfPresent() -> Bool {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return false }
     guard !serverArgs.isReadOnly, config.automaticallyTileNewWindows else { return false }
     do {
         let url = try persistedFrozenWorldUrl()

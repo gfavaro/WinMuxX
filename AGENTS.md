@@ -27,9 +27,8 @@ and failure handling. Read [workspace examples](docs/WORKSPACE_BEHAVIOR.md) when
 selection or movement is affected. [Agent evaluation](docs/AGENT_EVALUATION.md)
 is only for an explicitly requested model/guidance trial, not routine work.
 
-The default backend uses WinMuxX workspaces and parks hidden windows. An
-experimental native Spaces backend is opt-in ([native Spaces](docs/NATIVE_SPACES.md));
-keep virtual behavior working and validate native changes separately. Treat dated
+WinMuxX uses its own workspaces and parks hidden windows. The experimental native
+Spaces backend moved to the separate SpaceMuxX project on 2026-11-06. Treat dated
 adoption documents as historical scope and validate their assumptions against
 current code and the requested change.
 

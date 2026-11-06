@@ -40,9 +40,6 @@ func handleWorkspaceSidebarAction(
     viewModel: TrayMenuModel = TrayMenuModel.shared,
     targetMonitorScopeId: String? = nil,
 ) {
-    if runtime.workspaceBackend.ui.handleSidebarAction(action, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId) {
-        return
-    }
     switch action {
         case .selectWorkspace(let name):
             focusWorkspaceFromSidebar(name, targetMonitorScopeId: targetMonitorScopeId)

@@ -1,6 +1,6 @@
 ---
 name: winmuxx-workspaces
-description: Implement or review WinMuxX workspace lifecycle, selection, display ownership, summon, and whole-workspace moves. Use for changes to these behaviors, including sidebar routing and workspace backend proposals.
+description: Implement or review WinMuxX workspace lifecycle, selection, display ownership, summon, and whole-workspace moves. Use for changes to these behaviors, including sidebar routing.
 ---
 
 # Workspace and display changes
@@ -77,9 +77,7 @@ rejected operation that promises no state change. Before reporting completion,
 compare each acceptance condition with an assertion or explicitly recorded manual
 check; a passing suite cannot establish an invariant the test never observes.
 
-For backend proposals, identify which product behaviors survive and which need
-new mechanisms. Native Space identifiers need not equal WinMuxX workspace identity.
 Do not infer tested multi-display behavior from another project's API signatures.
-For native validation, move a populated workspace to another display and back;
+For manual validation, move a populated workspace to another display and back;
 check organization, focus and both displays' resulting workspaces. Report manual
 checks separately from automated results and do not imply installation from a build.

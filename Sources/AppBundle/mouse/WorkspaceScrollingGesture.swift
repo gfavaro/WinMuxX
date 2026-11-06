@@ -289,3 +289,15 @@ final class WorkspaceScrollingGestureController {
         isMotionActive = false
     }
 }
+
+/// The column whose centre is nearest the viewport's centre; ties follow the last
+/// movement direction.
+func nearestScrollingColumn(in metrics: ScrollingWorkspaceMetrics, offset: CGFloat, direction: CGFloat) -> ScrollingColumnMetric? {
+    let center = offset + metrics.areaWidth / 2
+    return metrics.columns.min { lhs, rhs in
+        let a = abs(lhs.start + lhs.width / 2 - center)
+        let b = abs(rhs.start + rhs.width / 2 - center)
+        if abs(a - b) < 0.5, direction != 0 { return direction > 0 ? lhs.start > rhs.start : lhs.start < rhs.start }
+        return a < b
+    }
+}

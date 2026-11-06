@@ -131,26 +131,24 @@ struct SettingsDisplaysView: View {
                     .disabled(layoutWorkspace.isEmpty || workspaceLayoutChoice == currentWorkspaceLayoutChoice)
                 SettingsDescription("Sets the workspace-wide arrangement. Each existing top-level group keeps its nested splits and tabs. A matching display override may take precedence.")
             }
-            // Native desktops stay on their display; the sidebar's Bring Here moves their windows.
-            if runtime.workspaceBackend.capabilities.relocatesVirtualWorkspaces {
-                SettingsSection("Move a workspace") {
-                    Picker("Workspace", selection: $workspace) {
-                        Text("Choose workspace").tag("")
-                        ForEach(tray.workspaces, id: \.name) { row in Text(row.displayName).tag(row.name) }
-                    }
-                    Picker("Destination", selection: $selectedDisplay) {
-                        Text("Choose display").tag(nil as String?)
-                        ForEach(displays.rows.filter { $0.uuid != nil }) { row in Text(row.name).tag(Optional(row.id)) }
-                    }
-                    Button("Bring Here…") {
-                        guard let selectedDisplay else { return }
-                        guard let row = displays.rows.first(where: { $0.id == selectedDisplay }) else { return }
-                        pendingMove = (workspace, selectedDisplay, row.activeWorkspace, row.name)
-                        confirmsMove = true
-                    }.disabled(workspace.isEmpty || selectedDisplay == nil)
-                    SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. A workspace with a saved assignment stays on its display.")
+            SettingsSection("Move a workspace") {
+                Picker("Workspace", selection: $workspace) {
+                    Text("Choose workspace").tag("")
+                    ForEach(tray.workspaces, id: \.name) { row in Text(row.displayName).tag(row.name) }
                 }
+                Picker("Destination", selection: $selectedDisplay) {
+                    Text("Choose display").tag(nil as String?)
+                    ForEach(displays.rows.filter { $0.uuid != nil }) { row in Text(row.name).tag(Optional(row.id)) }
+                }
+                Button("Bring Here…") {
+                    guard let selectedDisplay else { return }
+                    guard let row = displays.rows.first(where: { $0.id == selectedDisplay }) else { return }
+                    pendingMove = (workspace, selectedDisplay, row.activeWorkspace, row.name)
+                    confirmsMove = true
+                }.disabled(workspace.isEmpty || selectedDisplay == nil)
+                SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. A workspace with a saved assignment stays on its display.")
             }
+
             SettingsSection("Configured assignments") {
                 if config.workspaceToMonitorForceAssignment.isEmpty {
                     SettingsDescription("No saved display assignments. Workspaces keep their current owner until explicitly moved.")
@@ -168,7 +166,7 @@ struct SettingsDisplaysView: View {
                     }
                 }
                 assignmentEditor
-                SettingsDescription("An assigned workspace always shows on its display while that display is connected, as in AeroSpace. Moving it elsewhere is refused, and one showing elsewhere moves back. When WinMuxX starts without a saved arrangement, or with Start workspaces on main display, each secondary display shows its first assigned workspace. Native Spaces use assignments only to choose where new desktops are created.")
+                SettingsDescription("An assigned workspace always shows on its display while that display is connected, as in AeroSpace. Moving it elsewhere is refused, and one showing elsewhere moves back. When WinMuxX starts without a saved arrangement, or with Start workspaces on main display, each secondary display shows its first assigned workspace.")
                 Button("Startup options…", action: onGeneral)
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }

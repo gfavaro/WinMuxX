@@ -154,9 +154,6 @@ func scheduleRefreshSession(
     recordsActivation: Bool = true,
 ) {
     runtime.events.record(.refreshRequested, source: .refresh, generation: activeScheduledRefreshGeneration)
-    if runtime.workspaceBackend.kind == .native, case .globalObserver(let name) = event, nativeScrollingRelayoutEvents.contains(name) {
-        return runtime.workspaceBackend.native.tiling.relayoutVisibleScrolling()
-    }
     // Startup owns the first enumeration and tree restoration. AX notifications from
     // newly subscribed apps must not start a second enumeration alongside it.
     guard isUnitTest || isWinMuxRuntimeReady else { return }
@@ -221,22 +218,9 @@ func scheduleRefreshSession(
     }
 }
 
-/// Scrolling events that change only the strip's offset or its in-memory tree, never which
-/// windows a desktop owns: native mode re-lays out showing scrolling desktops at once
-/// instead of waiting for a full observation read. Listed explicitly, not by name prefix.
-let nativeScrollingRelayoutEvents: Set<String> = [
-    "scrollingCenter", "scrollingGesture", "scrollingGestureCancelled", "scrollingGestureSettleFrame",
-    "scrollingGestureSettled", "scrollingMinimapSelection", "scrollingMove", "scrollingPin", "scrollingWidth",
-    "moveScrollingColumn", "moveWithinScrollingColumn", "resizeScrollingColumn", "joinScrolling",
-]
-
 @MainActor
 func runRefreshSessionBlocking(_ event: RefreshSessionEvent, layoutWorkspaces: Bool = true,
                                optimisticallyPreLayoutWorkspaces: Bool = false) async throws {
-    guard runtime.workspaceBackend.kind == .virtual else {
-        runtime.workspaceBackend.native.observation?.requestRead(event: "refresh")
-        return
-    }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -264,7 +248,6 @@ func runCommandSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard
 func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
                        shouldSchedulePostRefresh: Bool = true,
                        body: @MainActor () async throws -> T) async throws -> T {
-    guard runtime.workspaceBackend.kind == .virtual else { return try await body() }
     let stateStore = runtime.publicState
     if stateStore.transactionDepth == 0, hasPublicStateSubscribers { _ = publicStateSnapshot() }
     stateStore.transactionDepth += 1
@@ -517,7 +500,6 @@ struct RunSessionGuard: Sendable {
 
 @MainActor
 func refreshModel() {
-    guard runtime.workspaceBackend.capabilities.ownsWorkspaceLifecycle else { return }
     // Focus-only sessions skip AX enumeration, but must still free layout slots
     // for closed native windows. Hidden/minimized windows remain valid here.
     if !isUnitTest {
@@ -616,14 +598,6 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
                 window.invalidateScrollingSheetCache()
             }
         }
-        if runtime.workspaceBackend.kind == .native {
-            // A pan's own window moves must not revoke the permits it is streaming
-            // with; the pan reads once when it settles.
-            if NativeScrollingPan.shared.isPanning, nativePanIgnoresNotification(notif) { return }
-            runtime.workspaceBackend.native.writeAuthority.invalidate()
-            runtime.workspaceBackend.native.observation?.requestRead(event: "axWindowChange")
-            return
-        }
         if let destroyedWindowId {
             WindowBorderController.shared.remove(windowId: destroyedWindowId)
             (Window.get(byId: destroyedWindowId) as? MacWindow)?.garbageCollect(skipClosedWindowsCache: false)
@@ -645,7 +619,6 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
 
 @MainActor
 private func layoutWorkspaces() async throws {
-    guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return }
     if WindowRecoveryController.shared.suppressAutomaticFrameWrites { return }
     let monitors = monitors
     var monitorToOptimalHideCorner: [CGPoint: OptimalHideCorner] = [:]

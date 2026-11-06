@@ -28,8 +28,7 @@ final class WindowRecoveryController {
     }
 
     private func initializeIfNeeded() {
-        guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
-        guard !didInitialize else { return }
+                guard !didInitialize else { return }
         didInitialize = true
         guard !isUnitTest, !serverArgs.isReadOnly else { return }
         let application = NSRunningApplication.current
@@ -57,8 +56,7 @@ final class WindowRecoveryController {
     }
 
     func stageOriginalFrame(_ window: MacWindow, originalRect: Rect?) {
-        guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
-        guard TrayMenuModel.shared.isEnabled, !isRecovering, window.nodeWorkspace != nil,
+                guard TrayMenuModel.shared.isEnabled, !isRecovering, window.nodeWorkspace != nil,
               let rect = originalRect, let identity = identity(for: window) else { return }
         guard journal?.entries[window.windowId]?.identity != identity else { return }
         guard stagedOriginals[window.windowId]?.identity != identity else { return }
@@ -67,8 +65,7 @@ final class WindowRecoveryController {
     }
 
     func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
-        guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
-        guard TrayMenuModel.shared.isEnabled, !isRecovering else { return }
+                guard TrayMenuModel.shared.isEnabled, !isRecovering else { return }
         if let identity = identity(for: window) { managedIdentities[window.windowId] = identity }
         stageOriginalFrame(window, originalRect: originalRect)
         guard !stagedOriginals.isEmpty else { journal?.retryFailedSaveIfNeeded(); return }
@@ -159,7 +156,7 @@ final class WindowRecoveryController {
     }
 
     /// Explicit user action only. Pausing first prevents the next refresh from undoing
-    /// recovered geometry. Never move native Spaces or force-unminimize/fullscreen windows.
+    /// recovered geometry. Never force-unminimize/fullscreen windows.
     func recoverAfterCrash() async -> String {
         guard !isRecovering else { return "Recovery is already running." }
         guard !serverArgs.isReadOnly else { return "Recovery is unavailable in read-only mode." }

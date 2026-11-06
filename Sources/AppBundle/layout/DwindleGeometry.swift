@@ -47,7 +47,7 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                 }
                 let frames = container.dwindleChildFrames(in: rect, gaps: gaps,
                     ratioAt: { ratios[$0] }, enforceMinimums: physical)
-                for (child, frame) in zip(container.frameLayoutChildren, frames) { visit(child, frame) }
+                for (child, frame) in zip(container.children, frames) { visit(child, frame) }
             case .tiles, .master:
                 var weights: [ObjectIdentifier: CGFloat] = [:]
                 for child in container.children {
@@ -59,7 +59,7 @@ func dwindleGeometry(in workspace: Workspace, weightMap: WindowResizePreviewWeig
                     }
                     return weight
                 }
-                for (child, frame) in zip(container.frameLayoutChildren, frames) {
+                for (child, frame) in zip(container.children, frames) {
                     visit(child, physical ? frame.physical : frame.virtual)
                 }
         }

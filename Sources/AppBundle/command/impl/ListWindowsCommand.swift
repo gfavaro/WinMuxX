@@ -17,7 +17,7 @@ struct ListWindowsCommand: Command {
                 return io.err(noWindowIsFocused)
             }
         } else {
-            let allWorkspaces = runtime.workspaceBackend.current.listedWorkspaces(.userFacing)
+            let allWorkspaces = listedWorkspaces(.userFacing)
             var workspaces: Set<Workspace> = args.filteringOptions.workspaces.isEmpty
                 ? allWorkspaces.toSet()
                 : args.filteringOptions.workspaces
@@ -25,7 +25,7 @@ struct ListWindowsCommand: Command {
                         switch filter {
                             case .focused: [focus.workspace]
                             case .visible: Workspace.all.filter(\.isVisible)
-                            case .name(let name): userWorkspace(named: name.raw).map { [$0] } ?? []
+                            case .name(let name): Workspace.existing(byName: name.raw).map { [$0] } ?? []
                         }
                     }
                     .toSet()

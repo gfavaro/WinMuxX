@@ -29,7 +29,6 @@ extension Workspace {
 
     @MainActor
     var usesSpatialFocus: Bool {
-        if runtime.workspaceBackend.kind == .native { return true }
         return arrangement != .dwindle || rootTilingContainer.layout == .dwindle || rootTilingContainer.layout == .master
     }
 
@@ -42,7 +41,6 @@ extension Workspace {
             transitionArrangement(to: .master)
         }
         guard arrangement == .master else { return }
-        if runtime.workspaceBackend.kind == .native { return }
         masterGroupIndex = min(max(masterGroupIndex, 0), max(workspaceLayoutUnits.count - 1, 0))
     }
 
@@ -119,6 +117,6 @@ extension Workspace {
     var workspaceLayoutUnits: [TreeNode] {
         let root = arrangementGroupParent
         let units = root.layout == .tabGroup || root.layout == .stacked ? [root] : root.children
-        return runtime.workspaceBackend.kind == .native ? units.filter(\.hasNativeLayoutWindow) : units
+        return units
     }
 }

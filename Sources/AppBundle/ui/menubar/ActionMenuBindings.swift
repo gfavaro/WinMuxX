@@ -14,7 +14,6 @@ struct ActionMenuBindings {
     private(set) var entries: [ActionMenuBinding]
     private var shown: Set<Int> = []
 
-    /// Only bindings the current backend registers; native mode leaves the rest to macOS.
     @MainActor
     init(mode: Mode?) {
         entries = (mode?.bindings.values.map {
@@ -27,7 +26,6 @@ struct ActionMenuBindings {
             ActionMenuBinding(notation: "Sequence " + $0.descriptionWithKeyNotation, commands: $0.commands,
                               keyEquivalent: nil, modifiers: [])
         } ?? [])
-        entries.removeAll { !runtime.workspaceBackend.accepts($0.commands) }
         entries.sort { $0.notation < $1.notation }
     }
 

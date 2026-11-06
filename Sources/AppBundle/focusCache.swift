@@ -104,11 +104,6 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         )
         return note("ignored:projectHold")
     }
-    if nativeFocusHoldRejects(nativeFocused) {
-        runtime.nativeFocus.lastKnownWindowID = nil
-        debugFocusLog("updateFocusCache ignoredNativeFocusHold nativeFocused=\(nativeFocused?.windowId.description ?? "nil")")
-        return note("ignored:focusHold")
-    }
     // The launching app has its window now; focus may be taken back from it again.
     if let pid = nativeFocused?.app.pid, pid == runtime.refresh.windowlessActivationPid {
         runtime.refresh.windowlessActivationPid = nil
@@ -144,7 +139,7 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 /// no layout, so moving one rearranges nothing. Only for an activation of this app made from the
 /// current workspace, so a focus report that lags a workspace switch moves nothing; and only from
 /// a hidden workspace. A window another display shows is focused there; tiled windows and excluded
-/// apps keep following the activation; native Spaces handles its own windows.
+/// apps keep following the activation.
 @MainActor
 func shouldBringActivatedWindowHere(_ window: Window, activation: RefreshActivationContext?) -> Bool {
     bringActivatedWindowHereVerdict(window, activation: activation) == nil
@@ -153,7 +148,6 @@ func shouldBringActivatedWindowHere(_ window: Window, activation: RefreshActivat
 /// Nil when the window comes here, otherwise a fixed code saying why not, for event recording.
 @MainActor
 func bringActivatedWindowHereVerdict(_ window: Window, activation: RefreshActivationContext?) -> String? {
-    guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return "nativeBackend" }
     guard let activation else { return "noActivation" }
     guard activation.pid == window.app.pid else { return "otherAppActivated" }
     guard activation.workspaceName == focus.workspace.name,

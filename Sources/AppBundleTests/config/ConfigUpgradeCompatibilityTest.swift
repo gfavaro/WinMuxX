@@ -22,12 +22,4 @@ final class ConfigUpgradeCompatibilityTest: XCTestCase {
         XCTAssertEqual(parsed.config.workspaceLayouts["3"]?.displays.first?.settings.rootLayout, .tiles)
         XCTAssertFalse(parseConfig("[workspace.'1']\nlayout = 'spiral'").errors.isEmpty)
     }
-
-    func testOnlyAConfigAskingForNativeSpacesStartsReadOnlyWhenItFailsToParse() {
-        XCTAssertTrue(configTextRequestsNativeBackend("[workspace-backend]\ntype = 'native'\n"))
-        XCTAssertTrue(configTextRequestsNativeBackend("workspace-backend.type = \"native\" # opt in"))
-        XCTAssertFalse(configTextRequestsNativeBackend("[workspace-backend]\n# type = 'native'\ntype = 'virtual'"))
-        XCTAssertFalse(configTextRequestsNativeBackend("[gaps]\ntype = 'native'"), "Only the backend table counts")
-        XCTAssertFalse(configTextRequestsNativeBackend("broken = = toml"))
-    }
 }

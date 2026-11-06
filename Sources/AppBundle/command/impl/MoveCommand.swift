@@ -104,8 +104,7 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
         }
         return false
     }
-    // `groups` can omit columns native mode is not laying out (a lone minimized window),
-    // so positions are taken from the tree, next to the neighbouring visible column.
+    // Positions are taken from the tree, next to the neighbouring visible column.
     if column.allLeafWindowsRecursive.count <= 1 {
         guard let root = column.parent as? TilingContainer, root === workspace.rootTilingContainer,
               groups.indices.contains(index + direction.focusOffset) else { return false }
@@ -185,13 +184,6 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
                 let moveNodeToMonitorArgs = MoveNodeToMonitorCmdArgs(target: .direction(direction))
                     .copy(\.windowId, focusWindow.windowId)
                     .copy(\.focusFollowsWindow, focus.windowOrNil == focusWindow)
-                if runtime.workspaceBackend.kind == .native {
-                    guard let sink = NativeTilingCommandScope.monitorMoveSink else {
-                        return io.err("Moving to another display runs through native tiling")
-                    }
-                    sink.pending = moveNodeToMonitorArgs
-                    return true
-                }
                 return MoveNodeToMonitorCommand(args: moveNodeToMonitorArgs).runVirtual(env, io)
             } else {
                 return hitAllMonitorsOuterFrameBoundaries(node, workspace, args, direction)

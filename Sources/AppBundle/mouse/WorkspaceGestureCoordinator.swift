@@ -4,9 +4,8 @@ func workspaceGesturesNeedRawTouch(horizontal: Bool, overview: Bool, overviewOpe
     runtimeEnabled && (horizontal || overview || overviewOpen)
 }
 
-/// macOS owns Space gestures in native mode; WinMuxX's would activate only its own model.
 @MainActor var workspaceSwipeGestureEnabled: Bool {
-    config.workspaceSwipe.enabled && runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces
+    config.workspaceSwipe.enabled
 }
 /// Horizontal swipes recognized from raw touch, when macOS's own swipe is not read instead.
 @MainActor var rawWorkspaceSwipeEnabled: Bool {
@@ -17,7 +16,7 @@ func workspaceGesturesNeedRawTouch(horizontal: Bool, overview: Bool, overviewOpe
     workspaceOverviewGestureEnabled && !DockWorkspaceSwipeSource.shared.readsVertical
 }
 @MainActor var workspaceOverviewGestureEnabled: Bool {
-    config.workspaceOverview.threeFingerUp && runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces
+    config.workspaceOverview.threeFingerUp
 }
 
 /// Composition boundary: input lifetime and arbitration stay outside individual features.

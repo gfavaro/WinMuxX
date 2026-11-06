@@ -6,9 +6,7 @@ struct FocusCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = false
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
-        let focused = try await focusInTree(env, io)
-        if focused { runtime.workspaceBackend.current.focusDidMove(to: focus.windowOrNil) }
-        return focused
+        try await focusInTree(env, io)
     }
 
     @MainActor private func focusInTree(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
@@ -16,10 +14,7 @@ struct FocusCommand: Command {
         WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
         target.workspace.lastScrollingFocusWindowId = nil
         // todo bug: floating windows break mru
-        // Native floating windows retain their ownership and physical geometry.
-        // Do not temporarily rebind them across asynchronous AX reads. Explicit
-        // --window-id focus still supports them without a tree mutation.
-        let includeFloating = args.floatingAsTiling && runtime.workspaceBackend.capabilities.arrangesFloatingWindows
+        let includeFloating = args.floatingAsTiling
         let floatingWindows = includeFloating ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
         defer {
             if includeFloating {
@@ -144,10 +139,7 @@ struct FocusCommand: Command {
             }
 
             if let targetMonitor = monitors.getOrNil(atIndex: index) {
-                guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: targetMonitor) else {
-                    return io.err("\(targetMonitor.name) shows no desktop")
-                }
-                return shown.focusWorkspace()
+                return targetMonitor.activeWorkspace.focusWorkspace()
             } else {
                 guard let wrapped = monitors.get(wrappingIndex: index) else { return false }
                 return hitAllMonitorsOuterFrameBoundaries(target, io, args, direction, wrapped)
@@ -170,7 +162,7 @@ struct FocusCommand: Command {
         case .wrapAroundTheWorkspace:
             return wrapAroundTheWorkspace(target, io, direction)
         case .wrapAroundAllMonitors:
-            guard let shown = runtime.workspaceBackend.current.shownWorkspace(on: wrappedMonitor) else { return false }
+            let shown = wrappedMonitor.activeWorkspace
             shown.findLeafWindowRecursive(snappedTo: direction.opposite)?.markAsMostRecentChild()
             return shown.focusWorkspace()
     }

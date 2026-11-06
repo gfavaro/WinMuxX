@@ -3,7 +3,6 @@ import Common
 
 @MainActor
 func buildDiagnosticsReport() async -> String {
-    if let report = await runtime.workspaceBackend.current.diagnosticsReport() { return report }
     let io = CmdIo(stdin: .emptyStdin)
     io.out("WinMux doctor — git \(gitShortHash)")
     io.out("")

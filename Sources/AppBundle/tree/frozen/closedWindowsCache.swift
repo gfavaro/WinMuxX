@@ -136,7 +136,6 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
 }
 
 @MainActor func cacheClosedWindowIfNeeded() {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     let frozenWorld = snapshotCurrentFrozenWorld()
     if frozenWorld.windowIds.isSubset(of: runtime.recovery.closedWindows.windowIds) {
         return // already cached
@@ -151,7 +150,6 @@ func replaceClosedWindowsCache(_ frozenWorld: FrozenWorld) {
 
 @MainActor
 func syncClosedWindowsCacheToCurrentWorld() {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return }
     invalidateLateRestartTreeRestoration()
     runtime.recovery.closedWindows = keepingMissingWindows(of: runtime.recovery.closedWindows, in: snapshotCurrentFrozenWorld())
 }
@@ -206,7 +204,6 @@ extension FrozenContainer {
 }
 
 @MainActor func restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: Window) async throws -> Bool {
-    guard runtime.workspaceBackend.capabilities.usesVirtualRecovery else { return false }
     // An empty cache is not a restoration: new-window rules must still run.
     guard !runtime.recovery.closedWindows.workspaces.isEmpty else { return false }
     return try await restoreFrozenWorldIfNeeded(runtime.recovery.closedWindows, newlyDetectedWindow: newlyDetectedWindow)

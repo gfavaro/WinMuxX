@@ -70,9 +70,6 @@ final class MacWindow: Window {
     @MainActor
     @discardableResult
     static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
-        if runtime.workspaceBackend.kind == .native {
-            return try await getOrRegisterNative(windowId: windowId, macApp: macApp)
-        }
         // Focus/main-window AX attributes can continue reporting a closed id.
         // Never let the fast focus path recreate its layout node.
         if !isUnitTest && !winmux_window_exists(windowId) {
@@ -128,51 +125,6 @@ final class MacWindow: Window {
         return window
     }
 
-    @MainActor
-    private static func getOrRegisterNative(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
-        let layouts = runtime.workspaceBackend.native.layouts
-        guard let registration = layouts.registration(for: windowId),
-              !macApp.nsApp.isTerminated else { return nil }
-        let workspace = registration.workspace
-        if let existing = allWindowsMap[windowId], existing.macApp === macApp,
-           existing.nodeWorkspace === workspace {
-            let native = try await macApp.readNativeState(windowId)
-            try Task.checkCancellation()
-            guard layouts.accepts(registration) else { return nil }
-            existing.nativeLayoutEligible = native?.fullscreen == false && native?.minimized == false
-            return existing.nativeLayoutEligible ? existing : nil
-        }
-        let rect = try await macApp.getAxRect(windowId)
-        let type = try await macApp.getAxUiElementWindowType(windowId, getWindowLevel(for: windowId))
-        let native = try await macApp.readNativeState(windowId)
-        try Task.checkCancellation()
-        guard layouts.accepts(registration),
-              !macApp.nsApp.isTerminated, native?.fullscreen == false, native?.minimized == false else { return nil }
-        if case .popup = type { return nil }
-        if let existing = allWindowsMap[windowId] {
-            if existing.macApp !== macApp {
-                existing.garbageCollect(skipClosedWindowsCache: true)
-            } else {
-                let floated = existing.parent is Workspace
-                let binding = floated ? BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-                    : bindingDataForNewWindow(type: type, workspace: workspace, window: existing)
-                existing.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
-                existing.recordAuthoritativeActualRect(rect)
-                return existing
-            }
-        }
-        let binding = bindingDataForNewWindow(type: type, workspace: workspace, window: nil)
-        let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size,
-            parent: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
-        window.recordAuthoritativeActualRect(rect)
-        allWindowsMap[windowId] = window
-        window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
-        try await applyNativeWindowDetectedRules(window) { layouts.accepts(registration) }
-        runtime.workspaceBackend.native.stateChanges.notify() // Wakes a palette pick awaiting adoption.
-        runtime.workspaceBackend.native.tiling.windowAdopted(window)
-        return window
-    }
-
     // var description: String {
     //     let description = [
     //         ("title", title),
@@ -215,13 +167,6 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
-        if runtime.workspaceBackend.kind == .native {
-            guard MacWindow.allWindowsMap.removeValue(forKey: windowId) != nil else { return }
-            WindowMotion.shared.forget(windowId)
-            resetLearnedMinimum()
-            if parent != nil { _ = unbindFromParent() }
-            return
-        }
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
         if macApp.nsApp.isTerminated, MacWindow.allWindowsMap[windowId] != nil {
@@ -317,8 +262,7 @@ final class MacWindow: Window {
     // todo it's part of the window layout and should be moved to layoutRecursive.swift
     @MainActor
     func hideInCorner(_ corner: OptimalHideCorner, force: Bool = false) async throws {
-        guard runtime.workspaceBackend.capabilities.parksInactiveWindows else { return }
-        guard let nodeMonitor else { return }
+                guard let nodeMonitor else { return }
         // Don't accidentally override prevUnhiddenEmulationPosition in case of subsequent `hideInCorner` calls
         if !isHiddenInCorner {
             guard let windowRect = try await getAxRect() else { return }
@@ -513,7 +457,6 @@ final class MacWindow: Window {
             return
         }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
-        NativeOriginalFrames.shared.recordBeforeWrite(self)
         macApp.setAxFrame(windowId, topLeft, size)
         // Reasserting an unchanged layout must neither flood AX with observations nor
         // continually cancel the confirmation already waiting for that same request.
@@ -550,9 +493,6 @@ final class MacWindow: Window {
                                                animating: WindowMotion.shared.isAnimating(self.windowId)) else { return }
                 let oldMinimum = self.learnedMinimum.size
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
-                if runtime.workspaceBackend.kind == .native, self.learnedMinimum.size != oldMinimum {
-                    runtime.workspaceBackend.native.observation?.requestRead(event: "nativeMinimumChanged")
-                }
                 if !isUnitTest { PersistedAppMinimums.shared.remember(self.learnedMinimum.size, for: self.macApp.rawAppBundleId) }
                 WindowMotion.shared.noteLanded(self.windowId,
                     asked: CGRect(origin: topLeft, size: size),
@@ -570,7 +510,6 @@ final class MacWindow: Window {
         suspendMinimumObservationForMotion()
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
-        NativeOriginalFrames.shared.recordBeforeWrite(self)
         macApp.setAnimatedAxFrame(windowId, frame, session: session)
     }
 
@@ -601,7 +540,6 @@ final class MacWindow: Window {
         minimumObservation?.cancel()
         minimumRequest = nil
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
-        NativeOriginalFrames.shared.recordBeforeWrite(self)
         return try await macApp.setAxFrameBlocking(windowId, topLeft, size, positionFirst: positionFirst)
     }
 

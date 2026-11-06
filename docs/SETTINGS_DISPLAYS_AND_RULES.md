@@ -23,8 +23,7 @@ summon, Bring Here) is refused, and one showing elsewhere after a reload, restor
 or display change moves to its display. When WinMuxX starts without restoring a saved
 arrangement (a first launch, or with Start workspaces on main display), each secondary
 display also shows its assigned workspace; the first name in numeric order wins a
-secondary display assigned more than once. Native Spaces
-also use them to choose the display for each desktop they create. Existing assignments remain visible even when
+secondary display assigned more than once. Existing assignments remain visible even when
 their display is unavailable.
 Choose Edit to change one, then Save changes. Merely opening the editor preserves
 the original value and formatting, including ordered alternatives. External

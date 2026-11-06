@@ -1,6 +1,5 @@
 import AppKit
 @testable import AppBundle
-@testable import NativeSpaces
 import XCTest
 
 struct WorkspaceSidebarDragTestMonitor: Monitor {
@@ -913,16 +912,6 @@ final class WorkspaceSidebarDragTest: XCTestCase {
         updateNativeFullscreenChromeSuppression()
         XCTAssertFalse(shouldSuppressChromeForFullscreenContent(on: mainMonitor))
         XCTAssertFalse(shouldSuppressWorkspaceSidebarForFullscreenContent(on: mainMonitor))
-    }
-
-    func testNativeFullscreenDisplayDetectionUsesEachDisplaysActiveSpace() {
-        let desktop = NativeSpace(id: "1", uuid: "desktop", type: 0)
-        let fullscreen = NativeSpace(id: "2", uuid: "fullscreen", type: 4)
-        let left = NativeSpaceDisplay(identifier: "left", activeSpaceID: "1", spaces: [desktop, fullscreen])
-        let right = NativeSpaceDisplay(identifier: "right", activeSpaceID: "2", spaces: [desktop, fullscreen])
-        XCTAssertEqual(fullscreenNativeSpaceDisplays([left, right]), ["right"])
-        XCTAssertEqual(fullscreenNativeSpaceDisplays([left.showing("2"), right.showing("1")]), ["left"])
-        XCTAssertEqual(fullscreenNativeSpaceDisplays([left, right.showing("1")]), [])
     }
 
     @MainActor

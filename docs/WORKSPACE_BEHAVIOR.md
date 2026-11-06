@@ -1,7 +1,7 @@
 # Workspace behavior examples
 
 These describe current behavior, not a ban on an explicitly requested change.
-Swapping workspaces and migrating to native Spaces remain separate product decisions.
+Swapping workspaces remains a separate product decision.
 M is the main display, S a secondary display and T a third display. A, B and C are
 workspaces. Unless stated otherwise, no forced assignment applies.
 

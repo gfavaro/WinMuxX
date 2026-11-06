@@ -35,7 +35,7 @@ final class MonitorConfigurationObserver {
         WindowMotion.shared.screensChanged()
         // A vanished display's workspace must not stay "visible" on it: selection would then
         // target it and be refused. Retiring creates no fallback workspace.
-        if runtime.workspaceBackend.capabilities.ownsWorkspaceLifecycle { retireDisconnectedViewports() }
+        retireDisconnectedViewports()
         // AppKit can emit this notification while the display topology is still changing.
         // Refresh panels immediately, but wait for the settled pass before reconciling
         // workspace-to-monitor assignments. This avoids creating fallback workspaces for a

@@ -103,39 +103,33 @@ struct ShortcutBehaviorSettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
 
             }
-            if runtime.workspaceBackend.kind == .native {
-                SettingsSection("Gestures") {
-                    Text("WinMuxX is using macOS Spaces, so macOS swipes between desktops and opens Mission Control. Hold Option and scroll with two fingers to pan a scrolling desktop.")
-                        .font(.callout).foregroundStyle(.secondary)
+            SettingsSection("Workspace swipes — experimental") {
+                SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
+                    persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
-            } else {
-                SettingsSection("Workspace swipes — experimental") {
-                    SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
-                        persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
-                    }
-                    SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
-                        persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
-                    }
-                    .disabled(!workspaceSwipes)
-                    SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
-                        help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
-                        persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
-                    }
-                    .disabled(!workspaceSwipes)
-                    Text(DockWorkspaceSwipeSource.shared.readsHorizontal ? DockWorkspaceSwipeSource.shared.status
-                        : workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
-                        .font(.callout).foregroundStyle(.secondary)
-                    Text("With Swipe between full-screen apps on three fingers in macOS Trackpad settings, macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Otherwise WinMuxX reads exactly three fingers through the private raw-touch API. Normal two-finger scrolling stays with your apps.")
-                        .font(.callout).foregroundStyle(.secondary)
+                SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
+                    persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
                 }
-                SettingsSection("Workspace overview") {
-                    SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
-                        persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
-                    }
-                    Text("Use workspace-overview from a shortcut or the CLI. With Mission Control on three fingers in macOS Trackpad settings, macOS recognizes the swipe and it opens the overview instead; Mission Control stays on its keyboard shortcut. Otherwise move all three fingers together, with Mission Control on four fingers or off. Minimized windows, hidden apps and native full-screen windows are excluded.")
-                        .font(.callout).foregroundStyle(.secondary)
+                .disabled(!workspaceSwipes)
+                SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
+                    help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
+                    persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
                 }
+                .disabled(!workspaceSwipes)
+                Text(DockWorkspaceSwipeSource.shared.readsHorizontal ? DockWorkspaceSwipeSource.shared.status
+                    : workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
+                    .font(.callout).foregroundStyle(.secondary)
+                Text("With Swipe between full-screen apps on three fingers in macOS Trackpad settings, macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Otherwise WinMuxX reads exactly three fingers through the private raw-touch API. Normal two-finger scrolling stays with your apps.")
+                    .font(.callout).foregroundStyle(.secondary)
             }
+            SettingsSection("Workspace overview") {
+                SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
+                    persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
+                }
+                Text("Use workspace-overview from a shortcut or the CLI. With Mission Control on three fingers in macOS Trackpad settings, macOS recognizes the swipe and it opens the overview instead; Mission Control stays on its keyboard shortcut. Otherwise move all three fingers together, with Mission Control on four fingers or off. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+
             masterSettingsSection
             scrollingSettingsSection
             SettingsSection("Hover bar") {

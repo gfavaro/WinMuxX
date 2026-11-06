@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import NativeSpaces
 
 /// Displays showing native fullscreen content, by display UUID. WinMuxX chrome (sidebar,
 /// borders, dimming) stays off them. Decided from what is on screen, not from the focused
@@ -11,24 +10,17 @@ var fullscreenContentDisplays: Set<String> = []
 
 @MainActor
 func updateNativeFullscreenChromeSuppression() {
-    fullscreenContentDisplays = runtime.workspaceBackend.current.fullscreenDisplayIDs()
+    fullscreenContentDisplays = fullscreenDisplayIDs()
 }
 
-/// Native Spaces: a display whose showing Space is not an ordinary desktop.
-func fullscreenNativeSpaceDisplays(_ displays: [NativeSpaceDisplay]) -> Set<String> {
-    Set(displays.filter { display in
-        display.spaces.first { $0.id == display.activeSpaceID }.map { !$0.isDesktop } ?? false
-    }.map(\.identifier))
-}
-
-/// Virtual workspaces: the known native fullscreen windows.
+/// The known native fullscreen windows.
 @MainActor
 func nativeFullscreenWindowIds() -> [UInt32] {
     Workspace.all.compactMap(\.existingMacOsNativeFullscreenWindowsContainer)
         .flatMap { $0.children.filterIsInstance(of: Window.self) }.map(\.windowId)
 }
 
-/// Virtual workspaces: the displays under a known fullscreen window that is on screen.
+/// The displays under a known fullscreen window that is on screen.
 @MainActor
 func fullscreenWindowDisplays(onScreen frames: [UInt32: CGRect]) -> Set<String> {
     Set(nativeFullscreenWindowIds().compactMap { id in

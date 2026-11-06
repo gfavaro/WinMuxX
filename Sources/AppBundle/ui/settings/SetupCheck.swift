@@ -13,13 +13,8 @@ struct SetupCheckItem: Equatable, Identifiable {
 
 /// What the checks read, so tests can supply it.
 struct SetupCheckInput {
-    var backend: WorkspaceBackendKind
     var accessibilityGranted: Bool
     var otherWindowManagers: [String]
-    /// macOS "Displays have separate Spaces" (`spans-displays` off).
-    var separateSpaces: Bool
-    /// macOS "Automatically rearrange Spaces based on most recent use".
-    var rearrangesSpaces: Bool
     var workspaceSwipe: Bool
     var overviewThreeFingerUp: Bool
     /// macOS trackpad settings: 2 assigns the gesture to three fingers.
@@ -28,11 +23,8 @@ struct SetupCheckInput {
 
     @MainActor static var current: Self {
         return Self(
-            backend: runtime.workspaceBackend.kind,
             accessibilityGranted: AXIsProcessTrusted(),
             otherWindowManagers: runningOtherWindowManagers(),
-            separateSpaces: !(CFPreferencesCopyAppValue("spans-displays" as CFString, "com.apple.spaces" as CFString) as? Bool ?? false),
-            rearrangesSpaces: CFPreferencesCopyAppValue("mru-spaces" as CFString, "com.apple.dock" as CFString) as? Bool ?? true,
             workspaceSwipe: config.workspaceSwipe.enabled,
             overviewThreeFingerUp: config.workspaceOverview.threeFingerUp,
             macThreeFingerHorizontalSwipe: macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2,
@@ -42,7 +34,6 @@ struct SetupCheckInput {
 }
 
 private let accessibilitySettings = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-private let desktopSettings = "x-apple.systempreferences:com.apple.Desktop-Settings.extension"
 private let trackpadSettings = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension"
 
 func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
@@ -53,38 +44,28 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
         SetupCheckItem(id: "other-window-managers", title: "No other window manager", ok: input.otherWindowManagers.isEmpty,
                        detail: input.otherWindowManagers.isEmpty ? "None running." : "\(input.otherWindowManagers.joined(separator: ", ")) also moves windows; quit it so the two do not fight."),
     ]
-    switch input.backend {
-        case .native:
-            items.append(SetupCheckItem(id: "separate-spaces", title: "Displays have separate Spaces", ok: input.separateSpaces,
-                detail: input.separateSpaces ? "On." : "Native tiling lays out each display's own desktop. Turn on Displays have separate Spaces in Desktop & Dock, then log out and back in.",
-                fixURL: input.separateSpaces ? nil : desktopSettings))
-            items.append(SetupCheckItem(id: "rearrange-spaces", title: "Desktops keep their order", ok: !input.rearrangesSpaces,
-                detail: input.rearrangesSpaces ? "macOS reorders desktops by recent use, so desktop numbers and shortcuts change. Turn off Automatically rearrange Spaces based on most recent use in Desktop & Dock." : "Off.",
-                fixURL: input.rearrangesSpaces ? desktopSettings : nil))
-        case .virtual:
-            // Either works: macOS's swipe is read when it uses three fingers, raw touch otherwise.
-            if input.workspaceSwipe {
-                items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: true,
-                    detail: input.macThreeFingerHorizontalSwipe
-                        ? "WinMuxX switches workspaces with macOS's own three-finger swipe recognition."
-                        : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Swipe between full-screen applications to three fingers.",
-                    fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
-            }
-            if input.overviewThreeFingerUp {
-                items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: true,
-                    detail: input.macThreeFingerVerticalSwipe
-                        ? "Three fingers up opens the overview with macOS's own recognition, in place of Mission Control. Mission Control stays on its keyboard shortcut."
-                        : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
-                    fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
-            }
+    // Either works: macOS's swipe is read when it uses three fingers, raw touch otherwise.
+    if input.workspaceSwipe {
+        items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: true,
+            detail: input.macThreeFingerHorizontalSwipe
+                ? "WinMuxX switches workspaces with macOS's own three-finger swipe recognition."
+                : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Swipe between full-screen applications to three fingers.",
+            fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
+    }
+    if input.overviewThreeFingerUp {
+        items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: true,
+            detail: input.macThreeFingerVerticalSwipe
+                ? "Three fingers up opens the overview with macOS's own recognition, in place of Mission Control. Mission Control stays on its keyboard shortcut."
+                : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
+            fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
     }
     return items
 }
 
-/// Opens Settings › General once per backend when something needs attention.
+/// Opens Settings › General once when something needs attention.
 @MainActor func showSetupCheckIfNeeded() {
     guard !isUnitTest else { return }
-    let key = "setupCheck.shown.\(runtime.workspaceBackend.kind.rawValue)"
+    let key = "setupCheck.shown.virtual"
     guard !UserDefaults.standard.bool(forKey: key), setupCheckItems(.current).contains(where: { !$0.ok }) else { return }
     UserDefaults.standard.set(true, forKey: key)
     UserDefaults.standard.set(SettingsSidebarItem.general.rawValue, forKey: "settings.selectedPage")

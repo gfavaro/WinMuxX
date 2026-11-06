@@ -1,6 +1,5 @@
 import AppKit
 import Common
-import NativeSpaces
 
 public final class TrayMenuModel: ObservableObject {
     @MainActor public static let shared = TrayMenuModel()
@@ -11,8 +10,6 @@ public final class TrayMenuModel: ObservableObject {
     @Published var menuBarWorkspaceIndicator: String = "1"
     @Published var menuBarWorkspaceName: String = ""
     @Published var menuBarWorkspaceArrangement: WorkspaceLayoutName = .dwindle
-    /// Why native tiling has stopped until something outside WinMuxX changes.
-    @Published var menuBarTilingStoppedReason: String? = nil
     /// Is "layouting" enabled
     @Published var isEnabled: Bool = true
     @Published var shortcutHealth: ShortcutHealth = .available
@@ -67,7 +64,6 @@ extension ObservableObject {
 }
 
 @MainActor func updateTrayText() {
-    if runtime.workspaceBackend.ui.updateTray() { return }
     let focus = focus
     let workspace = focus.workspace
     let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)
@@ -100,19 +96,4 @@ extension ObservableObject {
         )
     }
     TrayMenuModel.shared.setIfChanged(\.workspaces, workspaces)
-
-}
-
-/// The tray indicator for native Spaces: the desktop number, its name and tiling state.
-@MainActor func updateNativeTrayText() {
-    let displays = nativeObservedDisplays() ?? []
-    let display = displays.first { $0.identifier == focus.workspace.workspaceMonitor.displayUUID } ?? displays.first
-    let number = display.flatMap { NativeSpaceNavigation.activeDesktopNumber(on: $0.identifier, in: displays) }
-    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceIndicator, number.map(String.init) ?? "Spaces")
-    let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Observation only"
-    let place = display == nil ? "Native Spaces unavailable" : number.map { nativeDesktopDisplayName($0) } ?? "Fullscreen App"
-    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceName, "\(place) · \(state)")
-    TrayMenuModel.shared.setIfChanged(\.menuBarWorkspaceArrangement, focus.workspace.arrangement)
-    let tiling = runtime.workspaceBackend.native.tiling
-    TrayMenuModel.shared.setIfChanged(\.menuBarTilingStoppedReason, runtime.workspaceBackend.native.tilingEnabled && tiling.isStopped ? tiling.status : nil)
 }

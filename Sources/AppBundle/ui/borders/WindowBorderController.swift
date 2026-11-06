@@ -2,7 +2,6 @@ import AppKit
 import Common
 import PrivateApi
 import QuartzCore
-import NativeSpaces
 
 @MainActor
 final class WindowBorderController {
@@ -67,9 +66,7 @@ final class WindowBorderController {
                 if windowId != 0, controller.borderWindowIds.contains(windowId) || NSApp.window(withWindowNumber: Int(windowId)) != nil { return }
                 if [UInt32(723), 806, 807, 808].contains(event) {
                     WorkspaceTransitionDiagnostics.recordNativeEvent(event, windowId: windowId)
-                    if runtime.workspaceBackend.capabilities.parksInactiveWindows {
-                        HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
-                    }
+                    HiddenWorkspaceWindowRecovery.shared.nativeGeometryChanged(windowId)
                 }
                 if !controller.missionControlState.active,
                    [UInt32(723), 806, 807, 808].contains(event),
@@ -141,7 +138,7 @@ final class WindowBorderController {
         var bundles: [pid_t: String?] = [:]
         func bundleIdentifier(_ pid: pid_t) -> String? {
             if let bundle = bundles[pid] { return bundle }
-            let bundle = NativeSpaceTransitionGuard.windowManagerBundleIdentifier(pid)
+            let bundle = windowManagerBundleIdentifier(pid)
             bundles[pid] = bundle
             return bundle
         }
@@ -180,9 +177,6 @@ final class WindowBorderController {
 
     func windowGeometryChanged(_ windowId: UInt32) {
         guard !isUnitTest, borders[windowId] != nil, !missionControlState.active else { return }
-        // Borders are hidden during a native pan; redrawing each moved window's
-        // border would take most of the main thread.
-        guard !NativeScrollingPan.shared.isPanning else { return }
         refreshMovingBorder(windowId)
         // Poll only the moving window between notifications, which can arrive well
         // after the WindowServer has already moved the content.
@@ -221,16 +215,15 @@ final class WindowBorderController {
         synchronizeNativeWindowSubscriptions()
         var chromeAllowed = false
         defer { InactiveWindowDimmer.shared.refresh(chromeAllowed: chromeAllowed) }
-        // Dimming stays through a pan; only borders wait for it to settle.
         chromeAllowed = !missionControlState.active
-        guard !missionControlState.active, !NativeScrollingPan.shared.isPanning else { clear(); return }
+        guard !missionControlState.active else { clear(); return }
         let settings = config.windowBorders
         guard TrayMenuModel.shared.isEnabled, settings.enabled, settings.width > 0 else { clear(); return }
         var frames = onScreenFrames ?? [:]
         if onScreenFrames == nil {
             let native = nativeSnapshot ?? (CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? [])
             guard !isMissionControlVisible(native, screenSizes: NSScreen.screens.map { $0.frame.size },
-                bundleIdentifierForPID: NativeSpaceTransitionGuard.windowManagerBundleIdentifier) else {
+                bundleIdentifierForPID: windowManagerBundleIdentifier) else {
                 chromeAllowed = false
                 clear()
                 return
@@ -486,9 +479,29 @@ private struct Appearance: Equatable {
     init(settings: WindowBordersConfig, active: Bool) { self.settings = settings; let h = active ? settings.activeColor : settings.inactiveColor; let v = UInt32(h.dropFirst(), radix: 16) ?? 0; let rgb = h.count == 9 ? v >> 8 : v; let alpha = h.count == 9 ? v & 255 : 255; rgba = (rgb << 8) | alpha }
 }
 
+/// Current-host Mission Control overlay signature. This is a heuristic, not a
+/// documented Mission Control API, and must be validated on each supported OS.
 func isMissionControlVisible(_ windows: [[String: Any]], screenSizes: [CGSize], bundleIdentifierForPID: (pid_t) -> String?) -> Bool {
-    NativeSpaceTransitionGuard.isMissionControlVisible(windows, screenSizes: screenSizes,
-        bundleIdentifierForPID: bundleIdentifierForPID)
+    windows.contains { window in
+        // Layer first: the bundle lookup creates an NSRunningApplication per window.
+        guard (window[kCGWindowLayer as String] as? NSNumber)?.intValue == 19,
+              let pid = (window[kCGWindowOwnerPID as String] as? NSNumber)?.int32Value,
+              bundleIdentifierForPID(pid) == "com.apple.WindowManager",
+              let bounds = window[kCGWindowBounds as String] as? NSDictionary,
+              let frame = CGRect(dictionaryRepresentation: bounds), frame.width > 0, frame.height > 0 else { return false }
+        return screenSizes.contains { abs($0.width - frame.width) < 2 && abs($0.height - frame.height) < 2 }
+    }
+}
+
+private let windowManagerPath = "/System/Library/CoreServices/WindowManager.app/Contents/MacOS/WindowManager"
+
+/// `com.apple.WindowManager` for the process that draws Mission Control, otherwise nil.
+/// The only bundle these checks ask about, answered from the process's executable path:
+/// a system call rather than a synchronous LaunchServices request per process.
+func windowManagerBundleIdentifier(_ pid: pid_t) -> String? {
+    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
+    return String(cString: path) == windowManagerPath ? "com.apple.WindowManager" : nil
 }
 
 // Public AppKit fallback when the private WindowServer renderer is unavailable.

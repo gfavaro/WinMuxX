@@ -9,9 +9,7 @@ extension Workspace {
         let recent = rootTilingContainer.mostRecentWindowRecursive
         let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor)
         let rect = rootTilingContainer.lastAppliedLayoutPhysicalRect ?? workspaceMonitor.visibleRectPaddedByOuterGaps
-        NativeLayoutProjection.$includesConcealed.withValue(true) {
-            rootTilingContainer.materializeDwindle(in: rect, gaps: gaps)
-        }
+        rootTilingContainer.materializeDwindle(in: rect, gaps: gaps)
         recent?.markAsMostRecentChild()
     }
 }

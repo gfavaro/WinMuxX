@@ -58,12 +58,8 @@ Today WinMuxX uses its own workspaces and parks hidden windows offscreen; these 
 distinct from native macOS Spaces. That mechanism is the current implementation,
 not the product's defining principle.
 
-An experimental native Spaces backend, informed by Dinky, is available as an opt-in;
-see [native Spaces](NATIVE_SPACES.md). Making it the default must demonstrate
-whole-workspace display moves, layout preservation, explicit ownership, restart
-recovery and coexistence with fullscreen and Mission Control. Reading another project's code establishes feasibility, not
-runtime parity. Earlier adoption plans that exclude native Spaces describe their
-original scope; they do not establish a permanent ban on a future proposal.
+The experimental native Spaces backend moved to the separate SpaceMuxX project on
+2026-11-06; WinMuxX has one backend.
 
 ## Evidence matters
 

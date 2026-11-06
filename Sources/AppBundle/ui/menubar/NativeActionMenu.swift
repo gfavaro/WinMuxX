@@ -29,7 +29,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName, stopped: String?)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
     private var capturedRuleTarget: QuickFloatingRuleTarget?
 
     func install(checkForUpdates: (() -> Void)?) {
@@ -70,8 +70,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement, stopped: model.menuBarTilingStoppedReason)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, previous.stopped == state.stopped, lastModePresentation == model.modePresentation { return }
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
         lastIconState = state
         lastModePresentation = model.modePresentation
         let mode = model.isEnabled ? model.modePresentation : nil
@@ -79,13 +79,12 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let color = mode?.color(dark: dark, increasedContrast: NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast)
         let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
         let arrangementName = state.arrangement.rawValue.capitalized
-        let arrangementDescription = " · \(arrangementName) layout" + (state.stopped.map { " · \($0)" } ?? "")
+        let arrangementDescription = " · \(arrangementName) layout"
         if model.isEnabled && state.indicator == .workspace {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
             let title = NSMutableAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor])
             if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
-            if state.stopped != nil { title.append(NSAttributedString(string: " ⏸", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
             statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
             statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + arrangementDescription + modeDescription
@@ -96,7 +95,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         statusItem?.button?.attributedTitle = NSAttributedString(string: "")
         statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux, \(arrangementName) layout" + modeDescription : "WinMux disabled")
         let image = menuBarIconImage(
-            enabled: model.isEnabled && state.stopped == nil,
+            enabled: model.isEnabled,
             arrangement: state.arrangement,
             appearance: model.menuBarConfiguration.iconAppearance,
             keyboardTint: color,
@@ -115,14 +114,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             return QuickFloatingRuleTarget(window: app, focus: focus, bundleId: bundleId,
                 pid: app.macApp.pid, launchDate: app.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
         }
-        let native = runtime.workspaceBackend.kind == .native
-        let place = native ? nativeDesktopNumber(of: focus.workspace).map { nativeDesktopDisplayName($0) } ?? "Native Spaces"
-            : workspaceDisplayName(focus.workspace.name)
-        menu.addItem(NSMenuItem(title: "WinMuxX · \(place)", action: nil, keyEquivalent: ""))
-        if native, !runtime.workspaceBackend.native.tiling.ready {
-            let state = runtime.workspaceBackend.native.tilingEnabled ? runtime.workspaceBackend.native.tiling.status : "Tiling off (observation only)"
-            menu.addItem(NSMenuItem(title: state, action: nil, keyEquivalent: ""))
-        }
+        menu.addItem(NSMenuItem(title: "WinMuxX · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         if activeMode != mainModeId {
             menu.addItem(NSMenuItem(title: "Mode: \(activeMode ?? "none")", action: nil, keyEquivalent: ""))
         }
@@ -172,7 +164,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(configToggleItem("Borders", isOn: config.windowBorders.enabled, #selector(toggleBorders)))
         menu.addItem(configToggleItem("Focus Follows Pointer", isOn: config.focusFollowsMouse, #selector(toggleFocusFollowsPointer)))
         menu.addItem(.separator())
-        addSubmenu("Commands", to: menu) { addCommandsMenu(to: $0, native: native) }
+        addSubmenu("Commands", to: menu) { addCommandsMenu(to: $0) }
         menu.addItem(.separator())
         let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
         if recoverableCount > 0 {
@@ -187,7 +179,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
     }
 
-    private func addCommandsMenu(to menu: NSMenu, native: Bool) {
+    private func addCommandsMenu(to menu: NSMenu) {
         addSubmenu("Workspaces", to: menu) { workspacesMenu in
             addCommand("Previous", script: "workspace prev", to: workspacesMenu)
             addCommand("Next", script: "workspace next", to: workspacesMenu)
@@ -257,7 +249,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
-        if native { menu.addItem(callbackItem("Refresh Desktops", #selector(refreshNativeSpaces))) }
         addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
     }
 
@@ -291,9 +282,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private func addCommand(_ title: String, command: any Command, to menu: NSMenu, requiresWindow: Bool? = nil, allowDisabled: Bool = false) -> NSMenuItem {
         let item = commandItem(title, commands: [command])
         let needsWindow = requiresWindow ?? menuCommandRequiresWindow(command)
-        let accepted = runtime.workspaceBackend.accepts(command)
-        item.isEnabled = accepted && (allowDisabled || TrayMenuModel.shared.isEnabled) && (!needsWindow || focus.windowOrNil != nil)
-        if !accepted { item.toolTip = "Not available with native Spaces" }
+        item.isEnabled = (allowDisabled || TrayMenuModel.shared.isEnabled) && (!needsWindow || focus.windowOrNil != nil)
         applyBindings(bindings.bindings(for: command), to: item)
         menu.addItem(item)
         return item
@@ -459,7 +448,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
     @objc private func openDiagnostics() { DiagnosticsWindowController.shared.show() }
-    @objc private func refreshNativeSpaces() { runtime.workspaceBackend.native.observation?.requestRead() }
     @objc private func toggleBorders() {
         persistMenuToggle(SettingsConfigEdit(section: "borders", key: "enabled", renderedValue: config.windowBorders.enabled ? "false" : "true"))
     }
@@ -534,12 +522,12 @@ func menuCommandRequiresWindow(_ command: any Command) -> Bool {
 
 @MainActor
 func menuWorkspaceTargets() -> [(workspace: Workspace, target: String)] {
-    runtime.workspaceBackend.current.commandTargets()
+    workspaceCommandTargets()
 }
 
 @MainActor
 func menuWorkspaceTitle(_ workspace: Workspace) -> String {
-    runtime.workspaceBackend.current.title(ofWorkspaceNamed: workspace.name)
+    workspaceDisplayName(workspace.name)
 }
 
 /// Credits under the version in the About panel: the fork, its upstream and the repository.

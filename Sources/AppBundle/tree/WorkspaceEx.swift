@@ -10,17 +10,15 @@ func resolvedForceAssignedMonitor(forWorkspaceName name: String) -> Monitor? {
 
 @MainActor
 func isAssignedElsewhere(_ workspaceName: String, than monitor: Monitor) -> Bool {
-    guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces,
-          let assigned = resolvedForceAssignedMonitor(forWorkspaceName: workspaceName) else { return false }
+    guard let assigned = resolvedForceAssignedMonitor(forWorkspaceName: workspaceName) else { return false }
     return assigned.rect.topLeftCorner != monitor.rect.topLeftCorner
 }
 
 extension Workspace {
-    /// The connected display configuration assigns this workspace to. As in AeroSpace, a virtual
-    /// workspace shows only there; native Spaces use assignments only to place new desktops.
+    /// The connected display configuration assigns this workspace to. As in AeroSpace, the
+    /// workspace shows only there.
     @MainActor var forceAssignedMonitor: Monitor? {
-        guard runtime.workspaceBackend.capabilities.activatesVirtualWorkspaces else { return nil }
-        return resolvedForceAssignedMonitor(forWorkspaceName: name)
+        resolvedForceAssignedMonitor(forWorkspaceName: name)
     }
 
     private func existingContainer<T: TreeNode>(_ type: T.Type) -> T? {

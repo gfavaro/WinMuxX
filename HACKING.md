@@ -4,29 +4,8 @@ Start with [core principles](docs/PRINCIPLES.md) and [CONTRIBUTING](CONTRIBUTING
 for product expectations and the contribution workflow. Coding agents enter through
 [AGENTS.md](AGENTS.md) and its repository-local skill.
 
-WinMuxX has an experimental native backend: observation is
-the default, with a separate Dwindle/Master tiling opt-in. Initial single-display
-positioning/focus/fullscreen checks passed; broader native validation remains pending.
-`WorkspaceBackendState` belongs to `WinMuxRuntime`; its native lifecycle owns
-observation and native runtime services. Capabilities gate virtual lifecycle, parking
-and recovery. `NativeSpaces` isolates dynamic read-side SkyLight
-access and generation-checked event reconciliation. Layout trees/algorithms remain
-shared, with native visibility filtering and separate UUID-keyed persistence.
-
-When behaviour differs between the backends, shared code does not check
-`workspaceBackend.kind`. It asks `runtime.workspaceBackend.current` (the
-`WorkspaceBackend` protocol in `runtime/WorkspaceBackend.swift`) for behaviour:
-commands with their own implementation, listing and naming workspaces, focus side
-effects, diagnostics and geometry events. `workspaceBackend.ui` selects sidebar,
-palette and tray adapters. It asks
-`workspaceBackend.capabilities` for policy, such as parking hidden windows, virtual
-recovery, animated motion, arranging floating windows, publishing state and owning
-workspace lifecycle. Checking `kind` directly is left to the native tiling engine
-itself: its command fence, layout projection, write validation, startup and
-observers. Add a protocol method or capability rather than a new `kind` check.
-See [workspace backend architecture](docs/WORKSPACE_BACKEND_ARCHITECTURE.md),
-[native mode and rollback](docs/NATIVE_SPACES.md), the
-[assessment](docs/NATIVE_SPACES_ASSESSMENT.md) and [decision record](docs/NATIVE_SPACES_ADR.md).
+WinMuxX uses its own workspaces and parks hidden windows offscreen. The experimental
+native Spaces backend moved to the separate SpaceMuxX project on 2026-11-06.
 
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for
 bundle identity, configuration ownership, upstream integration and signing policy.
