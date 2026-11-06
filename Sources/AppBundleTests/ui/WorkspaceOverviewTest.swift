@@ -156,6 +156,39 @@ final class WorkspaceOverviewTest: XCTestCase {
         await fulfillment(of: [complete], timeout: 3)
     }
 
+    func testNoDisplaysCannotOpenOrRetainPresentation() throws {
+        var deps = dependencies(cards: [card()], image: try image())
+        deps.displays = { [] }
+        deps.makePanel = { _, _ in XCTFail("No display should create a panel"); return OverviewPanelSpy() }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        XCTAssertFalse(controller.show())
+        XCTAssertTrue(controller.models.isEmpty)
+        XCTAssertTrue(controller.panels.isEmpty)
+        XCTAssertEqual(controller.phase, .closed)
+    }
+
+    func testDisconnectedDisplayIsRemovedOnReopening() async throws {
+        var deps = dependencies(cards: [card()], image: try image())
+        let first = deps.displays()[0]
+        let other = WorkspaceOverviewDisplay(id: MonitorViewportId(topLeftCorner: CGPoint(x: 1920, y: 0)),
+            name: "Other", frame: CGRect(x: 1920, y: 0, width: 1920, height: 1080))
+        var displays = [first, other]
+        deps.displays = { displays }
+        let controller = WorkspaceOverviewController(dependencies: deps)
+        XCTAssertTrue(controller.show())
+        await drain(controller)
+        XCTAssertEqual(controller.models.compactMap(\.monitor), [first.id, other.id])
+        controller.dismiss(animated: false)
+        displays = [other]
+        XCTAssertTrue(controller.show())
+        await drain(controller)
+        XCTAssertEqual(controller.models.compactMap(\.monitor), [other.id])
+        XCTAssertEqual(controller.panels.count, 1)
+        controller.dismiss(animated: false)
+        XCTAssertTrue(controller.models.isEmpty)
+        XCTAssertTrue(controller.panels.isEmpty)
+    }
+
     func testReopeningCancelsRetiringPresentationAndIgnoresItsCompletion() async throws {
         var panels: [DeferredOverviewPanel] = []
         var deps = dependencies(cards: [card()], image: try image())

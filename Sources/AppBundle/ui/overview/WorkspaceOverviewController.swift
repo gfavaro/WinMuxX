@@ -104,8 +104,14 @@ final class WorkspaceOverviewController {
     private(set) var phase: Phase = .closed
     var isOpen: Bool { phase == .opening || phase == .open }
     let dependencies: WorkspaceOverviewDependencies
-    private(set) var models: [WorkspaceOverviewDisplayModel] = []
-    private(set) var panels: [any WorkspaceOverviewPresenting] = []
+    private struct Presentation {
+        let display: WorkspaceOverviewDisplay
+        let model: WorkspaceOverviewDisplayModel
+        let panel: any WorkspaceOverviewPresenting
+    }
+    private var presentations: [Presentation] = []
+    var models: [WorkspaceOverviewDisplayModel] { presentations.map(\.model) }
+    var panels: [any WorkspaceOverviewPresenting] { presentations.map(\.panel) }
     private var reusablePanels: [MonitorViewportId: WorkspaceOverviewPanel] = [:]
     private var project: WorkspaceProjectId?
     private var generation = 0
@@ -170,12 +176,12 @@ final class WorkspaceOverviewController {
                 self.switchDisplay(from: model, by: delta)
             }
             model.canSwitchDisplay = displays.count > 1
-            models.append(model)
-            panels.append(reused ?? dependencies.makePanel(model, display))
+            presentations.append(Presentation(display: display, model: model,
+                panel: reused ?? dependencies.makePanel(model, display)))
         }
-        for (index, panel) in panels.enumerated() {
-            let key = dependencies.nativeIntegration ? displays[index].id == MonitorViewportId(focus.workspace.workspaceMonitor) : index == 0
-            panel.present(key: key, gestureProgress: gestureProgress)
+        for (index, presentation) in presentations.enumerated() {
+            let key = dependencies.nativeIntegration ? presentation.display.id == MonitorViewportId(focus.workspace.workspaceMonitor) : index == 0
+            presentation.panel.present(key: key, gestureProgress: gestureProgress)
         }
         WorkspaceMotionDiagnostics.record("Overview setup to panel submission", milliseconds: (CACurrentMediaTime() - setupStarted) * 1000)
         phase = .open
@@ -232,9 +238,11 @@ final class WorkspaceOverviewController {
     private func finishDismiss() {
         guard phase == .closing else { return }
         phase = .closed
-        let retiredPanels = panels, retiredModels = models
-        panels.removeAll(); models.removeAll()
-        for (panel, model) in zip(retiredPanels, retiredModels) {
+        let retired = presentations
+        presentations.removeAll()
+        for presentation in retired {
+            let panel = presentation.panel
+            let model = presentation.model
             var reused = false
             if let native = panel as? WorkspaceOverviewPanel, let id = model.monitor {
                 native.hideForReuse()
@@ -430,10 +438,11 @@ final class WorkspaceOverviewController {
     }
 
     private func switchDisplay(from model: WorkspaceOverviewDisplayModel, by delta: Int) {
-        guard isOpen, models.count > 1, let index = models.firstIndex(where: { $0 === model }) else { return }
-        let target = (index + delta % models.count + models.count) % models.count
-        panels[target].focusOverview()
-        models[target].focusRequest += 1
+        guard isOpen, presentations.count > 1, let index = presentations.firstIndex(where: { $0.model === model }) else { return }
+        let count = presentations.count
+        let target = (index + delta % count + count) % count
+        presentations[target].panel.focusOverview()
+        presentations[target].model.focusRequest += 1
     }
 
     private func installObservers() {
