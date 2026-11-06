@@ -7,6 +7,54 @@ import XCTest
 final class RestartWorkspaceTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
+    func testSnapshotAppendAndExpiryWhileRestoreIsSuspendedKeepIndicesStable() async throws {
+        let destination = Workspace.get(byName: "1")
+        let old = TestWindow.new(id: 1, parent: destination.rootTilingContainer)
+        old.restartIdentity = identity("Original")
+        let saved = snapshotCurrentFrozenWorld()
+        old.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(.init(version: 2, world: saved, pending: nil))
+        let current = TestWindow.new(id: 99, parent: Workspace.get(byName: "2").rootTilingContainer)
+        let liveIdentity = identity("Original")
+        current.restartIdentity = liveIdentity
+        let started = expectation(description: "identity query suspended")
+        var continuation: CheckedContinuation<Void, Never>?
+        runtime.recovery.restartIdentityQueryForTests = { _ in
+            await withCheckedContinuation { continuation = $0; started.fulfill() }
+            return [(99, liveIdentity)]
+        }
+        defer {
+            continuation?.resume()
+            runtime.recovery.restartIdentityQueryForTests = nil
+        }
+        let task = Task { try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current) }
+        await fulfillment(of: [started], timeout: 2)
+        XCTAssertEqual(runtime.recovery.restartRestorationsInFlight, 1)
+        let another = TestWindow.new(id: 100, parent: Workspace.get(byName: "3").rootTilingContainer)
+        another.restartIdentity = identity("Another")
+        rememberRestartWindowBeforeAppTermination(another)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2)
+        expireLateRestartTreeRestoration()
+        compactPendingRestartSnapshots()
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2, "In-flight candidate indices must not be compacted")
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2)
+        continuation?.resume()
+        continuation = nil
+        let restored = try await task.value
+        XCTAssertTrue(restored)
+        XCTAssertTrue(current.nodeWorkspace === destination)
+        XCTAssertEqual(runtime.recovery.restartRestorationsInFlight, 0)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.map(\.snapshot.remainingWindowIds), [[100]])
+    }
+
+    func testRestartEnvelopeRetainsItsExactFixedFixtureEncoding() throws {
+        let url = projectRoot.appendingPathComponent("resources/test-fixtures/restart-envelope-v2.json")
+        let fixture = try Data(contentsOf: url)
+        let decoded = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self, from: fixture)
+        let bytes = try JSONEncoder.winMuxDefault.encode(decoded)
+        XCTAssertEqual(bytes, fixture)
+    }
+
     func testAppLaunchedAfterWorkspaceSelectionKeepsNewPlacementAcrossFurtherNavigation() async throws {
         let oldWorkspace = Workspace.get(byName: "1")
         let old = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
@@ -78,7 +126,7 @@ final class RestartWorkspaceTest: XCTestCase {
             PendingRestartSnapshot(world: world, remainingWindowIds: [1], savedAt: .now - 8 * day),
             PendingRestartSnapshot(world: world, remainingWindowIds: [1], savedAt: .now - 6 * day),
         ]))
-        XCTAssertEqual(runtime.recovery.pendingRestartSnapshots.map { Int((Date.now.timeIntervalSince($0.savedAt) / day).rounded()) }, [6, 0])
+        XCTAssertEqual(runtime.recovery.restartSnapshots.map { Int((Date.now.timeIntervalSince($0.snapshot.savedAt) / day).rounded()) }, [6, 0])
 
         var json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(
             PendingRestartSnapshot(world: world, remainingWindowIds: [1]))) as? [String: Any])

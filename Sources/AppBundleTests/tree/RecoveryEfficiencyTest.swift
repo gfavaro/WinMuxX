@@ -19,28 +19,27 @@ final class RecoveryEfficiencyTest: XCTestCase {
             rememberRestartWindowBeforeAppTermination(window)
             window.unbindFromParent()
         }
-        let snapshots = runtime.recovery.pendingRestartSnapshots
+        let snapshots = runtime.recovery.restartSnapshots
         XCTAssertEqual(snapshots.count, 500)
-        XCTAssertEqual(snapshots.flatMap(\.world.workspaces).reduce(0) {
+        XCTAssertEqual(snapshots.flatMap(\.snapshot.world.workspaces).reduce(0) {
             $0 + collectFrozenWindows($1).count
         }, 500)
     }
 
     func testConsumedTreesWaitForReadersAndThenRelease() {
         let world = snapshotCurrentFrozenWorld()
-        runtime.recovery.pendingRestartSnapshots = [PendingRestartSnapshot(world: world, remainingWindowIds: [])]
-        runtime.recovery.restartMatchedWindows = [[:]]
+        runtime.recovery.restartSnapshots = [RestartSnapshotState(snapshot: PendingRestartSnapshot(world: world, remainingWindowIds: []))]
         runtime.recovery.restartRestorationsInFlight = 1
         compactPendingRestartSnapshots()
-        XCTAssertEqual(runtime.recovery.pendingRestartSnapshots.count, 1)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 1)
         runtime.recovery.restartRestorationsInFlight = 0
         runtime.recovery.lateRestartTreeDeadline = .now.addingTimeInterval(30)
         compactPendingRestartSnapshots()
-        XCTAssertEqual(runtime.recovery.pendingRestartSnapshots.count, 1)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 1)
         runtime.recovery.lateRestartTreeDeadline = nil
         compactPendingRestartSnapshots()
-        XCTAssertTrue(runtime.recovery.pendingRestartSnapshots.isEmpty)
-        XCTAssertTrue(runtime.recovery.restartMatchedWindows.isEmpty)
+        XCTAssertTrue(runtime.recovery.restartSnapshots.isEmpty)
+        XCTAssertTrue(runtime.recovery.restartSnapshots.allSatisfy { $0.matchedWindows.isEmpty })
     }
 
     func testUnchangedSnapshotDoesNotRewritePrimaryOrBackup() throws {
