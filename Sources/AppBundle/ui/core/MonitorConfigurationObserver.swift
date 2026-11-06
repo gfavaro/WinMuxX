@@ -6,6 +6,8 @@ final class MonitorConfigurationObserver {
 
     private var observer: NSObjectProtocol?
     private var screenChangeGeneration: UInt64 = 0
+    /// Replaces the settle delay, so tests can release each deadline in turn.
+    var settleDelayOverrideForTests: (@MainActor () async -> Void)?
 
     private init() {}
 
@@ -27,10 +29,13 @@ final class MonitorConfigurationObserver {
         }
     }
 
-    private func handleScreenParametersChanged() {
+    func handleScreenParametersChanged() {
         runtime.displays.displayHookPending = false
         WorkspaceOverviewController.shared.invalidate()
         WindowMotion.shared.screensChanged()
+        // A vanished display's workspace must not stay "visible" on it: selection would then
+        // target it and be refused. Retiring creates no fallback workspace.
+        if runtime.workspaceBackend.capabilities.ownsWorkspaceLifecycle { retireDisconnectedViewports() }
         // AppKit can emit this notification while the display topology is still changing.
         // Refresh panels immediately, but wait for the settled pass before reconciling
         // workspace-to-monitor assignments. This avoids creating fallback workspaces for a
@@ -54,7 +59,11 @@ final class MonitorConfigurationObserver {
         screenChangeGeneration += 1
         let generation = screenChangeGeneration
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 750_000_000)
+            if let delay = self.settleDelayOverrideForTests {
+                await delay()
+            } else {
+                try? await Task.sleep(nanoseconds: 750_000_000)
+            }
             guard generation == screenChangeGeneration else { return }
             WindowMotion.shared.screensSettled()
             if TrayMenuModel.shared.isEnabled {

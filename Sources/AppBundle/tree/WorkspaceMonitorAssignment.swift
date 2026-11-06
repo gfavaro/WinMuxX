@@ -156,6 +156,20 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
     }
 }
 
+/// A display that disappears stops showing its workspace at once, so that workspace is an
+/// ordinary hidden one while the topology settles; its viewport is stashed by display UUID
+/// for reconnection. Fallbacks for new displays still wait for the settled pass.
+@MainActor
+func retireDisconnectedViewports() {
+    let connected = Set(monitors.compactMap(\.displayUUID))
+    for (id, viewport) in runtime.workspaces.monitorViewportsById {
+        // Without a UUID a vanished coordinate proves nothing; the settled pass maps it.
+        guard let uuid = viewport.displayUUID, !connected.contains(uuid) else { continue }
+        runtime.workspaces.disconnectedViewportsByDisplay[uuid] = viewport
+        runtime.workspaces.monitorViewportsById[id] = nil
+    }
+}
+
 @MainActor
 func rearrangeWorkspacesOnMonitors() {
     let displayUUIDById = Dictionary(monitors.map { (MonitorViewportId($0), $0.displayUUID) }, uniquingKeysWith: { first, _ in first })

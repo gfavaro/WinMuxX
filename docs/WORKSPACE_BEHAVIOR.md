@@ -17,6 +17,7 @@ workspaces. Unless stated otherwise, no forced assignment applies.
 | Disconnect and reconnect a display | Reconcile valid active viewports and preserve surviving display history; do not promise physical restoration beyond tested behavior | `testDisconnectAndReconnectPreservesSurvivingDisplayHistory`; desktop checks still required |
 | B on S; S disconnects and reconnects, possibly elsewhere in the arrangement | S shows B again, matched by display UUID; if the user showed B elsewhere meanwhile, B stays there and S gets a fallback | `testReconnectedDisplayShowsItsWorkspaceAgainEvenWhenRearranged`, `testReconnectedDisplayLeavesItsWorkspaceWhereTheUserShowedItMeanwhile` |
 | A on M, B on S; M and S swap positions in the arrangement | Each display keeps its workspace | `testDisplaysThatSwapPositionsKeepTheirOwnWorkspaces` |
+| A on M, B on S; S disconnects and the user swipes on M before the topology settles | B is hidden at once, so the swipe can show it on M; when S returns, B stays on M and S gets a fallback | `testSwipeRightAfterUnplugCanShowTheDisplaysWorkspaceWhichThenStaysAndTheStaleDeadlineDoesNothing` |
 | A window of hidden C is missing after sleep or lock; the user selects B, then the window reappears | It returns to C, not the focused B; B stays selected | `testSelectionWhileWindowIsMissingKeepsItsWorkspaceAndTheSelection` |
 
 Unnamed test classes above refer to `Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift`.

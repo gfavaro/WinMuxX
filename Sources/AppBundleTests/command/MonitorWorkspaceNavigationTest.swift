@@ -472,6 +472,56 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         }
     }
 
+    func testSwipeRightAfterUnplugCanShowTheDisplaysWorkspaceWhichThenStaysAndTheStaleDeadlineDoesNothing() async throws {
+        @MainActor final class Deadlines { var waiting: [CheckedContinuation<Void, Never>] = [] }
+        let deadlines = Deadlines()
+        var scheduled: [String] = []
+        let observer = MonitorConfigurationObserver.shared
+        let savedEnabled = TrayMenuModel.shared.isEnabled
+        defer {
+            observer.settleDelayOverrideForTests = nil
+            setScheduledRefreshOverrideForTests(nil)
+            TrayMenuModel.shared.isEnabled = savedEnabled
+            WindowMotion.shared.screensSettled()
+        }
+        TrayMenuModel.shared.isEnabled = true
+        observer.settleDelayOverrideForTests = { await withCheckedContinuation { deadlines.waiting.append($0) } }
+        setScheduledRefreshOverrideForTests { event, _ in scheduled.append(event.description) }
+        func waitForDeadlines(_ count: Int) async {
+            while deadlines.waiting.count < count { await Task.yield() }
+        }
+        func settledRefreshes() -> Int { scheduled.filter { $0.contains(".settled") }.count }
+
+        let connected = identifiedDisplays()
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        // The ultrawide (S) disappears: its workspace B is hidden at once, before the settle deadline,
+        // so swiping on the laptop reaches it like any hidden workspace.
+        setMonitorsForTests([connected[0], connected[2]])
+        observer.handleScreenParametersChanged()
+        await waitForDeadlines(1)
+        XCTAssertFalse(spaces[1].isVisible)
+        XCTAssertTrue(navigateWorkspaceBySwipe(on: connected[0], isNext: true))
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(connected[0].activeWorkspace, spaces[1])
+        // S returns before the first deadline.
+        setMonitorsForTests(connected)
+        observer.handleScreenParametersChanged()
+        await waitForDeadlines(2)
+
+        deadlines.waiting[0].resume()
+        for _ in 0..<20 { await Task.yield() }
+        XCTAssertEqual(settledRefreshes(), 0, "The stale deadline schedules nothing")
+        deadlines.waiting[1].resume()
+        while settledRefreshes() == 0 { await Task.yield() }
+        Workspace.reconcileWorkspaceState()
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+        XCTAssertEqual(connected[0].activeWorkspace, spaces[1], "The user showed B on the laptop, so it stays there")
+        XCTAssertTrue(connected[1].activeWorkspace.isEffectivelyEmpty, "The ultrawide gets a fallback")
+        XCTAssertEqual(connected[2].activeWorkspace, spaces[4])
+        XCTAssertEqual(focus.workspace, spaces[1])
+    }
+
     func testDisplaysThatSwapPositionsKeepTheirOwnWorkspaces() {
         let connected = identifiedDisplays()
         setMonitorsForTests(connected)
