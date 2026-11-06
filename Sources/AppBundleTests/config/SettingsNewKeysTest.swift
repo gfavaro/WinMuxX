@@ -16,8 +16,6 @@ final class SettingsNewKeysTest: XCTestCase {
         let config = write("", [
             ("master", "size", "0.7"), ("master", "side", "'right'"), ("master", "stack-layout", "'accordion'"),
             ("master", "ultrawide-mains", "2"),
-            ("scrolling", "center-focused-column", "'on-overflow'"),
-            ("scrolling", "minimap-hold-modifiers", tomlCommaSeparatedStringArray("ctrl, alt")),
             ("hover-bar", "enabled", "false"),
             ("dimming", "inactive-windows", "0.25"),
             ("follow-app-activation", "enabled", "false"),
@@ -27,8 +25,6 @@ final class SettingsNewKeysTest: XCTestCase {
         XCTAssertEqual(config.master.side, .right)
         XCTAssertEqual(config.master.stackLayout, .stacked)
         XCTAssertEqual(config.master.ultrawideMains, 2)
-        XCTAssertEqual(config.scrolling.centerFocusedColumn, .onOverflow)
-        XCTAssertEqual(config.scrolling.minimapHoldModifiers, [.control, .option])
         XCTAssertFalse(config.hoverBar.enabled)
         XCTAssertEqual(config.dimming.inactiveWindows, 0.25)
         XCTAssertFalse(config.followAppActivation.enabled)
@@ -41,10 +37,4 @@ final class SettingsNewKeysTest: XCTestCase {
         XCTAssertFalse(config.followAppActivation.enabled, "The shorthand's value is kept as enabled")
     }
 
-    func testMinimapHoldKeysRoundTripAndRejectUnknownNames() {
-        XCTAssertEqual(minimapHoldModifierNames([.option, .control]), "ctrl, alt")
-        XCTAssertNil(minimapHoldModifierError("ctrl, alt"))
-        XCTAssertNil(minimapHoldModifierError(""))
-        XCTAssertNotNil(minimapHoldModifierError("ctrl, hyper"))
-    }
 }

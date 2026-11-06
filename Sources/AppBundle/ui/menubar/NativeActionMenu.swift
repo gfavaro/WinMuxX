@@ -130,7 +130,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         // The top level shows state and quick switches; every other command lives in Commands.
         menu.addItem(.separator())
         let arrangement = focus.workspace.arrangement
-        for layout in [WorkspaceLayoutName.dwindle, .master, .scrolling] {
+        for layout in [WorkspaceLayoutName.dwindle, .master] {
             let item = addCommand(layout.rawValue.capitalized, script: "workspace-layout \(layout.rawValue)", to: menu)
             item?.image = MenuBarLayoutIcon.image(for: layout, monochrome: true)
             item?.state = arrangement == layout ? .on : .off
@@ -138,12 +138,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         switch arrangement {
             case .master:
                 addCommand("Swap with Master", script: "swap-with-master", to: menu)
-            case .scrolling:
-                addCommand("Center Column", script: "scrolling-center", to: menu)
-                addCommand("Show Minimap", script: "scrolling-minimap", to: menu)
-                addCommand("Cycle Column Width", script: "scrolling-width next", to: menu)
-                addCommand("Pin Column Left", script: "scrolling-pin left", to: menu)
-                addCommand("Pin Column Right", script: "scrolling-pin right", to: menu)
             case .dwindle:
                 break
         }

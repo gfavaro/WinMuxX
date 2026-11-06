@@ -16,7 +16,6 @@ struct WorkspaceLayoutCommand: Command {
         // Arrangement transitions retain the live nested tree. In particular, an
         // empty workspace can opt in before its first window is detected.
         workspace.transitionArrangement(to: layout, focused: window)
-        WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
         return true
     }
 }

@@ -26,7 +26,7 @@ struct RetileCommand: Command {
 @MainActor
 func retileCandidates(frame: (UInt32) -> CGRect?) -> [Window] {
     Workspace.all.filter(\.isVisible).flatMap(\.allLeafWindowsRecursive).filter { window in
-        guard window.parent is TilingContainer, !window.isFullscreen, !window.isConcealedByScrolling,
+        guard window.parent is TilingContainer, !window.isFullscreen,
               let tile = window.lastAppliedLayoutPhysicalRect, let actual = frame(window.windowId) else { return false }
         return !windowRestsOnTile(actual, tile: tile)
     }

@@ -99,7 +99,7 @@ final class Dinky019AdoptionTest: XCTestCase {
             layout = 'dwindle'
             orientation = 'horizontal'
             [workspace.1.display.'Samsung']
-            layout = 'scrolling'
+            layout = 'dwindle'
             [workspace.1.display.'Samsung Ultra']
             layout = 'master'
             orientation = 'vertical'
@@ -215,13 +215,13 @@ final class Dinky019AdoptionTest: XCTestCase {
     }
 
     func testGlobalLayoutReloadDoesNotOverrideExplicitWorkspacePolicy() {
-        config.workspaceLayouts = parseConfig("[workspace.1]\nlayout = 'scrolling'\norientation = 'vertical'").config.workspaceLayouts
+        config.workspaceLayouts = parseConfig("[workspace.1]\nlayout = 'master'\norientation = 'vertical'").config.workspaceLayouts
         let workspace = Workspace.get(byName: "1")
         workspace.applyConfiguredLayout()
         config.defaultRootContainerLayout = .dwindle
         _ = applyDwindleToExistingTiledWorkspaces()
         workspace.applyConfiguredLayout()
-        XCTAssertEqual(workspace.arrangement, .scrolling)
+        XCTAssertEqual(workspace.arrangement, .master)
         XCTAssertEqual(workspace.rootTilingContainer.orientation, .h)
     }
 

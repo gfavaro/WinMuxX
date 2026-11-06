@@ -9,8 +9,4 @@ final class WorkspaceFitDiagnosticsTest: XCTestCase {
         XCTAssertFalse(layoutMinimumExceedsArea(CGSize(width: 900, height: 700), available: CGSize(width: 1200, height: 900)))
     }
 
-    func testIntentionalOffscreenColumnIsNotDiagnosedUnlessItsMinimumExceedsViewport() {
-        XCTAssertFalse(scrollingColumnMinimumExceedsViewport(800, viewportWidth: 1000))
-        XCTAssertTrue(scrollingColumnMinimumExceedsViewport(1100, viewportWidth: 1000))
-    }
 }

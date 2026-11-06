@@ -91,7 +91,6 @@ enum GlobalObserver {
         let modifierFlags = event.modifierFlags
         runOnMainActor {
             noteTapBindingFlagsChanged(keyCode: keyCode, modifierFlags: modifierFlags)
-            WorkspaceScrollingMinimap.shared.modifiersChanged(modifierFlags)
         }
     }
 
@@ -104,7 +103,6 @@ enum GlobalObserver {
         let point = normalizeAppKitScreenPoint(screenPoint)
         runOnMainActor {
             if isClick {
-                WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
                 WorkspaceSwipeController.shared.cancelVisualInteraction()
                 DoubleSidedWindowController.shared.cancelPreparation()
             }
@@ -132,8 +130,7 @@ enum GlobalObserver {
 
     @MainActor
     private static func scheduleFocusFollowsMouse(point: CGPoint, timestamp: TimeInterval) {
-        guard !WorkspaceScrollingGestureController.shared.isMotionActive,
-              !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
+        guard !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
               !isMouseManipulationActive,
               let window = pointerFocusCandidate(at: point),
               window.participatesInWorkspaceFocus else {
@@ -148,14 +145,14 @@ enum GlobalObserver {
         let dwell = max(config.focusFollowsMouseDwell, 0)
         focusFollowsMouseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(dwell))
-            guard !Task.isCancelled, !WorkspaceScrollingGestureController.shared.isMotionActive,
+            guard !Task.isCancelled,
                   !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive,
                   !isLeftMouseButtonDown,
                   let ready = FocusFollowsMouseController.shared.isReady(dwell: Double(dwell) / 1000, timestamp: ProcessInfo.processInfo.systemUptime),
                   ready == window.windowId else { return }
             let id = await PointerFocusNativeHitTester.shared.windowId(at: point)
-            guard !Task.isCancelled, !WorkspaceScrollingGestureController.shared.isMotionActive,
+            guard !Task.isCancelled,
                   !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive, !isLeftMouseButtonDown,
                   let target = pointerFocusTarget(at: point, frontmostWindowId: id),

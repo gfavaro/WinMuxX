@@ -32,8 +32,7 @@ and workload.
 
 `doctor` reports whether a tracked window's WindowServer frame agrees with the
 public CoreGraphics window list within one point. A missing public witness is
-inconclusive. Border lines report the backends currently active, and raw-touch
-status reports registration only; it does not establish gesture correctness.
+inconclusive. Border lines report the backends currently active.
 The report is observational and does not switch backends or change macOS
 preferences.
 

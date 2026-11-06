@@ -3,7 +3,6 @@ import SwiftUI
 import Common
 
 struct ShortcutBehaviorSettingsView: View {
-    @ObservedObject private var workspaceTouch = RawWorkspaceTouchSource.shared
     @ObservedObject private var minimums = PersistedAppMinimums.shared
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
@@ -14,14 +13,6 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
-    @SettingsDraft("scrolling.column-width", load: { Int((config.scrolling.columnWidth * 100).rounded()) }) private var scrollingColumnWidth: Int
-    @SettingsDraft("scrolling.width-presets", load: { config.scrolling.widthPresets.map { String($0 * 100) }.joined(separator: ", ") }) private var scrollingWidthPresets: String
-    @SettingsDraft("scrolling.gesture-enabled", load: { config.scrolling.gestureEnabled }) private var scrollingGestureEnabled: Bool
-    @SettingsDraft("scrolling.gesture-sensitivity", load: { String(config.scrolling.gestureSensitivity) }) private var scrollingSensitivity: String
-    @SettingsDraft("scrolling.minimap-enabled", load: { config.scrolling.minimapEnabled }) private var scrollingMinimapEnabled: Bool
-    @SettingsDraft("scrolling.keep-window-height", load: { config.scrolling.keepWindowHeight }) private var scrollingKeepWindowHeight: Bool
-    @SettingsDraft("scrolling.center-focused-column", load: { config.scrolling.centerFocusedColumn }) private var scrollingCenterMode: ScrollingCenterMode
-    @SettingsDraft("scrolling.minimap-hold-modifiers", load: { minimapHoldModifierNames(config.scrolling.minimapHoldModifiers) }) private var minimapHoldModifiers: String
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
     @SettingsDraft("master.stack-layout", load: { config.master.stackLayout }) private var masterStackLayout: Layout
@@ -116,22 +107,20 @@ struct ShortcutBehaviorSettingsView: View {
                     persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
                 }
                 .disabled(!workspaceSwipes)
-                Text(DockWorkspaceSwipeSource.shared.readsHorizontal ? DockWorkspaceSwipeSource.shared.status
-                    : workspaceTouch.status + (workspaceTouch.maximumFingerCount > 0 ? " · Detected up to \(workspaceTouch.maximumFingerCount) fingers" : ""))
+                Text(DockWorkspaceSwipeSource.shared.status)
                     .font(.callout).foregroundStyle(.secondary)
-                Text("With Swipe between full-screen apps on three fingers in macOS Trackpad settings, macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Otherwise WinMuxX reads exactly three fingers through the private raw-touch API. Normal two-finger scrolling stays with your apps.")
+                Text("Needs Swipe between full-screen apps on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Normal two-finger scrolling stays with your apps.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Workspace overview") {
                 SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
                     persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
                 }
-                Text("Use workspace-overview from a shortcut or the CLI. With Mission Control on three fingers in macOS Trackpad settings, macOS recognizes the swipe and it opens the overview instead; Mission Control stays on its keyboard shortcut. Otherwise move all three fingers together, with Mission Control on four fingers or off. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                Text("Use workspace-overview from a shortcut or the CLI. The swipe needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes it and it opens the overview instead; Mission Control stays on its keyboard shortcut. Minimized windows, hidden apps and native full-screen windows are excluded.")
                     .font(.callout).foregroundStyle(.secondary)
             }
 
             masterSettingsSection
-            scrollingSettingsSection
             SettingsSection("Hover bar") {
                 SettingsToggle("Show quick actions above windows", id: "hover-bar.enabled", isOn: $hoverBarEnabled,
                     help: "Rest the pointer on the middle of a tiled window's top edge for Main (Master), Focus and Float, with their shortcuts; a focused window offers Unfocus. Tab groups always show their tabs there.") {
@@ -242,12 +231,12 @@ struct ShortcutBehaviorSettingsView: View {
     private var fitDiagnosticsSection: some View {
         SettingsSection("Layout fit diagnostics") {
             if fitIssues.isEmpty {
-                Text("No tiled group or visible scrolling column exceeds its available layout area.")
+                Text("No tiled group exceeds its available layout area.")
                     .font(.callout).foregroundStyle(.secondary)
             } else {
                 ForEach(fitIssues) { issue in
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(issue.kind == .tiledGroup ? "Tiled group minimum exceeds its layout area" : "Scrolling column minimum exceeds the viewport")
+                        Text("Tiled group minimum exceeds its layout area")
                             .font(.body)
                         Text("\(workspaceDisplayName(runtime.workspaces.workspaceById[issue.workspaceId]?.name ?? issue.workspaceId.rawValue)) · minimum \(minimumSizeDescription(issue.minimumSize)) · available \(minimumSizeDescription(issue.availableSize))")
                             .font(.caption).foregroundStyle(.secondary)
@@ -255,59 +244,11 @@ struct ShortcutBehaviorSettingsView: View {
                     .padding(.vertical, 4)
                 }
             }
-            Text("Offscreen scrolling columns are intentionally reachable by scrolling and are not reported as fit failures.")
-                .font(.callout).foregroundStyle(.secondary)
         }
     }
 
     private func refreshFitDiagnostics() {
         fitIssues = workspaceFitIssues(in: orderedWorkspacesForPresentation())
-    }
-
-    private var scrollingSettingsSection: some View {
-        SettingsSection("Scrolling workspaces") {
-            SettingsStepper("Default column width", id: "scrolling.column-width", value: $scrollingColumnWidth,
-                range: 10...100, help: "Preferred share of the usable display width. A lone column still fills the display.", unit: "%") {
-                persistConfig(section: "scrolling", key: "column-width", value: String(Double(scrollingColumnWidth) / 100))
-            }
-            SettingsTextField("Width presets (%)", id: "scrolling.width-presets", text: $scrollingWidthPresets,
-                help: "Comma-separated ascending percentages from 10 to 100.", validate: scrollingPresetError) {
-                if let values = scrollingPresetValues(scrollingWidthPresets) {
-                    persistConfig(section: "scrolling", key: "width-presets", value: "[" + values.map { String($0) }.joined(separator: ", ") + "]")
-                }
-            }
-            SettingsToggle("Option + three-finger pan", id: "scrolling.gesture-enabled", isOn: $scrollingGestureEnabled,
-                help: "Pan the horizontal strip. Plain horizontal swipes still switch workspaces.") {
-                persistConfig(section: "scrolling", key: "gesture-enabled", value: scrollingGestureEnabled ? "true" : "false")
-            }
-            SettingsTextField("Gesture sensitivity", id: "scrolling.gesture-sensitivity", text: $scrollingSensitivity,
-                help: "Multiplier for the default pan distance. Enter a finite value greater than zero.", validate: scrollingSensitivityError) {
-                if let value = Double(scrollingSensitivity), value.isFinite, value > 0 {
-                    persistConfig(section: "scrolling", key: "gesture-sensitivity", value: String(value))
-                }
-            }
-            SettingsToggle("Keep each window's opening height", id: "scrolling.keep-window-height", isOn: $scrollingKeepWindowHeight,
-                help: "A window alone in its column keeps the height it opened with, aligned to the top, instead of filling the column.") {
-                persistConfig(section: "scrolling", key: "keep-window-height", value: scrollingKeepWindowHeight ? "true" : "false")
-            }
-            SettingsToggle("Show scrolling minimap", id: "scrolling.minimap-enabled", isOn: $scrollingMinimapEnabled,
-                help: "Show the workspace map while panning and allow it to be opened from the menu or a shortcut.") {
-                persistConfig(section: "scrolling", key: "minimap-enabled", value: scrollingMinimapEnabled ? "true" : "false")
-            }
-            SettingsTextField("Hold to keep the minimap up", id: "scrolling.minimap-hold-modifiers", text: $minimapHoldModifiers,
-                help: "Comma-separated keys from ctrl, alt, cmd and shift; while they are held the minimap stays open. Empty turns this off.",
-                validate: minimapHoldModifierError) {
-                if minimapHoldModifierError(minimapHoldModifiers) == nil {
-                    persistConfig(section: "scrolling", key: "minimap-hold-modifiers", value: tomlCommaSeparatedStringArray(minimapHoldModifiers))
-                }
-            }
-            SettingsPicker("Centre the focused column", id: "scrolling.center-focused-column", selection: $scrollingCenterMode,
-                help: "Where focusing a column scrolls the strip.") {
-                Text("Never: just bring it into view").tag(ScrollingCenterMode.never)
-                Text("Only when the strip overflows").tag(ScrollingCenterMode.onOverflow)
-                Text("Always").tag(ScrollingCenterMode.always)
-            } onChange: { persistConfig(section: "scrolling", key: "center-focused-column", value: "'\(scrollingCenterMode.rawValue)'") }
-        }
     }
 
     private var masterSettingsSection: some View {
@@ -345,17 +286,6 @@ struct ShortcutBehaviorSettingsView: View {
     }
 }
 
-private let minimapHoldModifierFlags: [(String, NSEvent.ModifierFlags)] = [("ctrl", .control), ("alt", .option), ("cmd", .command), ("shift", .shift)]
-
-func minimapHoldModifierNames(_ flags: NSEvent.ModifierFlags) -> String {
-    minimapHoldModifierFlags.filter { flags.contains($0.1) }.map(\.0).joined(separator: ", ")
-}
-
-func minimapHoldModifierError(_ text: String) -> String? {
-    let names = text.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-    let unknown = names.filter { name in !minimapHoldModifierFlags.contains { $0.0 == name } }
-    return unknown.isEmpty ? nil : "Unknown key: \(unknown.joined(separator: ", ")). Use ctrl, alt, cmd or shift."
-}
 
 private func minimumAppName(_ bundleId: String) -> String {
     NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first?.localizedName
@@ -374,22 +304,4 @@ private func minimumSizeDescription(_ size: CGSize) -> String {
     let width = size.width == 0 ? "?" : String(Int(size.width.rounded()))
     let height = size.height == 0 ? "?" : String(Int(size.height.rounded()))
     return "\(width) × \(height)"
-}
-
-private func scrollingPresetValues(_ text: String) -> [Double]? {
-    let parts = text.split(separator: ",", omittingEmptySubsequences: false)
-    let values = parts.compactMap { Double($0.trimmingCharacters(in: .whitespacesAndNewlines)) }.map { $0 / 100 }
-    guard values.count == parts.count, !values.isEmpty,
-          values.allSatisfy({ $0.isFinite && (0.1...1).contains($0) }),
-          zip(values, values.dropFirst()).allSatisfy(<) else { return nil }
-    return values
-}
-
-private func scrollingPresetError(_ text: String) -> String? {
-    scrollingPresetValues(text) == nil ? "Enter ascending percentages between 10 and 100, separated by commas." : nil
-}
-
-private func scrollingSensitivityError(_ text: String) -> String? {
-    guard let value = Double(text), value.isFinite, value > 0 else { return "Enter a finite value greater than zero." }
-    return nil
 }

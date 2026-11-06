@@ -4,17 +4,12 @@ import Common
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
-        var pinIndicatorShown = false
-        defer { if !pinIndicatorShown { ScrollingPinIndicator.shared.hide(self) } }
         applyConfiguredLayout()
         normalizeMasterLayout()
         if isEffectivelyEmpty { return }
         let rect = workspaceTilingRect(self)
         let context = LayoutContext(self)
         if let tabGroup = rootTilingContainer.allTabbedContainersRecursive.first(where: \.hasFullscreenTab) {
-            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
-            ScrollingWindowOrdering.shared.cancel()
-            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -26,9 +21,6 @@ extension Workspace {
             return
         }
         if let fullscreenWindow = rootTilingContainer.mostRecentWindowRecursive, fullscreenWindow.isFullscreen {
-            WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
-            ScrollingWindowOrdering.shared.cancel()
-            WorkspaceScrollingMinimap.shared.dismiss()
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -39,14 +31,12 @@ extension Workspace {
             try await fullscreenWindow.layoutFullscreen(context)
             return
         }
-        if arrangement == .master || arrangement == .scrolling {
+        if arrangement == .master {
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
             rootTilingContainer.lastAppliedLayoutVirtualRect = rect
             try await layoutWorkspaceGroups(in: rect, context)
-            ScrollingPinIndicator.shared.update(self, rect: rect, gaps: context.resolvedGaps)
-            pinIndicatorShown = true
             for window in children.filterIsInstance(of: Window.self) {
                 window.lastAppliedLayoutPhysicalRect = nil
                 window.lastAppliedLayoutVirtualRect = nil
@@ -64,51 +54,10 @@ extension Workspace {
 @MainActor
 private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) async throws {
     let workspace = context.workspace
-    if workspace.arrangement == .scrolling {
-        workspace.rebaseScrollingViewportIfNeeded(using: workspace.scrollingMetrics)
-        let metrics = workspace.scrollingMetrics
-        if !workspace.scrollingGestureMotionActive, let focused = focus.windowOrNil,
-           workspace.lastScrollingFocusWindowId != focused.windowId,
-           let column = metrics.columns.first(where: { $0.node === focused.topLevelWorkspaceGroup })
-        {
-            workspace.scrollingOffset = metrics.focusedOffset(for: column, current: workspace.scrollingOffset)
-            workspace.lastScrollingFocusWindowId = focused.windowId
-        }
-        workspace.scrollingOffset = metrics.clampedOffset(workspace.scrollingOffset)
-        if !workspace.scrollingGestureMotionActive, let window = focus.windowOrNil as? MacWindow,
-           window.nodeWorkspace === workspace,
-           let column = metrics.columns.first(where: { $0.node === window.topLevelWorkspaceGroup }) {
-            let epoch = workspace.scrollingSessionEpoch
-            let offsets = (try? await window.scrollingSheetOffsets()) ?? []
-            try checkCancellation()
-            if workspace.scrollingSessionEpoch == epoch, focus.windowOrNil === window {
-                let leafInset = (window.lastAppliedLayoutVirtualRect?.minX ?? 0) -
-                    (column.node.lastAppliedLayoutVirtualRect?.minX ?? 0)
-                let target = offsets.map(\.minX).min().flatMap { left in offsets.map(\.maxX).max().map { right in
-                    metrics.sheetRevealedOffset(start: column.start + leafInset + left,
-                        end: column.start + leafInset + right, current: workspace.scrollingOffset)
-                } }
-                let step = ScrollingSheetReveal.step(current: workspace.scrollingOffset, windowId: window.windowId,
-                    target: target, remembered: workspace.scrollingSheetReveal)
-                // Stored before the offset so the geometry's range already reaches it.
-                workspace.scrollingSheetReveal = step.remembered
-                workspace.scrollingOffset = step.remembered == nil ? metrics.clampedOffset(step.offset) : step.offset
-            }
-        }
-    }
     let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
     for frame in frames {
-        for window in frame.node.allLeafWindowsRecursive {
-            window.isConcealedByScrolling = workspace.arrangement == .scrolling && frame.node !== workspace.pinnedScrollingColumn &&
-                !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size)
-                    .intersects(workspace.scrollingMetrics.geometry.area)
-        }
         try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
                                              height: frame.physical.height, virtual: frame.virtual, context)
-    }
-    if workspace.arrangement == .scrolling {
-        workspace.captureScrollingViewportAnchor()
-        ScrollingWindowOrdering.shared.update(workspace: workspace, frames: frames)
     }
 }
 

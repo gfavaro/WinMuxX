@@ -5,7 +5,7 @@ public struct WorkspaceLayoutCmdArgs: CmdArgs {
         kind: .workspaceLayout,
         allowInConfig: true,
         help: """
-        USAGE: winmuxx workspace-layout [--window-id <window-id>] (dwindle|master|scrolling)...
+        USAGE: winmuxx workspace-layout [--window-id <window-id>] (dwindle|master)...
 
         Switch the target window's workspace-wide arrangement. Multiple choices cycle
         after the current mode, wrapping to the first. Requires a tiled window.
@@ -17,7 +17,7 @@ public struct WorkspaceLayoutCmdArgs: CmdArgs {
 }
 
 public enum WorkspaceLayoutName: String, CaseIterable, Equatable, Sendable, Codable {
-    case dwindle, master, scrolling
+    case dwindle, master
 }
 
 private func parseWorkspaceLayoutChoices(input: PosArgParserInput) -> ParsedCliArgs<[WorkspaceLayoutName]> {

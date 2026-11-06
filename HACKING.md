@@ -121,10 +121,11 @@ A configured assignment overrides all of these while its display is connected
 elsewhere is refused at `CGPoint.setActiveWorkspace`, fallbacks and new automatic
 names skip it, and reconciliation moves one showing elsewhere to its display.
 
-`WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
-`DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events instead of
-raw touch when macOS assigns a gesture to three fingers: horizontal for workspace
-swipes, vertical (Mission Control) for the overview. `DockSwipeTracker` decides which
+`WorkspaceGestureCoordinator` wires the gestures to their configuration.
+`DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events when macOS
+assigns a gesture to three fingers: horizontal for workspace swipes, vertical
+(Mission Control) for the overview. WinMuxX does not read raw touches; scrolling
+workspaces and their raw-touch pan moved to SpaceMuxX. `DockSwipeTracker` decides which
 swipes WinMuxX keeps from the Dock and replays the rest; vertical progress follows
 Natural scrolling, horizontal progress already accounts for it. On macOS 27 the Dock must still receive the physical Ended event (motion
 zeroed), or its gesture state stays open.

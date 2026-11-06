@@ -44,19 +44,19 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
         SetupCheckItem(id: "other-window-managers", title: "No other window manager", ok: input.otherWindowManagers.isEmpty,
                        detail: input.otherWindowManagers.isEmpty ? "None running." : "\(input.otherWindowManagers.joined(separator: ", ")) also moves windows; quit it so the two do not fight."),
     ]
-    // Either works: macOS's swipe is read when it uses three fingers, raw touch otherwise.
+    // The swipes are macOS's own: they need the matching gesture on three fingers.
     if input.workspaceSwipe {
-        items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: true,
+        items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: input.macThreeFingerHorizontalSwipe,
             detail: input.macThreeFingerHorizontalSwipe
                 ? "WinMuxX switches workspaces with macOS's own three-finger swipe recognition."
-                : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Swipe between full-screen applications to three fingers.",
+                : "Set Trackpad › More Gestures › Swipe between full-screen applications to three fingers; WinMuxX switches workspaces with that swipe.",
             fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
     }
     if input.overviewThreeFingerUp {
-        items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: true,
+        items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: input.macThreeFingerVerticalSwipe,
             detail: input.macThreeFingerVerticalSwipe
                 ? "Three fingers up opens the overview with macOS's own recognition, in place of Mission Control. Mission Control stays on its keyboard shortcut."
-                : "WinMuxX recognizes three fingers itself. For recognition exactly like macOS's, set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
+                : "Set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
             fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
     }
     return items

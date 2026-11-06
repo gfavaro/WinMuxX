@@ -9,7 +9,7 @@ final class ConfigUpgradeCompatibilityTest: XCTestCase {
         [workspace.'1']
         layout = 'accordion'
         [workspace.'2']
-        layout = 'scrolling'
+        layout = 'master'
         [workspace.'3'.display.'Built-in']
         layout = 'tiles'
         """)
@@ -17,7 +17,7 @@ final class ConfigUpgradeCompatibilityTest: XCTestCase {
         let first = parsed.config.workspaceLayouts["1"]?.defaults
         XCTAssertEqual(first?.layout, .dwindle)
         XCTAssertEqual(first?.rootLayout, .stacked)
-        XCTAssertEqual(parsed.config.workspaceLayouts["2"]?.defaults.layout, .scrolling)
+        XCTAssertEqual(parsed.config.workspaceLayouts["2"]?.defaults.layout, .master)
         XCTAssertNil(parsed.config.workspaceLayouts["2"]?.defaults.rootLayout)
         XCTAssertEqual(parsed.config.workspaceLayouts["3"]?.displays.first?.settings.rootLayout, .tiles)
         XCTAssertFalse(parseConfig("[workspace.'1']\nlayout = 'spiral'").errors.isEmpty)

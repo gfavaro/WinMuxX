@@ -181,7 +181,6 @@ final class WorkspaceOverviewController {
         phase = .open
         if dependencies.nativeIntegration {
             installObservers()
-            WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
         }
         startCaptures()
         return true
@@ -211,7 +210,6 @@ final class WorkspaceOverviewController {
         }
         attempted.removeAll(); invalidated.removeAll(); ranks.removeAll(); project = nil
         if dependencies.nativeIntegration {
-            WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
             WorkspaceSidebarPanel.refreshAll()
         }
         if restoreFocus, dependencies.nativeIntegration, NSWorkspace.shared.frontmostApplication?.processIdentifier == myPid {

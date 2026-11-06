@@ -34,8 +34,8 @@ In master mode, this applies to the stack. A tab group keeps its windows togethe
 see the [tab group diagram](assets/layouts/tabs.svg).
 
 `layout strip` shows a tab group as a strip instead: its windows sit side by side as
-columns inside the group's tile, in Dwindle, Master or a scrolling column. Each column
-takes `[scrolling] column-width` of the group (gaps included, so 0.5 shows two), and the
+columns inside the group's tile, in Dwindle or Master. Each column takes just under half
+the group (gaps included, so two show at once) unless it was resized, and the
 columns that fit fill the tile. The others wait hidden; focus left or right steps through
 the columns and scrolls hidden ones in, leaving the strip at either end. `layout tab-group`
 shows the same group as tabs again. The choice is saved with the layout. Make a group with

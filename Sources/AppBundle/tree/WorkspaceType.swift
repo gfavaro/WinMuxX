@@ -8,33 +8,15 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     private(set) var namingStyle: WorkspaceNamingStyle = .explicit
     var projectId: WorkspaceProjectId = workspaceProjectDefaultId
     var restoredDisplayIndex: Int?
-    var preferredMonitorPoint: CGPoint? {
-        didSet { if oldValue != preferredMonitorPoint { scrollingSessionEpoch &+= 1 } }
-    }
+    var preferredMonitorPoint: CGPoint?
     var lifecycle: WorkspaceLifecycle = .durable
     var lastConfiguredLayout: WorkspaceLayoutSettings?
     // Once workspace arrangements are used, returning to Dwindle must retain
     // the same group boundaries rather than rerun the legacy tree migration.
     var preservesTopLevelGroups = false
     var arrangement: WorkspaceLayoutName = .dwindle {
-        didSet {
-            if arrangement != .dwindle { preservesTopLevelGroups = true }
-            if oldValue != arrangement { scrollingSessionEpoch &+= 1 }
-        }
+        didSet { if arrangement != .dwindle { preservesTopLevelGroups = true } }
     }
-    var scrollingSessionEpoch: UInt64 = 0
-    var scrollingOffset: CGFloat = 0
-    /// A column held at a screen edge, full height, while the rest of the strip scrolls.
-    weak var scrollingPinnedNode: TreeNode?
-    var scrollingPinSide = ScrollingPinCmdArgs.Side.left
-    var lastScrollingFocusWindowId: UInt32?
-    /// Where the strip was before an attached sheet pulled it aside, to settle back.
-    var scrollingSheetReveal: ScrollingSheetReveal?
-    var scrollingAnchorWindowId: UInt32?
-    var scrollingAnchorViewportPosition: CGFloat?
-    var scrollingAnchorAreaWidth: CGFloat?
-    @MainActor var scrollingGestureMotionActive = false
-    @MainActor var scrollingGestureSessionID: UUID?
     private var savedMasterGroupIndex = 0
     private weak var masterGroup: TreeNode?
     @MainActor var masterGroupIndex: Int {
@@ -133,21 +115,6 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
 }
 
 extension Workspace {
-    @MainActor
-    var scrollingTopologySignature: String {
-        let bounds = workspaceTilingRect(self)
-        var values: [String] = [arrangement.rawValue, id.rawValue,
-            "\(bounds.minX),\(bounds.minY),\(bounds.width),\(bounds.height)"]
-        func visit(_ node: TreeNode) {
-            values.append("\(ObjectIdentifier(node).hashValue):\(node.bindingGeneration):\(node.children.count):\(node.scrollingColumnWidth ?? config.scrolling.columnWidth)")
-            if let window = node as? Window {
-                values.append("\(window.minimumLayoutSize.width),\(window.minimumLayoutSize.height)")
-            }
-            node.children.forEach(visit)
-        }
-        visit(rootTilingContainer)
-        return values.joined(separator: ",")
-    }
 }
 
 extension Workspace {

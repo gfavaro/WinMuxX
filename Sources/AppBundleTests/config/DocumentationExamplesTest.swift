@@ -11,7 +11,7 @@ final class DocumentationExamplesTest: XCTestCase {
             layout = 'master'
 
             [workspace.Code.display.'Built-in']
-            layout = 'scrolling'
+            layout = 'dwindle'
             """)
         XCTAssertTrue(errors.isEmpty, errors.map(\.description).joined(separator: "\n"))
     }

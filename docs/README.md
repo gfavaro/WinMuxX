@@ -45,7 +45,6 @@ guides above for today's settings and development workflow.
 - [Dinky fit and implementation plan](archive/DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
 - [Dinky execution checklist](archive/DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
 - [Robustness plan](archive/ROBUSTNESS_PLAN.md), shipped in build 121, with its [validation](archive/ROBUSTNESS_VALIDATION.md).
-- [Scrolling workspaces validation](archive/SCROLLING_WORKSPACES_COMPLETION.md)
 - [AeroSpork comparison](archive/AEROSPORK_REVIEW.md) and the [Settings ideas it led to](archive/SETTINGS_AND_CLEANUP_PLAN.md), shipped in build 73.
 - [prateek/winmux fork review](archive/PRATEEK_FORK_REVIEW.md)
 - [Shoji review](SHOJI_REVIEW.md): hands-on notes, pill tab strips and other ideas; not yet reviewed.

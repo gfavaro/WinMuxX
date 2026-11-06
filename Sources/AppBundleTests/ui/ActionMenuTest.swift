@@ -105,7 +105,7 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
-        for title in ["Dwindle", "Master", "Scrolling", "Retile", "Balance Sizes", "Fullscreen", "No Peek", "Borders",
+        for title in ["Dwindle", "Master", "Retile", "Balance Sizes", "Fullscreen", "No Peek", "Borders",
                       "Focus Follows Pointer", "Commands", "About WinMuxX", "Settings…", "Enabled", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
@@ -148,18 +148,11 @@ final class ActionMenuTest: XCTestCase {
         workspace.arrangement = .master
         controller.menuNeedsUpdate(menu)
         XCTAssertTrue(menu.items.contains { $0.title == "Swap with Master" })
-        XCTAssertFalse(menu.items.contains { $0.title == "Center Column" })
         XCTAssertEqual(menu.items.first { $0.title == "Borders" }?.state, .on)
         XCTAssertEqual(menu.items.first { $0.title == "Focus Follows Pointer" }?.state, .off)
-        workspace.arrangement = .scrolling
-        controller.menuNeedsUpdate(menu)
-        XCTAssertFalse(menu.items.contains { $0.title == "Swap with Master" })
-        for title in ["Center Column", "Show Minimap", "Cycle Column Width", "Pin Column Left", "Pin Column Right"] {
-            XCTAssertTrue(menu.items.contains { $0.title == title }, title)
-        }
         workspace.arrangement = .dwindle
         controller.menuNeedsUpdate(menu)
-        XCTAssertFalse(menu.items.contains { $0.title == "Swap with Master" || $0.title == "Center Column" })
+        XCTAssertFalse(menu.items.contains { $0.title == "Swap with Master" })
     }
 
     private func submenu(_ title: String, in menu: NSMenu) throws -> NSMenu {

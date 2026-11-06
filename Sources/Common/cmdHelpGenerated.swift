@@ -71,7 +71,7 @@ let layout_help_generated = """
     In master layout this changes the focused window's own container; use
     [master] stack-layout to arrange the stack.
     Multiple choices cycle after the last matching state, wrapping to the first.
-    Use 'workspace-layout dwindle master scrolling' to switch workspace modes.
+    Use 'workspace-layout dwindle master' to switch workspace modes.
     """
 let list_apps_help_generated = """
     USAGE: list-apps [-h|--help] [--macos-native-hidden [no]] [--format <output-format>] [--count] [--json]

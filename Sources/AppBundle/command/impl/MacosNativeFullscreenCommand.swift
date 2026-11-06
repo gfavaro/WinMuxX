@@ -11,9 +11,6 @@ struct MacosNativeFullscreenCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
-        WorkspaceScrollingGestureController.shared.cancelForInteractiveDrag()
-        ScrollingWindowOrdering.shared.cancel()
-        WorkspaceScrollingMinimap.shared.dismiss()
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)

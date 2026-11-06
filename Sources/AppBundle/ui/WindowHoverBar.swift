@@ -87,7 +87,7 @@ final class WindowHoverBar {
             let windows = workspace.allLeafWindowsRecursive
             let floating = workspace.floatingWindows.filter { $0.participatesInWorkspaceFocus && !$0.isHiddenInCorner }
             for window in floating + windows.filter(\.isFullscreen) + windows.filter({ !$0.isFullscreen }) {
-                guard window.parent is TilingContainer || window.parent is Workspace, !window.isConcealedByScrolling,
+                guard window.parent is TilingContainer || window.parent is Workspace,
                       !window.isInactiveWindowTab, let frame = frame(of: window),
                       triggerZone(for: frame).contains(point) else { continue }
                 return window

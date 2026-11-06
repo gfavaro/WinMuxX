@@ -22,8 +22,6 @@ enum MenuBarLayoutIcon {
                 case .master:
                     drawOuter()
                     drawMaster()
-                case .scrolling:
-                    drawScrolling(in: rect)
             }
             return true
         }
@@ -59,25 +57,6 @@ enum MenuBarLayoutIcon {
         path.stroke()
     }
 
-    private static func drawScrolling(in rect: NSRect) {
-        NSGraphicsContext.saveGraphicsState()
-        let clip = NSBezierPath(rect: rect.insetBy(dx: 0.2, dy: 0.2))
-        clip.addClip()
-
-        let neighbor = NSBezierPath(roundedRect: NSRect(x: -4.8, y: 3.0, width: 8.0, height: 12.0), xRadius: 1.8, yRadius: 1.8)
-        let center = NSBezierPath(roundedRect: NSRect(x: 5.4, y: 1.6, width: 7.2, height: 14.8), xRadius: 2.0, yRadius: 2.0)
-        let next = NSBezierPath(roundedRect: NSRect(x: 14.8, y: 3.0, width: 8.0, height: 12.0), xRadius: 1.8, yRadius: 1.8)
-        neighbor.lineWidth = 1.1
-        neighbor.lineJoinStyle = .round
-        neighbor.stroke()
-        center.lineWidth = 1.4
-        center.lineJoinStyle = .round
-        center.stroke()
-        next.lineWidth = 1.1
-        next.lineJoinStyle = .round
-        next.stroke()
-        NSGraphicsContext.restoreGraphicsState()
-    }
 }
 
 func menuBarIconImage(

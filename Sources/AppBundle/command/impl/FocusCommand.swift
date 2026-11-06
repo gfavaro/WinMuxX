@@ -11,8 +11,6 @@ struct FocusCommand: Command {
 
     @MainActor private func focusInTree(_ env: CmdEnv, _ io: CmdIo) async throws -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
-        WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
-        target.workspace.lastScrollingFocusWindowId = nil
         // todo bug: floating windows break mru
         let includeFloating = args.floatingAsTiling
         let floatingWindows = includeFloating ? try await makeFloatingWindowsSeenAsTiling(workspace: target.workspace) : []
@@ -30,32 +28,6 @@ struct FocusCommand: Command {
                    let column = window.directChild(in: strip), let index = column.ownIndex,
                    let neighbor = strip.children.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive {
                     return neighbor.focusWindow()
-                }
-                if target.workspace.arrangement == .scrolling, let window {
-                    let groups = target.workspace.workspaceLayoutUnits
-                    if direction.orientation == .h,
-                       let index = groups.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) {
-                        let next = index + direction.focusOffset
-                        if groups.indices.contains(next),
-                           let destination = groups[next].mostRecentWindowRecursive {
-                            return destination.focusWindow()
-                        }
-                        return hitWorkspaceBoundaries(target, io, args, direction)
-                    }
-                    if direction.orientation == .v,
-                       let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction,
-                            candidates: window.topLevelWorkspaceGroup.allLeafWindowsRecursive) {
-                        return neighbor.focusWindow()
-                    }
-                    if direction.orientation == .v {
-                        switch args.boundariesAction {
-                            case .stop: return true
-                            case .fail: return false
-                            case .wrapAroundTheWorkspace, .wrapAroundAllMonitors:
-                                return spatialWrapFocusTarget(in: target.workspace, from: window, direction: direction,
-                                    candidates: window.topLevelWorkspaceGroup.allLeafWindowsRecursive)?.focusWindow() ?? false
-                        }
-                    }
                 }
                 if target.workspace.usesSpatialFocus, let window,
                    let (group, index) = window.closestParent(hasChildrenInDirection: direction, withLayout: nil),

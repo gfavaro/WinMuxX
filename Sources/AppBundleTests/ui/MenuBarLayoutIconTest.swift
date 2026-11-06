@@ -29,10 +29,10 @@ final class MenuBarLayoutIconTest: WorkspaceTestCase {
         updateTrayText()
         XCTAssertEqual(publishCount, afterChange, "refreshing an unchanged arrangement must not publish")
 
-        second.arrangement = .scrolling
+        second.arrangement = .dwindle
         XCTAssertTrue(second.focusWorkspace())
         updateTrayText()
-        XCTAssertEqual(shared.menuBarWorkspaceArrangement, .scrolling)
+        XCTAssertEqual(shared.menuBarWorkspaceArrangement, .dwindle)
         let afterSwitch = publishCount
         updateTrayText()
         XCTAssertEqual(publishCount, afterSwitch, "a settled workspace switch must not republish")
@@ -42,13 +42,13 @@ final class MenuBarLayoutIconTest: WorkspaceTestCase {
         let images = WorkspaceLayoutName.allCases.map {
             MenuBarLayoutIcon.image(for: $0, monochrome: true)
         }
-        XCTAssertEqual(images.map(\.isTemplate), [true, true, true])
-        XCTAssertEqual(Set(images.map(renderedPixelSignature)).count, 3, "each arrangement needs a distinct symbol")
+        XCTAssertEqual(images.map(\.isTemplate), [true, true])
+        XCTAssertEqual(Set(images.map(renderedPixelSignature)).count, 2, "each arrangement needs a distinct symbol")
 
         let tint = NSColor(deviceRed: 0.93, green: 0.21, blue: 0.37, alpha: 1)
-        let tinted = try XCTUnwrap(menuBarIconImage(enabled: true, arrangement: .scrolling, appearance: .monochrome, keyboardTint: tint))
+        let tinted = try XCTUnwrap(menuBarIconImage(enabled: true, arrangement: .dwindle, appearance: .monochrome, keyboardTint: tint))
         XCTAssertFalse(tinted.isTemplate, "keyboard tint must be baked into the selected layout symbol")
-        let untinted = MenuBarLayoutIcon.image(for: .scrolling, monochrome: true)
+        let untinted = MenuBarLayoutIcon.image(for: .dwindle, monochrome: true)
         XCTAssertNotEqual(renderedPixelSignature(tinted), renderedPixelSignature(untinted), "keyboard tint must change the rendered layout icon")
 
         let disabled = try XCTUnwrap(menuBarIconImage(enabled: false, arrangement: .master, appearance: .color, keyboardTint: tint))

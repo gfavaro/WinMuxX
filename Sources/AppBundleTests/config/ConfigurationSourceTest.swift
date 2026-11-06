@@ -61,6 +61,39 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
                        "An explicit chrome-style wins over the alias")
     }
 
+    func testScrollingConfigurationIsRemovedAndItsWorkspacesUseTheDefault() throws {
+        let original = """
+        # Kept
+        scrolling.gesture-enabled = false
+        [scrolling]
+        column-width = 0.5
+        keep-window-height = true
+        [workspace.'Code']
+        layout = 'scrolling'
+        orientation = 'vertical'
+        [mode.main.binding]
+        alt-ctrl-m = 'scrolling-minimap'
+        alt-w = 'workspace-layout dwindle master scrolling'
+        alt-s = 'workspace-layout scrolling'
+        alt-x = ['focus left', 'scrolling-center']
+        alt-h = 'focus left'
+        alt-t = 'exec-and-forget open -a Scrolling scrolling'
+        """
+        let migrated = try removingRetiredConfigKeys(in: original)
+        XCTAssertTrue(migrated.contains("alt-w = \"workspace-layout dwindle master\""), migrated)
+        XCTAssertFalse(migrated.contains("alt-s"), "workspace-layout with nothing left goes")
+        XCTAssertTrue(migrated.contains("alt-x = \"focus left\""), "the rest of a command list stays")
+        XCTAssertTrue(migrated.contains("alt-t = 'exec-and-forget open -a Scrolling scrolling'"), "other commands are untouched")
+        XCTAssertFalse(migrated.contains("scrolling-"), migrated)
+        XCTAssertFalse(migrated.contains("[scrolling]"), migrated)
+        XCTAssertTrue(migrated.contains("# Kept"))
+        let parsed = parseConfig(migrated)
+        XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
+        XCTAssertNil(parsed.config.workspaceLayouts["Code"]?.defaults.layout)
+        XCTAssertEqual(parsed.config.workspaceLayouts["Code"]?.defaults.orientation, .vertical)
+        XCTAssertEqual(try removingRetiredConfigKeys(in: migrated), migrated)
+    }
+
     func testSmallerMinimumDoesNotRewriteExplicitNamesOrComments() throws {
         let original = """
         config-version = 2

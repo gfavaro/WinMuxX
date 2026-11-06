@@ -66,7 +66,6 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 ),
                 shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "workspace-layout dwindle"),
                 shortcutAction(id: "layout-master", title: "Master", command: "workspace-layout master"),
-                shortcutAction(id: "scrolling-minimap", title: "Show Scrolling Minimap", command: "scrolling-minimap"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
                 shortcutAction(id: "layout-tabs", title: "Stacked: Tabbed", command: "layout tab-group"),
@@ -79,27 +78,6 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "retile", title: "Retile", command: "retile"),
                 shortcutAction(id: "no-peek", title: "No Peek", command: "no-peek"),
                 shortcutAction(id: "swap-with-master", title: "Swap with Master", command: "swap-with-master"),
-            ],
-        ),
-        .init(
-            id: "managed-scrolling",
-            category: .managed,
-            title: "Scrolling",
-            summary: "Columns on a scrolling strip: jump, reorder, pin and size them.",
-            actions: [
-                shortcutAction(id: "layout-scrolling", title: "Scrolling Layout", command: "workspace-layout scrolling"),
-                shortcutAction(id: "scrolling-first", title: "Focus First Column", command: "scrolling-focus first"),
-                shortcutAction(id: "scrolling-last", title: "Focus Last Column", command: "scrolling-focus last"),
-            ] + (1...4).map {
-                shortcutAction(id: "scrolling-focus-\($0)", title: "Focus Column \($0)", command: "scrolling-focus \($0)")
-            } + [
-                shortcutAction(id: "scrolling-move-first", title: "Move Column to Start", command: "scrolling-move first"),
-                shortcutAction(id: "scrolling-move-last", title: "Move Column to End", command: "scrolling-move last"),
-                shortcutAction(id: "scrolling-pin-left", title: "Pin Column Left", command: "scrolling-pin left"),
-                shortcutAction(id: "scrolling-pin-right", title: "Pin Column Right", command: "scrolling-pin right"),
-                shortcutAction(id: "scrolling-center", title: "Centre Column", command: "scrolling-center"),
-                shortcutAction(id: "scrolling-width-next", title: "Next Column Width", command: "scrolling-width next"),
-                shortcutAction(id: "scrolling-width-full", title: "Full Width", command: "scrolling-width full"),
             ],
         ),
         .init(id: "managed-stack", category: .managed, title: "Grouping", summary: nil,

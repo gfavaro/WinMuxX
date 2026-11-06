@@ -7,8 +7,7 @@ import Common
 // tap keeps the ones WinMuxX acts on from the Dock and hands the rest back untouched.
 // Interception after InstantSpaceSwitcher (MIT, jurplel) and iss (ISC, joshuarli); the
 // macOS 27 handling of the final event and the vertical direction follow both and Space
-// Rabbit's measurements. Raw touch remains the fallback when macOS assigns a gesture to
-// four fingers or turns it off.
+// Rabbit's measurements. A gesture macOS assigns to four fingers or turns off is not read.
 
 enum DockSwipeStart: Equatable {
     /// WinMuxX previews and may act.
@@ -224,8 +223,6 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
            shouldSuppressChromeForFullscreenContent(on: monitor) { return .unavailable }
         let start = WorkspaceSwipeController.shared.dockSwipeMayStart()
         guard start == .started else { return start }
-        // Option with three fingers pans a scrolling workspace through raw touch; it never switches.
-        if NSEvent.modifierFlags.contains(.option) { return .ignored }
         WorkspaceSwipeController.shared.dockSwipeTouchedDown()
         return .started
     }
@@ -308,7 +305,7 @@ final class DockOverviewSwipeReceiver: DockSwipeReceiver {
     }
 
     func dockSwipeEnded(commit: Bool, progress: Double, velocity: Double, timestamp: Double) {
-        // Closing takes less travel than opening, as with raw touch.
+        // Closing takes less travel than opening.
         let commits = commit || (!opens && progress >= 0.25)
         if interactive {
             interactive = false
@@ -323,9 +320,9 @@ final class DockOverviewSwipeReceiver: DockSwipeReceiver {
 final class DockWorkspaceSwipeSource {
     static let shared = DockWorkspaceSwipeSource()
     private(set) var status = "Disabled"
-    /// macOS's three-finger horizontal swipe switches workspaces instead of raw touch.
+    /// macOS's three-finger horizontal swipe switches workspaces.
     private(set) var readsHorizontal = false
-    /// macOS's three-finger vertical swipe opens and closes the overview instead of raw touch.
+    /// macOS's three-finger vertical swipe opens and closes the overview.
     private(set) var readsVertical = false
     private var horizontal = DockSwipeTracker()
     private var vertical = DockSwipeTracker()
@@ -346,13 +343,13 @@ final class DockWorkspaceSwipeSource {
         let wantsHorizontal = workspaceSwipeGestureEnabled && macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2
         let wantsVertical = workspaceOverviewGestureEnabled && macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2
         guard wantsHorizontal || wantsVertical else {
-            if workspaceSwipeGestureEnabled || workspaceOverviewGestureEnabled { status = "macOS three-finger swipes are not on three fingers; using raw touch" }
+            if workspaceSwipeGestureEnabled || workspaceOverviewGestureEnabled { status = "Set macOS trackpad gestures to three fingers to use these swipes" }
             return
         }
         let dock = makeTap(type: Self.dockControl)
         guard let dock, let envelope = makeTap(type: Self.gesture) else {
             dock.map(discard)
-            status = "Event tap unavailable; using raw touch"
+            status = "Event tap unavailable"
             return
         }
         dockTap = dock

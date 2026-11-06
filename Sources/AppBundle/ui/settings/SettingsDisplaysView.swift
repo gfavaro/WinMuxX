@@ -125,7 +125,6 @@ struct SettingsDisplaysView: View {
                     Text("Inherit global default").tag("inherit")
                     Text("Dwindle").tag("dwindle")
                     Text("Master").tag("master")
-                    Text("Scrolling").tag("scrolling")
                 }
                 Button("Save workspace mode") { saveWorkspaceLayout() }
                     .disabled(layoutWorkspace.isEmpty || workspaceLayoutChoice == currentWorkspaceLayoutChoice)

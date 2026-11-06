@@ -34,15 +34,6 @@ typedef void (*WinMuxWindowServerChangedCallback)(uint32_t event, uint32_t windo
 bool winmux_watch_mission_control(WinMuxWindowServerChangedCallback callback);
 
 // Raw trackpad frames: the callback copies these transient contact values immediately.
-typedef struct { int32_t identifier; double y; } WinMuxTouchContact;
-typedef void (*WinMuxTouchFrameCallback)(uint64_t generation, uint64_t device, int32_t fingers,
-                                       double x, double y, double timestamp, uint64_t contacts,
-                                       const WinMuxTouchContact *threeContacts);
-typedef void (*WinMuxTouchTopologyCallback)(void);
-int winmux_touch_start(uint64_t generation, WinMuxTouchFrameCallback callback);
-void winmux_touch_stop(void);
-bool winmux_touch_watch_topology(WinMuxTouchTopologyCallback callback);
-void winmux_touch_unwatch_topology(void);
 
 // Potential alternative 1?
 // func allWindowsOnCurrentMacOsSpace() {

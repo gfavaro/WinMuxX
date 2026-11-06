@@ -42,8 +42,8 @@ func migratingLegacyMinimumWorkspaceCount(in text: String) throws -> String {
 /// Keys WinMuxX no longer reads. Each either accepted only one value or was an alias, so
 /// dropping them changes nothing; `use-liquid-glass` becomes `chrome-style` unless that is set.
 func removingRetiredConfigKeys(in text: String) throws -> String {
-    let table = try TOMLTable(string: text)
-    var result = text
+    var result = removingScrollingConfiguration(in: text)
+    let table = try TOMLTable(string: result)
     for key in ["after-login-command", "non-empty-workspaces-root-containers-layout-on-startup",
                 "indent-for-nested-containers-with-the-same-orientation"] where table[key] != nil {
         result = removeSettingsConfigValue(in: result, section: nil, key: key)
@@ -56,6 +56,57 @@ func removingRetiredConfigKeys(in text: String) throws -> String {
         }
     }
     return result
+}
+
+/// Scrolling workspaces moved to SpaceMuxX: the `[scrolling]` table, `scrolling.*` keys,
+/// `layout = 'scrolling'` in workspace tables (which then use the default arrangement)
+/// and shortcuts that run a scrolling command are removed. Line based, so comments stay.
+func removingScrollingConfiguration(in text: String) -> String {
+    var section = ""
+    var lines: [String] = []
+    for line in text.components(separatedBy: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespaces)
+        if trimmed.hasPrefix("[") { section = trimmed }
+        if section == "[scrolling]" || section.hasPrefix("[scrolling.") { continue }
+        let parts = trimmed.split(separator: "=", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+        guard parts.count == 2, !trimmed.hasPrefix("#") else { lines.append(line); continue }
+        let key = parts[0], value = parts[1].trimmingCharacters(in: CharacterSet(charactersIn: "'\""))
+        if section.isEmpty, key.hasPrefix("scrolling.") { continue }
+        if section.hasPrefix("[workspace."), key == "layout", value == "scrolling" { continue }
+        if section.hasPrefix("[mode."), let commands = bindingCommands(parts[1]) {
+            let kept = commands.compactMap(withoutScrolling)
+            if kept == commands { lines.append(line); continue }
+            if kept.isEmpty { continue }
+            let indent = line.prefix(while: { $0 == " " || $0 == "\t" })
+            let rendered = kept.count == 1 ? settingsQuotedString(kept[0]) : "[" + kept.map(settingsQuotedString).joined(separator: ", ") + "]"
+            lines.append("\(indent)\(parts[0]) = \(rendered)")
+            continue
+        }
+        lines.append(line)
+    }
+    return lines.joined(separator: "\n")
+}
+
+/// A binding's commands: one string or an array of strings, as TOML reads them. Anything
+/// else is left exactly as written.
+private func bindingCommands(_ rawValue: String) -> [String]? {
+    guard let value = (try? TOMLTable(string: "v = \(rawValue)"))?["v"] else { return nil }
+    if let command = value.string { return [command] }
+    guard let array = value.array else { return nil }
+    let commands = array.compactMap(\.string)
+    return commands.count == array.count ? commands : nil
+}
+
+/// The command without scrolling: nil for a retired scrolling command, and `workspace-layout`
+/// loses its `scrolling` choice (nil when nothing else is left). Its only flag takes a
+/// window id, so a `scrolling` word there is always a layout choice.
+private func withoutScrolling(_ command: String) -> String? {
+    let words = command.split(separator: " ").map(String.init)
+    let retired: Set = ["scrolling-center", "scrolling-width", "scrolling-minimap", "scrolling-focus", "scrolling-move", "scrolling-pin"]
+    guard let name = words.first, !retired.contains(name) else { return nil }
+    guard name == "workspace-layout" else { return command }
+    let kept = words.filter { $0 != "scrolling" }
+    return kept.contains(where: { $0 == "dwindle" || $0 == "master" }) ? kept.joined(separator: " ") : nil
 }
 
 /// Import legacy preferences only when TOML does not already choose a value.

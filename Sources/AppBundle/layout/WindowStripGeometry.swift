@@ -50,11 +50,10 @@ extension TilingContainer {
     @MainActor
     var isWindowStrip: Bool { presentsAsStrip && usesWindowTabBehavior }
 
-    /// Column widths come from each child's scrolling width, else the scrolling column width.
+    /// Column widths come from each child's own width, else just under half the group.
     @MainActor
     func windowStripGeometry(in rect: Rect, gaps: ResolvedGaps) -> WindowStripGeometry {
-        let fallback = CGFloat(config.scrolling.columnWidth)
-        return .calculate(in: rect, shares: children.map { $0.scrollingColumnWidth ?? fallback },
+        .calculate(in: rect, shares: children.map { $0.stripColumnWidth ?? 0.49 },
             gap: CGFloat(gaps.inner.horizontal), focused: mostRecentChild?.ownIndex ?? 0,
             firstVisible: stripVisibleColumns.lowerBound)
     }

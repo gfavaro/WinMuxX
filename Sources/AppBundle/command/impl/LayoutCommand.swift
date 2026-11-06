@@ -20,17 +20,6 @@ struct LayoutCommand: Command {
         }
         let targetDescription = nextLayout(in: args.toggleBetween.val, matching: { window.matchesDescription($0) })
         if window.matchesDescription(targetDescription) { return false }
-        if target.workspace.arrangement == .scrolling,
-           window.parent === target.workspace.rootTilingContainer,
-           targetDescription != .floating, targetDescription != .tiling {
-            let parent = window.parent as! TilingContainer
-            let binding = window.unbindFromParent()
-            let wrapper = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight,
-                                          parent.orientation, .tiles, index: binding.index)
-            wrapper.scrollingColumnWidth = window.scrollingColumnWidth
-            window.scrollingColumnWidth = nil
-            window.bind(to: wrapper, adaptiveWeight: WEIGHT_AUTO, index: 0)
-        }
         switch targetDescription {
             case .hTabGroup:
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: .h, window: window)

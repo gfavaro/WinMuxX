@@ -37,15 +37,9 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case project
     case reloadConfig = "reload-config"
     case resize
-    case scrollingCenter = "scrolling-center"
     case undoLayout = "undo-layout"
     case retile
     case noPeek = "no-peek"
-    case scrollingWidth = "scrolling-width"
-    case scrollingMinimap = "scrolling-minimap"
-    case scrollingFocus = "scrolling-focus"
-    case scrollingMove = "scrolling-move"
-    case scrollingPin = "scrolling-pin"
     case split
     case stackWith = "stack-with"
     case state
@@ -160,24 +154,12 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(parseWorkspaceCmdArgs)
             case .workspaceLayout:
                 result[kind.rawValue] = SubCommandParser(parseWorkspaceLayoutCmdArgs)
-            case .scrollingCenter:
-                result[kind.rawValue] = SubCommandParser(ScrollingCenterCmdArgs.init)
             case .undoLayout:
                 result[kind.rawValue] = SubCommandParser(UndoLayoutCmdArgs.init)
             case .retile:
                 result[kind.rawValue] = SubCommandParser(RetileCmdArgs.init)
             case .noPeek:
                 result[kind.rawValue] = SubCommandParser(NoPeekCmdArgs.init)
-            case .scrollingWidth:
-                result[kind.rawValue] = SubCommandParser(ScrollingWidthCmdArgs.init)
-            case .scrollingMinimap:
-                result[kind.rawValue] = SubCommandParser(ScrollingMinimapCmdArgs.init)
-            case .scrollingFocus:
-                result[kind.rawValue] = SubCommandParser(ScrollingFocusCmdArgs.init)
-            case .scrollingMove:
-                result[kind.rawValue] = SubCommandParser(ScrollingMoveCmdArgs.init)
-            case .scrollingPin:
-                result[kind.rawValue] = SubCommandParser(ScrollingPinCmdArgs.init)
             case .workspaceOverview:
                 result[kind.rawValue] = SubCommandParser(WorkspaceOverviewCmdArgs.init)
             case .workspaceBackAndForth:

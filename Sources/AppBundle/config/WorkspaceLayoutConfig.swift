@@ -77,7 +77,7 @@ private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: 
         if let arrangement = WorkspaceLayoutName(rawValue: value) { return .success(.arrangement(arrangement)) }
         // Configs written before arrangements existed set the root layout here.
         if let root = value.parseLayout(), [.tiles, .stacked, .tabGroup].contains(root) { return .success(.rootLayout(root)) }
-        return .failure(.semantic(trace, "Expected dwindle, master, scrolling, tiles, accordion or tab-group"))
+        return .failure(.semantic(trace, "Expected dwindle, master, tiles, accordion or tab-group"))
     }
 }
 
@@ -166,6 +166,5 @@ extension Workspace {
             root.changeOrientation(axis)
         }
         for window in allLeafWindowsRecursive { window.lastAppliedLayoutPhysicalRect = nil }
-        WorkspaceGestureCoordinator.shared.overviewPresentationChanged()
     }
 }

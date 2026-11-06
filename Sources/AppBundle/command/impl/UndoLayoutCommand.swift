@@ -29,8 +29,7 @@ final class LayoutUndoHistory {
         switch command {
             case is LayoutCommand, is WorkspaceLayoutCommand, is MoveCommand, is SwapCommand, is SwapWithMasterCommand,
                  is JoinWithCommand, is SplitCommand, is StackWithCommand, is FlattenWorkspaceTreeCommand,
-                 is BalanceSizesCommand, is ResizeCommand, is ScrollingWidthCommand, is ScrollingMoveCommand,
-                 is ScrollingPinCommand:
+                 is BalanceSizesCommand, is ResizeCommand:
                 true
             default:
                 false

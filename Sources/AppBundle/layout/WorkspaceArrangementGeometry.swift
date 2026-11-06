@@ -5,42 +5,21 @@ struct WorkspaceGroupFrame {
     let node: TreeNode
     let physical: Rect
     let virtual: Rect
-    let visibility: ScrollingColumnVisibility?
     let stackingIndex: Int
 }
 
 extension Workspace {
     /// Both rendering and directional navigation consume these workspace slots.
-    /// Scrolling keeps logical columns distinct even when edge previews overlap.
     @MainActor
     func arrangementGroupFrames(in rect: Rect, gaps: ResolvedGaps) -> [WorkspaceGroupFrame] {
         let groups = workspaceLayoutUnits
         guard !groups.isEmpty else { return [] }
         switch arrangement {
             case .dwindle: return []
-            case .scrolling:
-                let geometry = scrollingGeometry(in: rect, gaps: gaps)
-                scrollingOffset = geometry.clampedOffset
-                // A pinned column sits at its edge, above the strip.
-                let pinned = scrollingPinSplit(in: rect, gaps: gaps).flatMap { split in
-                    pinnedScrollingColumn.map { WorkspaceGroupFrame(node: $0, physical: split.pinned, virtual: split.pinned,
-                                                                   visibility: .visible, stackingIndex: geometry.columns.count) }
-                }
-                return zip(scrollingStripUnits, geometry.columns).map { node, frame in
-                    // With keep-window-height, a lone window keeps the height it opened with, at the top.
-                    let opened = config.scrolling.keepWindowHeight ? (node as? Window)?.lastFloatingSize?.height : nil
-                    let height = { (full: CGFloat) in opened.map { min(max($0, 1), full) } ?? full }
-                    return WorkspaceGroupFrame(node: node,
-                        physical: Rect(topLeftX: frame.physicalFrame.minX, topLeftY: frame.physicalFrame.minY,
-                                       width: frame.physicalFrame.width, height: height(frame.physicalFrame.height)),
-                        virtual: Rect(topLeftX: frame.logicalFrame.minX, topLeftY: frame.logicalFrame.minY,
-                                      width: frame.logicalFrame.width, height: height(frame.logicalFrame.height)),
-                        visibility: frame.visibility, stackingIndex: geometry.stackingOrder.firstIndex(of: frame.index) ?? frame.index)
-                } + (pinned.map { [$0] } ?? [])
             case .master:
                 let primary = masterGroupIndex
                 guard groups.indices.contains(primary) else { return [] }
-                if groups.count == 1 { return [.init(node: groups[primary], physical: rect, virtual: rect, visibility: nil, stackingIndex: 0)] }
+                if groups.count == 1 { return [.init(node: groups[primary], physical: rect, virtual: rect, stackingIndex: 0)] }
                 let axis = config.master.side.orientation
                 var stack = groups.indices.filter { $0 != primary }.map { groups[$0] }
                 // Ultrawide: the next window joins the main one side by side, and the rest
@@ -65,7 +44,7 @@ extension Workspace {
                     masterSideBySide([groups[primary], second], in: mainFrames[0].physical.layoutRect, gaps: gaps,
                                      reversed: config.master.side.isReversed)
                 } ?? [WorkspaceGroupFrame(node: groups[primary], physical: mainFrames[0].physical.layoutRect,
-                                          virtual: mainFrames[0].virtual.layoutRect, visibility: nil, stackingIndex: 0)]
+                                          virtual: mainFrames[0].virtual.layoutRect, stackingIndex: 0)]
                 let stackRect = mainFrames[1].physical.layoutRect
                 let stackAxis = axis.opposite
                 let stackFrames = TileLayoutGeometry.calculate(TileLayoutInput(
@@ -75,7 +54,7 @@ extension Workspace {
                     master: true, reversed: false))
                 result += zip(stack, stackFrames).map { node, frame in
                     WorkspaceGroupFrame(node: node, physical: masterStackLayout == .stacked ? stackRect : frame.physical.layoutRect,
-                                        virtual: frame.virtual.layoutRect, visibility: nil, stackingIndex: result.count)
+                                        virtual: frame.virtual.layoutRect, stackingIndex: result.count)
                 }
                 return result
         }
@@ -92,7 +71,7 @@ private func masterSideBySide(_ nodes: [TreeNode], in rect: Rect, gaps: Resolved
         master: true, reversed: reversed))
     return zip(nodes, frames).enumerated().map { index, pair in
         WorkspaceGroupFrame(node: pair.0, physical: pair.1.physical.layoutRect, virtual: pair.1.virtual.layoutRect,
-                            visibility: nil, stackingIndex: index)
+                            stackingIndex: index)
     }
 }
 

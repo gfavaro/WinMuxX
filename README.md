@@ -219,12 +219,12 @@ and window recovery/performance fixes. See [configuration and comparison notes](
 Dinky 0.20 adaptations add optional master layout / `swap-with-master`,
 app-activation exclusions, browser overlay filtering, and original-frame restoration
 on disable/quit. See [options and behavior](docs/archive/DINKY_020_ADOPTION.md) for the
-historical adoption notes. Current Master and Scrolling modes arrange each existing
+historical adoption notes. Master mode arranges each existing
 top-level group as a whole, preserving its nested splits and tabs. Group layout
 commands continue to affect their own group; `workspace-layout dwindle` restores
 the workspace's default arrangement mode.
 
-Dinky 0.21 command separation uses `workspace-layout dwindle master scrolling`
+Dinky 0.21 command separation uses `workspace-layout dwindle master`
 to select workspace modes; `layout` changes container layouts or floating/tiling.
 Three-option container cycles visit every option, and `%{workspace-layout}` reports
 the workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
@@ -628,10 +628,7 @@ stays on its keyboard shortcut and its own swipes still work while it is open. T
 fingers down closes the overview; with the overview closed, down stays with macOS (App
 Exposé when enabled), as does the whole gesture when the overview gesture is off.
 Natural scrolling is read for each swipe. With Mission Control on four fingers or off,
-WinMuxX recognizes raw touches itself: all three fingers must
-move in the same direction to start it, reducing accidental triggers while a finger
-is resting. A three-finger downward gesture closes it whenever it is open, including when opened by command
-with the upward shortcut disabled. The overview follows your fingers while swiping
+the swipe up does not open the overview; use `workspace-overview` from a shortcut instead. The overview follows your fingers while swiping
 up or down; reversing a short swipe returns it to its starting state. Release
 settles with your swipe velocity. Hidden overview surfaces are reused between openings;
 images and selection state are cleared on dismissal. Opening and closing use a spring
@@ -738,17 +735,11 @@ scrolling sets the direction as it does for Spaces. An event tap reads macOS's
 private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
 the Accessibility permission WinMuxX already has.
 
-With that setting on four fingers or off, WinMuxX recognizes raw touches itself:
-exactly three touching fingers moving horizontally select the next/previous existing
-workspace on the display under the pointer. Left means next, right means previous;
-reverse direction is optional. Navigation stays within that display and project,
-stops at either end, and never creates, moves or swaps workspaces.
-
 Previews follow your three fingers proportionally after a small horizontal
 movement, without adding an easing animation to each input update. A short quick flick or a longer drag followed by release
 commits the switch. Pulling back before release reduces progress and can cancel it. Each gesture selects at most one adjacent
-workspace. Partial lifts finish the gesture using its last three-finger position;
-extra/replaced contacts and invalid frames cancel it. Window dragging/resizing blocks it.
+workspace. Window dragging/resizing blocks it. With Swipe between full-screen apps on four
+fingers or off, WinMuxX does not take the swipe.
 
 Only snapshots move during the gesture; real workspace activation waits for release.
 The preview is clipped to the target display and leaves its sidebar fixed. Snapshot
@@ -764,16 +755,7 @@ visual preview while retaining release-to-switch navigation. Without Screen Reco
 access the preview draws each window as a card with its app icon on the wallpaper, so
 macOS shows no recording indicator; the overview's thumbnails do the same. Keyboard/mouse actions,
 disabling, sleep and display changes clear the preview. No screen images are saved.
-Ordinary one/two-finger movement is not turned into workspace navigation and does
-not dispatch main-thread work on every raw frame.
 
-The backend loads macOS's private MultitouchSupport API dynamically. Missing symbols
-or unavailable devices leave gestures unavailable without affecting tiling. Driver
-callbacks copy only scalar summaries into a bounded queue; pointer data never escapes
-the callback. Wake and device topology changes re-register the devices. Disable the
-feature to unregister the callbacks. The binding and recognizer are independently
-implemented; OmniWM's raw-touch architecture was reviewed as a reference.
-
-Neither backend changes system preferences. Settings shows which backend is in use,
-its registration and the highest finger count detected; `winmuxx doctor` also reports
-received frames and the last macOS swipe's progress, velocity and outcome.
+WinMuxX does not change system preferences. Settings shows whether it is reading
+macOS's swipes; `winmuxx doctor` also reports the last macOS swipe's progress,
+velocity and outcome.

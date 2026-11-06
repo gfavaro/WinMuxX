@@ -57,13 +57,10 @@ func buildDiagnosticsReport() async -> String {
     io.out("Private API paths:")
     io.out("  WindowServer frame read: \(MacWindow.allWindows.first.map { String(describing: privateWindowFrameDiagnostic($0.windowId)) } ?? "inconclusive (no tracked window)")")
     io.out("  Borders: \(WindowBorderController.shared.backendDiagnosticSummary)")
-    let touchStatus = RawWorkspaceTouchSource.shared.status
-    io.out("  Raw trackpad input: \(touchStatus) (status reports registration; it does not verify gestures)")
     io.out("")
 
-    let touch = RawWorkspaceTouchSource.shared
     let dock = DockWorkspaceSwipeSource.shared
-    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "raw-touch") overview=\(dock.readsVertical ? "macos-swipe" : "raw-touch") macOS=\(dock.status) raw=\(touch.status) devices=\(touch.deviceCount) frames=\(touch.frameCount) maxFingers=\(touch.maximumFingerCount)")
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "off") overview=\(dock.readsVertical ? "macos-swipe" : "off") macOS=\(dock.status)")
     for (axis, swipe) in [("left/right", dock.horizontalSummary), ("up/down", dock.verticalSummary)] {
         io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
                       axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))

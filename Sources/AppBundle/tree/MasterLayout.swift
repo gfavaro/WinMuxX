@@ -6,9 +6,6 @@ import Common
 extension Workspace {
     @MainActor
     func transitionArrangement(to next: WorkspaceLayoutName, focused: Window? = nil) {
-        ScrollingWindowOrdering.shared.cancel()
-        WorkspaceScrollingGestureController.shared.cancelForWorkspaceChange(self)
-        for window in allLeafWindowsRecursive { window.isConcealedByScrolling = false }
         if next != .dwindle { preserveAtomicRootAsArrangementGroup() }
         arrangement = next
         if next == .master, let focused,

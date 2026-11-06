@@ -63,24 +63,18 @@ modified shortcuts are not treated as plain grid navigation. Arrow keys, Tab and
 Shift-Tab retain the workspace/window navigation behavior.
 
 `workspace-overview [show|hide|toggle]` defaults to toggle. The optional
-`workspace-overview.three-finger-up` setting defaults to false. Both gesture
-features use one raw-touch callback/router, with axis locking before dispatch.
-An overview swipe starts only after each of the three contacts moves in the same
-vertical direction; a resting finger plus two moving fingers does not trigger it.
-Once recognized, progress remains continuous and can reverse before release.
-The private raw-touch source runs if either feature is enabled. With motion enabled,
-vertical gestures present the overview during the swipe: upward motion reveals it,
+`workspace-overview.three-finger-up` setting defaults to false. It uses macOS's
+own three-finger swipe up, so it needs Mission Control on three fingers in Trackpad
+settings. Once recognized, progress remains continuous and can reverse before release.
+With motion enabled, vertical gestures present the overview during the swipe: upward motion reveals it,
 and downward motion withdraws it. Progress updates only existing panel layers;
 there are no per-frame model publications, layouts, screenshots or window writes.
 Release settles from the current presentation using the shared spring, configured
 duration and bounded release velocity. Short reversed/cancelled opening gestures
 dismiss their provisional session; cancelled closing gestures settle the same
-session back open. Invalid contacts and reset cancel the interaction rather than
-triggering a late open. With motion disabled, gestures retain release-only actions. Downward dismissal has a shorter threshold and remains
+session back open. Reset cancels the interaction rather than triggering a late open. With motion disabled, gestures retain release-only actions. Downward dismissal has a shorter threshold and remains
 available whenever the overview is open, including command-opened sessions with
-upward activation disabled. Raw touch starts on demand for those sessions and
-stops after dismissal when neither gesture feature otherwise needs it.
-macOS's own Mission Control gesture must be configured separately by the user.
+upward activation disabled.
 
 Project/display changes, native Mission Control, native Space changes, sleep,
 session deactivation, runtime disablement and activating another app dismiss the

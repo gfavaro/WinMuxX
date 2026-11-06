@@ -54,7 +54,6 @@ struct Config: ConvenienceCopyable {
     var enableShakeToToggleTiling: Bool = true
     var focusFollowsMouse: Bool = false
     var master = MasterConfig()
-    var scrolling = ScrollingConfig()
     var followAppActivation = FollowAppActivationConfig()
     var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none

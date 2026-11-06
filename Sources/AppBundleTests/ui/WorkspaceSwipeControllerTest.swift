@@ -91,21 +91,23 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         world = nil
     }
 
-    private func frame(_ x: Double, fingers: Int = 3, time: Double) {
-        controller.handle(WorkspaceTouchFrame(device: 1, fingers: fingers, x: x, y: 0.5,
-                                              timestamp: time, contacts: 123))
+    /// A macOS swipe toward the next workspace, most of the way across.
+    private func begin(time: Double = 1) {
+        _ = controller.beginDockSwipe(slidesLeft: true, progress: 0.8, timestamp: time + 0.2)
     }
 
-    private func begin(time: Double = 1) {
-        frame(0.5, fingers: 0, time: time)
-        frame(0.5, time: time + 0.1)
-        frame(0.3, time: time + 0.2)
+    private func move(_ progress: Double, time: Double) {
+        controller.updateDockSwipe(progress, timestamp: time)
+    }
+
+    private func release(time: Double) {
+        controller.endDockSwipe(commit: true, timestamp: time)
     }
 
     private func commit(time: Double = 1) async throws -> Task<Void, Never> {
         let started = expectation(description: "Navigation entered session")
         gate.started = started
-        frame(0.3, fingers: 0, time: time + 0.3)
+        release(time: time + 0.3)
         let task = try XCTUnwrap(controller.pending)
         await fulfillment(of: [started], timeout: 2)
         gate.started = nil
@@ -255,7 +257,7 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         begin()
         XCTAssertTrue(activateWorkspaceForUser(world.spaces[3], on: world.displays[0]))
         XCTAssertTrue(preview.validity?() == false)
-        frame(0.3, fingers: 0, time: 1.3)
+        release(time: 1.3)
         XCTAssertNil(controller.pending)
         XCTAssertEqual(preview.releases, [false])
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[3])
@@ -266,7 +268,7 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         XCTAssertTrue(preview.validity?() == true)
         XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(world.spaces[2], targetMonitor: world.displays[1]))
         XCTAssertTrue(preview.validity?() == false)
-        frame(0.3, fingers: 0, time: 1.3)
+        release(time: 1.3)
         XCTAssertNil(controller.pending)
         XCTAssertEqual(preview.releases, [false])
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
@@ -285,8 +287,8 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     func testRuntimeBecomingUnavailableDuringGestureCancelsPreview() {
         begin()
         navigationAllowed = false
-        frame(0.25, time: 1.25)
-        frame(0.25, fingers: 0, time: 1.3)
+        move(1, time: 1.25)
+        release(time: 1.3)
         XCTAssertFalse(preview.isActive)
         XCTAssertNil(controller.pending)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])

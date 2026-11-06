@@ -121,21 +121,12 @@ final class WorkspaceFocusState {
 enum FocusChangeOrigin: Equatable { case explicit, native }
 
 @MainActor func setFocus(to newFocus: LiveFocus, origin: FocusChangeOrigin = .explicit) -> Bool {
-    if origin == .explicit {
-        ScrollingWindowOrdering.shared.cancel()
-        let interruptedMotion = WorkspaceScrollingGestureController.shared.isMotionActive
-        WorkspaceScrollingGestureController.shared.interruptForExplicitFocus()
-        if interruptedMotion { newFocus.workspace.lastScrollingFocusWindowId = nil }
-    } else if WorkspaceScrollingGestureController.shared.isMotionActive {
-        return false
-    }
     // By identity, before resolving: a deleted workspace may already resolve to its fallback.
     let leavingWorkspace = runtime.focus.requested.workspaceId != newFocus.workspace.id
     if runtime.focus.requested == newFocus.frozen {
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
     let oldFocus = focus
-    if oldFocus.workspace !== newFocus.workspace { WorkspaceScrollingMinimap.shared.dismiss() }
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     guard status else { return false }
 

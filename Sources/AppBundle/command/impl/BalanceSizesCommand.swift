@@ -8,14 +8,7 @@ struct BalanceSizesCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
-        if target.workspace.arrangement == .scrolling {
-            for group in target.workspace.workspaceLayoutUnits {
-                group.scrollingColumnWidth = nil
-                if let container = group as? TilingContainer { balance(container) }
-            }
-        } else {
-            balance(target.workspace.rootTilingContainer)
-        }
+        balance(target.workspace.rootTilingContainer)
         return true
     }
 }

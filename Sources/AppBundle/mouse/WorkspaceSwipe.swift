@@ -73,7 +73,6 @@ final class WorkspaceSwipeController {
         var commit: Bool?
     }
     private var followUps: [FollowUp] = []
-    private var recognizer = WorkspaceTouchRecognizer()
     private var gesture: Gesture?
     private(set) var pending: Task<Void, Never>?
     private var generation = 0
@@ -81,8 +80,6 @@ final class WorkspaceSwipeController {
     func reset() {
         cancelVisualInteraction()
         dependencies.preview.invalidate()
-        recognizer = WorkspaceTouchRecognizer()
-        recognizer.cancel()
         generation += 1
         pending?.cancel()
         pending = nil
@@ -92,33 +89,10 @@ final class WorkspaceSwipeController {
     func cancelVisualInteraction() {
         guard gesture != nil || dependencies.preview.isActive else { return }
         gesture = nil
-        recognizer.cancel()
         dependencies.preview.cancel()
     }
 
     var canNavigate: Bool { dependencies.canNavigate() }
-
-    func handle(_ frame: WorkspaceTouchFrame) {
-        guard canNavigate else {
-            cancelVisualInteraction()
-            recognizer.cancel()
-            if frame.fingers == 0 { _ = recognizer.receive(frame, displayPoint: nil, reversed: false) }
-            return
-        }
-        let point = dependencies.pointer()
-        let display = dependencies.monitors().first { $0.rect.contains(point) }?.rect.topLeftCorner
-        guard let event = recognizer.receive(frame, displayPoint: display, reversed: dependencies.reversed()) else { return }
-        switch event {
-            case .began(let request):
-                if !begin(request, timestamp: frame.timestamp) { recognizer.cancel() }
-            case .changed(let progress):
-                update(progress, timestamp: frame.timestamp, receivedAt: frame.receivedAt)
-            case .ended(let commit):
-                finish(commit: commit, timestamp: frame.timestamp)
-            case .cancelled:
-                finish(commit: false, timestamp: frame.timestamp)
-        }
-    }
 
     /// macOS recognized a three-finger swipe moving toward the next Space (`slidesLeft`) or
     /// the previous one. With no workspace that way it belongs to macOS.
@@ -146,7 +120,7 @@ final class WorkspaceSwipeController {
         }
         let isNext = slidesLeft != dependencies.reversed()
         guard workspaceSwipeTarget(on: monitor, isNext: isNext) != nil else { return .unavailable }
-        let request = WorkspaceTouchRecognizer.Request(displayPoint: monitor.rect.topLeftCorner, isNext: isNext,
+        let request = WorkspaceSwipeRequest(displayPoint: monitor.rect.topLeftCorner, isNext: isNext,
                                                        progress: progress, slidesLeft: slidesLeft)
         return begin(request, timestamp: timestamp) ? .started : .ignored
     }
@@ -176,7 +150,7 @@ final class WorkspaceSwipeController {
             let next = followUps.removeFirst()
             guard next.commit != false, canNavigate,
                   let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == next.displayPoint }) else { continue }
-            let request = WorkspaceTouchRecognizer.Request(displayPoint: next.displayPoint,
+            let request = WorkspaceSwipeRequest(displayPoint: next.displayPoint,
                 isNext: next.slidesLeft != dependencies.reversed(), progress: next.progress, slidesLeft: next.slidesLeft)
             guard workspaceSwipeTarget(on: monitor, isNext: request.isNext) != nil,
                   begin(request, timestamp: next.timestamp) else { continue }
@@ -185,7 +159,7 @@ final class WorkspaceSwipeController {
         }
     }
 
-    private func begin(_ request: WorkspaceTouchRecognizer.Request, timestamp: Double) -> Bool {
+    private func begin(_ request: WorkspaceSwipeRequest, timestamp: Double) -> Bool {
         // A settling preview gives way: the new swipe takes the panel over from it.
         guard pending == nil,
               let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == request.displayPoint }),

@@ -430,19 +430,6 @@ final class MacApp: AbstractApp {
         }
     }
 
-    func attachedSheetOffsets(_ windowId: UInt32) async throws -> [CGRect] {
-        (try await withWindow(windowId) { window, job -> [CGRect] in
-            guard let children = window.get(Ax.childrenAttr), !children.isEmpty,
-                  let parent = window.get(Ax.topLeftCornerAttr) else { return [] }
-            return try children.prefix(32).compactMap { sheet -> CGRect? in
-                try job.checkCancellation()
-                guard sheet.get(Ax.roleAttr) == (kAXSheetRole as String) else { return nil }
-                guard let position = sheet.get(Ax.topLeftCornerAttr), let size = sheet.get(Ax.sizeAttr) else { return nil }
-                return CGRect(x: position.x - parent.x, y: position.y - parent.y, width: size.width, height: size.height)
-            }
-        }) ?? []
-    }
-
     func isWindowHeuristic(_ windowId: UInt32, _ windowLevel: MacOsWindowLevel?) async throws -> Bool {
         return try await withWindow(windowId) { [nsApp, axApp, appId] window, job in
             window.isWindowHeuristic(axApp: axApp.threadGuarded, appId, nsApp.activationPolicy, windowLevel)

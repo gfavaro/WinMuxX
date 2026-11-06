@@ -13,9 +13,8 @@ help documents an explicit target.
 `layout` changes the selected window's container. These scopes differ; see
 [layouts](LAYOUTS.md).
 
-**Scrolling workspaces:** `scrolling-width next|previous|full` changes the focused group's width; `scrolling-center` centers it. `scrolling-focus 1-9|first|last` focuses a column by place (9 is the last), `scrolling-move 1-9|first|last` moves the focused column there, and `scrolling-pin left|right` pins the focused column to a screen edge (again to unpin). `scrolling-minimap toggle` opens or closes the clickable workspace map; explicit opening keeps it visible and supports Left/Right, Return and Escape, also available as Show Minimap in the menu while the workspace scrolls, and Control–Option–M in fresh configurations.
 
-**Undo:** `undo-layout` puts the focused workspace's layout back as it was before its last layout command (`layout`, `move`, `join-with`, `resize`, `balance-sizes`, `workspace-layout`, scrolling moves, widths and pins, and similar), one step at a time, up to 20 steps. It rearranges only windows still on that workspace, and a window opened since is tiled into the restored layout. Available from Commands → Container Layout → Undo Layout Change.
+**Undo:** `undo-layout` puts the focused workspace's layout back as it was before its last layout command (`layout`, `move`, `join-with`, `resize`, `balance-sizes`, `workspace-layout` and similar), one step at a time, up to 20 steps. It rearranges only windows still on that workspace, and a window opened since is tiled into the restored layout. Available from Commands → Container Layout → Undo Layout Change.
 
 **Retile:** `retile` puts every tiled window on the showing workspaces back on its tile and reports how many had moved ("Put 2 windows back" or "Nothing had moved"), briefly on screen as well. It also renews the put-back budget for windows whose apps kept moving them: an app that moves its tiled window off its tile again and again is put back at most three times in 10 seconds per tile, then left alone until that time passes or the tile changes. Available as Retile in the menu.
 

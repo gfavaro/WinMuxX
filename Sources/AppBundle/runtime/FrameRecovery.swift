@@ -43,8 +43,8 @@ final class FrameRecovery {
     }
 
     private static func tile(of window: Window) -> Rect? {
-        guard window.parent is TilingContainer, !window.isFullscreen, !window.isConcealedByScrolling, !window.isHiddenInCorner,
-              window.nodeWorkspace?.isVisible == true, window.nodeWorkspace?.scrollingGestureMotionActive != true else { return nil }
+        guard window.parent is TilingContainer, !window.isFullscreen, !window.isHiddenInCorner,
+              window.nodeWorkspace?.isVisible == true else { return nil }
         return window.lastAppliedLayoutPhysicalRect
     }
 }

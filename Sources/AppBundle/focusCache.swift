@@ -42,9 +42,6 @@ private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?,
             windowID: nativeFocused?.windowId, workspaceID: nativeFocused?.nodeWorkspace?.id,
             reason: "\(decision()) event:\(refreshSessionEvent?.eventCode ?? "none")")
     }
-    // AX can report a key-window change caused by stacking while a viewport
-    // gesture is in flight. A real click ends the gesture in GlobalObserver.
-    guard !WorkspaceScrollingGestureController.shared.isMotionActive else { return note("ignored:gesture") }
     if ignoresCrossWorkspaceActivation(nativeFocused) { return note("ignored:excludedApp") }
     if nativeFocused?.parent is MacosPopupWindowsContainer {
         return note("ignored:popup")

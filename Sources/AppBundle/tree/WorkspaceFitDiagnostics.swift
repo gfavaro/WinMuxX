@@ -3,7 +3,6 @@ import Common
 
 enum WorkspaceFitIssueKind: String, Equatable {
     case tiledGroup
-    case scrollingColumn
 }
 
 struct WorkspaceFitIssue: Identifiable, Equatable {
@@ -18,15 +17,6 @@ struct WorkspaceFitIssue: Identifiable, Equatable {
 func workspaceFitIssues(in workspaces: [Workspace]) -> [WorkspaceFitIssue] {
     workspaces.compactMap { workspace -> WorkspaceFitIssue? in
         let available = workspaceTilingRect(workspace).size
-        if workspace.arrangement == .scrolling {
-            let metrics = workspace.scrollingMetrics
-            guard let column = metrics.columns.first(where: {
-                scrollingColumnMinimumExceedsViewport($0.node.minimumLayoutExtent(along: .h, rect: workspaceTilingRect(workspace)), viewportWidth: metrics.areaWidth)
-            }) else { return nil }
-            return WorkspaceFitIssue(workspaceId: workspace.id, kind: .scrollingColumn,
-                minimumSize: CGSize(width: column.node.minimumLayoutExtent(along: .h, rect: workspaceTilingRect(workspace)), height: 0),
-                availableSize: CGSize(width: metrics.areaWidth, height: available.height))
-        }
         let root = workspace.rootTilingContainer
         let area = workspaceTilingRect(workspace)
         let minimum = CGSize(width: root.minimumLayoutExtent(along: .h, rect: area),
@@ -39,8 +29,4 @@ func workspaceFitIssues(in workspaces: [Workspace]) -> [WorkspaceFitIssue] {
 
 func layoutMinimumExceedsArea(_ minimum: CGSize, available: CGSize) -> Bool {
     minimum.width > available.width || minimum.height > available.height
-}
-
-func scrollingColumnMinimumExceedsViewport(_ minimumWidth: CGFloat, viewportWidth: CGFloat) -> Bool {
-    minimumWidth > viewportWidth
 }
