@@ -108,3 +108,21 @@ enum WorkspaceFrameWriteDiagnostics {
         logger.notice("\(message, privacy: .public)")
     }
 }
+
+/// Prefer the corner whose parking probes overlap fewer neighboring displays.
+func optimalWorkspaceHideCorner(for display: Rect, displays: [Rect]) -> OptimalHideCorner {
+    let horizontalProbeOffset = display.width * 0.1
+    let verticalProbeOffset = display.height * 0.1
+    let exactCornerProbeWeight = 10
+    func score(_ corner: CGPoint, outward: CGFloat) -> Int {
+        let horizontalProbe = corner + CGPoint(x: outward * 2, y: -verticalProbeOffset)
+        let verticalProbe = corner + CGPoint(x: -outward * horizontalProbeOffset, y: 2)
+        let exactCornerProbe = corner + CGPoint(x: outward * 2, y: 2)
+        return displays.sumOfInt { rect in
+            (rect.contains(horizontalProbe) ? 1 : 0) + (rect.contains(verticalProbe) ? 1 : 0) +
+                exactCornerProbeWeight * (rect.contains(exactCornerProbe) ? 1 : 0)
+        }
+    }
+    return score(display.bottomLeftCorner, outward: -1) < score(display.bottomRightCorner, outward: 1)
+        ? .bottomLeftCorner : .bottomRightCorner
+}
