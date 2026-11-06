@@ -112,18 +112,6 @@ final class MacWindow: Window {
         return window
     }
 
-    // var description: String {
-    //     let description = [
-    //         ("title", title),
-    //         ("role", axWindow.get(Ax.roleAttr)),
-    //         ("subrole", axWindow.get(Ax.subroleAttr)),
-    //         ("identifier", axWindow.get(Ax.identifierAttr)),
-    //         ("modal", axWindow.get(Ax.modalAttr).map { String($0) } ?? ""),
-    //         ("windowId", String(windowId)),
-    //     ].map { "\($0.0): '\(String(describing: $0.1))'" }.joined(separator: ", ")
-    //     return "Window(\(description))"
-    // }
-
     func isWindowHeuristic(_ windowLevel: MacOsWindowLevel?) async throws -> Bool { // todo cache
         try await macApp.isWindowHeuristic(windowId, windowLevel)
     }
@@ -471,7 +459,6 @@ final class MacWindow: Window {
                 guard self.canObserveMinimum(generation),
                       shouldLearnWindowMinimum(nativeFullscreen: confirmedFullscreen, nativeMinimized: confirmedMinimized,
                                                animating: WindowMotion.shared.isAnimating(self.windowId)) else { return }
-                let oldMinimum = self.learnedMinimum.size
                 self.learnedMinimum.observe(requested: size, first: first.size, confirmed: confirmed.size)
                 if !isUnitTest { PersistedAppMinimums.shared.remember(self.learnedMinimum.size, for: self.macApp.rawAppBundleId) }
                 WindowMotion.shared.noteLanded(self.windowId,
@@ -488,7 +475,6 @@ final class MacWindow: Window {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
             !isFullscreen && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
-            true &&
             !WindowMotion.shared.screensChanging &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites
