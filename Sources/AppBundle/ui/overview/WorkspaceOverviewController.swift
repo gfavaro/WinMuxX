@@ -323,19 +323,22 @@ final class WorkspaceOverviewController {
         let candidates = models.compactMap(\.selectedCard) + models.flatMap(\.visibleCards)
         for card in candidates where !attempted.contains(card.id) && !invalidated.contains(card.id) {
                 attempted.insert(card.id)
-                let key = WorkspaceSwipeSnapshotKey(workspace: card.id, display: card.monitor.description,
+                let allowCapture = !dependencies.nativeIntegration || CGPreflightScreenCaptureAccess()
+                var key = WorkspaceSwipeSnapshotKey(workspace: card.id, display: card.monitor.description,
                     rect: CGRect(origin: .zero, size: card.desktopSize))
+                key.placeholder = !allowCapture
                 let windows = card.windows.compactMap { window -> WorkspaceSwipeSnapshotRequest.Window? in
                     guard let rect = window.frame else { return nil }
                     return .init(id: window.id, frame: CGRect(x: rect.minX * card.desktopSize.width,
                         y: (1 - rect.maxY) * card.desktopSize.height,
-                        width: rect.width * card.desktopSize.width, height: rect.height * card.desktopSize.height))
+                        width: rect.width * card.desktopSize.width, height: rect.height * card.desktopSize.height),
+                        icon: allowCapture ? nil : placeholderAppIcon(forWindowId: window.id))
                 }
                 var request = WorkspaceSwipeSnapshotRequest(key: key, windows: windows)
                 request.overviewSession = captureSession
                 request.maximumPixelSize = CGSize(width: 640, height: 360)
                 request.windowsAreBackToFront = true
-                request.allowCapture = !dependencies.nativeIntegration || CGPreflightScreenCaptureAccess()
+                request.allowCapture = allowCapture
                 guard !windows.isEmpty else { continue }
                 return (generation, card, request)
         }

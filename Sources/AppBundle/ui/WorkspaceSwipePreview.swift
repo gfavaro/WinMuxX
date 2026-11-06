@@ -86,7 +86,7 @@ final class WorkspaceSwipePreview {
     private var canPreview: Bool {
         !isUnitTest && config.animations.enabled && config.workspaceSwipe.animationDurationMs > 0 &&
             !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
-            !WindowBorderController.shared.isMissionControlActive && CGPreflightScreenCaptureAccess()
+            !WindowBorderController.shared.isMissionControlActive
     }
 
     private func area(on monitor: Monitor) -> (rect: Rect, capture: WorkspaceSwipeSnapshotRequest) {
@@ -95,6 +95,10 @@ final class WorkspaceSwipePreview {
         let rect = Rect(topLeftX: visible.minX + (config.workspaceSidebar.position == .left ? inset : 0),
                         topLeftY: visible.minY, width: visible.width - inset, height: visible.height)
         let sourceKey = WorkspaceSwipeSnapshotKey(workspace: monitor.activeWorkspace, monitor: monitor, rect: rect)
+        // Without Screen Recording the outgoing side is drawn like the incoming one, as placeholders.
+        guard CGPreflightScreenCaptureAccess() else {
+            return (rect, WorkspaceSwipeSnapshotRequest(workspace: monitor.activeWorkspace, monitor: monitor, rect: rect))
+        }
         let captureRect = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
         return (rect, WorkspaceSwipeSnapshotRequest(screenKey: sourceKey, rect: captureRect))
     }
@@ -139,9 +143,7 @@ final class WorkspaceSwipePreview {
         let started = CACurrentMediaTime()
         let (rect, capture) = area(on: monitor)
         let request = WorkspaceSwipeSnapshotRequest(workspace: target, monitor: monitor, rect: rect)
-        begin(request: request, capture: capture, rect: rect, slidesLeft: slidesLeft, started: started) {
-            isValid() && CGPreflightScreenCaptureAccess()
-        }
+        begin(request: request, capture: capture, rect: rect, slidesLeft: slidesLeft, started: started, isValid: isValid)
     }
 
     /// Screen capture uses the same bounded worker as incoming composition. Only the
@@ -297,7 +299,16 @@ final class WorkspaceSwipePreview {
         incoming?.contents = back
         CATransaction.commit()
         applyProgress()
+        // Placeholder cards differ from the real windows they cover, so they fade in.
+        let fadesIn = !panel.isVisible && !CGPreflightScreenCaptureAccess()
+        if fadesIn { panel.alphaValue = 0 }
         panel.orderFrontRegardless()
+        if fadesIn {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = Self.placeholderFadeDuration
+                panel.animator().alphaValue = 1
+            }
+        }
         updateTiming {
             $0.panelMs = (CACurrentMediaTime() - panelStarted) * 1000
             $0.submissionMs = (CACurrentMediaTime() - started) * 1000
@@ -390,6 +401,7 @@ final class WorkspaceSwipePreview {
         })
     }
     static let handOffDuration = 0.08
+    static let placeholderFadeDuration = 0.15
 
     func invalidate() {
         cancel()

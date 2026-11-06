@@ -11,6 +11,8 @@ struct WorkspaceSwipeSnapshotKey: Hashable, Sendable {
     let y: Double
     let width: Double
     let height: Double
+    /// Placeholder cards and captured pixels of the same workspace are different images.
+    var placeholder = false
 
     @MainActor
     init(workspace: Workspace, monitor: Monitor, rect: Rect) {
@@ -30,8 +32,10 @@ struct WorkspaceSwipeSnapshotRequest: Sendable {
     struct Window: Sendable {
         let id: UInt32
         let frame: CGRect
+        /// Drawn on a placeholder card when the window cannot be captured.
+        var icon: CGImage? = nil
     }
-    let key: WorkspaceSwipeSnapshotKey
+    var key: WorkspaceSwipeSnapshotKey
     let screenRect: CGRect?
     let wallpaper: URL?
     let windows: [Window]
@@ -47,6 +51,9 @@ struct WorkspaceSwipeSnapshotRequest: Sendable {
         let screens = NSScreen.screens
         let index = monitor.monitorAppKitNsScreenScreensId - 1
         wallpaper = screens.indices.contains(index) ? NSWorkspace.shared.desktopImageURL(for: screens[index]) : nil
+        let canCapture = CGPreflightScreenCaptureAccess()
+        allowCapture = canCapture
+        key.placeholder = !canCapture
         windows = workspace.allLeafWindowsRecursive.compactMap { node in
             guard let window = node as? MacWindow, case .standard = window.layoutReason else { return nil }
             if let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior, group.tabActiveWindow !== window { return nil }
@@ -60,7 +67,7 @@ struct WorkspaceSwipeSnapshotRequest: Sendable {
             return Window(id: window.windowId, frame: CGRect(
                 x: saved.minX * monitor.rect.width + monitor.rect.minX - rect.minX,
                 y: rect.height - (saved.minY * monitor.rect.height + monitor.rect.minY - rect.minY) - height,
-                width: width, height: height))
+                width: width, height: height), icon: canCapture ? nil : placeholderAppIcon(forWindowId: window.windowId))
         }
     }
 
@@ -222,9 +229,13 @@ actor WorkspaceSwipeSnapshotRenderer {
             try Task.checkCancellation()
             autoreleasepool {
                 // A missing capture still has truthful geometry; no extra AX read or retry.
+                guard request.allowCapture else {
+                    drawWindowPlaceholder(window.frame, icon: window.icon, in: context)
+                    return
+                }
                 context.setFillColor(CGColor(gray: 0.23, alpha: 1))
                 context.fill(window.frame)
-                if request.allowCapture, let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]) {
+                if let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]) {
                     context.draw(image, in: window.frame)
                 }
             }

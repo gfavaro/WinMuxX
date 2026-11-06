@@ -83,6 +83,26 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertNil(byteLimited.image(for: request("a").key))
     }
 
+    func testPlaceholderRenderDrawsCardsWithoutCaptureAndIsCachedSeparately() async throws {
+        var placeholder = WorkspaceSwipeSnapshotRequest(key: request().key, windows: [
+            .init(id: 0, frame: CGRect(x: 20, y: 10, width: 120, height: 70), icon: try image()),
+        ])
+        placeholder.allowCapture = false
+        placeholder.key.placeholder = true
+        let rendered = try await WorkspaceSwipeSnapshotRenderer.shared.render(placeholder).image
+        let bitmap = NSBitmapImageRep(cgImage: rendered)
+        func gray(_ x: Int, _ y: Int) throws -> CGFloat {
+            try XCTUnwrap(bitmap.colorAt(x: x, y: y)?.usingColorSpace(.genericGray)).whiteComponent
+        }
+        XCTAssertEqual(try gray(2, 2), 0.12, accuracy: 0.03, "Desktop fill outside the card")
+        XCTAssertEqual(try gray(30, 45), 0.18, accuracy: 0.04, "Card body")
+        XCTAssertEqual(try gray(80, 45), 0.5, accuracy: 0.05, "App icon at the card's centre")
+
+        var cache = WorkspaceSwipeSnapshotCache()
+        cache.insert(rendered, for: placeholder.key)
+        XCTAssertNil(cache.image(for: request().key), "A capture of the same workspace is a different image")
+    }
+
     func testOnlyNewestPendingRenderRunsAndCancelledWorkCannotPopulateCache() async throws {
         let startedA = expectation(description: "a started")
         let startedC = expectation(description: "c started")

@@ -213,5 +213,5 @@ private func separateSpacesDiagnosticSetting() -> String {
 func diagnosticsPermissionLines() -> [String] {
     ["Permissions:",
      "  accessibility: \(AXIsProcessTrusted() ? "granted" : "MISSING (required)")",
-     "  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (tab previews / radius estimation degraded)")"]
+     "  screen capture: \(CGPreflightScreenCaptureAccess() ? "granted" : "missing (previews and animations use app-icon cards)")"]
 }

@@ -91,7 +91,8 @@ double-sided-windows = false
 
 Menu-bar settings apply on reload. Double-sided windows require enabled tab
 strips and exactly two window children. Larger groups keep their tabs. Rotation
-uses Screen Recording permission and respects Reduce Motion. These preferences
+shows the windows with Screen Recording permission, app-icon cards without it, and
+respects Reduce Motion. These preferences
 have no runtime fallback to UserDefaults.
 
 The icon represents the focused workspace arrangement: Dwindle uses four

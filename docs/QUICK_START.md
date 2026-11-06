@@ -3,8 +3,9 @@
 Install WinMuxX from the [releases page](https://github.com/gfavaro/WinMuxX/releases)
 using the steps in [HACKING.md](../HACKING.md#build-and-check), then open
 WinMuxX and grant Accessibility access when macOS asks. WinMuxX uses that access
-to read and position app windows. Screen Recording is optional and is used for
-workspace previews; tiling works without it.
+to read and position app windows. Screen Recording is optional: with it, swipe,
+overview and tab-flip previews show real window contents; without it they show
+app-icon cards, and tiling works the same.
 
 Open two ordinary windows. WinMuxX places them in the current workspace. Use the
 sidebar to switch workspaces or projects, and open Settings from the WinMuxX

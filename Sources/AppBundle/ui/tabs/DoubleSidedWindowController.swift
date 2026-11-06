@@ -21,7 +21,7 @@ final class DoubleSidedWindowController {
               let other = group.children.compactMap({ $0 as? Window }).first(where: { $0 !== window }),
               let rect = window.lastAppliedLayoutPhysicalRect
         else { return }
-        let canAnimate = config.animations.enabled && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion && CGPreflightScreenCaptureAccess()
+        let canAnimate = config.animations.enabled && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         guard canAnimate else {
             focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
             return
@@ -29,8 +29,12 @@ final class DoubleSidedWindowController {
         let frontId = window.windowId, backId = other.windowId
         let bounds = CGRect(x: rect.topLeftX, y: rect.topLeftY, width: rect.width, height: rect.height)
         let padding = backdropPadding
+        // Without Screen Recording the faces are placeholder cards, drawn here at once.
+        let placeholders = CGPreflightScreenCaptureAccess() ? nil
+            : placeholderWindowFlipImages(front: frontId, back: backId, rect: rect, padding: padding, monitor: window.nodeMonitor ?? mainMonitor)
         preparation.begin(capture: {
-            try await WindowFlipCapture.shared.capture(front: frontId, back: backId, rect: bounds, padding: padding)
+            if let placeholders { return placeholders }
+            return try await WindowFlipCapture.shared.capture(front: frontId, back: backId, rect: bounds, padding: padding)
         }) { [weak self, weak window, weak other, weak group] images in
             guard let self, let window, let other, let group, TrayMenuModel.shared.isEnabled,
                   group.usesDoubleSidedWindows, group.tabActiveWindow === window,

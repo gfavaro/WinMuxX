@@ -434,7 +434,8 @@ Settings → Windows → Show tab strips controls the visible tab bar. Turning i
 keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace
 the strip for two-window groups when enabled; three or more windows continue to
 use tabs. Option-click or Option-Tab flips between the two sides. This preference
-requires Show tab strips and Screen Recording access, and respects Reduce Motion.
+requires Show tab strips and respects Reduce Motion. Without Screen Recording access
+the flip turns two cards showing each window's app icon instead of the windows themselves.
 Tab chrome follows the sidebar's glass or solid style.
 
 Flip images are captured off the main thread at a bounded resolution. If capture
@@ -758,8 +759,10 @@ before release; otherwise navigation proceeds without a delayed animation. Incom
 previews use windows' last visible positions. After release the slide carries on at
 your fingers' speed and slows to a stop, taking at most 220 ms scaled by the remaining
 distance (never less than 120 ms), then fades over 80 ms into the real windows. Global animations,
-Reduce Motion, a zero settle duration or missing Screen Recording access disable the
-visual preview while retaining release-to-switch navigation. Keyboard/mouse actions,
+Reduce Motion or a zero settle duration disable the
+visual preview while retaining release-to-switch navigation. Without Screen Recording
+access the preview draws each window as a card with its app icon on the wallpaper, so
+macOS shows no recording indicator; the overview's thumbnails do the same. Keyboard/mouse actions,
 disabling, sleep and display changes clear the preview. No screen images are saved.
 Ordinary one/two-finger movement is not turned into workspace navigation and does
 not dispatch main-thread work on every raw frame.
