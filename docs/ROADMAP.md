@@ -2,7 +2,7 @@
 
 ## Dinky fit review — 2026-10-22
 
-The [Dinky implementation plan](DINKY_FIT_PLAN.md) proposes task-based guides and
+The [Dinky implementation plan](archive/DINKY_FIT_PLAN.md) proposes task-based guides and
 layout illustrations, TOML editor completion, actionable shortcut health, and
 targeted reliability reproductions. It distinguishes existing adaptations from
 new work and preserves projects, tabs and explicit workspace display ownership.
@@ -11,7 +11,7 @@ This is proposed work; the validation priorities below remain open.
 ## Current baseline — 2026-10-17
 
 Workspace/configuration ownership cleanup is complete in signed build 76; see
-[RUNTIME_STATE_CLEANUP_PLAN.md](RUNTIME_STATE_CLEANUP_PLAN.md). Settings, display
+[RUNTIME_STATE_CLEANUP_PLAN.md](archive/RUNTIME_STATE_CLEANUP_PLAN.md). Settings, display
 assignments/rules, the retained AeroSpork adaptations and dependency cleanup are
 implemented. Accessibility and screen capture were granted in the latest diagnostics.
 The latest local check passes **1,078 Swift + 13 Python tests**. Signed build 78
@@ -59,7 +59,7 @@ older test totals and permission observations have been superseded by the baseli
 - [x] Sequential corner resize with automatic-axis changes and matching live geometry.
 - [x] Flatten resets ratios/default orientation and preserves order, floating windows and logical focus.
 
-See [the detailed Dinky comparison](DWINDLE_DINKY_COMPARISON.md) for behavior and validation. Tabbed and accordion layouts are both supported. Fixed grids and scrolling workspace layouts are excluded by the product scope.
+See [the detailed Dinky comparison](archive/DWINDLE_DINKY_COMPARISON.md) for behavior and validation. Tabbed and accordion layouts are both supported. Fixed grids and scrolling workspace layouts are excluded by the product scope.
 
 ## Ideas to revisit
 
@@ -77,7 +77,7 @@ Future items need a detailed implementation plan and tests before execution. The
 
 Adapted from [Dinky 0.11's Electron fix](https://github.com/mikker/Dinky/commit/0fd853017eb6afca01126bf0f1011b09c5c7a614). Manual validation with Obsidian/Electron remains pending.
 
-Revisão de cada controle de aparência e suas dependências: [APPEARANCE_SETTINGS_REVIEW.md](APPEARANCE_SETTINGS_REVIEW.md). Modos de sidebar unificados, controles sem efeito removidos/condicionados e overrides de gaps preservados; validação visual pendente.
+Revisão de cada controle de aparência e suas dependências: [APPEARANCE_SETTINGS_REVIEW.md](archive/APPEARANCE_SETTINGS_REVIEW.md). Modos de sidebar unificados, controles sem efeito removidos/condicionados e overrides de gaps preservados; validação visual pendente.
 
 ## Dinky 0.12 / 0.13 follow-up
 
@@ -91,5 +91,5 @@ Historical validation: the then-current Swift suite passed (803 tests), followed
 
 ## Dinky 0.19 follow-up
 
-Implementation and validation are tracked in [the 0.19 comparison](DINKY_019_ADOPTION.md).
+Implementation and validation are tracked in [the 0.19 comparison](archive/DINKY_019_ADOPTION.md).
 This preserves explicit workspace display moves and excludes scrolling/fixed grids.

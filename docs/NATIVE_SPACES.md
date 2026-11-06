@@ -327,7 +327,7 @@ batch within the same Space; they cannot inherit another Space's focus. Directio
 native focus currently excludes floating windows; explicit window-ID focus includes
 them while preserving their tree membership.
 
-The [Dinky comparison](NATIVE_SPACES_DINKY_COMPARISON.md) traces its current source
+The [Dinky comparison](archive/NATIVE_SPACES_DINKY_COMPARISON.md) traces its current source
 and identifies targeted reconciliation, missed-event recovery and native stacking
 as implementation priorities. Targeted discovery and a topology audit are now
 implemented; native stacking is pending. Native UUIDs retain layout-tree objects

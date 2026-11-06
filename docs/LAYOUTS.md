@@ -18,7 +18,7 @@ stack beside it. Choose it for a workspace with `workspace-layout master`; run
 [master accordion](assets/layouts/master-accordion.svg) diagrams show the stack
 in each mode. `swap-with-master` exchanges the selected pane with the master.
 `balance-sizes` resets split shares; it does not rebuild the tree. See
-[master settings](DINKY_020_ADOPTION.md#master-layout).
+[master settings](archive/DINKY_020_ADOPTION.md#master-layout).
 
 On an ultrawide display (at least twice as wide as tall), `[master] ultrawide-mains = 2`
 puts the next window beside the main one, both full height, and stacks the rest in a

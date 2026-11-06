@@ -32,7 +32,7 @@ Reviewed Dinky's current [README](https://github.com/mikker/Dinky/blob/main/READ
 These main-branch references can change; this is a dated evaluation, not a claim
 that later releases have been audited. Earlier source-level adoption records are
 [0.19](DINKY_019_ADOPTION.md), [0.20](DINKY_020_ADOPTION.md) and
-[0.21](DINKY_021_ADOPTION.md), with pinned upstream references.
+[0.21](../DINKY_021_ADOPTION.md), with pinned upstream references.
 
 | Dinky idea | WinMuxX evidence / fit | Decision |
 | --- | --- | --- |
@@ -150,7 +150,7 @@ For each row: identify existing coverage, add a regression only for a meaningful
 uncovered case, reproduce it, then make a separate fix if needed. Native Spaces
 workarounds from Dinky do not establish a defect in WinMuxX. Keep physical swipe
 latency, dock/undock, recovery and accessibility checks in the existing
-[roadmap](ROADMAP.md) and [release validation](RELEASE_VALIDATION.md).
+[roadmap](../ROADMAP.md) and [release validation](../RELEASE_VALIDATION.md).
 
 ## Execution and completion
 

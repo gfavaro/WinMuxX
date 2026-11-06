@@ -371,7 +371,7 @@ queue tests also passed again following a test-only weak-binding warning cleanup
 ## Runtime ownership cleanup (build 76)
 
 The full scope and acceptance criteria are tracked in
-[RUNTIME_STATE_CLEANUP_PLAN.md](RUNTIME_STATE_CLEANUP_PLAN.md). Workspace/project /
+[RUNTIME_STATE_CLEANUP_PLAN.md](archive/RUNTIME_STATE_CLEANUP_PLAN.md). Workspace/project /
 viewport state, configuration/reload lifecycle, requested focus and history, native
 focus holds, hotkeys, monitor caches and recovery state now share one runtime owner.
 Legacy fixtures replace that owner; obsolete field-by-field reset functions were
@@ -462,7 +462,7 @@ injected model/save-queue regression covers the first-rule save path.
 
 The final `make check` passed **1,102 Swift tests and 20 Python tests**, including
 19 new regressions. The comparison, decisions, configuration examples and limits
-are recorded in [DINKY_019_ADOPTION.md](DINKY_019_ADOPTION.md).
+are recorded in [DINKY_019_ADOPTION.md](archive/DINKY_019_ADOPTION.md).
 
 The new tests cover Hyper/Meh duplicate detection and modifier-side filtering,
 case-insensitive bundle-ID rules and editor round trips, configured and empty

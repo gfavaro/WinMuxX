@@ -62,7 +62,7 @@ A reproduced input-blocking or data-loss issue takes precedence over that order.
 ## P0 — baseline
 
 Read the existing 0.19–0.21 adoption records and `docs/RELEASE_VALIDATION.md`.
-Create **new** `docs/DINKY_EXECUTION_RESULTS.md` containing the actual starting
+Create **new** `docs/archive/DINKY_EXECUTION_RESULTS.md` containing the actual starting
 commit, dirty-file summary, toolchain version and task evidence sections.
 Record existing relevant test names; do not copy historic pass counts as fresh
 results. No full test run is needed before prose-only work.
@@ -122,7 +122,7 @@ existing command tests; no runtime change belongs in this task.
 Read `resources/default-config.toml`, `Sources/AppBundle/config/parseConfig.swift`,
 `WorkspaceLayoutConfig.swift`, `FollowAppActivationConfig.swift`,
 `ModifierSides.swift`, `Sources/Common/cmdArgs/cmdArgsManifest.swift`, and
-`docs/DINKY_019_ADOPTION.md`.
+`docs/archive/DINKY_019_ADOPTION.md`.
 
 Create **new** `docs/RECIPES.md` and `docs/COMMANDS.md`.
 Write six recipes: ultrawide coding; laptop/docked layouts; floating utility;
@@ -149,7 +149,7 @@ Edit `README.md` and `docs/README.md` to link the new guides in learning order.
 Keep existing content until its replacement is linked; retain valid anchors when
 moving sections, or replace them with short forwarding sections.
 
-In `docs/DINKY_020_ADOPTION.md`, replace executable obsolete workspace-layout
+In `docs/archive/DINKY_020_ADOPTION.md`, replace executable obsolete workspace-layout
 examples with current syntax and label historical prose explicitly. Link 0.21.
 Create **new** `CHANGELOG.md` with an Unreleased section for this work. Add past
 release entries only when tags/release evidence establishes their contents.
@@ -296,7 +296,7 @@ For runtime/schema changes, finish with `make check` after focused checks pass.
 For prose-only tasks, validate examples, links and figures; no full app suite is
 needed. Run `git diff --check` and review `git diff --stat` for unrelated changes.
 
-In `docs/DINKY_EXECUTION_RESULTS.md`, record per task:
+In `docs/archive/DINKY_EXECUTION_RESULTS.md`, record per task:
 
 ```text
 Task ID / status:

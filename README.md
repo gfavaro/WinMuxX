@@ -162,7 +162,7 @@ existing immediate interactions.
 
 Tiled windows glide into place by default (150 ms). Set `animations.enabled = false`
 or `animations.duration-ms = 0` for immediate placement. Reduce Motion disables
-the glide. See [window motion](docs/WINDOW_MOTION.md) for configuration and limits.
+the glide. See [window motion](docs/archive/WINDOW_MOTION.md) for configuration and limits.
 
 ```toml
 [workspace-sidebar]
@@ -214,11 +214,11 @@ it opens. Actions without shortcuts remain clickable. Custom command chains, mod
 
 Dinky 0.19 adaptations include `hyper`/`meh` shortcut aliases, bundle-ID regex
 rules, optional workspace layouts per display, settled display-change actions,
-and window recovery/performance fixes. See [configuration and comparison notes](docs/DINKY_019_ADOPTION.md).
+and window recovery/performance fixes. See [configuration and comparison notes](docs/archive/DINKY_019_ADOPTION.md).
 
 Dinky 0.20 adaptations add optional master layout / `swap-with-master`,
 app-activation exclusions, browser overlay filtering, and original-frame restoration
-on disable/quit. See [options and behavior](docs/DINKY_020_ADOPTION.md) for the
+on disable/quit. See [options and behavior](docs/archive/DINKY_020_ADOPTION.md) for the
 historical adoption notes. Current Master and Scrolling modes arrange each existing
 top-level group as a whole, preserving its nested splits and tabs. Group layout
 commands continue to affect their own group; `workspace-layout dwindle` restores

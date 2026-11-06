@@ -195,7 +195,7 @@ Full checks passed 1,306 Swift and 48 Python tests. Installation and read-only
 resume returned `needs_review: focus_changed_during_validation` on the active
 desktop; no stale focus was replayed. Config/topology and all seven surviving
 assignments were preserved; three windows closed. The private rollback/report
-workflow remains available. See [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
+workflow remains available. See [RELEASE_VALIDATION.md](../RELEASE_VALIDATION.md)
 for exact sample results and unperformed native checks. No native performance
 improvement, physical helper rendering, multi-display acceptance or lifetime
 resource bound is claimed.

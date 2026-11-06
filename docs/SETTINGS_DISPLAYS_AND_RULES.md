@@ -119,4 +119,4 @@ of the exact App ID. All supplied conditions must match. Automation → Events a
 **On display connect/disconnect**, after the display topology settles, with
 `WINMUX_DISPLAYS` and `WINMUX_PREV_DISPLAYS` available to shell commands.
 Optional `[workspace.<internal-name>.display.<selector>]` layout/orientation defaults
-are advanced configuration; see [the adoption notes](DINKY_019_ADOPTION.md).
+are advanced configuration; see [the adoption notes](archive/DINKY_019_ADOPTION.md).

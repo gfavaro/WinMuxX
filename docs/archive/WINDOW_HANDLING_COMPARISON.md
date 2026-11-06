@@ -10,7 +10,7 @@ inactive windows and reports failure. Layout algorithms are out of scope; see th
 |---|---|---|
 | WinMuxX | `feat/native-spaces` `e46116bd`, build 262 | Installed and running when reviewed |
 | WinMux (original) | `upstream/main` `470eedbf`, v0.5.6 | The fork point; no upstream commits since |
-| Dinky | `efa24ab`, v0.23 | Source inspected, not built or run; MIT, see [license](licenses/Dinky-MIT.txt) |
+| Dinky | `efa24ab`, v0.23 | Source inspected, not built or run; MIT, see [license](../licenses/Dinky-MIT.txt) |
 
 Evidence is source reading unless marked **measured**. Dinky was read in its window
 model, frame applier, frame scheduler and coordinator, not exhaustively.

@@ -28,7 +28,7 @@
 - [Release validation](RELEASE_VALIDATION.md): completed checks, long observation and remaining native/energy gaps.
 - [Testing](TESTING.md): test design, isolation, asynchronous coordination and CI reports.
 - [Swipe performance](SWIPE_PERFORMANCE.md): stage timings, local surface benchmarks and physical validation requirements.
-- [Runtime state cleanup](RUNTIME_STATE_CLEANUP_PLAN.md): scope, ownership decisions and acceptance results.
+- [Runtime state cleanup](archive/RUNTIME_STATE_CLEANUP_PLAN.md): scope, ownership decisions and acceptance results.
 - [Fork maintenance](FORK.md): identity, upstream workflow, configuration ownership and signing.
 - [Roadmap](ROADMAP.md): progress, deferred work and manual validation.
 
@@ -36,26 +36,27 @@
 
 - [Screen-sharing picker compatibility](SCREEN_SHARING_PICKER_PLAN.md): investigation and plan; no runtime changes yet.
 
-## Reviews and investigations
+## Archive
 
-These documents preserve observations and experiments. Earlier sections may refer
+Dated reviews, investigations and completed plans live in [`archive/`](archive/).
+They preserve observations and experiments. Earlier sections may refer
 to controls, filenames or implementations subsequently replaced. Use the current
 guides above for today's settings and development workflow.
 
-- [Window handling comparison](WINDOW_HANDLING_COMPARISON.md): WinMuxX, the original WinMux and Dinky on window and app identity, AX isolation, frame writes, hiding and failure visibility.
-- [Dinky native implementation comparison](NATIVE_SPACES_DINKY_COMPARISON.md): coordinator, lifecycle, event reliability, frame scheduling and policies to retain or change.
-- [Dinky fit and implementation plan](DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
-- [Dinky execution checklist](DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
-- [Robustness plan](ROBUSTNESS_PLAN.md), shipped in build 121, with its [validation](ROBUSTNESS_VALIDATION.md).
-- [Scrolling workspaces validation](SCROLLING_WORKSPACES_COMPLETION.md)
-- [AeroSpork comparison](AEROSPORK_REVIEW.md) and the [Settings ideas it led to](SETTINGS_AND_CLEANUP_PLAN.md), shipped in build 73.
-- [prateek/winmux fork review](PRATEEK_FORK_REVIEW.md)
+- [Window handling comparison](archive/WINDOW_HANDLING_COMPARISON.md): WinMuxX, the original WinMux and Dinky on window and app identity, AX isolation, frame writes, hiding and failure visibility.
+- [Dinky native implementation comparison](archive/NATIVE_SPACES_DINKY_COMPARISON.md): coordinator, lifecycle, event reliability, frame scheduling and policies to retain or change.
+- [Dinky fit and implementation plan](archive/DINKY_FIT_PLAN.md): 2026-10-22 evaluation, existing adaptations, documentation, configuration completion and reliability priorities.
+- [Dinky execution checklist](archive/DINKY_EXECUTION_PLAN.md): ordered implementation tasks, exact starting files, validation and completion evidence for an implementation agent.
+- [Robustness plan](archive/ROBUSTNESS_PLAN.md), shipped in build 121, with its [validation](archive/ROBUSTNESS_VALIDATION.md).
+- [Scrolling workspaces validation](archive/SCROLLING_WORKSPACES_COMPLETION.md)
+- [AeroSpork comparison](archive/AEROSPORK_REVIEW.md) and the [Settings ideas it led to](archive/SETTINGS_AND_CLEANUP_PLAN.md), shipped in build 73.
+- [prateek/winmux fork review](archive/PRATEEK_FORK_REVIEW.md)
 - [Shoji review](SHOJI_REVIEW.md): hands-on notes, pill tab strips and other ideas; not yet reviewed.
-- [Test suite review](TEST_SUITE_REVIEW.md)
-- [Appearance settings review](APPEARANCE_SETTINGS_REVIEW.md)
-- [Menu-bar appearance investigation](MENU_BAR_APPEARANCE_INVESTIGATION.md)
-- [Dinky 0.20 adaptations](DINKY_020_ADOPTION.md)
-- [Dwindle comparison with Dinky](DWINDLE_DINKY_COMPARISON.md)
-- [Simplification review](SIMPLIFY_REVIEW.md)
-- [Window motion](WINDOW_MOTION.md)
-- [Plano de limpeza e controles nativos](CODE_HEALTH_NATIVE_UI_PLAN.md)
+- [Test suite review](archive/TEST_SUITE_REVIEW.md)
+- [Appearance settings review](archive/APPEARANCE_SETTINGS_REVIEW.md)
+- [Menu-bar appearance investigation](archive/MENU_BAR_APPEARANCE_INVESTIGATION.md)
+- [Dinky 0.20 adaptations](archive/DINKY_020_ADOPTION.md)
+- [Dwindle comparison with Dinky](archive/DWINDLE_DINKY_COMPARISON.md)
+- [Simplification review](archive/SIMPLIFY_REVIEW.md)
+- [Window motion](archive/WINDOW_MOTION.md)
+- [Plano de limpeza e controles nativos](archive/CODE_HEALTH_NATIVE_UI_PLAN.md)

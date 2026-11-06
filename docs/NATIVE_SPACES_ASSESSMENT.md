@@ -64,7 +64,7 @@ Sources were inspected at pinned revisions on 2026-10-26; these are evidence of 
 
 ## Architectural alternatives and recommendation
 
-The follow-up [Dinky implementation comparison](NATIVE_SPACES_DINKY_COMPARISON.md)
+The follow-up [Dinky implementation comparison](archive/NATIVE_SPACES_DINKY_COMPARISON.md)
 traces its actual coordinator, event, scheduling and stacking paths and revises the
 next native tiling milestone around targeted reconciliation.
 
@@ -142,7 +142,7 @@ before runtime readiness. The development process reported existing Accessibilit
 permission available without requesting or changing it. Both temporary development
 processes were stopped; the installed manager remained running.
 
-The [Dinky source comparison](NATIVE_SPACES_DINKY_COMPARISON.md) now defines the next
+The [Dinky source comparison](archive/NATIVE_SPACES_DINKY_COMPARISON.md) now defines the next
 runtime work: targeted incoming-Space reconciliation, incremental window lifecycle,
 missed-event recovery and frame-job membership authority, then native group stacking.
 These remain necessary before claiming a native tiling MVP.

@@ -76,6 +76,6 @@ For runtime changes: focused failing regressions first, `make check`, signed Rel
 ## Implementation follow-up
 
 The selected adaptations are implemented in the working tree for build 71. See
-[RELIABILITY.md](RELIABILITY.md) for behavior, boundaries and public selectors, and
-[TESTING.md](TESTING.md) for validation. The comparison above is retained as the
+[RELIABILITY.md](../RELIABILITY.md) for behavior, boundaries and public selectors, and
+[TESTING.md](../TESTING.md) for validation. The comparison above is retained as the
 pre-adaptation review rather than rewritten to imply those gaps never existed.

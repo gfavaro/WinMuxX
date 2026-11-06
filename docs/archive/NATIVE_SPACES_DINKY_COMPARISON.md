@@ -4,7 +4,7 @@ Reviewed 2026-10-26 against Dinky commit
 [`cd1d3ca5c09c9e5599d22a64fc5aebbde4cd483d`](https://github.com/mikker/Dinky/tree/cd1d3ca5c09c9e5599d22a64fc5aebbde4cd483d),
 also the remote HEAD when checked. Source was inspected, not executed. Dinky is
 MIT-licensed, copyright Mikkel Malmberg; any implementation adapted from it must
-retain the [existing license notice](licenses/Dinky-MIT.txt).
+retain the [existing license notice](../licenses/Dinky-MIT.txt).
 
 The recommendation is to use Dinky as the primary native runtime reference while
 retaining WinMuxX's layout engine and optional virtual backend. Our branch currently
@@ -15,7 +15,7 @@ Follow-up implementation now adds scoped discovery, incoming-Space targeting,
 WindowServer lifecycle events, a measured topology-only audit, AX classification
 into retained trees and per-write ownership checks. Physical native tiling remains
 disabled. The table below records the original comparison that led to these changes;
-the [assessment](NATIVE_SPACES_ASSESSMENT.md) records current implementation evidence.
+the [assessment](../NATIVE_SPACES_ASSESSMENT.md) records current implementation evidence.
 
 | Area | Dinky implementation | WinMuxX branch and decision |
 |---|---|---|
@@ -54,7 +54,7 @@ and inactive-window membership preservation. Native frame writes, overlapping
 window ordering, fullscreen/Mission Control cycles and third-party posted swipes
 were not validated during that comparison. Subsequent host validation exercised
 basic Dwindle/Master positioning, explicit focus, minimize/restore and native
-fullscreen; see the [current assessment](NATIVE_SPACES_ASSESSMENT.md). Native
+fullscreen; see the [current assessment](../NATIVE_SPACES_ASSESSMENT.md). Native
 overlapping-group ordering, Mission Control and third-party posted swipes remain
 unverified.
 
