@@ -180,12 +180,7 @@ func deleteWorkspaceForSidebar(workspaceName: String) throws {
 
 @MainActor
 func deleteWorkspaceProjectFromSidebar(_ projectId: WorkspaceProjectId) async throws {
-    switch config.workspaceSidebar.projectDeletionAction {
-        case .closeWindows:
-            try await closeWindowsAndDeleteWorkspaceProject(projectId)
-        case .moveWindowsToFallback:
-            try deleteWorkspaceProjectMovingWindowsToFallback(projectId)
-    }
+    try await closeWindowsAndDeleteWorkspaceProject(projectId)
 }
 
 @MainActor

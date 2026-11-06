@@ -61,6 +61,63 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
                        "An explicit chrome-style wins over the alias")
     }
 
+    func testRetiredBehaviorOptionsAreRemovedFromExistingConfig() throws {
+        let original = """
+        # Keep this comment
+        focus-follows-mouse-dwell = 250
+        drag-stack-layout = 'tab-group'
+        tab-group-padding = 30
+        single-window-alignment = 'right'
+        [master]
+        ultrawide-mains = 2
+        [window-tabs]
+        style = 'tabs'
+        [hover-bar]
+        enabled = false
+        [workspace-swipe]
+        reverse-direction = true
+        animation-duration-ms = 220
+        [workspace-sidebar]
+        hover-open-delay-ms = 400
+        menu-bar-reserve-height = 28
+        show-status-pills = true
+        project-deletion-action = 'close-windows'
+        [workspace.'Code']
+        single-window-alignment = 'left'
+        [workspace.'Code'.display.main]
+        single-window-alignment = 'right'
+        """
+        let migrated = try removingRetiredConfigKeys(in: original)
+        XCTAssertTrue(migrated.contains("# Keep this comment"))
+        for key in ["focus-follows-mouse-dwell", "drag-stack-layout", "tab-group-padding", "single-window-alignment",
+                    "ultrawide-mains", "style =", "hover-bar", "reverse-direction", "animation-duration-ms",
+                    "hover-open-delay-ms", "menu-bar-reserve-height", "show-status-pills", "project-deletion-action"] {
+            XCTAssertFalse(migrated.contains(key), "\(key):\n\(migrated)")
+        }
+        XCTAssertTrue(parseConfig(migrated).errors.isEmpty, "\(parseConfig(migrated).errors)")
+        XCTAssertEqual(try removingRetiredConfigKeys(in: migrated), migrated)
+    }
+
+    func testLaunchMigrationRemovesRetiredOptionsBeforeConfigLoad() throws {
+        let original = """
+        # My preferences
+        tab-group-padding = 30
+        drag-stack-layout = 'tab-group'
+        [workspace-sidebar]
+        show-status-pills = true
+        menu-bar-reserve-height = 28
+        project-deletion-action = 'close-windows'
+        """
+        let (file, defaults) = try fixture(original)
+        try migrateLegacyConfiguration(at: file, defaults: defaults)
+        let migrated = try String(contentsOf: file, encoding: .utf8)
+        XCTAssertTrue(migrated.contains("# My preferences"))
+        for key in ["tab-group-padding", "drag-stack-layout", "show-status-pills", "menu-bar-reserve-height", "project-deletion-action"] {
+            XCTAssertFalse(migrated.contains(key), "\(key):\n\(migrated)")
+        }
+        XCTAssertTrue(parseConfig(migrated).errors.isEmpty, "\(parseConfig(migrated).errors)")
+    }
+
     func testScrollingConfigurationIsRemovedAndItsWorkspacesUseTheDefault() throws {
         let original = """
         # Kept

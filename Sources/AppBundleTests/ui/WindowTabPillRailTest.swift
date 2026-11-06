@@ -54,13 +54,8 @@ final class WindowTabPillRailTest: XCTestCase {
         XCTAssertTrue(WindowHoverBar.tabs(for: lone).isEmpty, "A window outside a tab group gets only its actions")
     }
 
-    func testTabStyleChoosesPillsOrAStripThatTakesItsHeight() async throws {
-        let previous = config.windowTabs
-        defer { config.windowTabs = previous }
-        XCTAssertEqual(parseConfig("[window-tabs]\nstyle = 'tabs'").config.windowTabs.style, .tabs)
-        XCTAssertEqual(WindowTabsConfig().style, .pills, "Pills are the default")
-        XCTAssertFalse(parseConfig("[window-tabs]\nstyle = 'ribbon'").errors.isEmpty)
-
+    func testPillsRemainTheTabChromeAndHoverBarListsGroupTabs() async throws {
+        XCTAssertFalse(parseConfig("[window-tabs]\nstyle = 'tabs'").errors.isEmpty)
         config.windowTabs.enabled = true
         let workspace = Workspace.get(byName: name)
         let group = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: 1, .h, .tabGroup, index: 0)
@@ -68,23 +63,15 @@ final class WindowTabPillRailTest: XCTestCase {
         _ = TestWindow.new(id: 2, parent: group)
         first.markAsMostRecentChild()
 
-        config.windowTabs.style = .pills
         try await workspace.layoutWorkspace()
         let groupTop = try XCTUnwrap(group.lastAppliedLayoutPhysicalRect).minY
         XCTAssertEqual(try XCTUnwrap(first.lastAppliedLayoutPhysicalRect).minY, groupTop, "Pills take no space")
-
-        config.windowTabs.style = .tabs
-        try await workspace.layoutWorkspace()
-        XCTAssertEqual(try XCTUnwrap(first.lastAppliedLayoutPhysicalRect).minY, groupTop + resolvedWindowTabBarHeight(),
-            "A tab strip takes its height above the windows")
 
         let previousStrips = TrayMenuModel.shared.windowTabStrips
         defer { TrayMenuModel.shared.windowTabStrips = previousStrips }
         TrayMenuModel.shared.windowTabStrips = [WindowTabStripViewModel(id: ObjectIdentifier(group), workspaceName: workspace.name,
             frame: .zero, groupFrame: .zero, activeWindowId: 1, activeWindowCornerRadius: 10, tabs: tabs(active: 1),
             occludingFloatingWindowFrames: [], shownWindowIds: [1])]
-        XCTAssertTrue(WindowHoverBar.tabs(for: first).isEmpty, "With a strip on screen the hover bar shows only actions")
-        config.windowTabs.style = .pills
         XCTAssertFalse(WindowHoverBar.tabs(for: first).isEmpty)
     }
 

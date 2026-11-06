@@ -230,9 +230,6 @@ func beginWindowMoveWithMouseSessionIfNeeded(
     setCurrentMouseTabDetachOrigin(detachOrigin)
     setCurrentMouseDragStartedInSidebar(startedInSidebar)
     setDraggedWindowAnchorRect(anchorRect, for: windowId)
-    WindowTabStripPanelController.shared.setIgnoresMouseEvents(
-        shouldIgnoreWindowTabStripMouseEventsDuringDrag(detachOrigin: detachOrigin)
-    )
     if refreshActualRects {
         refreshVisibleWindowActualRectsForCurrentDrag(sourceWindowId: windowId)
     } else {
@@ -252,7 +249,6 @@ func cancelManipulatedWithMouseState() {
     setCurrentMouseTabDetachOrigin(.window)
     setCurrentMouseDragStartedInSidebar(false)
     currentlyManipulatedWithMouseWindowId = nil
-    WindowTabStripPanelController.shared.setIgnoresMouseEvents(false)
     for workspace in Workspace.all {
         workspace.resetResizeWeightBeforeResizeRecursive()
     }

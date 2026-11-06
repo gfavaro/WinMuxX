@@ -71,7 +71,7 @@ final class WindowHoverBar {
     /// The tabs of the group a tabbed window belongs to, from the published tab models.
     static func tabs(for window: Window) -> [HoverBarTab] {
         // A tab strip already shows the tabs; only pills leave them to the bar.
-        guard config.windowTabs.style == .pills, let group = window.nearestWindowTabGroup, group.showsWindowTabs,
+        guard let group = window.nearestWindowTabGroup, group.showsWindowTabs,
               let strip = TrayMenuModel.shared.windowTabStrips.first(where: { $0.id == ObjectIdentifier(group) })
         else { return [] }
         return strip.tabs.map { tab in
@@ -101,10 +101,7 @@ final class WindowHoverBar {
         if shown != nil, panelRect.insetBy(dx: -12, dy: -12).contains(point) { return }
         guard TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive else { return hide() }
         if shown != nil { hide() }
-        // A tab group's bar is its only tab chooser, so it shows even with quick actions off.
-        guard let window = Self.candidate(at: point),
-              config.hoverBar.enabled || (config.windowTabs.style == .pills && window.nearestWindowTabGroup?.showsWindowTabs == true)
-        else { return cancelPending() }
+        guard let window = Self.candidate(at: point) else { return cancelPending() }
         if pending?.windowId == window.windowId { return }
         cancelPending()
         let id = window.windowId

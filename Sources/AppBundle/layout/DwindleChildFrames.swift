@@ -60,7 +60,7 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
             : nil
         return .container(layout: container.layout, horizontal: container.orientation == .h,
             children: children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
-            tabChrome: chrome, stackedPadding: CGFloat(max(config.tabGroupPadding, 0)))
+            tabChrome: chrome, stackedPadding: tabGroupPadding)
     default: return .window(.zero)
     }
 }

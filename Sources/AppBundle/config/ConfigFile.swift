@@ -213,7 +213,6 @@ func migrateAerospaceConfigForWinMux(_ rawToml: String) throws -> String {
         ("AEROSPACE_PREV_WORKSPACE", "WINMUX_PREV_WORKSPACE"),
         ("AEROSPACE_WINDOW_ID", "WINMUX_WINDOW_ID"),
         ("AEROSPACE_WORKSPACE", "WINMUX_WORKSPACE"),
-        ("accordion-padding", "tab-group-padding"),
         ("h_accordion", "h_tab_group"),
         ("v_accordion", "v_tab_group"),
     ]

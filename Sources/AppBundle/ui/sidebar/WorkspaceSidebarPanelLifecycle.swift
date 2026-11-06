@@ -12,10 +12,6 @@ extension WorkspaceSidebarPanel {
         guard !isRetired else { return }
         syncContentLoading()
         defer { requestPublicStateUpdate() }
-        if appliedHoverOpenDelayMs != config.workspaceSidebar.hoverOpenDelayMs {
-            appliedHoverOpenDelayMs = config.workspaceSidebar.hoverOpenDelayMs
-            cancelHoverReveal()
-        }
         guard !WorkspaceOverviewController.shared.isOpen else {
             cancelExpansionWork()
             resetHiddenSidebarState()

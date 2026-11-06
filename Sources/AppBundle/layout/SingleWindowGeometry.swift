@@ -1,10 +1,8 @@
 import AppKit
 import Common
 
-func windowWidthRect(available: Rect, fraction: Double, minimumWidth: CGFloat,
-                     alignment: SingleWindowAlignment = .center) -> Rect {
-    alignedSingleWindowRect(available: available, width: available.width * fraction,
-                            minimumWidth: minimumWidth, alignment: alignment)
+func windowWidthRect(available: Rect, fraction: Double, minimumWidth: CGFloat) -> Rect {
+    centeredSingleWindowRect(available: available, width: available.width * fraction, minimumWidth: minimumWidth)
 }
 
 @MainActor
@@ -15,10 +13,10 @@ func fullscreenWindowRect(_ window: Window, in workspace: Workspace) -> Rect {
     return windowWidthRect(available: available, fraction: fraction, minimumWidth: window.minimumLayoutSize.width)
 }
 
-func singleWindowLimitedRect(available: Rect, screen: Rect, ratio: Double, minimumWidth: CGFloat, alignment: SingleWindowAlignment = .center) -> Rect {
+func singleWindowLimitedRect(available: Rect, screen: Rect, ratio: Double, minimumWidth: CGFloat) -> Rect {
     guard ratio.isFinite, ratio > 0, screen.height > 0, screen.width / screen.height >= 2.3 else { return available }
     let width = min(available.width, max(max(available.height - 1, 0) * CGFloat(ratio), minimumWidth))
-    return alignedSingleWindowRect(available: available, width: width, minimumWidth: minimumWidth, alignment: alignment)
+    return centeredSingleWindowRect(available: available, width: width, minimumWidth: minimumWidth)
 }
 
 @MainActor
@@ -52,27 +50,20 @@ func workspaceTilingRect(_ workspace: Workspace) -> Rect {
         }
     }
     guard let window = singleWindowWidthTarget(in: workspace) else { return available }
-    let alignment = settings.singleWindowAlignment ?? .center
     if let width = window.singleWindowManualWidth {
-        return alignedSingleWindowRect(available: available, width: width, minimumWidth: window.minimumLayoutSize.width, alignment: alignment)
+        return centeredSingleWindowRect(available: available, width: width, minimumWidth: window.minimumLayoutSize.width)
     }
     if let fraction = settings.fullscreenWidth {
-        return windowWidthRect(available: available, fraction: fraction,
-                               minimumWidth: window.minimumLayoutSize.width, alignment: alignment)
+        return windowWidthRect(available: available, fraction: fraction, minimumWidth: window.minimumLayoutSize.width)
     }
     return singleWindowLimitedRect(available: available, screen: monitor.rect,
-        ratio: config.singleWindowAspectRatio.getValue(for: monitor), minimumWidth: window.minimumLayoutSize.width, alignment: alignment)
+        ratio: config.singleWindowAspectRatio.getValue(for: monitor), minimumWidth: window.minimumLayoutSize.width)
 }
 
-func alignedSingleWindowRect(available: Rect, width: CGFloat, minimumWidth: CGFloat, alignment: SingleWindowAlignment = .center) -> Rect {
+func centeredSingleWindowRect(available: Rect, width: CGFloat, minimumWidth: CGFloat) -> Rect {
     guard width.isFinite, width > 0 else { return available }
     let fittedWidth = min(available.width, max(width, minimumWidth))
-    let inset: CGFloat = switch alignment {
-        case .left: 0
-        case .center: (available.width - fittedWidth) / 2
-        case .right: available.width - fittedWidth
-    }
-    return Rect(topLeftX: available.topLeftX + inset,
+    return Rect(topLeftX: available.topLeftX + (available.width - fittedWidth) / 2,
         topLeftY: available.topLeftY, width: fittedWidth, height: available.height)
 }
 

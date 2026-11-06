@@ -14,10 +14,6 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     /// The header the group reserves above its windows: the strip's height, or none with pills.
     var headerHeight: CGFloat = 0
 
-    var tabStripIsOccludedByFloatingWindow: Bool {
-        occludingFloatingWindowFrames.contains { $0.intersects(frame) }
-    }
-
     var groupFrameIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(groupFrame) }
     }

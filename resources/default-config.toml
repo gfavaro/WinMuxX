@@ -5,8 +5,6 @@ persistent-workspaces = []
 # Share of usable width for lone tiled windows and WinMuxX fullscreen (0.1 to 1).
 # Display and workspace tables can override this value.
 fullscreen-width = 1.0
-# Alignment within the area remaining after sidebar and gaps: center, left, right.
-single-window-alignment = 'center'
 
 config-version = 2
 
@@ -25,7 +23,6 @@ after-startup-command = []
 auto-reload-config = true
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true
-tab-group-padding = 30
 
 # Native tab-group chrome. Height is measured in points.
 window-tabs.enabled = true
@@ -45,8 +42,6 @@ borders.order = 'below'
 borders.exclude-apps = []
 
 # Dwindle splits space recursively when windows are tiled; no layout shortcut is needed.
-# New groups created by dragging: 'tab-group' or 'accordion'.
-drag-stack-layout = 'tab-group'
 default-root-container-layout = 'dwindle'
 default-root-container-orientation = 'auto'
 
@@ -60,9 +55,8 @@ automatically-unhide-macos-hidden-apps = false
 automatically-tile-new-windows = true
 # Shake a window horizontally while dragging its title bar to toggle floating/tiling.
 enable-shake-to-toggle-tiling = true
-# Focus a tiled window after the pointer remains over it for the configured dwell.
+# Focus a tiled window after the pointer remains over it briefly.
 focus-follows-mouse = false
-focus-follows-mouse-dwell = 250
 auto-add-new-windows-to-tab-group = true
 shortcuts-preset = 'none'
 on-mode-changed = []
@@ -89,9 +83,6 @@ on-mode-changed = []
     auto-hide = false
     # Keep the full sidebar open and reserve its width for tiled windows.
     always-expanded = false
-    # Wait before hover reveals the sidebar (0–5000 ms). Text-selection drags
-    # do not reveal it; commands and recognized window drags remain immediate.
-    hover-open-delay-ms = 400
     collapsed-width = 50
     width = 280
     # Omit monitor to show an independent sidebar on every display.
@@ -102,8 +93,6 @@ on-mode-changed = []
     # All height modes protect the menu bar, including its auto-hide reveal area.
     # Centered fits content, growing up to 90% of the safe display height.
     height-mode = 'standard'
-    project-deletion-action = 'close-windows'
-    show-status-pills = true
     show-clock = false
     show-seconds = true
     show-date = false
@@ -236,9 +225,6 @@ on-mode-changed = []
 # Assign native macOS full-screen app swipes to four fingers or off.
 [workspace-swipe]
 enabled = false
-reverse-direction = false
-# Finger-tracked preview; release past halfway to commit. Zero disables visuals.
-animation-duration-ms = 220
 
 # Menu bar appearance. Settings edits these same values.
 [menu-bar]

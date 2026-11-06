@@ -43,3 +43,21 @@ final class WindowTabGroupVisualPanel: NSPanelHud {
         return true
     }
 }
+
+extension NSPanelHud {
+    /// Shared setup for non-activating, transparent tab chrome panels hosting SwiftUI content.
+    func configureWindowTabChromePanel(identifier: String, hostingView: NSView) {
+        self.identifier = NSUserInterfaceItemIdentifier(identifier)
+        hasShadow = false
+        isFloatingPanel = false
+        isExcludedFromWindowsMenu = true
+        // `.transient` lets the system hide tab chrome during Mission Control instead of showing it as a window.
+        collectionBehavior = [.canJoinAllSpaces, .transient, .ignoresCycle, .fullScreenAuxiliary]
+        animationBehavior = .none
+        backgroundColor = .clear
+        applyWinMuxLayer(.windowChrome)
+        contentView = hostingView
+        hostingView.frame = contentView?.bounds ?? .zero
+        hostingView.autoresizingMask = [.width, .height]
+    }
+}

@@ -14,17 +14,11 @@ private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebar
     "enable-focus": Parser(\.enableFocus, parseBool),
     "auto-hide": Parser(\.autoHide, parseBool),
     "always-expanded": Parser(\.alwaysExpanded, parseBool),
-    "hover-open-delay-ms": Parser(\.hoverOpenDelayMs) { raw, backtrace in
-        parseInt(raw, backtrace).filter(.semantic(backtrace, "Must be between 0 and 5000 milliseconds")) {
-            (0...5000).contains($0)
-        }
-    },
     "collapsed-width": Parser(\.collapsedWidth, parseWorkspaceSidebarWidth),
     "width": Parser(\.width, parseWorkspaceSidebarWidth),
     "monitor": Parser(\.monitor) { value, backtrace, errors in
         parseMonitorDescriptions(value, backtrace, &errors)
     },
-    "show-status-pills": Parser(\.showStatusPills, parseBool),
     "show-clock": Parser(\.showClock, parseBool),
     "show-seconds": Parser(\.showSeconds, parseBool),
     "show-date": Parser(\.showDate, parseBool),
@@ -36,8 +30,6 @@ private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebar
     "chrome-style": Parser(\.chromeStyle, parseChromeStyle),
     "solid-chrome-color": Parser(\.solidChromeColor, parseChromeSolidColor),
     "solid-chrome-custom-color": Parser(\.solidChromeCustomColor, parseChromeSolidCustomColor),
-    "menu-bar-reserve-height": Parser(\.menuBarReserveHeight, parseWorkspaceSidebarMenuBarReserveHeight),
-    "project-deletion-action": Parser(\.projectDeletionAction, parseWorkspaceProjectDeletionAction),
     "workspace-labels": Parser(\.workspaceLabels, parseWorkspaceSidebarLabels),
     "project-labels": Parser(\.projectLabels, parseWorkspaceSidebarLabels),
     "project-colors": Parser(\.projectColors, parseWorkspaceSidebarProjectColors),
@@ -119,24 +111,6 @@ private func parseChromeSolidColor(_ raw: TOMLValueConvertible, _ backtrace: Tom
 private func parseWorkspaceSidebarWidth(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Int> {
     parseInt(raw, backtrace)
         .filter(.semantic(backtrace, "Must be greater than 0")) { $0 > 0 }
-}
-
-private func parseWorkspaceSidebarMenuBarReserveHeight(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Int> {
-    parseInt(raw, backtrace)
-        .filter(.semantic(backtrace, "Must be greater than or equal to 0")) { $0 >= 0 }
-}
-
-private func parseWorkspaceProjectDeletionAction(
-    _ raw: TOMLValueConvertible,
-    _ backtrace: TomlBacktrace,
-) -> ParsedToml<WorkspaceProjectDeletionAction> {
-    parseString(raw, backtrace).flatMap { rawValue in
-        WorkspaceProjectDeletionAction(rawValue: rawValue)
-            .orFailure(.semantic(
-                backtrace,
-                "Possible values: \(WorkspaceProjectDeletionAction.allCases.map(\.rawValue).joined(separator: ", "))",
-            ))
-    }
 }
 
 private func parseWorkspaceSidebarLabels(

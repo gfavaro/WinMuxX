@@ -62,7 +62,6 @@ final class WindowHoverBarTest: WorkspaceTestCase {
         XCTAssertEqual(WindowHoverBar.candidate(at: CGPoint(x: fullZone.minX + fullZone.width / 2, y: fullZone.minY + 2))?.windowId, b.windowId)
         XCTAssertEqual(WindowHoverBar.actions(for: b).map(\.command), ["fullscreen off --window-id 9612"])
         _ = a
-        XCTAssertTrue(parseConfig("").config.hoverBar.enabled)
-        XCTAssertFalse(parseConfig("[hover-bar]\nenabled = false").config.hoverBar.enabled)
+        XCTAssertFalse(parseConfig("[hover-bar]\nenabled = false").errors.isEmpty)
     }
 }

@@ -1,6 +1,9 @@
 import AppKit
 import Common
 
+/// Space around the windows of a tab group or accordion, in points.
+let tabGroupPadding: CGFloat = 30
+
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
@@ -276,7 +279,7 @@ extension TilingContainer {
         guard let mruIndex: Int = mostRecentChild?.ownIndex else { return }
         for (index, child) in children.enumerated() {
             let extent = orientation == .h ? width : height
-            let padding = min(CGFloat(max(config.tabGroupPadding, 0)), max(extent - 1, 0) / 2)
+            let padding = min(tabGroupPadding, max(extent - 1, 0) / 2)
             let (lPadding, rPadding): (CGFloat, CGFloat) = switch index {
                 case 0 where children.count == 1: (0, 0)
                 case 0:                           (0, padding)
@@ -330,7 +333,7 @@ extension TreeNode {
                 guard !minimums.isEmpty else { return 0 }
                 if container.layout == .tabGroup || container.layout == .stacked {
                     if container.layout == .stacked {
-                        return (minimums.max() ?? 0) + (container.orientation == axis && minimums.count > 1 ? CGFloat(max(config.tabGroupPadding, 0)) * 2 : 0)
+                        return (minimums.max() ?? 0) + (container.orientation == axis && minimums.count > 1 ? tabGroupPadding * 2 : 0)
                     }
                     let chrome = container.showsWindowTabs
                         ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()

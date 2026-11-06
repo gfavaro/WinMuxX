@@ -3,6 +3,9 @@ import Common
 import HotKey
 import PrivateApi
 
+/// How long the pointer rests on a window before focus follows it.
+let focusFollowsMouseDwellMs = 250
+
 enum GlobalObserver {
     @MainActor private static var isInitialized = false
     @MainActor private static var notificationObserverTokens: [NSObjectProtocol] = []
@@ -142,7 +145,7 @@ enum GlobalObserver {
         _ = controller.notePointer(windowId: window.windowId, point: point, timestamp: timestamp)
         if previous == controller.candidate, focusFollowsMouseTask != nil { return }
         focusFollowsMouseTask?.cancel()
-        let dwell = max(config.focusFollowsMouseDwell, 0)
+        let dwell = focusFollowsMouseDwellMs
         focusFollowsMouseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(dwell))
             guard !Task.isCancelled,

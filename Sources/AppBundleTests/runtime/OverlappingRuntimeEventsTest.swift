@@ -94,13 +94,13 @@ final class OverlappingRuntimeEventsTest: WorkspaceTestCase {
         scheduleRefreshSession(.configAutoReload)
         var args = ReloadConfigCmdArgs(rawArgs: []); args.noGui = true
         var output = ""
-        try "config-version = 2\nfocus-follows-mouse-dwell = 17\n[mode.main.binding]\n".write(to: file, atomically: true, encoding: .utf8)
+        try "config-version = 2\nmaster.size = 0.17\n[mode.main.binding]\n".write(to: file, atomically: true, encoding: .utf8)
         let valid = try await reloadConfig(args: args, forceConfigUrl: file, stdout: &output)
         XCTAssertTrue(valid)
         boundary("valid reload while refresh held")
         try "invalid = [".write(to: file, atomically: true, encoding: .utf8)
         let invalid = try await reloadConfig(args: args, forceConfigUrl: file, stdout: &output)
-        XCTAssertFalse(invalid); XCTAssertEqual(config.focusFollowsMouseDwell, 17)
+        XCTAssertFalse(invalid); XCTAssertEqual(config.master.size, 0.17)
         boundary("invalid reload preserves published config")
         resume?.resume(); try await waitForScheduledRefreshForTests()
         boundary("queued refresh drained")

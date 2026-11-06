@@ -20,10 +20,8 @@ in each mode. `swap-with-master` exchanges the selected pane with the master.
 `balance-sizes` resets split shares; it does not rebuild the tree. See
 [master settings](archive/DINKY_020_ADOPTION.md#master-layout).
 
-On an ultrawide display (at least twice as wide as tall), `[master] ultrawide-mains = 2`
-puts the next window beside the main one, both full height, and stacks the rest in a
-narrow column for chat or mail. Two windows simply share the screen. The default, 1,
-keeps one main window everywhere; side `top` or `bottom` always does.
+Master keeps one main window on every display, including ultrawide displays. The
+remaining windows form a stack beside it. Two windows share the screen.
 
 ## Container modes and tabs
 
@@ -49,7 +47,7 @@ commands target the focused window and do not select a workspace layout.
 ## Lone ultrawide window
 
 On ultrawide displays, a lone tiled window can use a configurable maximum width
-and alignment. Manual width resizing is respected for the current session. The
+and is centered. Manual width resizing is respected for the current session. The
 [ultrawide diagram](assets/layouts/ultrawide.svg) illustrates this behavior.
 See [single-window sizing](../README.md#single-window-on-ultrawide).
 

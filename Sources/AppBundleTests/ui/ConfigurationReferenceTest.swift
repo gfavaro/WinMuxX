@@ -13,8 +13,6 @@ final class ConfigurationReferenceTest: WorkspaceTestCase {
     }
 
     func testReferenceUsesAppDefaultsInsteadOfPersonalValues() {
-        config.tabGroupPadding = defaultConfig.tabGroupPadding + 123
-        let section = configurationReferenceSections.first { $0.id == "padding" }
-        XCTAssertEqual(section?.example, "tab-group-padding = \(defaultConfig.tabGroupPadding)")
+        XCTAssertFalse(configurationReferenceSections.contains { $0.id == "padding" })
     }
 }

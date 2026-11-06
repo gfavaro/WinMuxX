@@ -9,7 +9,6 @@ final class WindowWidthTest: WorkspaceTestCase {
         let parsed = parseConfig(text)
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
         config.fullscreenWidth = parsed.config.fullscreenWidth
-        config.singleWindowAlignment = parsed.config.singleWindowAlignment
         config.displayWindowSettings = parsed.config.displayWindowSettings
         config.workspaceLayouts = parsed.config.workspaceLayouts
     }
@@ -22,7 +21,7 @@ final class WindowWidthTest: WorkspaceTestCase {
             for value in ["0.1", "0.7", "1"] {
                 XCTAssertTrue(parseConfig(prefix + "fullscreen-width = " + value).errors.isEmpty, prefix + value)
             }
-            XCTAssertFalse(parseConfig(prefix + "single-window-alignment = 'top'").errors.isEmpty)
+            XCTAssertFalse(parseConfig(prefix + "single-window-alignment = 'left'").errors.isEmpty, "alignment is fixed: centered")
         }
         XCTAssertFalse(parseConfig("[display.main]\nfullscren-width = 0.7").errors.isEmpty)
         XCTAssertFalse(parseConfig("display = []").errors.isEmpty)
@@ -36,44 +35,33 @@ final class WindowWidthTest: WorkspaceTestCase {
         setMonitorsForTests([TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "Built-in Retina Display", rect: screen, visibleRect: screen, isMain: true)])
         try load("""
             fullscreen-width = 0.7
-            single-window-alignment = 'left'
             [display.main]
             fullscreen-width = 0.9
             [display.'Built-in']
             fullscreen-width = 0.8
             [display.'Built-in Retina']
             fullscreen-width = 0.6
-            single-window-alignment = 'right'
             """)
         XCTAssertEqual(workspace.windowWidthSettings.fullscreenWidth, 0.6)
-        XCTAssertEqual(workspace.windowWidthSettings.singleWindowAlignment, .right)
         config.workspaceLayouts[name] = WorkspaceLayoutConfig(defaults: .init(fullscreenWidth: 0.5))
         XCTAssertEqual(workspace.windowWidthSettings.fullscreenWidth, 0.5)
-        XCTAssertEqual(workspace.windowWidthSettings.singleWindowAlignment, .right)
-        config.workspaceLayouts[name]?.displays = [WorkspaceDisplayLayout(selector: .main, settings: .init(singleWindowAlignment: .center))]
-        XCTAssertEqual(workspace.windowWidthSettings.fullscreenWidth, 0.5)
-        XCTAssertEqual(workspace.windowWidthSettings.singleWindowAlignment, .center)
-        config.workspaceLayouts[name]?.displays[0] = WorkspaceDisplayLayout(selector: .main, settings: .init(fullscreenWidth: 1))
+        config.workspaceLayouts[name]?.displays = [WorkspaceDisplayLayout(selector: .main, settings: .init(fullscreenWidth: 1))]
         XCTAssertEqual(workspace.windowWidthSettings.fullscreenWidth, 1)
         config.workspaceLayouts = [:]
         config.displayWindowSettings = []
         XCTAssertEqual(workspace.windowWidthSettings.fullscreenWidth, 0.7)
-        XCTAssertEqual(workspace.windowWidthSettings.singleWindowAlignment, .left)
     }
 
-    func testLoneWindowAlignmentMinimumsAndSecondWindowOnLaptop() async throws {
+    func testLoneWindowIsCenteredHonorsMinimumsAndYieldsToASecondWindow() async throws {
         try load("fullscreen-width = 0.7")
         let workspace = focus.workspace
         let window = TestWindow.new(id: 71001, parent: workspace.rootTilingContainer)
         let available = workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
-        for (alignment, factor) in [(SingleWindowAlignment.left, 0.0), (.center, 0.5), (.right, 1.0)] {
-            config.singleWindowAlignment = alignment
-            try await workspace.layoutWorkspace()
-            let frame = try XCTUnwrap(window.lastAppliedLayoutPhysicalRect)
-            XCTAssertEqual(frame.width, available.width * 0.7, accuracy: 0.001)
-            XCTAssertEqual(frame.topLeftX, available.topLeftX + available.width * 0.3 * factor, accuracy: 0.001)
-            XCTAssertEqual(dwindleGeometry(in: workspace)[ObjectIdentifier(window)]?.width, frame.width)
-        }
+        try await workspace.layoutWorkspace()
+        let frame = try XCTUnwrap(window.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(frame.width, available.width * 0.7, accuracy: 0.001)
+        XCTAssertEqual(frame.topLeftX, available.topLeftX + available.width * 0.15, accuracy: 0.001)
+        XCTAssertEqual(dwindleGeometry(in: workspace)[ObjectIdentifier(window)]?.width, frame.width)
         window.testMinimumSize = CGSize(width: available.width * 0.8, height: 0)
         XCTAssertEqual(workspaceTilingRect(workspace).width, available.width * 0.8, accuracy: 0.001)
         window.testMinimumSize = CGSize(width: available.width * 2, height: 0)
@@ -89,7 +77,7 @@ final class WindowWidthTest: WorkspaceTestCase {
     }
 
     func testFullscreenStaysCenteredAndHonorsNoOuterGaps() async throws {
-        try load("fullscreen-width = 0.7\nsingle-window-alignment = 'right'")
+        try load("fullscreen-width = 0.7")
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
         _ = TestWindow.new(id: 72001, parent: root)
@@ -117,7 +105,7 @@ final class WindowWidthTest: WorkspaceTestCase {
         let window = TestWindow.new(id: 73001, parent: root)
         workspace.applyConfiguredLayout()
         root.layout = .dwindle
-        try load("[workspace.'\(workspace.name)']\nfullscreen-width = 0.7\nsingle-window-alignment = 'left'")
+        try load("[workspace.'\(workspace.name)']\nfullscreen-width = 0.7")
         workspace.applyConfiguredLayout()
         XCTAssertEqual(root.layout, .dwindle)
         XCTAssertTrue(applySingleWindowManualResize(window, width: 800))

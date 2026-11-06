@@ -25,12 +25,12 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
     func testIndependentRegistriesAndConfigurationWithOverlappingIDs() {
         let first = world(), second = world()
         let a = first.withValue {
-            config.focusFollowsMouseDwell = 7
+            config.master.size = 0.7
             return Workspace.get(byName: "1")
         }
         let b = second.withValue {
             XCTAssertNil(Workspace.existing(byName: "1"))
-            XCTAssertEqual(config.focusFollowsMouseDwell, 250)
+            XCTAssertEqual(config.master.size, 0.6)
             return Workspace.get(byName: "1")
         }
         XCTAssertEqual(a.id, b.id) // IDs are scoped to a registry.
@@ -38,7 +38,7 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
         XCTAssertEqual(Set([a, b]).count, 2)
         first.withValue {
             XCTAssertTrue(Workspace.existing(byName: "1") === a)
-            XCTAssertEqual(config.focusFollowsMouseDwell, 7)
+            XCTAssertEqual(config.master.size, 0.7)
         }
     }
 
@@ -71,7 +71,7 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
                 started.fulfill()
             }
             XCTAssertTrue(runtime === owner)
-            config.focusFollowsMouseDwell = 9
+            config.master.size = 0.9
             finished.fulfill()
         }
         await fulfillment(of: [started], timeout: 1)
@@ -81,8 +81,8 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
         await fulfillment(of: [finished], timeout: 1)
         await child.value
         XCTAssertTrue(runtime === replacement)
-        XCTAssertNotEqual(config.focusFollowsMouseDwell, 9)
-        XCTAssertEqual(owner.configuration.value.focusFollowsMouseDwell, 9)
+        XCTAssertNotEqual(config.master.size, 0.9)
+        XCTAssertEqual(owner.configuration.value.master.size, 0.9)
     }
 
     func testFreshOwnerHasNoPreviousFocusOrNativeFocusHolds() {
@@ -188,32 +188,32 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
         let originalURL = second.configuration.url
         var args = ReloadConfigCmdArgs(rawArgs: [])
         args.noGui = true
-        try "config-version = 2\nfocus-follows-mouse-dwell = 3\n[mode.main.binding]\n"
+        try "config-version = 2\nmaster.size = 0.3\n[mode.main.binding]\n"
             .write(to: file, atomically: true, encoding: .utf8)
         try await first.withValue {
             activeMode = nil
             var output = ""
             let loaded = try await reloadConfig(args: args, forceConfigUrl: file, stdout: &output)
             XCTAssertTrue(loaded)
-            XCTAssertEqual(config.focusFollowsMouseDwell, 3)
+            XCTAssertEqual(config.master.size, 0.3)
             XCTAssertEqual(configUrl, file)
             XCTAssertNil(lastConfigReloadError)
             try "invalid = [".write(to: file, atomically: true, encoding: .utf8)
             let invalid = try await reloadConfig(args: args, forceConfigUrl: file, stdout: &output)
             XCTAssertFalse(invalid)
-            XCTAssertEqual(config.focusFollowsMouseDwell, 3)
+            XCTAssertEqual(config.master.size, 0.3)
             XCTAssertEqual(configUrl, file)
             XCTAssertNotNil(lastConfigReloadError)
-            try "config-version = 2\nfocus-follows-mouse-dwell = 8\n[mode.main.binding]\n"
+            try "config-version = 2\nmaster.size = 0.8\n[mode.main.binding]\n"
                 .write(to: file, atomically: true, encoding: .utf8)
             args.dryRun = true
             let validated = try await reloadConfig(args: args, forceConfigUrl: file, stdout: &output)
             XCTAssertTrue(validated)
-            XCTAssertEqual(config.focusFollowsMouseDwell, 3)
+            XCTAssertEqual(config.master.size, 0.3)
             XCTAssertNotNil(lastConfigReloadError) // Validation does not publish diagnostics either.
         }
         second.withValue {
-            XCTAssertEqual(config.focusFollowsMouseDwell, 250)
+            XCTAssertEqual(config.master.size, 0.6)
             XCTAssertEqual(configUrl, originalURL)
             XCTAssertNil(lastConfigReloadError)
         }

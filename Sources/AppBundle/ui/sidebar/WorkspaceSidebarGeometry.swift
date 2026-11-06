@@ -1,5 +1,8 @@
 import AppKit
 
+/// Room kept for the menu bar above a standard-height sidebar, in points.
+let workspaceSidebarMenuBarReserveHeight: CGFloat = 28
+
 /// All modes retain the menu-bar reveal area, including when macOS auto-hides it.
 func workspaceSidebarPanelFrame(
     screen: CGRect,
@@ -8,7 +11,7 @@ func workspaceSidebarPanelFrame(
     contentHeight: CGFloat,
     backingWidth: CGFloat? = nil
 ) -> CGRect {
-    let reserve = min(max(0, menuBarHeight, config.heightMode == nil ? CGFloat(config.menuBarReserveHeight) : 0), max(0, screen.height - 1))
+    let reserve = min(max(0, menuBarHeight, config.heightMode == nil ? workspaceSidebarMenuBarReserveHeight : 0), max(0, screen.height - 1))
     let availableHeight = max(1, screen.height - reserve)
     let height = config.heightMode == .centered
         ? min(max(1, contentHeight), availableHeight * 0.9)

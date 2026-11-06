@@ -90,15 +90,12 @@ final class SingleWindowGeometryTest: XCTestCase {
         let initial = workspaceTilingRect(workspace)
         applyResizeWithMouse(window, rect: initial.copy(\.width, 2600))
         cancelManipulatedWithMouseState()
-        for alignment in SingleWindowAlignment.allCases {
-            config.singleWindowAlignment = alignment
-            try await workspace.layoutWorkspace()
-            let rect = workspaceTilingRect(workspace)
-            XCTAssertEqual(rect.width, 2600)
-            XCTAssertEqual(rect.height, initial.height)
-            let preview = windowResizePreviewItems(in: workspace, weightMap: .init(), excludingActiveWindowId: nil)
-            XCTAssertEqual(preview.first?.frame, window.lastAppliedLayoutPhysicalRect?.toAppKitScreenRect.alignedToBackingPixels())
-        }
+        try await workspace.layoutWorkspace()
+        let rect = workspaceTilingRect(workspace)
+        XCTAssertEqual(rect.width, 2600)
+        XCTAssertEqual(rect.height, initial.height)
+        let preview = windowResizePreviewItems(in: workspace, weightMap: .init(), excludingActiveWindowId: nil)
+        XCTAssertEqual(preview.first?.frame, window.lastAppliedLayoutPhysicalRect?.toAppKitScreenRect.alignedToBackingPixels())
         let second = TestWindow.new(id: 2002, parent: workspace.rootTilingContainer)
         XCTAssertEqual(workspaceTilingRect(workspace).width, workspace.workspaceMonitor.visibleRectPaddedByOuterGaps.width)
         XCTAssertFalse(applySingleWindowManualResize(window, width: 1700))
@@ -159,17 +156,11 @@ final class SingleWindowGeometryTest: XCTestCase {
         XCTAssertFalse(window.isFloating)
     }
 
-    func testAlignmentAndParsing() {
+    func testALoneWindowIsCentered() {
         let available = Rect(topLeftX: 150, topLeftY: 20, width: 3000, height: 1001)
-        for (alignment, expectedX) in [(SingleWindowAlignment.left, 150.0), (.center, 900.0), (.right, 1650.0)] {
-            let rect = alignedSingleWindowRect(available: available, width: 1500, minimumWidth: 0, alignment: alignment)
-            XCTAssertEqual(rect.topLeftX, expectedX)
-            XCTAssertEqual(rect.height, available.height)
-            let parsed = parseConfig("single-window-alignment = '\(alignment.rawValue)'")
-            XCTAssertTrue(parsed.errors.isEmpty)
-            XCTAssertEqual(parsed.config.singleWindowAlignment, alignment)
-        }
-        XCTAssertFalse(parseConfig("single-window-alignment = 'bottom'").errors.isEmpty)
+        let rect = centeredSingleWindowRect(available: available, width: 1500, minimumWidth: 0)
+        XCTAssertEqual(rect.topLeftX, 900)
+        XCTAssertEqual(rect.height, available.height)
     }
 
     func testParsingAndPersistence() {

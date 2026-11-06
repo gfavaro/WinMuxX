@@ -8,16 +8,8 @@ func parseFullscreenWidth(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -
     return .success(value)
 }
 
-func parseOptionalSingleWindowAlignment(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace) -> ParsedToml<SingleWindowAlignment?> {
-    parseString(raw, trace).flatMap {
-        SingleWindowAlignment(rawValue: $0).map { Optional($0) }
-            .orFailure(.semantic(trace, "Expected center, left or right"))
-    }
-}
-
 private let displayWindowParsers: [String: any ParserProtocol<WorkspaceLayoutSettings>] = [
     "fullscreen-width": Parser(\.fullscreenWidth, parseFullscreenWidth),
-    "single-window-alignment": Parser(\.singleWindowAlignment, parseOptionalSingleWindowAlignment),
 ]
 
 func parseDisplayWindowSettings(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace,
@@ -59,8 +51,7 @@ func matchingWindowSettings(_ rules: [WorkspaceDisplayLayout], on monitor: Monit
 extension Workspace {
     @MainActor
     var windowWidthSettings: WorkspaceLayoutSettings {
-        let global = WorkspaceLayoutSettings(fullscreenWidth: config.fullscreenWidth,
-                                            singleWindowAlignment: config.singleWindowAlignment)
+        let global = WorkspaceLayoutSettings(fullscreenWidth: config.fullscreenWidth)
         let display = matchingWindowSettings(config.displayWindowSettings, on: workspaceMonitor)?.overlaying(global) ?? global
         guard let workspace = config.workspaceLayouts[name] else { return display }
         let defaults = workspace.defaults.overlaying(display)

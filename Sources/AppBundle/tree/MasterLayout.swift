@@ -97,10 +97,9 @@ extension TreeNode {
 }
 
 extension Workspace {
-    /// The container whose children Master and Scrolling arrange: the root, except that
+    /// The container whose children Master arranges: the root, except that
     /// Master looks inside a root holding a single split (a row or column made in Dwindle),
-    /// which would otherwise be one group shown whole. The tree is not changed; Scrolling
-    /// keeps such a split as one column, a real choice there.
+    /// which would otherwise be one group shown whole. The tree is not changed.
     @MainActor
     var arrangementGroupParent: TilingContainer {
         let root = rootTilingContainer

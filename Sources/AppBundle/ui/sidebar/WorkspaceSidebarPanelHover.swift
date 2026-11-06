@@ -3,6 +3,9 @@ import Common
 import CoreGraphics
 import SwiftUI
 
+/// How long the pointer rests at the edge before the sidebar opens.
+let workspaceSidebarHoverOpenDelayMs = 400
+
 extension WorkspaceSidebarPanel {
     func setHovering(_ isHovering: Bool) {
         let expandedWidth = CGFloat(config.workspaceSidebar.width)
@@ -72,7 +75,7 @@ extension WorkspaceSidebarPanel {
             self.showHoverCue(cueWidth: cueWidth, expandedWidth: expandedWidth, collapsedWidth: collapsedWidth)
         }
         pendingExpand = expand
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(config.workspaceSidebar.hoverOpenDelayMs) / 1000, execute: expand)
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(workspaceSidebarHoverOpenDelayMs) / 1000, execute: expand)
     }
 
     var shouldSuppressHoverForPointerPress: Bool {

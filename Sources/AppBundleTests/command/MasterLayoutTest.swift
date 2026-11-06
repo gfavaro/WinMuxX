@@ -68,9 +68,7 @@ final class MasterLayoutTest: WorkspaceTestCase {
         XCTAssertEqual(helium.nodeWorkspace, workspace)
     }
 
-    func testUltrawideMainsSitSideBySideWithANarrowStack() async throws {
-        let previous = config.master
-        defer { config.master = previous }
+    func testUltrawideKeepsOneMainBesideANarrowStack() async throws {
         let workspace = focus.workspace
         let windows = (0..<4).map { TestWindow.new(id: UInt32(74100 + $0), parent: workspace.rootTilingContainer) }
         _ = windows[0].focusWindow()
@@ -82,19 +80,12 @@ final class MasterLayoutTest: WorkspaceTestCase {
                 (($0.node as? Window)?.windowId ?? 0, $0.physical)
             })
         }
-        let single = frames(ultrawide)
-        XCTAssertEqual(single[74101]?.minX, single[74102]?.minX, "One main: the rest stack in one column")
-
-        config.master.ultrawideMains = 2
-        let two = frames(ultrawide)
-        let main = try XCTUnwrap(two[74100]), second = try XCTUnwrap(two[74101]), stack = try XCTUnwrap(two[74102])
-        XCTAssertEqual(main.height, ultrawide.height, accuracy: 1)
-        XCTAssertEqual(second.height, ultrawide.height, accuracy: 1, "The second main is full height too")
-        XCTAssertEqual(main.width, second.width, accuracy: 2)
-        XCTAssertLessThan(main.maxX, second.minX + 1)
-        XCTAssertGreaterThan(stack.minX, second.maxX - 1, "The stack is the narrow column on the far side")
-        XCTAssertLessThan(stack.width, main.width)
-        XCTAssertEqual(two[74103]?.minX, stack.minX)
+        let wide = frames(ultrawide)
+        let main = try XCTUnwrap(wide[74100]), firstStack = try XCTUnwrap(wide[74101])
+        let secondStack = try XCTUnwrap(wide[74102]), thirdStack = try XCTUnwrap(wide[74103])
+        XCTAssertGreaterThan(main.width, firstStack.width, "Ultrawide layouts keep one main window")
+        XCTAssertEqual(firstStack.minX, secondStack.minX, accuracy: 1)
+        XCTAssertEqual(secondStack.minX, thirdStack.minX, accuracy: 1)
 
         let ordinary = frames(Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080))
         XCTAssertEqual(ordinary[74101]?.minX, ordinary[74102]?.minX, "A 16:9 display keeps one main")
@@ -102,9 +93,10 @@ final class MasterLayoutTest: WorkspaceTestCase {
         windows[2].unbindFromParent()
         windows[3].unbindFromParent()
         let pair = frames(ultrawide)
-        XCTAssertEqual(try XCTUnwrap(pair[74100]).width, try XCTUnwrap(pair[74101]).width, accuracy: 2, "Two windows share the screen")
+        XCTAssertGreaterThan(try XCTUnwrap(pair[74100]).width, try XCTUnwrap(pair[74101]).width,
+                             "The fixed one-main layout keeps its main pane with two windows")
         XCTAssertFalse(parseConfig("[master]\nultrawide-mains = 3").errors.isEmpty)
-        XCTAssertEqual(parseConfig("[master]\nultrawide-mains = 2").config.master.ultrawideMains, 2)
+        XCTAssertFalse(parseConfig("[master]\nultrawide-mains = 2").errors.isEmpty)
     }
 
     func testMasterPromotionChangesWorkspaceSelectionWithoutMovingNodes() async throws {

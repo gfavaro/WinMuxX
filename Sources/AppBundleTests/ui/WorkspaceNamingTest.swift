@@ -559,7 +559,6 @@ final class WorkspaceNamingTest: XCTestCase {
         projectWorkspace.assignProject(project.id)
         projectWorkspace.seedMonitorIfNeeded(mainMonitor)
         let projectWindow = TestWindow.new(id: 218, parent: projectWorkspace.rootTilingContainer)
-        config.workspaceSidebar.projectDeletionAction = .closeWindows
         config.workspaceSidebar.projectLabels[project.id.rawValue] = "Temporary"
         config.workspaceSidebar.projectColors[project.id.rawValue] = "#60A5FA"
 

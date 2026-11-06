@@ -15,8 +15,6 @@ final class SettingsNewKeysTest: XCTestCase {
     func testSettingsWritesForEveryNewKeyParseBack() {
         let config = write("", [
             ("master", "size", "0.7"), ("master", "side", "'right'"), ("master", "stack-layout", "'accordion'"),
-            ("master", "ultrawide-mains", "2"),
-            ("hover-bar", "enabled", "false"),
             ("dimming", "inactive-windows", "0.25"),
             ("follow-app-activation", "enabled", "false"),
             ("follow-app-activation", "exclude-apps", tomlCommaSeparatedStringArray("com.apple.finder")),
@@ -24,8 +22,6 @@ final class SettingsNewKeysTest: XCTestCase {
         XCTAssertEqual(config.master.size, 0.7)
         XCTAssertEqual(config.master.side, .right)
         XCTAssertEqual(config.master.stackLayout, .stacked)
-        XCTAssertEqual(config.master.ultrawideMains, 2)
-        XCTAssertFalse(config.hoverBar.enabled)
         XCTAssertEqual(config.dimming.inactiveWindows, 0.25)
         XCTAssertFalse(config.followAppActivation.enabled)
         XCTAssertEqual(config.followAppActivation.excludeApps, ["com.apple.finder"])

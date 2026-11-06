@@ -211,7 +211,6 @@ struct ShortcutCategoryView: View {
     @SettingsDraft("modifiers.cmd", load: { config.modifierSides.cmd.rawValue }) private var cmdSide: String
     @SettingsDraft("modifiers.ctrl", load: { config.modifierSides.ctrl.rawValue }) private var ctrlSide: String
     @SettingsDraft("modifiers.shift", load: { config.modifierSides.shift.rawValue }) private var shiftSide: String
-    @SettingsDraft("workspace-sidebar.project-deletion-action", load: { config.workspaceSidebar.projectDeletionAction }) private var projectDeletionAction: WorkspaceProjectDeletionAction
     @SettingsDraft("persistent-workspaces", load: { config.persistentWorkspaces.joined(separator: ", ") }) private var persistentWorkspaces: String
 
     var body: some View {
@@ -235,16 +234,6 @@ struct ShortcutCategoryView: View {
                             renderedValue: tomlCommaSeparatedStringArray(persistentWorkspaces), model: model)
                     }
                     SettingsDescription("Persistent workspaces keep their configured order and names. Other empty workspaces close automatically; each project and display keeps a usable workspace.")
-                }
-                Section("Projects") {
-                    SettingsPicker("Deleting projects", id: "workspace-sidebar.project-deletion-action", selection: $projectDeletionAction,
-                        help: "Choose what happens to the windows in a project when you delete it.") {
-                        Text("Close project windows").tag(WorkspaceProjectDeletionAction.closeWindows)
-                        Text("Move windows elsewhere").tag(WorkspaceProjectDeletionAction.moveWindowsToFallback)
-                    } onChange: {
-                        persistSettingsConfig(section: "workspace-sidebar", key: "project-deletion-action",
-                            renderedValue: "'\(projectDeletionAction.rawValue)'", model: model)
-                    }
                 }
             }
 

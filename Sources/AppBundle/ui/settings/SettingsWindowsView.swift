@@ -7,17 +7,11 @@ struct ShortcutBehaviorSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
-    @SettingsDraft("window-tabs.style", load: { config.windowTabs.style }) private var tabStyle: WindowTabStyle
-    @SettingsDraft("drag-stack-layout", load: { config.dragStackLayout }) private var dragStackLayout: Layout
-    @SettingsDraft("workspace-swipe.animation-duration-ms", load: { config.workspaceSwipe.animationDurationMs }) private var swipeAnimationDuration: Int
     @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
-    @SettingsDraft("workspace-swipe.reverse-direction", load: { config.workspaceSwipe.reverseDirection }) private var reverseWorkspaceSwipes: Bool
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
     @SettingsDraft("master.stack-layout", load: { config.master.stackLayout }) private var masterStackLayout: Layout
-    @SettingsDraft("master.ultrawide-mains", load: { config.master.ultrawideMains }) private var masterUltrawideMains: Int
-    @SettingsDraft("hover-bar.enabled", load: { config.hoverBar.enabled }) private var hoverBarEnabled: Bool
     @SettingsDraft("follow-app-activation.enabled", load: { config.followAppActivation.enabled }) private var followAppActivation: Bool
     @SettingsDraft("follow-app-activation.exclude-apps", load: { config.followAppActivation.excludeApps.joined(separator: ", ") }) private var followAppActivationExcluded: String
     @SettingsDraft("window-tabs.double-sided-windows", load: { config.windowTabs.doubleSidedWindows }) private var doubleSidedWindows: Bool
@@ -30,11 +24,9 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("enable-normalization-flatten-containers", load: { config.enableNormalizationFlattenContainers }) private var flattenContainers: Bool
     @SettingsDraft("enable-normalization-opposite-orientation-for-nested-containers", load: { config.enableNormalizationOppositeOrientationForNestedContainers }) private var normalizeNestedContainers: Bool
     @SettingsDraft("focus-follows-mouse", load: { config.focusFollowsMouse }) private var focusFollowsMouse: Bool
-    @SettingsDraft("focus-follows-mouse-dwell", load: { config.focusFollowsMouseDwell }) private var focusFollowsMouseDwell: Int
     @State private var confirmsForgetAllMinimums = false
     @State private var fitIssues: [WorkspaceFitIssue] = []
 
-    @SettingsDraft("single-window-alignment", load: { config.singleWindowAlignment }) private var singleWindowAlignment: SingleWindowAlignment
     @SettingsDraft("fullscreen-width", load: { config.fullscreenWidth ?? 1.0 }) private var fullscreenWidth: Double
 
     var body: some View {
@@ -47,10 +39,6 @@ struct ShortcutBehaviorSettingsView: View {
             learnedMinimumsSection
             fitDiagnosticsSection
             SettingsSection("Default layout") {
-                SettingsPicker("Default drag stack", id: "drag-stack-layout", selection: $dragStackLayout, help: "Layout for a new group created by dropping a window onto another. Existing groups keep their layout; edge drops still split.") {
-                    Text("Accordion").tag(Layout.stacked)
-                    Text("Tabbed").tag(Layout.tabGroup)
-                } onChange: { persistRootString("drag-stack-layout", dragStackLayout.rawValue) }
                 SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
                     Text("Master").tag(Layout.master)
@@ -78,18 +66,12 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Applies after sidebar and outer gaps on any display. Fullscreen stays centered; alignment below applies to lone tiled windows.")
                     .font(.callout).foregroundStyle(.secondary)
                 if let width = focus.workspace.windowWidthSettings.fullscreenWidth {
-                    Text("Current workspace: \(Int((width * 100).rounded()))% · \(focus.workspace.windowWidthSettings.singleWindowAlignment?.rawValue ?? "center") · \(focus.workspace.workspaceMonitor.name)")
+                    Text("Current workspace: \(Int((width * 100).rounded()))% · \(focus.workspace.workspaceMonitor.name)")
                         .font(.callout).foregroundStyle(.secondary)
                 } else {
                     Text("Current workspace uses the legacy aspect-ratio setting. Saving a width switches to percentage sizing.")
                         .font(.callout).foregroundStyle(.secondary)
                 }
-                SettingsPicker("Alignment", id: "single-window-alignment", selection: $singleWindowAlignment,
-                    help: "Position a lone tiled window within the available area after sidebar and gaps.") {
-                    Text("Centered").tag(SingleWindowAlignment.center)
-                    Text("Left").tag(SingleWindowAlignment.left)
-                    Text("Right").tag(SingleWindowAlignment.right)
-                } onChange: { persistRootString("single-window-alignment", singleWindowAlignment.rawValue) }
                 Text("Resizing width keeps the window tiled. Changing height makes it floating and preserves the gesture’s size and position.")
                     .font(.callout).foregroundStyle(.secondary)
 
@@ -98,15 +80,6 @@ struct ShortcutBehaviorSettingsView: View {
                 SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
                     persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
-                SettingsToggle("Reverse swipe direction", id: "workspace-swipe.reverse-direction", isOn: $reverseWorkspaceSwipes, help: "Default: swipe left for next, right for previous.") {
-                    persistConfig(section: "workspace-swipe", key: "reverse-direction", value: reverseWorkspaceSwipes ? "true" : "false")
-                }
-                .disabled(!workspaceSwipes)
-                SettingsStepper("Swipe settle duration", id: "workspace-swipe.animation-duration-ms", value: $swipeAnimationDuration, range: 0...1000,
-                    help: "Workspace previews follow your fingers. Flick to switch, or drag past halfway. Pull back before releasing to return. Zero disables the visual preview. Respects Reduce Motion and the global animation setting.", unit: "ms") {
-                    persistConfig(section: "workspace-swipe", key: "animation-duration-ms", value: String(swipeAnimationDuration))
-                }
-                .disabled(!workspaceSwipes)
                 Text(DockWorkspaceSwipeSource.shared.status)
                     .font(.callout).foregroundStyle(.secondary)
                 Text("Needs Swipe between full-screen apps on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Normal two-finger scrolling stays with your apps.")
@@ -122,19 +95,11 @@ struct ShortcutBehaviorSettingsView: View {
 
             masterSettingsSection
             SettingsSection("Hover bar") {
-                SettingsToggle("Show quick actions above windows", id: "hover-bar.enabled", isOn: $hoverBarEnabled,
-                    help: "Rest the pointer on the middle of a tiled window's top edge for Main (Master), Focus and Float, with their shortcuts; a focused window offers Unfocus. Tab groups always show their tabs there.") {
-                    persistConfig(section: "hover-bar", key: "enabled", value: hoverBarEnabled ? "true" : "false")
-                }
             }
             SettingsSection("Pointer focus") {
                 SettingsToggle("Focus windows under the pointer", id: "focus-follows-mouse", isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
                 }
-                SettingsStepper("Hover delay", id: "focus-follows-mouse-dwell", value: $focusFollowsMouseDwell, range: 0...2000, help: "Time the pointer must remain still before focusing the window.", unit: "ms") {
-                    persistRootInt("focus-follows-mouse-dwell", focusFollowsMouseDwell)
-                }
-                .disabled(!focusFollowsMouse)
                 Text("A delay of 0 focuses immediately. Mouse clicks and window manipulation always take priority.")
                     .font(.callout).foregroundStyle(.secondary)
                 SettingsToggle("Follow app activation", id: "follow-app-activation.enabled", isOn: $followAppActivation,
@@ -150,11 +115,6 @@ struct ShortcutBehaviorSettingsView: View {
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
                 SettingsToggle("Show tab strips", id: "window-tabs.enabled", isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
-                SettingsPicker("Tab style", id: "window-tabs.style", selection: $tabStyle, help: "Pills sit on a group's top edge and take no space; resting the pointer there shows the tabs in the hover bar. A tab strip stays above the group and takes its height.") {
-                    Text("Pills").tag(WindowTabStyle.pills)
-                    Text("Tab strip").tag(WindowTabStyle.tabs)
-                } onChange: { persistConfig(section: "window-tabs", key: "style", value: "'\(tabStyle.rawValue)'") }
-                .disabled(!tabEnabled)
                 SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the tab strip, and of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
@@ -267,11 +227,6 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Tiles").tag(Layout.tiles)
                 Text("Accordion").tag(Layout.stacked)
             } onChange: { persistConfig(section: "master", key: "stack-layout", value: "'\(masterStackLayout.rawValue)'") }
-            SettingsPicker("Main windows on ultrawide displays", id: "master.ultrawide-mains", selection: $masterUltrawideMains,
-                help: "On a display at least twice as wide as tall, two puts the next window beside the main one and stacks the rest in a narrow column. Left or right side only.") {
-                Text("One").tag(1)
-                Text("Two, side by side").tag(2)
-            } onChange: { persistConfig(section: "master", key: "ultrawide-mains", value: String(masterUltrawideMains)) }
         }
     }
 

@@ -55,6 +55,28 @@ func removingRetiredConfigKeys(in text: String) throws -> String {
                 renderedValue: settingsQuotedString((glass ? ChromeStyle.liquidGlass : .solid).rawValue))
         }
     }
+    // These options now have fixed behavior. Remove them before parsing so existing
+    // user configuration remains loadable after the parser stops accepting them.
+    let retiredPaths: Set<[String]> = [
+        ["focus-follows-mouse-dwell"], ["drag-stack-layout"], ["tab-group-padding"],
+        ["master", "ultrawide-mains"], ["window-tabs", "style"], ["hover-bar", "enabled"],
+        ["workspace-swipe", "reverse-direction"], ["workspace-swipe", "animation-duration-ms"],
+        ["workspace-sidebar", "hover-open-delay-ms"], ["workspace-sidebar", "menu-bar-reserve-height"],
+        ["workspace-sidebar", "show-status-pills"], ["workspace-sidebar", "project-deletion-action"],
+    ]
+    for statement in settingsTomlStatements(result.components(separatedBy: "\n")) {
+        guard let path = statement.keyPath,
+              retiredPaths.contains(path) || path.last == "single-window-alignment" else { continue }
+        let fullyQualifiedKey = path.map(settingsQuotedString).joined(separator: ".")
+        result = removeSettingsConfigValue(in: result, section: nil, key: fullyQualifiedKey)
+    }
+
+    // The hover bar is fixed on, so its former table is no longer recognized.
+    let lines = result.components(separatedBy: "\n")
+    let statements = settingsTomlStatements(lines)
+    guard !statements.contains(where: { $0.keyPath?.first == "hover-bar" }) else { return result }
+    let headerLines = Set(statements.filter { $0.headerPath == ["hover-bar"] }.map(\.start))
+    result = lines.enumerated().filter { !headerLines.contains($0.offset) }.map(\.element).joined(separator: "\n")
     return result
 }
 

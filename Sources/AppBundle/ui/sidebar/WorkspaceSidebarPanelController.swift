@@ -50,7 +50,6 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     var hoverDwellSatisfied = false
     var hoverRevealGeneration: UInt = 0
     var leftMousePressStartedInsideSidebar = false
-    var appliedHoverOpenDelayMs = 400
     let hoverCueAnimationResponse: TimeInterval = 0.18
     let animationDuration: TimeInterval = 0.14
     let menuTrackingEndGrace: TimeInterval = 0.75

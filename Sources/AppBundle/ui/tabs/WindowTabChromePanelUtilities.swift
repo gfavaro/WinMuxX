@@ -33,11 +33,6 @@ func applyWindowTabVisualStackingPolicy(for strip: WindowTabStripViewModel, to p
 }
 
 @MainActor
-func applyWindowTabStripStackingPolicy(for strip: WindowTabStripViewModel, to panel: NSPanelHud) {
-    applyWindowTabChromeStackingPolicy(for: strip, to: panel, order: .above)
-}
-
-@MainActor
 private func applyWindowTabChromeStackingPolicy(
     for strip: WindowTabStripViewModel,
     to panel: NSPanelHud,

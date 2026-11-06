@@ -37,7 +37,7 @@ struct WorkspaceSwipeDependencies {
                  workspaceSwipeGestureEnabled && isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
                      !WindowBorderController.shared.isMissionControlActive &&
                      !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress() && !WorkspaceOverviewController.shared.isOpen
-             }, reversed: { config.workspaceSwipe.reverseDirection }, navigate: { activate in
+             }, reversed: { false }, navigate: { activate in
                  guard let token: RunSessionGuard = .isServerEnabled else { return false }
                  return try await runLightSession(.globalObserver("workspaceSwipe"), token, shouldSchedulePostRefresh: false, body: activate)
              }, navigationFailed: { error in

@@ -79,14 +79,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "focus-follows-mouse": Parser(\.focusFollowsMouse, parseBool),
     "master": Parser(\.master, parseMaster),
     "follow-app-activation": Parser(\.followAppActivation, parseFollowAppActivation),
-    "focus-follows-mouse-dwell": Parser(\.focusFollowsMouseDwell, parseInt),
     "shortcuts-preset": Parser(\.shortcutsPreset, parseShortcutsPreset),
-    "drag-stack-layout": Parser(\.dragStackLayout) { raw, backtrace in
-        parseLayout(raw, backtrace).filter(.semantic(backtrace, "Expected accordion or tab-group")) {
-            $0 == .stacked || $0 == .tabGroup
-        }
-    },
-    "tab-group-padding": Parser(\.tabGroupPadding, parseInt),
     persistentWorkspacesKey: Parser(\.persistentWorkspaces, parsePersistentWorkspaces),
     "exec-on-workspace-change": Parser(\.execOnWorkspaceChange, parseArrayOfStrings),
     "exec": Parser(\.execConfig, parseExecConfig),
@@ -95,11 +88,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     modeConfigRootKey: Parser(\.modes, skipParsing(Config().modes)), // Parsed manually
 
     "auto-add-new-windows-to-tab-group": Parser(\.autoAddNewWindowsToTabGroup, parseBool),
-    "single-window-alignment": Parser(\.singleWindowAlignment) { raw, backtrace in
-        parseString(raw, backtrace).flatMap {
-            SingleWindowAlignment(rawValue: $0).orFailure(.semantic(backtrace, "Expected center, left or right"))
-        }
-    },
     "fullscreen-width": Parser(\.fullscreenWidth, parseFullscreenWidth),
     "display": Parser(\.displayWindowSettings, parseDisplayWindowSettings),
     "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
@@ -111,7 +99,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
     "borders": Parser(\.windowBorders, parseWindowBorders),
     "dimming": Parser(\.dimming, parseDimming),
-    "hover-bar": Parser(\.hoverBar, parseHoverBar),
     "modifiers": Parser(\.modifierSides, parseModifierSides),
     "animations": Parser(\.animations, parseAnimations),
     "workspace": Parser(\.workspaceLayouts, parseWorkspaceLayouts),

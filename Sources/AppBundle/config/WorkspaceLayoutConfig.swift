@@ -14,7 +14,6 @@ struct WorkspaceLayoutSettings: ConvenienceCopyable, Equatable {
     var layout: WorkspaceLayoutName?
     var orientation: DefaultContainerOrientation?
     var fullscreenWidth: Double?
-    var singleWindowAlignment: SingleWindowAlignment?
     var rootLayout: Layout?
 
     var layoutSetting: WorkspaceLayoutSetting? {
@@ -32,7 +31,6 @@ struct WorkspaceLayoutSettings: ConvenienceCopyable, Equatable {
         let inheritsLayout = layout == nil
         return Self(layout: layout ?? base.layout, orientation: orientation ?? base.orientation,
              fullscreenWidth: fullscreenWidth ?? base.fullscreenWidth,
-             singleWindowAlignment: singleWindowAlignment ?? base.singleWindowAlignment,
              rootLayout: inheritsLayout ? base.rootLayout : rootLayout)
     }
 }
@@ -61,14 +59,12 @@ private let workspaceLayoutParsers: [String: any ParserProtocol<WorkspaceLayoutS
     "layout": Parser(\.layoutSetting, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.orientation, parseOptionalWorkspaceOrientation),
     "fullscreen-width": Parser(\.fullscreenWidth, parseFullscreenWidth),
-    "single-window-alignment": Parser(\.singleWindowAlignment, parseOptionalSingleWindowAlignment),
 ]
 
 private let workspaceParsers: [String: any ParserProtocol<WorkspaceLayoutConfig>] = [
     "layout": Parser(\.defaults.layoutSetting, parseOptionalWorkspaceLayout),
     "orientation": Parser(\.defaults.orientation, parseOptionalWorkspaceOrientation),
     "fullscreen-width": Parser(\.defaults.fullscreenWidth, parseFullscreenWidth),
-    "single-window-alignment": Parser(\.defaults.singleWindowAlignment, parseOptionalSingleWindowAlignment),
     "display": Parser(\.displays, parseWorkspaceDisplayLayouts),
 ]
 

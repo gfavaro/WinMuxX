@@ -84,7 +84,7 @@ final class WorkspaceSwipePreview {
     var isActive: Bool { phase != .idle }
 
     private var canPreview: Bool {
-        !isUnitTest && config.animations.enabled && config.workspaceSwipe.animationDurationMs > 0 &&
+        !isUnitTest && config.animations.enabled && config.animations.durationMs > 0 &&
             !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion &&
             !WindowBorderController.shared.isMissionControlActive
     }
@@ -350,7 +350,7 @@ final class WorkspaceSwipePreview {
         let releaseVelocity = timestamp >= sampleTime && timestamp - sampleTime < 0.08 ? velocity : 0
         let end = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: commit ? 1 : 0, slidesLeft: slidesLeft)
         let remaining = commit ? 1 - progress : progress
-        let duration = max(0.12, Double(config.workspaceSwipe.animationDurationMs) / 1000 * sqrt(remaining))
+        let duration = max(0.12, Double(config.animations.durationMs) / 1000 * sqrt(remaining))
         var settlingDuration = 0.0
         CATransaction.begin()
         CATransaction.setDisableActions(true)

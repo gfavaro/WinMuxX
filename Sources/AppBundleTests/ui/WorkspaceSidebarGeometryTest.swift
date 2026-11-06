@@ -94,7 +94,6 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
                     var config = WorkspaceSidebarConfig()
                     config.position = side
                     config.heightMode = mode
-                    config.menuBarReserveHeight = 0
                     let frame = workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 300)
                     XCTAssertLessThanOrEqual(frame.maxY, screen.maxY - 38)
                     XCTAssertGreaterThanOrEqual(frame.minY, screen.minY)
@@ -120,13 +119,11 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         }
     }
 
-    func testLegacyClearanceCannotOverlapMenuBarAndNewModeOverridesIt() {
+    func testStandardModeKeepsTheFixedMenuBarReservationAndOtherModesUseSystemHeight() {
         var config = WorkspaceSidebarConfig()
         let screen = CGRect(x: 0, y: 0, width: 1200, height: 900)
-        config.menuBarReserveHeight = 0
+        XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 20, config: config, contentHeight: 0).maxY, 872)
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
-        config.menuBarReserveHeight = 72
-        XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 828)
         config.heightMode = .full
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
     }
@@ -163,7 +160,7 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         }
     }
 
-    func testGeometryOptionsParseAndRejectInvalidValues() {
+    func testGeometryOptionsParseAndRejectInvalidValues() throws {
         for position in WorkspaceSidebarPosition.allCases {
             for mode in WorkspaceSidebarHeightMode.allCases {
                 let (parsed, errors) = parseConfig("[workspace-sidebar]\nposition = '\(position.rawValue)'\nheight-mode = '\(mode.rawValue)'\n")
@@ -172,10 +169,10 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
                 XCTAssertEqual(parsed.workspaceSidebar.heightMode, mode)
             }
         }
-        let (legacy, errors) = parseConfig("[workspace-sidebar]\nmenu-bar-reserve-height = 0\n")
-        XCTAssertTrue(errors.isEmpty)
-        XCTAssertNil(legacy.workspaceSidebar.heightMode)
-        XCTAssertEqual(legacy.workspaceSidebar.position, .left)
+        let (_, errors) = parseConfig("[workspace-sidebar]\nmenu-bar-reserve-height = 0\n")
+        XCTAssertFalse(errors.isEmpty)
+        let migrated = try removingRetiredConfigKeys(in: "[workspace-sidebar]\nmenu-bar-reserve-height = 0\n")
+        XCTAssertTrue(parseConfig(migrated).errors.isEmpty)
         for entry in ["position = 'top'", "height-mode = 'huge'"] {
             XCTAssertFalse(parseConfig("[workspace-sidebar]\n\(entry)\n").1.isEmpty)
         }

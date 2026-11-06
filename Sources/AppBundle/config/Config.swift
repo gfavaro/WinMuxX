@@ -12,7 +12,6 @@ func getDefaultConfigUrlFromProject() -> URL {
     let projectRoot: URL = url
     return projectRoot.appending(component: "resources/default-config.toml")
 }
-
 var defaultConfigUrl: URL {
     if isUnitTest {
         return getDefaultConfigUrlFromProject()
@@ -55,12 +54,9 @@ struct Config: ConvenienceCopyable {
     var focusFollowsMouse: Bool = false
     var master = MasterConfig()
     var followAppActivation = FollowAppActivationConfig()
-    var focusFollowsMouseDwell: Int = 250
     var shortcutsPreset: ShortcutsPreset = .none
     var workspaceSwipe = WorkspaceSwipeConfig()
     var workspaceOverview = WorkspaceOverviewConfig()
-    var dragStackLayout: Layout = .tabGroup
-    var tabGroupPadding: Int = 30
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate
@@ -76,7 +72,6 @@ struct Config: ConvenienceCopyable {
     var autoAddNewWindowsToTabGroup: Bool = false
     var fullscreenWidth: Double?
     var displayWindowSettings: [WorkspaceDisplayLayout] = []
-    var singleWindowAlignment: SingleWindowAlignment = .center
     var singleWindowAspectRatio: DynamicConfigValue<Double> = .constant(1.5)
     var gaps: Gaps = .zero
     var workspaceSidebar = WorkspaceSidebarConfig()
@@ -84,7 +79,6 @@ struct Config: ConvenienceCopyable {
     var windowTabs = WindowTabsConfig()
     var windowBorders = WindowBordersConfig()
     var dimming = DimmingConfig()
-    var hoverBar = HoverBarConfig()
     var animations = AnimationsConfig()
     var workspaceLayouts: [String: WorkspaceLayoutConfig] = [:]
     var workspaceToMonitorForceAssignment: [String: [MonitorDescription]] = [:]
@@ -122,11 +116,9 @@ struct WorkspaceSidebarConfig: ConvenienceCopyable, Equatable, Sendable {
     var enableFocus: Bool = false
     var autoHide: Bool = false
     var alwaysExpanded: Bool = false
-    var hoverOpenDelayMs: Int = 400
     var collapsedWidth: Int = 44
     var width: Int = 240
     var monitor: [MonitorDescription] = []
-    var showStatusPills: Bool = true
     var showClock: Bool = true
     var showSeconds: Bool = true
     var showDate: Bool = true
@@ -142,8 +134,6 @@ struct WorkspaceSidebarConfig: ConvenienceCopyable, Equatable, Sendable {
     var solidChromeCustomColor: String = "#191B20"
     var position: WorkspaceSidebarPosition = .left
     var heightMode: WorkspaceSidebarHeightMode? = nil
-    var menuBarReserveHeight: Int = 28
-    var projectDeletionAction: WorkspaceProjectDeletionAction = .closeWindows
     var workspaceLabels: [String: String] = [:]
     var projectLabels: [String: String] = [:]
     var projectColors: [String: String] = [:]
@@ -294,28 +284,10 @@ enum ChromeSolidColor: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum WorkspaceProjectDeletionAction: String, CaseIterable, Identifiable, Sendable {
-    case closeWindows = "close-windows"
-    case moveWindowsToFallback = "move-windows-to-fallback"
-
-    var id: String { rawValue }
-}
-
 struct WindowTabsConfig: ConvenienceCopyable, Equatable, Sendable {
     var doubleSidedWindows: Bool = false
     var enabled: Bool = true
     var height: Int = 36
-    var style: WindowTabStyle = .pills
-}
-
-/// How a tab group shows its tabs.
-enum WindowTabStyle: String, CaseIterable, Identifiable, Sendable {
-    /// Pills on the group's top edge; the tabs open in the hover bar.
-    case pills
-    /// A tab strip above the group, always visible, taking its height from the tile.
-    case tabs
-
-    var id: String { rawValue }
 }
 
 extension WorkspaceSidebarConfig {
@@ -338,5 +310,3 @@ extension WorkspaceSidebarConfig {
             .filter { seenTopLeftCorners.insert($0.rect.topLeftCorner).inserted }
     }
 }
-
-enum SingleWindowAlignment: String, CaseIterable, Sendable { case center, left, right }

@@ -96,20 +96,11 @@ private func confirmWorkspaceSidebarProjectDeletion(_ project: WorkspaceSidebarP
     guard windowCount > 0 else { return true }
 
     let alert = NSAlert()
-    switch config.workspaceSidebar.projectDeletionAction {
-        case .closeWindows:
-            alert.messageText = "Close Project Windows?"
-            alert.informativeText = """
-            WinMux will ask macOS to close \(windowCount) window\(windowCount == 1 ? "" : "s") in “\(project.displayName)”. Apps may show their own confirmation dialogs for unsaved work. If any window stays open, WinMux will keep the project.
-            """
-            alert.addButton(withTitle: "Close Project")
-        case .moveWindowsToFallback:
-            alert.messageText = "Delete Project?"
-            alert.informativeText = """
-            WinMux will delete “\(project.displayName)” and move \(windowCount) window\(windowCount == 1 ? "" : "s") to another project.
-            """
-            alert.addButton(withTitle: "Delete Project")
-    }
+    alert.messageText = "Close Project Windows?"
+    alert.informativeText = """
+    WinMux will ask macOS to close \(windowCount) window\(windowCount == 1 ? "" : "s") in “\(project.displayName)”. Apps may show their own confirmation dialogs for unsaved work. If any window stays open, WinMux will keep the project.
+    """
+    alert.addButton(withTitle: "Close Project")
     alert.addButton(withTitle: "Cancel")
     alert.alertStyle = .warning
     return alert.runModal() == .alertFirstButtonReturn

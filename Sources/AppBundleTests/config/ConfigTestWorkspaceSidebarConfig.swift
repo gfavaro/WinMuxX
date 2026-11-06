@@ -4,17 +4,6 @@ import Common
 import XCTest
 
 extension ConfigTest {
-    func testSidebarHoverDelayDefaultsAcceptsBoundsAndRejectsInvalidValues() {
-        XCTAssertEqual(parseConfig("").config.workspaceSidebar.hoverOpenDelayMs, 400)
-        for value in [0, 400, 750, 5000] {
-            let result = parseConfig("[workspace-sidebar]\nhover-open-delay-ms = \(value)")
-            XCTAssertTrue(result.errors.isEmpty, "\(result.errors)")
-            XCTAssertEqual(result.config.workspaceSidebar.hoverOpenDelayMs, value)
-        }
-        for value in ["-1", "5001", "0.4", "'400'", "true"] {
-            XCTAssertFalse(parseConfig("[workspace-sidebar]\nhover-open-delay-ms = \(value)").errors.isEmpty)
-        }
-    }
 
     func testParseWorkspaceSidebar() {
         let (parsed, errors) = parseConfig(
@@ -26,14 +15,11 @@ extension ConfigTest {
                 always-expanded = true
                 width = 280
                 monitor = ['secondary', 2]
-                show-status-pills = false
                 show-clock = false
                 show-seconds = false
                 show-date = false
                 show-weekday = false
                 chrome-style = 'solid'
-                menu-bar-reserve-height = 30
-                project-deletion-action = 'move-windows-to-fallback'
 
             [workspace-sidebar.workspace-labels]
                 1 = 'Code'
@@ -57,14 +43,11 @@ extension ConfigTest {
                 collapsedWidth: 44,
                 width: 280,
                 monitor: [.secondary, .sequenceNumber(2)],
-                showStatusPills: false,
                 showClock: false,
                 showSeconds: false,
                 showDate: false,
                 showWeekday: false,
                 chromeStyle: .solid,
-                menuBarReserveHeight: 30,
-                projectDeletionAction: .moveWindowsToFallback,
                 workspaceLabels: ["1": "Code", "2": "Web"],
                 projectLabels: ["default": "Personal"],
                 projectColors: ["default": "#FF8844"],
@@ -135,12 +118,10 @@ extension ConfigTest {
             [workspace-sidebar]
                 collapsed-width = 0
                 width = 0
-                menu-bar-reserve-height = -1
             """,
         )
         assertEquals(widthErrors.descriptions, [
             "workspace-sidebar.collapsed-width: Must be greater than 0",
-            "workspace-sidebar.menu-bar-reserve-height: Must be greater than or equal to 0",
             "workspace-sidebar.width: Must be greater than 0",
         ])
 
@@ -152,16 +133,6 @@ extension ConfigTest {
         )
         assertEquals(colorErrors.descriptions, [
             "workspace-sidebar.project-colors.default: Must be a hex color like '#RRGGBB'",
-        ])
-
-        let (_, actionErrors) = parseConfig(
-            """
-            [workspace-sidebar]
-                project-deletion-action = 'explode'
-            """,
-        )
-        assertEquals(actionErrors.descriptions, [
-            "workspace-sidebar.project-deletion-action: Possible values: close-windows, move-windows-to-fallback",
         ])
     }
 

@@ -91,17 +91,16 @@ Choose a share of the available width for a lone tiled window and WinMuxX's
 
 ```toml
 fullscreen-width = 0.70
-single-window-alignment = 'center' # center | left | right
 ```
 
 `fullscreen-width` accepts `0.1` to `1.0`; the default is `1.0`. Width is measured
 after the sidebar and outer gaps. Known application minimum widths take priority,
-up to the available width. Fullscreen stays centered; alignment applies to lone
-tiled windows. macOS native fullscreen is unaffected.
+up to the available width. Lone tiled windows and WinMuxX fullscreen are centered.
+macOS native fullscreen is unaffected.
 
 A second tiled window restores the usual full-width layout. Floating windows,
 minimized windows, hidden apps and popups do not count toward the lone tile.
-Settings → Windows exposes the global width percentage and alignment, and shows
+Settings → Windows exposes the global width percentage and shows
 the current workspace's resolved values. Display and workspace overrides use
 Dinky-style tables; omitted keys inherit independently:
 
@@ -113,17 +112,17 @@ fullscreen-width = 0.70
 fullscreen-width = 0.80
 
 [workspace.3.display.'Built-in']
-single-window-alignment = 'right'
+fullscreen-width = 0.65
 ```
 
 Precedence is workspace/display → workspace → display → global. Named display
 patterns beat main/secondary; longer names win, then lexical order. Exact UUID,
 hardware and display-number selectors take priority over name patterns. Existing
-layout/orientation policies retain their existing selector ordering. Width and
-alignment changes preserve manual layout choices and the workspace tree.
+layout/orientation policies retain their existing selector ordering. Width changes
+preserve manual layout choices and the workspace tree.
 
 Width-only mouse resizing and `resize width`/`resize smart` keep a lone window
-tiled and retain its alignment. The manual width lasts for the window's session,
+tiled and centered. The manual width lasts for the window's session,
 including after another tile opens and closes. A mouse resize that changes height
 makes it floating and preserves its size and position. Small native frame rounding
 changes are ignored.
@@ -152,9 +151,8 @@ chosen side.
 With auto-hide enabled, reach the outermost **2 points** of the chosen display
 edge to reveal the sidebar, like the Dock. The hidden trigger is independent of
 the collapsed rail size. The wider exit tolerance applies after revealing.
-The sidebar waits 400 ms before revealing on hover by default. Change
-`hover-open-delay-ms` in `[workspace-sidebar]`, or **Settings → Sidebar → Hover
-reveal delay**. Moving away cancels the pending reveal. A left-button press begun
+The sidebar waits a fixed 400 ms before revealing on hover. Moving away cancels
+the pending reveal. A left-button press begun
 outside the sidebar keeps a collapsed sidebar from revealing or trapping the
 pointer during text selection; releasing starts a fresh hover delay. Sidebar
 clicks, recognized window/sidebar drags, and `winmuxx open-sidebar` retain their
@@ -166,7 +164,6 @@ the glide. See [window motion](docs/archive/WINDOW_MOTION.md) for configuration 
 
 ```toml
 [workspace-sidebar]
-    hover-open-delay-ms = 400 # 0–5000; Settings → Sidebar → Hover reveal delay
     chrome-style = 'liquid-glass' # or 'solid'
     menu-bar-background = false
     position = 'left'            # or 'right'
@@ -175,8 +172,8 @@ the glide. See [window motion](docs/archive/WINDOW_MOTION.md) for configuration 
 
 `appearance`, `background` and `frosted-tint` remain accepted for older configs;
 `chrome-style` is the appearance selector used at runtime. Legacy
-`menu-bar-reserve-height` applies only when height-mode is absent and cannot
-reduce the mandatory system reservation.
+Standard height keeps a fixed 28-point minimum menu-bar reservation; other modes
+use the measured menu bar.
 
 ### Menu-bar indicator
 
@@ -425,10 +422,8 @@ A tab group reserves no space above its windows. Its pills sit in the gap, centr
 group's top edge, one per tab: the active window's is longest and uses the accent colour,
 and in a strip the other columns on screen are lighter. Resting the pointer on that edge
 opens the hover bar with a row of tabs (icon and title; click one to switch) above the
-window's actions, each with its configured shortcut. A tab group's bar shows even when
-quick actions are off. Set `window-tabs.style = 'tabs'` (Settings → Windows → Tab style)
-to show a tab strip above each group instead, always visible and `window-tabs.height`
-tall, with reordering and close buttons; the hover bar then shows only the actions.
+window's actions, each with its configured shortcut. The pill rail remains visible
+independently of quick actions.
 
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
 keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace
@@ -452,7 +447,7 @@ columns that scroll within the group, see [layouts](docs/LAYOUTS.md#container-mo
 peeking edges, like AeroSpace. Choose either in Settings → Windows for new roots,
 or use `winmuxx layout tabbed accordion` to toggle the focused container.
 `layout tab-group` remains supported. `layout horizontal` and `layout vertical`
-choose the accordion axis; `tab-group-padding` controls its peeking edges.
+choose the accordion axis; peeking edges use a fixed 30-point spacing.
 Accordion never shows tab strips or uses double-sided windows.
 
 ### Tiling and floating
@@ -632,7 +627,7 @@ the swipe up does not open the overview; use `workspace-overview` from a shortcu
 up or down; reversing a short swipe returns it to its starting state. Release
 settles with your swipe velocity. Hidden overview surfaces are reused between openings;
 images and selection state are cleared on dismissal. Opening and closing use a spring
-timed by `workspace-swipe.animation-duration-ms`. The overview uses the expanded
+timed by `animations.duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
 animations skip motion. WinMuxX does not change macOS settings. Horizontal workspace swipes
@@ -704,9 +699,8 @@ starter config. `--config-path` selects an explicit file. See
 WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
 build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
 
-The **Windows → Default layout → Default drag stack** setting chooses Accordion or
-Tabbed for new groups created by dragging (`drag-stack-layout = 'accordion'` or
-`'tab-group'`). Existing groups keep their layout; edge drops still split normally.
+Dragging a window onto another creates a tab group. Existing accordion or tab groups
+keep their layout; edge drops still split normally.
 
 ### Workspace swipes
 
@@ -716,8 +710,6 @@ workspace swipes. It is off by default:
 ```toml
 [workspace-swipe]
 enabled = false
-reverse-direction = false
-animation-duration-ms = 220
 ```
 
 When **System Settings → Trackpad → More Gestures → Swipe between full-screen

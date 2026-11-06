@@ -14,12 +14,12 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
 
     func testBackupsRotateAndAllReplacementsArePrivate() throws {
         for value in 0...7 {
-            try ConfigFileStore.edit(at: url) { _ in "focus-follows-mouse-dwell = \(value)\n" }
+            try ConfigFileStore.edit(at: url) { _ in "gaps.inner.horizontal = \(value)\n" }
         }
-        XCTAssertEqual(try String(contentsOf: url), "focus-follows-mouse-dwell = 7\n")
+        XCTAssertEqual(try String(contentsOf: url), "gaps.inner.horizontal = 7\n")
         for index in 1...5 {
             let backup = url.appendingPathExtension("backup.\(index)")
-            XCTAssertEqual(try String(contentsOf: backup), "focus-follows-mouse-dwell = \(7 - index)\n")
+            XCTAssertEqual(try String(contentsOf: backup), "gaps.inner.horizontal = \(7 - index)\n")
             XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: backup.path)[.posixPermissions] as? Int, 0o600)
         }
         XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o600)
@@ -27,33 +27,33 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
     }
 
     func testNoOpAndInvalidEditLeaveFileAndBackupsUnchanged() throws {
-        let original = "# retained comment\nfocus-follows-mouse-dwell = 9\n"
+        let original = "# retained comment\ngaps.inner.horizontal = 9\n"
         try ConfigFileStore.replace(at: url, text: original, expected: nil)
         XCTAssertFalse(try ConfigFileStore.edit(at: url) { $0 })
-        XCTAssertThrowsError(try ConfigFileStore.edit(at: url) { _ in "focus-follows-mouse-dwell = 'bad'" })
+        XCTAssertThrowsError(try ConfigFileStore.edit(at: url) { _ in "gaps.inner.horizontal = 'bad'" })
         XCTAssertEqual(try String(contentsOf: url), original)
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.appendingPathExtension("backup.1").path))
     }
 
     func testRawEditorRefusesAnExternalChange() throws {
-        try ConfigFileStore.replace(at: url, text: "focus-follows-mouse-dwell = 3", expected: nil)
-        try "focus-follows-mouse-dwell = 4".write(to: url, atomically: true, encoding: .utf8)
-        XCTAssertThrowsError(try ConfigFileStore.replace(at: url, text: "focus-follows-mouse-dwell = 5", expected: "focus-follows-mouse-dwell = 3"))
-        XCTAssertEqual(try String(contentsOf: url), "focus-follows-mouse-dwell = 4")
+        try ConfigFileStore.replace(at: url, text: "gaps.inner.horizontal = 3", expected: nil)
+        try "gaps.inner.horizontal = 4".write(to: url, atomically: true, encoding: .utf8)
+        XCTAssertThrowsError(try ConfigFileStore.replace(at: url, text: "gaps.inner.horizontal = 5", expected: "gaps.inner.horizontal = 3"))
+        XCTAssertEqual(try String(contentsOf: url), "gaps.inner.horizontal = 4")
     }
 
     func testStructuredEditReappliesToExternalChangesAndPreservesSymlink() throws {
         let target = directory.appendingPathComponent("actual.toml")
-        try "focus-follows-mouse-dwell = 3\n".write(to: target, atomically: true, encoding: .utf8)
+        try "gaps.inner.horizontal = 3\n".write(to: target, atomically: true, encoding: .utf8)
         try FileManager.default.createSymbolicLink(at: url, withDestinationURL: target)
         var attempts = 0
         try ConfigFileStore.edit(at: url) { text in
             attempts += 1
-            if attempts == 1 { try "# external\nfocus-follows-mouse-dwell = 4\n".write(to: target, atomically: true, encoding: .utf8) }
+            if attempts == 1 { try "# external\ngaps.inner.horizontal = 4\n".write(to: target, atomically: true, encoding: .utf8) }
             return text + "# our edit\n"
         }
         XCTAssertEqual(attempts, 2)
-        XCTAssertEqual(try String(contentsOf: target), "# external\nfocus-follows-mouse-dwell = 4\n# our edit\n")
+        XCTAssertEqual(try String(contentsOf: target), "# external\ngaps.inner.horizontal = 4\n# our edit\n")
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: url.path), target.path)
     }
 

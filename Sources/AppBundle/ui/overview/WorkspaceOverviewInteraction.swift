@@ -6,7 +6,7 @@ extension WorkspaceOverviewController {
     func beginGesture(opening: Bool, progress: Double) -> Bool {
         guard gestureOpening == nil,
               !dependencies.nativeIntegration || WorkspaceGestureAnimation.duration(
-                milliseconds: config.workspaceSwipe.animationDurationMs, enabled: config.animations.enabled,
+                milliseconds: config.animations.durationMs, enabled: config.animations.enabled,
                 reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) != nil else { return false }
         if opening {
             guard !isOpen, show(gestureProgress: progress) else { return false }

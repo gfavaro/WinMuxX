@@ -90,7 +90,7 @@ import XCTest
         ])
     }
 
-    func testWindowTabStripViewModelTracksFloatingWindowOcclusionSeparatelyForStripAndFrame() {
+    func testWindowTabStripViewModelTracksFloatingWindowOcclusionForGroupFrame() {
         let owner = NSObject()
         let model = WindowTabStripViewModel(
             id: ObjectIdentifier(owner),
@@ -105,7 +105,6 @@ import XCTest
             ],
         )
 
-        XCTAssertFalse(model.tabStripIsOccludedByFloatingWindow)
         XCTAssertTrue(model.groupFrameIsOccludedByFloatingWindow)
     }
 

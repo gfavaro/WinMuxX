@@ -6,7 +6,7 @@ func dragStackLayout(for targetWindow: Window, defaultLayout: Layout? = nil) -> 
        parent.layout == .tabGroup || parent.layout == .stacked {
         return parent.layout
     }
-    return defaultLayout ?? config.dragStackLayout
+    return defaultLayout ?? .tabGroup
 }
 
 @MainActor

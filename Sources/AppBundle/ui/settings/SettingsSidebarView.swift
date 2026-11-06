@@ -5,7 +5,6 @@ struct ShortcutSidebarSettingsView: View {
     @SettingsDraft("workspace-sidebar.enabled", load: { config.workspaceSidebar.enabled }) private var sidebarEnabled: Bool
     @SettingsDraft("workspace-sidebar.enable-focus", load: { config.workspaceSidebar.enableFocus }) private var sidebarFocusEnabled: Bool
     @SettingsDraft("workspace-sidebar.display-mode", load: { SettingsSidebarDisplayMode(config.workspaceSidebar) }) private var sidebarDisplayMode: SettingsSidebarDisplayMode
-    @SettingsDraft("workspace-sidebar.show-status-pills", load: { config.workspaceSidebar.showStatusPills }) private var showStatusPills: Bool
     @SettingsDraft("workspace-sidebar.show-clock", load: { config.workspaceSidebar.showClock }) private var showClock: Bool
     @SettingsDraft("workspace-sidebar.show-seconds", load: { config.workspaceSidebar.showSeconds }) private var showSeconds: Bool
     @SettingsDraft("workspace-sidebar.show-date", load: { config.workspaceSidebar.showDate }) private var showDate: Bool
@@ -17,7 +16,6 @@ struct ShortcutSidebarSettingsView: View {
     @SettingsDraft("workspace-sidebar.position", load: { config.workspaceSidebar.position }) private var sidebarPosition: WorkspaceSidebarPosition
     @SettingsDraft("workspace-sidebar.height-mode", load: { config.workspaceSidebar.heightMode ?? .standard }) private var sidebarHeightMode: WorkspaceSidebarHeightMode
 
-    @SettingsDraft("workspace-sidebar.hover-open-delay-ms", load: { config.workspaceSidebar.hoverOpenDelayMs }) private var hoverOpenDelayMs: Int
 
     var body: some View {
         SettingsScrollView {
@@ -38,18 +36,6 @@ struct ShortcutSidebarSettingsView: View {
                     Text("Always expanded").tag(SettingsSidebarDisplayMode.expanded)
                 } onChange: { persistSidebarDisplayMode() }
                 .disabled(!sidebarEnabled)
-                SettingsPicker("Hover reveal delay", id: "workspace-sidebar.hover-open-delay-ms", selection: $hoverOpenDelayMs,
-                               help: "Wait before revealing the sidebar at the edge. Text-selection drags do not reveal it. Commands and window dragging remain immediate.") {
-                    Text("Immediate").tag(0)
-                    Text("200 ms").tag(200)
-                    Text("400 ms (default)").tag(400)
-                    Text("600 ms").tag(600)
-                    Text("1 second").tag(1000)
-                    if ![0, 200, 400, 600, 1000].contains(hoverOpenDelayMs) {
-                        Text("Custom (\(hoverOpenDelayMs) ms)").tag(hoverOpenDelayMs)
-                    }
-                } onChange: { sidebarInt("hover-open-delay-ms", hoverOpenDelayMs) }
-                .disabled(!sidebarEnabled || sidebarDisplayMode == .expanded)
                 SettingsPicker("Expanded sidebar size", id: "workspace-sidebar.width", selection: $sidebarWidth,
                                help: "Width of the expanded sidebar: Small 200 pt, Medium 240 pt, Large 280 pt.") {
                     Text("Small").tag(200).disabled(collapsedWidth >= 200)
@@ -86,8 +72,6 @@ struct ShortcutSidebarSettingsView: View {
             SettingsSection("Sidebar content") {
                 if !showClock { Text("Enable Show clock to display seconds, date, and weekday.").font(.callout).foregroundStyle(.secondary) }
                 if !sidebarEnabled { Text("Enable Show sidebar to change its content.").font(.callout).foregroundStyle(.secondary) }
-                SettingsToggle("Show status pills", id: "workspace-sidebar.show-status-pills", isOn: $showStatusPills) { sidebarBool("show-status-pills", showStatusPills) }
-                .disabled(!sidebarEnabled)
                 SettingsToggle("Show clock", id: "workspace-sidebar.show-clock", isOn: $showClock) { sidebarBool("show-clock", showClock) }
                 .disabled(!sidebarEnabled)
                 SettingsToggle("Show seconds", id: "workspace-sidebar.show-seconds", isOn: $showSeconds) { sidebarBool("show-seconds", showSeconds) }

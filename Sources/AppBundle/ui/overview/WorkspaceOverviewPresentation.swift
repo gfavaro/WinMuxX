@@ -52,7 +52,7 @@ final class WorkspaceOverviewPresentation {
         let fromOpacity = CGFloat(visible.opacity), fromScale = visible.transform.m11, fromY = visible.transform.m42
         cancel(panel)
         let target = WorkspaceOverviewMotion(progress: opening ? 1 : 0, height: view.bounds.height)
-        guard let duration = WorkspaceGestureAnimation.duration(milliseconds: config.workspaceSwipe.animationDurationMs,
+        guard let duration = WorkspaceGestureAnimation.duration(milliseconds: config.animations.durationMs,
             enabled: config.animations.enabled && !isUnitTest,
             reduceMotion: NSWorkspace.shared.accessibilityDisplayShouldReduceMotion) else {
             apply(target, to: layer); completion(); return
