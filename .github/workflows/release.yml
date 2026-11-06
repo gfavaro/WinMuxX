@@ -37,6 +37,16 @@ jobs:
           brew install swiftly
           swiftly init --skip-install --assume-yes --verbose
           swiftly install
+      - name: Set up Python for schema tests
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.14'
+
+      - name: Install pinned config schema test dependencies
+        run: |
+          python3 -m venv .deps/config-schema
+          ./.deps/config-schema/bin/pip install --requirement requirements-schema.txt
+
       - name: Test
         run: make check
       - name: Import persistent signing identity
