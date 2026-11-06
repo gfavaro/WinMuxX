@@ -1,8 +1,9 @@
 import copy
+import json
 import tempfile
 import unittest
 from pathlib import Path
-from script.install_fork import APP, Installer, NativeOperations, SessionLocked
+from script.install_fork import APP, Installer, NativeOperations, SessionLocked, VERIFICATION_ATTEMPTS
 
 
 class Operations:
@@ -57,6 +58,35 @@ class InstallerTest(unittest.TestCase):
         self.installer = Installer(self.ops, Path(self.directory.name) / 'report.json')
 
     def install(self, **kwargs): return self.installer.install(Path('/candidate'), **kwargs)
+
+    def testStartupObservationRequiresThreeReadySamples(self):
+        self.installer.report['before'] = copy.deepcopy(self.ops.state)
+        observation = self.installer._observe_startup()
+        self.assertEqual(observation.ready_samples, 3)
+        self.assertEqual(self.ops.calls.count('snapshot'), 3)
+        self.assertEqual(observation.current, self.ops.state)
+        self.assertFalse(observation.focus_changed)
+
+    def testStartupObservationRetainsLastErrorAndExhaustsBoundedAttempts(self):
+        self.installer.report['before'] = copy.deepcopy(self.ops.state)
+        self.ops.fail = 'snapshot'
+        observation = self.installer._observe_startup()
+        self.assertIsNone(observation.current)
+        self.assertEqual(observation.last_error, 'snapshot')
+        self.assertEqual(self.ops.calls.count('snapshot'), VERIFICATION_ATTEMPTS)
+
+    def testStartupObservationResetsReadySamplesWhenAssignmentsChange(self):
+        self.installer.report['before'] = copy.deepcopy(self.ops.state)
+        original = self.ops.snapshot
+        def snapshot():
+            state = original()
+            if self.ops.calls.count('snapshot') == 2:
+                state['windows'][0]['workspace'] = 'other'
+            return state
+        self.ops.snapshot = snapshot
+        observation = self.installer._observe_startup()
+        self.assertEqual(observation.ready_samples, 3)
+        self.assertEqual(self.ops.calls.count('snapshot'), 5)
 
     def testSuccessAndOrder(self):
         self.assertEqual(self.install()['status'], 'validated')
@@ -137,7 +167,13 @@ class InstallerTest(unittest.TestCase):
         self.install()
         self.ops.calls.clear()
         self.ops.fail = 'snapshot'
-        self.assertEqual(self.installer.verify()['status'], 'needs_review')
+        result = self.installer.verify()
+        self.assertEqual(result['status'], 'needs_review')
+        self.assertEqual(result['reason'], 'CLI unavailable')
+        self.assertEqual(result['error'], 'snapshot')
+        saved = json.loads(self.installer.path.read_text())
+        self.assertEqual(saved['reason'], 'CLI unavailable')
+        self.assertEqual(saved['error'], 'snapshot')
         self.assertNotIn('rollback', self.ops.calls)
 
     def testRollbackFailureIsVisible(self):

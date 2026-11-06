@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Install a signed local WinMuxX build with an auditable, resumable report."""
 import argparse
+from dataclasses import dataclass
+from typing import Optional
 import hashlib
 import json
 import os
@@ -15,6 +17,18 @@ import uuid
 import zipfile
 
 APP = Path('/Applications/WinMuxX.app')
+VERIFICATION_ATTEMPTS = 150
+VERIFICATION_READY_SAMPLES = 3
+VERIFICATION_POLL_SECONDS = .2
+
+
+@dataclass
+class VerificationObservation:
+    current: Optional[dict] = None
+    last_error: Optional[str] = None
+    initial_focus: Optional[tuple] = None
+    focus_changed: bool = False
+    ready_samples: int = 0
 
 
 class SessionLocked(RuntimeError):
@@ -176,7 +190,7 @@ class NativeOperations:
             command('focus', '--window-id', str(before['focused_window'][0]['window-id']))
 
     def sleep(self):
-        time.sleep(.2)
+        time.sleep(VERIFICATION_POLL_SECONDS)
 
 
 class Installer:
@@ -230,38 +244,45 @@ class Installer:
                 return self.status('rollback_failed', error=str(error), rollback_error=str(rollback_error))
         return self.status('installed_pending_validation', error=str(error))
 
+    def _observe_startup(self):
+        observation = VerificationObservation()
+        for _ in range(VERIFICATION_ATTEMPTS):
+            if self.ops.locked():
+                raise SessionLocked('Session locked during startup validation')
+            try:
+                current = self.ops.snapshot()
+                observation.current = current
+                focus = (current['focus'], current['focused_window'])
+                if observation.initial_focus is None:
+                    observation.initial_focus = focus
+                elif focus != observation.initial_focus:
+                    observation.focus_changed = True
+                delta = differences(self.report['before'], current)
+                # Require discovery before accepting missing windows as closed.
+                if not self.report['before']['windows'] or current['windows']:
+                    if not delta['moved'] and not delta['closed']:
+                        observation.ready_samples += 1
+                        if observation.ready_samples >= VERIFICATION_READY_SAMPLES:
+                            break
+                    else:
+                        observation.ready_samples = 0
+            except Exception as error:
+                observation.last_error = str(error)
+            self.ops.sleep()
+        return observation
+
     def verify(self, restore=False):
         if self.ops.locked():
             return self.status('installed_pending_validation', reason='session_locked')
         if self.ops.metadata(APP) != self.report['candidate']:
             return self.status('needs_review', reason='installed_build_changed')
-        last_error = None
-        current = None
-        initial_focus = None
-        focus_changed = False
-        ready_samples = 0
-        for _ in range(150):
-            if self.ops.locked():
-                return self.status('installed_pending_validation', reason='session_locked')
-            try:
-                current = self.ops.snapshot()
-                focus = (current['focus'], current['focused_window'])
-                if initial_focus is None:
-                    initial_focus = focus
-                elif focus != initial_focus:
-                    focus_changed = True
-                delta = differences(self.report['before'], current)
-                # Require discovery before accepting missing windows as closed.
-                if not self.report['before']['windows'] or current['windows']:
-                    if not delta['moved'] and not delta['closed']:
-                        ready_samples += 1
-                        if ready_samples >= 3:
-                            break
-                    else:
-                        ready_samples = 0
-            except Exception as error:
-                last_error = str(error)
-            self.ops.sleep()
+        try:
+            observation = self._observe_startup()
+        except SessionLocked:
+            return self.status('installed_pending_validation', reason='session_locked')
+        current = observation.current
+        last_error = observation.last_error
+        focus_changed = observation.focus_changed
         if current is None:
             if restore:
                 return self.failed_install(last_error or 'CLI startup timed out')
