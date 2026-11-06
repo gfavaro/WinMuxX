@@ -8,6 +8,14 @@ final class RestartWorkspaceTest: XCTestCase {
     override func setUp() async throws { setUpWorkspacesForTests() }
 
     func testSnapshotAppendAndExpiryWhileRestoreIsSuspendedKeepIndicesStable() async throws {
+        try await exerciseSuspendedRestore(expire: true)
+    }
+
+    func testSnapshotAppendPreservesPostAwaitMatchedWindowWrite() async throws {
+        try await exerciseSuspendedRestore(expire: false)
+    }
+
+    private func exerciseSuspendedRestore(expire: Bool) async throws {
         let destination = Workspace.get(byName: "1")
         let old = TestWindow.new(id: 1, parent: destination.rootTilingContainer)
         old.restartIdentity = identity("Original")
@@ -34,23 +42,35 @@ final class RestartWorkspaceTest: XCTestCase {
         another.restartIdentity = identity("Another")
         rememberRestartWindowBeforeAppTermination(another)
         XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2)
-        expireLateRestartTreeRestoration()
+        if expire { expireLateRestartTreeRestoration() }
         compactPendingRestartSnapshots()
         XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2, "In-flight candidate indices must not be compacted")
-        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2)
         continuation?.resume()
         continuation = nil
         let restored = try await task.value
         XCTAssertTrue(restored)
         XCTAssertTrue(current.nodeWorkspace === destination)
         XCTAssertEqual(runtime.recovery.restartRestorationsInFlight, 0)
-        XCTAssertEqual(runtime.recovery.restartSnapshots.map(\.snapshot.remainingWindowIds), [[100]])
+        if expire {
+            XCTAssertEqual(runtime.recovery.restartSnapshots.map(\.snapshot.remainingWindowIds), [[100]])
+        } else {
+            XCTAssertEqual(runtime.recovery.restartSnapshots.count, 2)
+            XCTAssertTrue(runtime.recovery.restartSnapshots[0].matchedWindows[1] === current)
+            XCTAssertTrue(runtime.recovery.restartSnapshots[0].snapshot.remainingWindowIds.isEmpty)
+            XCTAssertEqual(runtime.recovery.restartSnapshots[1].snapshot.remainingWindowIds, [100])
+        }
     }
 
     func testRestartEnvelopeRetainsItsExactFixedFixtureEncoding() throws {
         let url = projectRoot.appendingPathComponent("resources/test-fixtures/restart-envelope-v2.json")
         let fixture = try Data(contentsOf: url)
         let decoded = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self, from: fixture)
+        XCTAssertEqual(decoded.world.windowIds, [1])
+        let workspace = try XCTUnwrap(decoded.world.workspaces.first)
+        let window = try XCTUnwrap(collectFrozenWindows(workspace)[1])
+        XCTAssertEqual(window.restartIdentity?.title, "Fixture document")
+        XCTAssertEqual(window.restartIdentity?.documentURL, "file:///fixture.txt")
+        XCTAssertEqual(decoded.pending?.first?.remainingWindowIds, [1])
         let bytes = try JSONEncoder.winMuxDefault.encode(decoded)
         XCTAssertEqual(bytes, fixture)
     }

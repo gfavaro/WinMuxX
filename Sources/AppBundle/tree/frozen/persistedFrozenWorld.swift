@@ -471,7 +471,7 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
     let saved = candidates.map(\.window)
     guard !saved.isEmpty else { return false }
     let live: [(UInt32, RestartWindowIdentity)]
-    if let query = recovery.restartIdentityQueryForTests {
+    if isUnitTest, let query = recovery.restartIdentityQueryForTests {
         live = await query(window)
     } else if let macWindow = window as? MacWindow {
         live = (try? await macWindow.macApp.restartWindowIdentities()) ?? []

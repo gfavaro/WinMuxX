@@ -2,18 +2,79 @@
   "pending" : [
     {
       "remainingWindowIds" : [
-
+        1
       ],
       "savedAt" : 2524608000,
       "world" : {
         "monitors" : [
-
+          {
+            "displayUUID" : "fixture-display",
+            "topLeftCorner" : [
+              0,
+              0
+            ],
+            "visibleWorkspace" : "1"
+          }
         ],
         "windowIds" : [
-
+          1
         ],
         "workspaces" : [
+          {
+            "arrangement" : "dwindle",
+            "floatingWindows" : [
 
+            ],
+            "macosUnconventionalWindows" : [
+
+            ],
+            "masterGroupIndex" : 0,
+            "masterStackLayout" : "tiles",
+            "monitor" : {
+              "displayUUID" : "fixture-display",
+              "topLeftCorner" : [
+                0,
+                0
+              ],
+              "visibleWorkspace" : "1"
+            },
+            "name" : "1",
+            "namingStyle" : "explicit",
+            "preservesTopLevelGroups" : false,
+            "projectId" : "default",
+            "rootTilingNode" : {
+              "children" : [
+                {
+                  "kind" : "window",
+                  "window" : {
+                    "id" : 1,
+                    "isFullscreen" : false,
+                    "layoutReason" : {
+                      "standard" : {
+
+                      }
+                    },
+                    "minimumEvidenceAppGeneration" : 0,
+                    "minimumEvidenceGlobalGeneration" : 0,
+                    "minimumEvidenceVersion" : 3,
+                    "noOuterGapsInFullscreen" : false,
+                    "restartIdentity" : {
+                      "accessibilityIdentifier" : "fixture-window",
+                      "bundleId" : "test.editor",
+                      "documentURL" : "file:///fixture.txt",
+                      "launchDate" : -978307190,
+                      "pid" : 10,
+                      "title" : "Fixture document"
+                    },
+                    "weight" : 1
+                  }
+                }
+              ],
+              "layout" : "tiles",
+              "orientation" : "h",
+              "weight" : 1
+            }
+          }
         ]
       }
     }
@@ -21,13 +82,74 @@
   "version" : 2,
   "world" : {
     "monitors" : [
-
+      {
+        "displayUUID" : "fixture-display",
+        "topLeftCorner" : [
+          0,
+          0
+        ],
+        "visibleWorkspace" : "1"
+      }
     ],
     "windowIds" : [
-
+      1
     ],
     "workspaces" : [
+      {
+        "arrangement" : "dwindle",
+        "floatingWindows" : [
 
+        ],
+        "macosUnconventionalWindows" : [
+
+        ],
+        "masterGroupIndex" : 0,
+        "masterStackLayout" : "tiles",
+        "monitor" : {
+          "displayUUID" : "fixture-display",
+          "topLeftCorner" : [
+            0,
+            0
+          ],
+          "visibleWorkspace" : "1"
+        },
+        "name" : "1",
+        "namingStyle" : "explicit",
+        "preservesTopLevelGroups" : false,
+        "projectId" : "default",
+        "rootTilingNode" : {
+          "children" : [
+            {
+              "kind" : "window",
+              "window" : {
+                "id" : 1,
+                "isFullscreen" : false,
+                "layoutReason" : {
+                  "standard" : {
+
+                  }
+                },
+                "minimumEvidenceAppGeneration" : 0,
+                "minimumEvidenceGlobalGeneration" : 0,
+                "minimumEvidenceVersion" : 3,
+                "noOuterGapsInFullscreen" : false,
+                "restartIdentity" : {
+                  "accessibilityIdentifier" : "fixture-window",
+                  "bundleId" : "test.editor",
+                  "documentURL" : "file:///fixture.txt",
+                  "launchDate" : -978307190,
+                  "pid" : 10,
+                  "title" : "Fixture document"
+                },
+                "weight" : 1
+              }
+            }
+          ],
+          "layout" : "tiles",
+          "orientation" : "h",
+          "weight" : 1
+        }
+      }
     ]
   }
 }
