@@ -38,6 +38,29 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
         XCTAssertEqual(Array(parseConfig(original).config.persistentWorkspaces), ["7", "Code", "1", "2", "3"])
     }
 
+    func testRetiredKeysAreRemovedAndTheLiquidGlassAliasBecomesChromeStyle() throws {
+        let original = """
+        # User config
+        config-version = 2
+        after-login-command = []
+        non-empty-workspaces-root-containers-layout-on-startup = 'smart'
+        [workspace-sidebar]
+        use-liquid-glass = false
+        """
+        let migrated = try removingRetiredConfigKeys(in: original)
+        for key in ["after-login-command", "non-empty-workspaces", "use-liquid-glass"] {
+            XCTAssertFalse(migrated.contains(key), key)
+        }
+        XCTAssertTrue(migrated.contains("# User config"))
+        let parsed = parseConfig(migrated)
+        XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
+        XCTAssertEqual(parsed.config.workspaceSidebar.chromeStyle, .solid)
+        XCTAssertEqual(try removingRetiredConfigKeys(in: migrated), migrated)
+        let explicit = "[workspace-sidebar]\nchrome-style = 'liquid-glass'\nuse-liquid-glass = false\n"
+        XCTAssertEqual(parseConfig(try removingRetiredConfigKeys(in: explicit)).config.workspaceSidebar.chromeStyle, .liquidGlass,
+                       "An explicit chrome-style wins over the alias")
+    }
+
     func testSmallerMinimumDoesNotRewriteExplicitNamesOrComments() throws {
         let original = """
         config-version = 2

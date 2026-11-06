@@ -31,7 +31,7 @@ extension ConfigTest {
                 show-seconds = false
                 show-date = false
                 show-weekday = false
-                use-liquid-glass = false
+                chrome-style = 'solid'
                 menu-bar-reserve-height = 30
                 project-deletion-action = 'move-windows-to-fallback'
 

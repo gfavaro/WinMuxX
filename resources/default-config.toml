@@ -22,7 +22,6 @@ start-at-login = false
 # Reset workspace placement at launch; explicit assignments still apply.
 start-workspaces-on-main-monitor = false
 after-startup-command = []
-# after-login-command is deprecated; use start-at-login and after-startup-command.
 auto-reload-config = true
 enable-normalization-flatten-containers = true
 enable-normalization-opposite-orientation-for-nested-containers = true

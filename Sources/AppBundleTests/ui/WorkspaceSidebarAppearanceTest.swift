@@ -196,17 +196,6 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         }
     }
 
-    func testCustomChromeSupportsLegacyLiquidGlassKey() {
-        let (parsed, errors) = parseConfig("""
-            [workspace-sidebar]
-            appearance = 'custom'
-            use-liquid-glass = false
-            """)
-        XCTAssertEqual(errors, [])
-        XCTAssertEqual(parsed.workspaceSidebar.appearance, .custom)
-        XCTAssertEqual(parsed.workspaceSidebar.chromeStyle, .solid)
-    }
-
     func testSnapshotUsesSurfaceStyleAsOnlyAppearanceChoice() {
         let previous = config
         defer { config = previous }

@@ -36,9 +36,6 @@ private let workspaceSidebarParser: [String: any ParserProtocol<WorkspaceSidebar
     "chrome-style": Parser(\.chromeStyle, parseChromeStyle),
     "solid-chrome-color": Parser(\.solidChromeColor, parseChromeSolidColor),
     "solid-chrome-custom-color": Parser(\.solidChromeCustomColor, parseChromeSolidCustomColor),
-    "use-liquid-glass": Parser(\.chromeStyle) { raw, backtrace in
-        parseBool(raw, backtrace).map { $0 ? .liquidGlass : .solid }
-    },
     "menu-bar-reserve-height": Parser(\.menuBarReserveHeight, parseWorkspaceSidebarMenuBarReserveHeight),
     "project-deletion-action": Parser(\.projectDeletionAction, parseWorkspaceProjectDeletionAction),
     "workspace-labels": Parser(\.workspaceLabels, parseWorkspaceSidebarLabels),

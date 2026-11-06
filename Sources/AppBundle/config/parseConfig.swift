@@ -56,7 +56,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     },
     "config-version": Parser(\.configVersion, parseConfigVersion),
 
-    "after-login-command": Parser(\.afterLoginCommand, parseAfterLoginCommand),
     "after-startup-command": Parser(\.afterStartupCommand) { parseCommandOrCommands($0).toParsedToml($1) },
 
     "on-display-changed": Parser(\.onDisplayChanged) { parseCommandOrCommands($0).toParsedToml($1) },
@@ -121,8 +120,6 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "on-window-detected": Parser(\.onWindowDetected, parseOnWindowDetectedArray),
 
     // Deprecated
-    "non-empty-workspaces-root-containers-layout-on-startup": Parser(\._nonEmptyWorkspacesRootContainersLayoutOnStartup, parseStartupRootContainerLayout),
-    "indent-for-nested-containers-with-the-same-orientation": Parser(\._indentForNestedContainersWithTheSameOrientation, parseIndentForNestedContainersWithTheSameOrientation),
 ]
 
 extension ParsedCmd where T == any Command {
@@ -142,14 +139,6 @@ extension Command {
     fileprivate var isMacOsNativeCommand: Bool { // Problem ID-B6E178F2
         self is MacosNativeMinimizeCommand || self is MacosNativeFullscreenCommand
     }
-}
-
-func parseAfterLoginCommand(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<[any Command]> {
-    if let array = raw.array, array.count == 0 {
-        return .success([])
-    }
-    let msg = "after-login-command is deprecated since WinMux 0.19.0. https://github.com/nikitabobko/WinMux/issues/1482"
-    return .failure(.semantic(backtrace, msg))
 }
 
 func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]> {
@@ -236,14 +225,6 @@ func parseCommandOrCommands(_ raw: TOMLValueConvertible) -> Parsed<[any Command]
     return (config, errors)
 }
 
-func parseIndentForNestedContainersWithTheSameOrientation(
-    _ _: TOMLValueConvertible,
-    _ backtrace: TomlBacktrace,
-) -> ParsedToml<Void> {
-    let msg = "Deprecated. Please drop it from the config. See https://github.com/nikitabobko/WinMux/issues/96"
-    return .failure(.semantic(backtrace, msg))
-}
-
 func parseConfigVersion(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Int> {
     let min = 1
     let max = 2
@@ -280,12 +261,6 @@ func parseTable<T: ConvenienceCopyable>(
         return initial
     }
     return table.parseTable(initial, fieldsParser, backtrace, &errors)
-}
-
-private func parseStartupRootContainerLayout(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Void> {
-    parseString(raw, backtrace)
-        .filter(.semantic(backtrace, "'non-empty-workspaces-root-containers-layout-on-startup' is deprecated. Please drop it from your config")) { raw in raw == "smart" }
-        .map { _ in () }
 }
 
 private func parseLayout(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Layout> {

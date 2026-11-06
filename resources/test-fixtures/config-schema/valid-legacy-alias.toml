@@ -1,4 +1,4 @@
 config-version = 2
 
 [workspace-sidebar]
-use-liquid-glass = true
+appearance = 'system'

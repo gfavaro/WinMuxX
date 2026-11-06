@@ -39,6 +39,25 @@ func migratingLegacyMinimumWorkspaceCount(in text: String) throws -> String {
     return result
 }
 
+/// Keys WinMuxX no longer reads. Each either accepted only one value or was an alias, so
+/// dropping them changes nothing; `use-liquid-glass` becomes `chrome-style` unless that is set.
+func removingRetiredConfigKeys(in text: String) throws -> String {
+    let table = try TOMLTable(string: text)
+    var result = text
+    for key in ["after-login-command", "non-empty-workspaces-root-containers-layout-on-startup",
+                "indent-for-nested-containers-with-the-same-orientation"] where table[key] != nil {
+        result = removeSettingsConfigValue(in: result, section: nil, key: key)
+    }
+    if let sidebar = table["workspace-sidebar"]?.table, let glass = sidebar["use-liquid-glass"]?.bool {
+        result = removeSettingsConfigValue(in: result, section: "workspace-sidebar", key: "use-liquid-glass")
+        if sidebar["chrome-style"] == nil {
+            result = updateSettingsScalarConfig(in: result, section: "workspace-sidebar", key: "chrome-style",
+                renderedValue: settingsQuotedString((glass ? ChromeStyle.liquidGlass : .solid).rawValue))
+        }
+    }
+    return result
+}
+
 /// Import legacy preferences only when TOML does not already choose a value.
 /// After the validated, backed-up write succeeds, removing the old keys prevents
 /// a later TOML deletion from resurrecting an obsolete preference on next launch.
@@ -49,7 +68,7 @@ func migrateLegacyConfiguration(at url: URL, defaults: UserDefaults = .standard)
     let indicator = defaults.string(forKey: keys[1]).flatMap(MenuBarIndicator.init(rawValue:))
     let icon = defaults.string(forKey: keys[2]).flatMap(MenuBarIconAppearance.init(rawValue:))
     try ConfigFileStore.edit(at: url) { current in
-        var result = try migratingLegacyMinimumWorkspaceCount(in: current)
+        var result = try migratingLegacyMinimumWorkspaceCount(in: removingRetiredConfigKeys(in: current))
         let table = try TOMLTable(string: result)
         if table["window-tabs"]?.table?["double-sided-windows"] == nil, let doubleSided {
             result = updateSettingsScalarConfig(in: result, section: "window-tabs", key: "double-sided-windows",
