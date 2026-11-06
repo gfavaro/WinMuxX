@@ -70,7 +70,8 @@ class NativeOperations:
 
     def config(self):
         doctor = self.cli('doctor')
-        if 'accessibility: granted' not in doctor or 'screen capture: granted' not in doctor:
+        # Screen Recording is optional: without it previews draw app-icon cards.
+        if 'accessibility: granted' not in doctor:
             raise RuntimeError('Required permissions are unavailable')
         path = next((line.split('loaded:', 1)[1].strip() for line in doctor.splitlines() if 'loaded:' in line), None)
         if not path:
