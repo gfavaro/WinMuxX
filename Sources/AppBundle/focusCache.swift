@@ -1,13 +1,6 @@
 import Common
 import Foundation
 
-
-@MainActor struct WorkspaceProjectFocusHold {
-    let projectId: WorkspaceProjectId
-    let expiresAt: Date
-}
-
-
 @MainActor struct WindowClosureFocusHold {
     let workspaceId: WorkspaceId
     let appPid: Int32
@@ -17,7 +10,6 @@ import Foundation
 @MainActor
 final class NativeFocusState {
     var lastKnownWindowID: UInt32?
-    var projectHold: WorkspaceProjectFocusHold?
     var windowClosureHold: WindowClosureFocusHold?
 }
 
@@ -37,40 +29,6 @@ private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?,
     // Closing the final document can make macOS promote another document of
     // the same app, even when it is parked in an inactive workspace.
     return nativeFocused.app.pid == hold.appPid && workspace.id != hold.workspaceId && !workspace.isVisible
-}
-
-@MainActor
-func holdFocusOnWorkspaceProject(_ projectId: WorkspaceProjectId, for duration: TimeInterval) {
-    runtime.nativeFocus.projectHold = WorkspaceProjectFocusHold(
-        projectId: projectId,
-        expiresAt: Date().addingTimeInterval(duration),
-    )
-}
-
-@MainActor
-func clearFocusOnWorkspaceProjectHold(_ projectId: WorkspaceProjectId? = nil) {
-    guard projectId == nil || runtime.nativeFocus.projectHold?.projectId == projectId else { return }
-    runtime.nativeFocus.projectHold = nil
-}
-
-@MainActor
-private func activeWorkspaceProjectFocusHold(now: Date = .now) -> WorkspaceProjectFocusHold? {
-    guard let hold = runtime.nativeFocus.projectHold else { return nil }
-    if hold.expiresAt <= now {
-        runtime.nativeFocus.projectHold = nil
-        return nil
-    }
-    return hold
-}
-
-@MainActor
-private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) -> Bool {
-    guard let hold = activeWorkspaceProjectFocusHold(),
-          let nativeFocused
-    else {
-        return false
-    }
-    return nativeFocused.visualWorkspace?.projectId != hold.projectId
 }
 
 /// The data should flow (from nativeFocused to focused) and
@@ -96,13 +54,6 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
         runtime.nativeFocus.lastKnownWindowID = nil
         debugFocusLog("updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
         return note("ignored:windowClosure")
-    }
-    if shouldIgnoreNativeFocusDuringProjectHold(nativeFocused) {
-        runtime.nativeFocus.lastKnownWindowID = nil
-        debugFocusLog(
-            "updateFocusCache ignoredProjectHold event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") heldProject=\(activeWorkspaceProjectFocusHold()?.projectId.rawValue ?? "nil") logicalFocus=\(debugDescribe(focus))"
-        )
-        return note("ignored:projectHold")
     }
     // The launching app has its window now; focus may be taken back from it again.
     if let pid = nativeFocused?.app.pid, pid == runtime.refresh.windowlessActivationPid {
@@ -140,11 +91,7 @@ private func shouldIgnoreNativeFocusDuringProjectHold(_ nativeFocused: Window?) 
 /// current workspace, so a focus report that lags a workspace switch moves nothing; and only from
 /// a hidden workspace. A window another display shows is focused there; tiled windows and excluded
 /// apps keep following the activation.
-@MainActor
-func shouldBringActivatedWindowHere(_ window: Window, activation: RefreshActivationContext?) -> Bool {
-    bringActivatedWindowHereVerdict(window, activation: activation) == nil
-}
-
+///
 /// Nil when the window comes here, otherwise a fixed code saying why not, for event recording.
 @MainActor
 func bringActivatedWindowHereVerdict(_ window: Window, activation: RefreshActivationContext?) -> String? {

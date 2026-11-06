@@ -235,7 +235,6 @@ import XCTest
             - (windowTabStripContentPadding() * 2)
 
         XCTAssertEqual(windowTabStripScrollViewportWidth(stripWidth: stripWidth), expectedViewportWidth)
-        XCTAssertEqual(windowTabStripAvailableTabsWidth(stripWidth: stripWidth), expectedTabsWidth)
         XCTAssertEqual(windowTabStripTabWidth(stripWidth: stripWidth, count: 1), 240)
         XCTAssertEqual(windowTabStripTabWidth(stripWidth: stripWidth, count: 2), 132)
         XCTAssertEqual(windowTabStripTabWidth(stripWidth: stripWidth, count: 3), windowTabStripMinimumTabWidth)
@@ -251,7 +250,6 @@ import XCTest
                 + windowTabStripContentPadding() * 2,
             windowTabStripScrollViewportWidth(stripWidth: stripWidth)
         )
-        XCTAssertLessThan(windowTabStripAvailableTabsWidth(stripWidth: stripWidth), stripWidth)
     }
 
     func testWindowTabStripScrollBackgroundDragIgnoresTabPills() {

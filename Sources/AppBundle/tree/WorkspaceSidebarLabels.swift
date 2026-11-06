@@ -1,12 +1,5 @@
 import Common
 
-@MainActor
-func nextSidebarDraftWorkspaceName() -> String {
-    clearOrphanedWorkspaceSidebarLabels()
-    let nextIndex = lowestUnusedPositiveIndex(Set(runtime.workspaces.workspaceIdByName.keys.compactMap(sidebarDraftWorkspaceIndex)))
-    return "\(sidebarDraftWorkspacePrefix)\(nextIndex)"
-}
-
 func isSidebarDraftWorkspaceName(_ name: String) -> Bool {
     name.hasPrefix(sidebarDraftWorkspacePrefix)
 }

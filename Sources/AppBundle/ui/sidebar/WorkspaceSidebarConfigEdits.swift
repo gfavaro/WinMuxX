@@ -1,53 +1,6 @@
 import Foundation
 
 private let workspaceSidebarSectionHeader = "[workspace-sidebar]"
-private let workspaceSidebarMenuBarReserveKey = "menu-bar-reserve-height"
-private let workspaceSidebarProjectDeletionActionKey = "project-deletion-action"
-
-func updateWorkspaceSidebarMenuBarReserveConfig(
-    in configText: String,
-    height: Int,
-) -> String {
-    updateWorkspaceSidebarScalarConfig(
-        in: configText,
-        key: workspaceSidebarMenuBarReserveKey,
-        renderedValue: "\(height)",
-    )
-}
-
-func updateWorkspaceSidebarProjectDeletionActionConfig(
-    in configText: String,
-    action: WorkspaceProjectDeletionAction,
-) -> String {
-    updateWorkspaceSidebarScalarConfig(
-        in: configText,
-        key: workspaceSidebarProjectDeletionActionKey,
-        renderedValue: "'\(action.rawValue)'",
-    )
-}
-
-private func updateWorkspaceSidebarScalarConfig(
-    in configText: String,
-    key: String,
-    renderedValue: String,
-) -> String {
-    let lines = configText.components(separatedBy: "\n")
-    guard case let (sectionIndex, sectionEnd)? = tomlSectionBounds(in: lines, header: workspaceSidebarSectionHeader) else {
-        return appendingTomlSection(to: configText, header: workspaceSidebarSectionHeader, line: "    \(key) = \(renderedValue)")
-    }
-
-    var resultLines = lines
-    for lineIndex in (sectionIndex + 1)..<sectionEnd {
-        guard workspaceSidebarConfigKey(in: resultLines[lineIndex]) == key else { continue }
-        let indentation = String(resultLines[lineIndex].prefix(while: { $0.isWhitespace }))
-        let trailingComment = trailingTomlComment(in: resultLines[lineIndex]).map { " " + $0 } ?? ""
-        resultLines[lineIndex] = "\(indentation)\(key) = \(renderedValue)\(trailingComment)"
-        return resultLines.joined(separator: "\n")
-    }
-
-    resultLines.insert("    \(key) = \(renderedValue)", at: sectionIndex + 1)
-    return resultLines.joined(separator: "\n")
-}
 
 func updateWorkspaceSidebarLabelConfig(
     in configText: String,

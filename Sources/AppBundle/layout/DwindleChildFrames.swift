@@ -65,13 +65,6 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
     }
 }
 
-@MainActor
-func fittedDwindleSplitLength(total: CGFloat, gap: CGFloat, ratio: CGFloat, minimum: CGFloat, remainingMinimum: CGFloat) -> CGFloat {
-    let available = max(total - gap, 0)
-    let requested = available * ratio
-    return fitLayoutSizes([requested, available - requested], minimums: [minimum, remainingMinimum], total: available)[0]
-}
-
 extension TilingContainer {
     @MainActor var explicitDwindleShares: [CGFloat]? {
         isExplicitDwindle ? dwindleShares(count: children.count) : nil

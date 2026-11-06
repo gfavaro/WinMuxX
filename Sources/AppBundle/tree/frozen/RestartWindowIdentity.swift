@@ -66,12 +66,3 @@ func matchRestartWindowIndex(
     guard competingLiveWindows.count == 1, competingLiveWindows[0].0 == id else { return nil }
     return index
 }
-
-func matchRestartWindow(
-    id: UInt32,
-    identity: RestartWindowIdentity,
-    saved: [FrozenWindow],
-    live: [(UInt32, RestartWindowIdentity)]
-) -> UInt32? {
-    matchRestartWindowIndex(id: id, identity: identity, saved: saved, live: live).map { saved[$0].id }
-}

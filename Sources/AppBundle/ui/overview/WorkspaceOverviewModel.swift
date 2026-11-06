@@ -68,10 +68,6 @@ func buildWorkspaceOverviewCards(project: WorkspaceProjectId, monitors: [Monitor
     }
 }
 
-func workspaceOverviewHitWindow(_ windows: [WorkspaceOverviewWindow], at point: CGPoint) -> WorkspaceOverviewWindow? {
-    windows.reversed().first { $0.frame?.intersection(CGRect(x: 0, y: 0, width: 1, height: 1)).contains(point) == true }
-}
-
 @MainActor
 final class WorkspaceOverviewDisplayModel: ObservableObject {
     var monitor: MonitorViewportId?

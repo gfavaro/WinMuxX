@@ -63,14 +63,6 @@ func windowTabStripTabWidth(stripWidth: CGFloat, count: Int) -> CGFloat {
     )
 }
 
-func windowTabStripAvailableTabsWidth(stripWidth: CGFloat) -> CGFloat {
-    max(
-        0,
-        windowTabStripScrollViewportWidth(stripWidth: stripWidth)
-            - (windowTabStripContentHorizontalPadding * 2),
-    )
-}
-
 func windowTabResolvedScrollFadeWidth(stripWidth: CGFloat) -> CGFloat {
     min(windowTabStripScrollFadeWidth, max(stripWidth / 5, 0))
 }

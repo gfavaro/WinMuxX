@@ -246,8 +246,6 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertNil(normalizedWorkspacePreviewFrame(.zero, origin: .zero, desktopSize: .zero))
         let back = window(1, frame: CGRect(x: -0.1, y: 0, width: 0.8, height: 0.8))
         let front = window(2, frame: CGRect(x: 0.2, y: 0.2, width: 0.8, height: 0.8))
-        XCTAssertEqual(workspaceOverviewHitWindow([back, front], at: CGPoint(x: 0.3, y: 0.3))?.id, 2)
-        XCTAssertNil(workspaceOverviewHitWindow([back, front], at: CGPoint(x: -0.05, y: 0.3)))
     }
 
     func testPaginationAndKeyboardNavigation() {

@@ -37,14 +37,6 @@ func workspaceFitIssues(in workspaces: [Workspace]) -> [WorkspaceFitIssue] {
     }
 }
 
-struct ExplicitResizeMinimumBlock: Equatable {
-    let requested: CGFloat
-    let minimum: CGFloat
-    let dimension: Orientation
-
-    var isBlocked: Bool { requested + 1 < minimum }
-}
-
 func layoutMinimumExceedsArea(_ minimum: CGSize, available: CGSize) -> Bool {
     minimum.width > available.width || minimum.height > available.height
 }

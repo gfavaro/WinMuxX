@@ -111,49 +111,4 @@ extension ConfigTest {
         XCTAssertTrue(updated.contains("[mode.main.binding]"))
     }
 
-    func testUpdateWorkspaceSidebarMenuBarReserveConfigAddsValueToExistingSection() {
-        let updated = updateWorkspaceSidebarMenuBarReserveConfig(
-            in: """
-            [workspace-sidebar]
-                enabled = true
-                width = 240
-
-            [mode.main.binding]
-                alt-h = 'focus left'
-            """,
-            height: 32,
-        )
-
-        XCTAssertTrue(updated.contains("[workspace-sidebar]\n    menu-bar-reserve-height = 32\n    enabled = true"))
-        XCTAssertTrue(updated.contains("[mode.main.binding]"))
-    }
-
-    func testUpdateWorkspaceSidebarMenuBarReserveConfigReplacesValueAndPreservesComment() {
-        let updated = updateWorkspaceSidebarMenuBarReserveConfig(
-            in: """
-            [workspace-sidebar]
-                menu-bar-reserve-height = 28 # visible menu bar
-                enabled = true
-            """,
-            height: 0,
-        )
-
-        XCTAssertTrue(updated.contains("menu-bar-reserve-height = 0 # visible menu bar"))
-        XCTAssertFalse(updated.contains("menu-bar-reserve-height = 28"))
-    }
-
-    func testUpdateWorkspaceSidebarProjectDeletionActionReplacesValueAndPreservesComment() {
-        let updated = updateWorkspaceSidebarProjectDeletionActionConfig(
-            in: """
-            [workspace-sidebar]
-                project-deletion-action = 'move-windows-to-fallback' # legacy
-                enabled = true
-            """,
-            action: .closeWindows,
-        )
-
-        XCTAssertTrue(updated.contains("project-deletion-action = 'close-windows' # legacy"))
-        XCTAssertFalse(updated.contains("move-windows-to-fallback"))
-    }
-
 }

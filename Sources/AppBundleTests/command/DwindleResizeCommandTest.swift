@@ -106,12 +106,6 @@ final class DwindleResizeCommandTest: XCTestCase {
         XCTAssertGreaterThan(second.lastAppliedLayoutPhysicalRect.orDie().height, 0)
     }
 
-    func testSplitReservesNeighbourMinimumIncludingGap() {
-        XCTAssertEqual(fittedDwindleSplitLength(total: 1020, gap: 20, ratio: 0.9, minimum: 0, remainingMinimum: 300), 700)
-        XCTAssertEqual(fittedDwindleSplitLength(total: 1020, gap: 20, ratio: 0.1, minimum: 350, remainingMinimum: 0), 350)
-        XCTAssertEqual(fittedDwindleSplitLength(total: 1020, gap: 20, ratio: 0.7, minimum: 600, remainingMinimum: 600), 700)
-    }
-
     func testSmartOppositeResizesOuterSplitFromLastWindow() async throws {
         let (workspace, _, _) = try await pair()
         let last = TestWindow.new(id: 17003, parent: workspace.rootTilingContainer)

@@ -95,7 +95,6 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
             checkOnFocusChangedCallbacks()
             XCTAssertEqual(prevFocusedWorkspace?.name, "1")
             XCTAssertNotNil(prevFocus)
-            holdFocusOnWorkspaceProject(workspaceProjectDefaultId, for: 30)
             holdFocusAfterLastWindowClosure(on: b, appPid: 42)
         }
         second.withValue {
@@ -103,7 +102,6 @@ final class WinMuxRuntimeTest: WorkspaceTestCase {
             XCTAssertNil(prevFocus)
             XCTAssertNil(prevPrevFocus)
             XCTAssertEqual(prevFocusedWorkspaceDate, .distantPast)
-            XCTAssertNil(runtime.nativeFocus.projectHold)
             XCTAssertNil(runtime.nativeFocus.windowClosureHold)
         }
         first.withValue { XCTAssertEqual(focus.workspace.name, "2") }

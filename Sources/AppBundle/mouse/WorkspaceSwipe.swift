@@ -259,13 +259,6 @@ final class WorkspaceSwipeController {
 }
 
 @MainActor
-@discardableResult
-func navigateWorkspaceBySwipe(on monitor: Monitor, isNext: Bool) -> Bool {
-    guard let target = workspaceSwipeTarget(on: monitor, isNext: isNext) else { return false }
-    return activateWorkspaceForUser(target, on: monitor)
-}
-
-@MainActor
 func workspaceSwipeTarget(on monitor: Monitor, isNext: Bool) -> Workspace? {
     getNextPrevWorkspace(current: monitor.activeWorkspace, isNext: isNext, wrapAround: false,
                         stdin: nil, on: monitor)

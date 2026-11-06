@@ -56,28 +56,6 @@ func updateModeBindingConfig(
 }
 
 
-func readModeBindingEntries(
-    in configText: String,
-    modeName: String = mainModeId,
-    tableKey: String = "binding",
-) -> [String: String] {
-    let sectionHeader = "[mode.\(modeName).\(tableKey)]"
-    let lines = configText.components(separatedBy: "\n")
-    guard let sectionIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == sectionHeader }) else {
-        return [:]
-    }
-    let sectionEnd = lines[(sectionIndex + 1)...]
-        .firstIndex(where: isTomlSectionHeader)
-        ?? lines.endIndex
-    var result: [String: String] = [:]
-    for line in lines[(sectionIndex + 1)..<sectionEnd] {
-        if let entry = parseTomlStringAssignment(line) {
-            result[entry.key] = entry.value
-        }
-    }
-    return result
-}
-
 func canonicalConfigCommandScript(_ raw: String) -> String? {
     switch parseCommand(raw) {
         case .cmd(let command):

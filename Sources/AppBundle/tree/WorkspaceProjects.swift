@@ -179,11 +179,6 @@ func deleteWorkspaceForSidebar(workspaceName: String) throws {
 }
 
 @MainActor
-func deleteWorkspaceProject(_ projectId: WorkspaceProjectId) throws {
-    try deleteWorkspaceProjectMovingWindowsToFallback(projectId)
-}
-
-@MainActor
 func deleteWorkspaceProjectFromSidebar(_ projectId: WorkspaceProjectId) async throws {
     switch config.workspaceSidebar.projectDeletionAction {
         case .closeWindows:
@@ -194,7 +189,7 @@ func deleteWorkspaceProjectFromSidebar(_ projectId: WorkspaceProjectId) async th
 }
 
 @MainActor
-private func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: WorkspaceProjectId) throws {
+func deleteWorkspaceProjectMovingWindowsToFallback(_ projectId: WorkspaceProjectId) throws {
     _ = try deletableWorkspaceProject(projectId)
     try removeWorkspaceProject(projectId) { workspace, fallbackId in
         let fallback = workspaceFallbackForDeletion(
