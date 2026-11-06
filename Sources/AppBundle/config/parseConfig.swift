@@ -45,6 +45,9 @@ private let persistentWorkspacesKey = "persistent-workspaces"
 // For every new config option you add, think:
 // 1. Does it make sense to have different value
 // 2. Prefer commands and commands flags over toml options if possible
+/// Every root key the configuration accepts; the editor schema must list the same ones.
+var configRootKeys: Set<String> { Set(configParser.keys) }
+
 private let configParser: [String: any ParserProtocol<Config>] = [
     "appearance": Parser(\.appearance) { raw, backtrace in
         parseString(raw, backtrace).flatMap {

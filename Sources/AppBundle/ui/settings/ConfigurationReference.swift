@@ -36,7 +36,7 @@ var configurationReferenceSections: [ConfigurationReferenceSection] {
         check-further-callbacks = false
         run = 'layout floating'
         """),
-        .init(id: "assignments", title: "[workspace-to-monitor-force-assignment]", description: "Assign internal workspace names to displays. Display selectors include uuid:<UUID>, hardware:<vendor>:<model>:<serial>, main, secondary, display numbers and name patterns. Each assigned workspace starts on its display when WinMuxX launches; afterwards any workspace can show on any display. Native Spaces also use them to place new desktops. Configure them in Displays.", defaults: "No forced assignments.", example: """
+        .init(id: "assignments", title: "[workspace-to-monitor-force-assignment]", description: "Assign internal workspace names to displays. Display selectors include uuid:<UUID>, hardware:<vendor>:<model>:<serial>, main, secondary, display numbers and name patterns. While its display is connected, an assigned workspace shows only there, as in AeroSpace; moving it elsewhere is refused. Configure them in Displays.", defaults: "No forced assignments.", example: """
         [workspace-to-monitor-force-assignment]
         '1' = 'main'
         '2' = 'secondary'

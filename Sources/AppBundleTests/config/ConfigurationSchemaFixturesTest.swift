@@ -25,4 +25,13 @@ final class ConfigurationSchemaFixturesTest: XCTestCase {
             XCTAssertEqual(errors.isEmpty, expectation.parser, "Unexpected parser outcome for \(name): \(errors.map(\.description).joined(separator: "\n"))")
         }
     }
+
+    /// The parser is the source of truth; the editor schema follows it key for key.
+    func testSchemaListsExactlyTheParserRootKeys() throws {
+        let data = try Data(contentsOf: projectRoot.appending(path: "docs/schemas/winmuxx.schema.json"))
+        let schema = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let properties = try XCTUnwrap(schema["properties"] as? [String: Any])
+        XCTAssertEqual(Set(properties.keys).subtracting(configRootKeys).sorted(), [], "Schema keys the parser rejects")
+        XCTAssertEqual(configRootKeys.subtracting(properties.keys).sorted(), [], "Parser keys missing from the schema")
+    }
 }
