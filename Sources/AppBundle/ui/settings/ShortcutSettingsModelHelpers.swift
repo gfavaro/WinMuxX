@@ -55,7 +55,7 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
             actions: [
                 shortcutAction(
                     id: "toggle-floating",
-                    title: "Toggle Floating",
+                    title: "Float / Tile Window",
                     subtitle: "Switch the focused managed window between floating and tiling.",
                     command: "layout floating tiling"
                 ),
@@ -64,13 +64,13 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                     title: "Toggle Fullscreen",
                     command: "fullscreen"
                 ),
-                shortcutAction(id: "layout-dwindle", title: "Dwindle", command: "workspace-layout dwindle"),
-                shortcutAction(id: "layout-master", title: "Master", command: "workspace-layout master"),
+                shortcutAction(id: "layout-dwindle", title: "Workspace Arrangement: Dwindle", command: "workspace-layout dwindle"),
+                shortcutAction(id: "layout-master", title: "Workspace Arrangement: Master", command: "workspace-layout master"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
-                shortcutAction(id: "layout-tabs", title: "Stacked: Tabbed", command: "layout tab-group"),
-                shortcutAction(id: "layout-strip", title: "Stacked: Strip", command: "layout strip"),
-                shortcutAction(id: "layout-stacked", title: "Stacked: Accordion", command: "layout accordion"),
+                shortcutAction(id: "layout-tabs", title: "Window Group: Tabs", command: "layout tab-group"),
+                shortcutAction(id: "layout-strip", title: "Window Group: Columns", command: "layout strip"),
+                shortcutAction(id: "layout-stacked", title: "Window Group: Accordion", command: "layout accordion"),
                 shortcutAction(id: "layout-orientation", title: "Toggle Orientation", command: "layout horizontal vertical"),
                 shortcutAction(id: "balance", title: "Balance Sizes", command: "balance-sizes"),
                 shortcutAction(id: "flatten", title: "Flatten Workspace Tree", command: "flatten-workspace-tree"),

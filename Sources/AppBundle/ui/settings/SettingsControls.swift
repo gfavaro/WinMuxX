@@ -2,9 +2,15 @@ import SwiftUI
 
 struct SettingsScrollView<Content: View>: View {
     @ViewBuilder let content: Content
+    @Environment(\.settingsSearchTarget) private var searchTarget
     var body: some View {
-        Form { content }
-            .formStyle(.grouped)
+        ScrollViewReader { proxy in
+            Form { content }.formStyle(.grouped)
+                .onPreferenceChange(SettingsSearchReadyKey.self) { ready in
+                    guard let ready, ready == searchTarget else { return }
+                    proxy.scrollTo(ready.id, anchor: .center)
+                }
+        }
     }
 }
 
@@ -469,6 +475,7 @@ struct SettingsFieldFeedback: ViewModifier {
     let id: String
     let title: String
     @ObservedObject private var model = ShortcutSettingsModel.shared
+    @Environment(\.settingsSearchTarget) private var searchTarget
 
     func body(content: Content) -> some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -478,6 +485,13 @@ struct SettingsFieldFeedback: ViewModifier {
                     .font(.callout).textSelection(.enabled)
                     .accessibilityLabel("Could not save \(title). \(error)")
             }
+        }
+        .background(searchTarget?.id == id ? Color.accentColor.opacity(0.12) : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(searchTarget?.id == id ? Color.accentColor : .clear))
+        .id(id)
+        .anchorPreference(key: SettingsSearchReadyKey.self, value: .bounds) { _ in
+            searchTarget?.id == id ? searchTarget : nil
         }
     }
 }

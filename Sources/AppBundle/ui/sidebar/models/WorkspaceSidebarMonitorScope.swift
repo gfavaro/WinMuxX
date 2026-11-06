@@ -29,6 +29,12 @@ func workspaceSidebarMonitor(forScopeId scopeId: String) -> Monitor? {
     return sortedMonitors.first { $0.rect.topLeftCorner == point }
 }
 
+@MainActor
+func workspaceSidebarMonitor(forDisplayUUID uuid: String?) -> Monitor? {
+    guard let uuid, !uuid.isEmpty else { return nil }
+    return sortedMonitors.first { $0.displayUUID?.caseInsensitiveCompare(uuid) == .orderedSame }
+}
+
 func workspaceSidebarWorkspaceMatchesScope(
     workspaceMonitorScopeId: String,
     selectedScopeId: String,

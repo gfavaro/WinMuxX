@@ -5,6 +5,75 @@ import XCTest
 @MainActor
 final class SettingsRefinementTest: WorkspaceTestCase {
 
+    func testSearchRequestsRemainDistinctAndReadinessIgnoresUnrelatedFields() {
+        let first = SettingsSearchDestination(id: "borders.enabled")
+        let repeated = SettingsSearchDestination(id: "borders.enabled")
+        XCTAssertNotEqual(first, repeated)
+        var ready: SettingsSearchDestination?
+        SettingsSearchReadyKey.reduce(value: &ready, nextValue: { first })
+        SettingsSearchReadyKey.reduce(value: &ready, nextValue: { nil })
+        XCTAssertEqual(ready, first)
+        SettingsSearchReadyKey.reduce(value: &ready, nextValue: { repeated })
+        XCTAssertEqual(ready, repeated)
+    }
+
+    func testDisplayMoveTargetSurvivesRepositioningAndRejectsMissingDisplays() {
+        var original = TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "External",
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080), isMain: true)
+        original.displayUUID = "physical-display"
+        setMonitorsForTests([original])
+        defer { setMonitorsForTests(nil) }
+        XCTAssertEqual(workspaceSidebarMonitor(forDisplayUUID: "PHYSICAL-DISPLAY")?.name, "External")
+        var replacement = TestMonitor(monitorAppKitNsScreenScreensId: 2, name: "Replacement",
+            rect: original.rect, visibleRect: original.visibleRect, isMain: true)
+        replacement.displayUUID = "different-display"
+        var moved = TestMonitor(monitorAppKitNsScreenScreensId: 1, name: "External",
+            rect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080), isMain: false)
+        moved.displayUUID = original.displayUUID
+        setMonitorsForTests([replacement, moved])
+        XCTAssertEqual(workspaceSidebarMonitor(forDisplayUUID: original.displayUUID)?.rect.topLeftCorner, moved.rect.topLeftCorner)
+        setMonitorsForTests([replacement])
+        XCTAssertNil(workspaceSidebarMonitor(forDisplayUUID: original.displayUUID))
+        XCTAssertNil(workspaceSidebarMonitor(forDisplayUUID: nil))
+        XCTAssertNil(workspaceSidebarMonitor(forDisplayUUID: ""))
+    }
+
+    func testUnmappedReferenceSettingsAreDiscoverableInConfiguration() {
+        for query in ["on-window-detected", "inherit-env-vars"] {
+            XCTAssertTrue(SettingsSidebarItem.configuration.matchesSearch(query), query)
+        }
+        let unmapped = configurationReferenceSections.filter { $0.pane == nil }
+        XCTAssertFalse(unmapped.isEmpty)
+        for section in unmapped {
+            XCTAssertTrue(SettingsSidebarItem.configuration.matchesSearch(section.title), section.id)
+        }
+        XCTAssertFalse(SettingsSidebarItem.configuration.matchesSearch("nonexistent-setting"))
+        XCTAssertFalse(SettingsSidebarItem.general.matchesSearch("inherit-env-vars"))
+        XCTAssertTrue(SettingsSidebarItem.windows.matchesSearch("fullscreen-width"))
+    }
+
+    func testControlSearchFindsSpecificDestinations() {
+        let borders = settingsControlSearchResults("borders")
+        XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })
+        XCTAssertEqual(settingsControlSearchResults("fullscreen-width").map(\.id), ["fullscreen-width"])
+        XCTAssertTrue(settingsControlSearchResults("START LOGIN").contains { $0.id == "start-at-login" })
+        XCTAssertTrue(settingsControlSearchResults("  ").isEmpty)
+        XCTAssertTrue(settingsControlSearchResults("nonexistent-setting").isEmpty)
+    }
+
+    func testSettingsSearchFindsPagesBySettingNamesAndDescriptions() {
+        XCTAssertTrue(SettingsSidebarItem.windows.matchesSearch("fullscreen-width"))
+        XCTAssertTrue(SettingsSidebarItem.general.matchesSearch(" LOGIN "))
+        XCTAssertTrue(SettingsSidebarItem.sidebar.matchesSearch("clock"))
+        XCTAssertTrue(SettingsSidebarItem.shortcuts.matchesSearch("hotkeys"))
+        XCTAssertFalse(SettingsSidebarItem.general.matchesSearch("nonexistent-setting"))
+        XCTAssertTrue(SettingsSidebarItem.automation.isAdvanced)
+        XCTAssertTrue(SettingsSidebarItem.configuration.isAdvanced)
+        XCTAssertFalse(SettingsSidebarItem.windows.isAdvanced)
+    }
+
     func testStoredNavigationIdentifiersRestoreAndUnknownValuesFallBack() {
         for page in SettingsSidebarItem.allCases {
             XCTAssertEqual(SettingsSidebarItem.restored(page.rawValue), page)

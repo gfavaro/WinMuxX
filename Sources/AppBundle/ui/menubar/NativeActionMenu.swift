@@ -127,24 +127,81 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             menu.addItem(NSMenuItem(title: "⚠ Other window managers: \(conflicts.joined(separator: ", "))", action: nil, keyEquivalent: ""))
             menu.addItem(callbackItem("Window management may conflict — view diagnostics…", #selector(openDiagnostics)))
         }
-        // The top level shows state and quick switches; every other command lives in Commands.
         menu.addItem(.separator())
-        let arrangement = focus.workspace.arrangement
+        let arrangementMenu = NSMenu(title: "Arrange Windows")
+        arrangementMenu.addItem(NSMenuItem(title: "Workspace Arrangement", action: nil, keyEquivalent: ""))
         for layout in [WorkspaceLayoutName.dwindle, .master] {
-            let item = addCommand(layout.rawValue.capitalized, script: "workspace-layout \(layout.rawValue)", to: menu)
+            let item = addCommand(layout.rawValue.capitalized, script: "workspace-layout \(layout.rawValue)", to: arrangementMenu)
             item?.image = MenuBarLayoutIcon.image(for: layout, monochrome: true)
-            item?.state = arrangement == layout ? .on : .off
+            item?.state = focus.workspace.arrangement == layout ? .on : .off
         }
-        switch arrangement {
+        arrangementMenu.addItem(.separator())
+        addCommand("Balance Sizes", script: "balance-sizes", to: arrangementMenu)
+        let arrangementItem = NSMenuItem(title: "Arrange Windows", action: nil, keyEquivalent: "")
+        arrangementItem.submenu = arrangementMenu
+        menu.addItem(arrangementItem)
+        menu.addItem(.separator())
+        addCommand("Retile", script: "retile", to: menu, requiresWindow: false)
+        addCommand("Fullscreen", script: "fullscreen", to: menu)
+        addCommand("Float / Tile Window", script: "layout floating tiling", to: menu)
+        menu.addItem(.separator())
+        let commandsMenu = NSMenu(title: "Commands")
+        let sections = addCommandsMenu(to: commandsMenu)
+        if let groupItem = sections[.windowGroup], let groups = groupItem.submenu {
+            commandsMenu.removeItem(groupItem)
+            arrangementMenu.addItem(.separator())
+            arrangementMenu.addItem(NSMenuItem(title: "Window Grouping", action: nil, keyEquivalent: ""))
+            for item in groups.items {
+                groups.removeItem(item)
+                arrangementMenu.addItem(item)
+            }
+        }
+        for section in [CommandMenuSection.joinWith, .resize, .swapWithMaster] {
+            if let item = sections[section] {
+                commandsMenu.removeItem(item)
+                arrangementMenu.addItem(item)
+            }
+        }
+        for section in [CommandMenuSection.workspaces, .focus, .moveWindow, .display, .mode] {
+            if let item = sections[section] {
+                commandsMenu.removeItem(item)
+                menu.addItem(item)
+            }
+        }
+        // Keep occasional switches and maintenance actions together.
+        while commandsMenu.items.first?.isSeparatorItem == true { commandsMenu.removeItem(at: 0) }
+        let commandsItem = NSMenuItem(title: "Commands", action: nil, keyEquivalent: "")
+        commandsItem.submenu = commandsMenu
+        menu.addItem(commandsItem)
+        menu.addItem(.separator())
+        let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
+        if recoverableCount > 0 {
+            let item = callbackItem("Recover \(recoverableCount) Windows from Previous Session…", #selector(recoverWindows))
+            item.isEnabled = !WindowRecoveryController.shared.isRecovering
+            menu.addItem(item)
+        }
+        menu.addItem(callbackItem("About WinMuxX", #selector(showAbout)))
+        let settingsItem = callbackItem("Settings…", #selector(openSettings))
+        settingsItem.image = nil
+        if #available(macOS 27.0, *) { settingsItem.preferredImageVisibility = .hidden }
+        menu.addItem(settingsItem)
+        _ = addCommand(TrayMenuModel.shared.isEnabled ? "Pause Window Management" : "Resume Window Management", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
+        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+    }
+
+    private enum CommandMenuSection {
+        case workspaces, focus, moveWindow, joinWith, resize, windowGroup, display, mode, swapWithMaster
+    }
+
+    /// Return stable section references so labels can change independently of placement.
+    private func addCommandsMenu(to menu: NSMenu) -> [CommandMenuSection: NSMenuItem] {
+        var sections: [CommandMenuSection: NSMenuItem] = [:]
+        switch focus.workspace.arrangement {
             case .master:
-                addCommand("Swap with Master", script: "swap-with-master", to: menu)
+                sections[.swapWithMaster] = addCommand("Swap with Master", script: "swap-with-master", to: menu)
             case .dwindle:
                 break
         }
-        menu.addItem(.separator())
-        addCommand("Retile", script: "retile", to: menu, requiresWindow: false)
-        addCommand("Balance Sizes", script: "balance-sizes", to: menu)
-        addCommand("Fullscreen", script: "fullscreen", to: menu)
         menu.addItem(.separator())
         if let target = capturedRuleTarget {
             let appName = target.window.macApp.name ?? "This App"
@@ -158,23 +215,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(configToggleItem("Borders", isOn: config.windowBorders.enabled, #selector(toggleBorders)))
         menu.addItem(configToggleItem("Focus Follows Pointer", isOn: config.focusFollowsMouse, #selector(toggleFocusFollowsPointer)))
         menu.addItem(.separator())
-        addSubmenu("Commands", to: menu) { addCommandsMenu(to: $0) }
-        menu.addItem(.separator())
-        let recoverableCount = WindowRecoveryController.shared.recoverableEntries.count
-        if recoverableCount > 0 {
-            let item = callbackItem("Recover \(recoverableCount) Windows from Previous Session…", #selector(recoverWindows))
-            item.isEnabled = !WindowRecoveryController.shared.isRecovering
-            menu.addItem(item)
-        }
-        menu.addItem(callbackItem("About WinMuxX", #selector(showAbout)))
-        menu.addItem(callbackItem("Settings…", #selector(openSettings)))
-        let enabled = addCommand("Enabled", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
-        enabled?.state = TrayMenuModel.shared.isEnabled ? .on : .off
-        menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
-    }
-
-    private func addCommandsMenu(to menu: NSMenu) {
-        addSubmenu("Workspaces", to: menu) { workspacesMenu in
+        sections[.workspaces] = addSubmenu("Workspaces", to: menu) { workspacesMenu in
             addCommand("Previous", script: "workspace prev", to: workspacesMenu)
             addCommand("Next", script: "workspace next", to: workspacesMenu)
             addCommand("Back and Forth", script: "workspace-back-and-forth", to: workspacesMenu)
@@ -199,7 +240,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         if sortedMonitors.count > 1 {
-            addSubmenu("Display", to: menu) { submenu in
+            sections[.display] = addSubmenu("Display", to: menu) { submenu in
                 addCommand("Focus Previous", script: "focus-monitor prev", to: submenu)
                 addCommand("Focus Next", script: "focus-monitor next", to: submenu)
                 submenu.addItem(.separator())
@@ -209,33 +250,34 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         menu.addItem(.separator())
-        for (title, command) in [("Focus", "focus"), ("Move Window", "move"), ("Join With", "join-with")] {
-            addSubmenu(title, to: menu) { submenu in
+        for (section, title, command) in [(CommandMenuSection.focus, "Focus", "focus"),
+                                           (.moveWindow, "Move Window", "move"),
+                                           (.joinWith, "Join With", "join-with")] {
+            sections[section] = addSubmenu(title, to: menu) { submenu in
                 for direction in ["left", "down", "up", "right"] {
                     addCommand(direction.capitalized, script: "\(command) \(direction)", to: submenu)
                 }
             }
         }
-        addSubmenu("Resize", to: menu) { submenu in
+        sections[.resize] = addSubmenu("Resize", to: menu) { submenu in
             for (title, script) in [("Wider", "resize width +50"), ("Narrower", "resize width -50"),
                                     ("Taller", "resize height +50"), ("Shorter", "resize height -50")] {
                 addCommand(title, script: script, to: submenu)
             }
         }
-        addSubmenu("Container Layout", to: menu) { submenu in
+        sections[.windowGroup] = addSubmenu("Window Group", to: menu) { submenu in
             for (title, script) in [("Tiles", "layout tiles"),
-                                    ("Tabbed", "layout tab-group"), ("Strip", "layout strip"), ("Accordion", "layout accordion")] {
+                                    ("Tabs", "layout tab-group"), ("Columns", "layout strip"), ("Accordion", "layout accordion")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())
             addCommand("Horizontal", script: "layout horizontal", to: submenu)
             addCommand("Vertical", script: "layout vertical", to: submenu)
             submenu.addItem(.separator())
-            addCommand("Toggle Floating", script: "layout floating tiling", to: submenu)
             addCommand("Undo Layout Change", script: "undo-layout", to: submenu)
         }
         if config.modes.count > 1 {
-            addSubmenu("Mode", to: menu) { submenu in
+            sections[.mode] = addSubmenu("Mode", to: menu) { submenu in
                 for mode in config.modes.keys.sorted() {
                     let item = addCommand(mode, args: ["mode", mode], to: submenu)
                     item?.state = mode == activeMode ? .on : .off
@@ -244,6 +286,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
         menu.addItem(.separator())
         addCommand("Reload Config", script: "reload-config", to: menu, requiresWindow: false, allowDisabled: true)
+        return sections
     }
 
     private func configToggleItem(_ title: String, isOn: Bool, _ action: Selector) -> NSMenuItem {
@@ -252,13 +295,15 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         return item
     }
 
-    private func addSubmenu(_ title: String, to menu: NSMenu, build: (NSMenu) -> Void) {
+    @discardableResult
+    private func addSubmenu(_ title: String, to menu: NSMenu, build: (NSMenu) -> Void) -> NSMenuItem {
         let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
         let submenu = NSMenu(title: title)
         submenu.autoenablesItems = false
         build(submenu)
         item.submenu = submenu
         menu.addItem(item)
+        return item
     }
 
     @discardableResult

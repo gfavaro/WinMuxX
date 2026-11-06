@@ -17,7 +17,9 @@ selecting `Code` in the sidebar focuses the display where `Code` currently lives
 Selecting a hidden workspace that belongs to another display shows it there and
 leaves focus on the display you are using, so the sidebar can change what another
 display shows without pulling you away from your work.
-Use **Move Workspace to Display** when you want to change that assignment.
+The expanded sidebar shows each workspace’s owning display when multiple displays
+are connected. Right-click a workspace and choose **Move to Display** to relocate
+its windows and layout together. Configured display assignments still apply.
 
 WinMuxX saves workspace assignments and layout state for restart recovery. Its
 workspaces are managed by WinMuxX; they are distinct from macOS Spaces. Native

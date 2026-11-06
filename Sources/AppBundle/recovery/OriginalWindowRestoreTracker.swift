@@ -8,9 +8,22 @@ enum OriginalWindowRestoreError: Error { case unavailable, rejected }
 final class OriginalWindowRestoreTracker {
     private var restored = Set<RecoveryWindowIdentity>()
     private var failures: [RecoveryWindowIdentity: CGRect] = [:]
-    func reset() { restored.removeAll(); failures.removeAll() }
-    func forget(_ identity: RecoveryWindowIdentity) { restored.remove(identity); failures[identity] = nil }
-    func succeeded(_ identity: RecoveryWindowIdentity) { restored.insert(identity); failures[identity] = nil }
+
+    func reset() {
+        restored.removeAll()
+        failures.removeAll()
+    }
+
+    func forget(_ identity: RecoveryWindowIdentity) {
+        restored.remove(identity)
+        failures[identity] = nil
+    }
+
+    func succeeded(_ identity: RecoveryWindowIdentity) {
+        restored.insert(identity)
+        failures[identity] = nil
+    }
+
     func failed(_ identity: RecoveryWindowIdentity, frame: CGRect?) {
         // Losing native bounds is not evidence of manual movement. Keep the last
         // known failure frame so a later retry can still protect an off-state move.

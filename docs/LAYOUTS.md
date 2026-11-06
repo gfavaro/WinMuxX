@@ -37,8 +37,7 @@ the group (gaps included, so two show at once) unless it was resized, and the
 columns that fit fill the tile. The others wait hidden; focus left or right steps through
 the columns and scrolls hidden ones in, leaving the strip at either end. `layout tab-group`
 shows the same group as tabs again. The choice is saved with the layout. Make a group with
-`stack-with` or by dragging a window onto another, then choose Commands → Container Layout →
-Strip in the menu or bind Stacked: Strip in Settings → Shortcuts.
+`stack-with` or by dragging a window onto another, then choose Arrange Windows → Columns in the menu or bind Window Group: Columns in Settings → Shortcuts.
 
 `layout floating` and `layout tiling` change the selected window's state. These
 commands target the focused window and do not select a workspace layout.

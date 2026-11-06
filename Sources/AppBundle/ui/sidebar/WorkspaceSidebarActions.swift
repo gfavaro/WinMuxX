@@ -76,6 +76,28 @@ func overrideWorkspaceInUseFromSidebar(_ workspaceName: String, targetMonitorSco
     }
 }
 
+/// Resolve at execution time: screen coordinates may have changed since the menu opened.
+@MainActor
+func moveWorkspaceToDisplayFromSidebar(_ workspaceName: String, displayUUID: String?) {
+    WorkspaceSidebarPanel.suppressEdgeTrapForWorkspaceActivation()
+    runWorkspaceSidebarSession {
+        guard let target = workspaceSidebarMonitor(forDisplayUUID: displayUUID) else {
+            showWorkspaceSidebarError("The selected display is no longer available. Reopen Move to Display and try again.")
+            return
+        }
+        guard let workspace = Workspace.existing(byName: workspaceName) else {
+            showWorkspaceSidebarError("This workspace is no longer available.")
+            return
+        }
+        if activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: target) {
+            _ = workspace.focusWorkspace()
+        } else {
+            let assigned = workspace.forceAssignedMonitor.map { " to \($0.name)" } ?? ""
+            showWorkspaceSidebarError("This workspace is assigned\(assigned) in Settings › Displays, so it stays there.")
+        }
+    }
+}
+
 @MainActor
 func runWorkspaceSidebarSession(_ body: @escaping @MainActor () async throws -> Void) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }

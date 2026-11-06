@@ -44,9 +44,10 @@ These are the defaults and features maintained here:
   Sidebar clicks on another display ask before bringing the workspace there.
 - Learned application minimum sizes constrain layouts. Borders use an AppKit
   fallback when the private renderer is unavailable.
-- The native menu shows the workspace layout and quick switches (Retile, No Peek,
-  Borders, Focus Follows Pointer, floating rules), keeps other commands under
-  Commands, and offers recovery of original window frames after an interrupted
+- The native menu offers Workspace Arrangement, Settings and Pause/Resume,
+  with Retile, Fullscreen and Float / Tile Window at the top level,
+  and Arrange Windows grouping layout, balance, resize and join actions,
+  and additional actions and appearance switches under Commands, and offers recovery of original window frames after an interrupted
   session and About WinMuxX with the version, build and credits.
 
 The app has its own identity, CLI, configuration and recovery state. On first
@@ -58,7 +59,12 @@ aliases. Use `winmuxx <command> --help` for details. Help works without the app 
 
 ## Settings
 
-Open Settings from the WinMuxX menu. The window is resizable, and the controls
+Open Settings from the WinMuxX menu. Everyday pages stay visible; Automation and
+Configuration are grouped under Advanced. Use Find settings to locate pages by
+name, configuration key or description, including advanced pages. Matching everyday controls appear as direct results: selecting one opens its page,
+scrolls to the control and highlights it. Other matches open the relevant page.
+
+The window is resizable, and the controls
 support keyboard navigation, accessible labels and values, Reduce Motion, Reduce
 Transparency, and increased contrast.
 

@@ -30,10 +30,18 @@ def write_report(path, report):
 
 
 def differences(before, after):
-    old = {str(w['window-id']): w['workspace'] for w in before['windows']}
-    new = {str(w['window-id']): w['workspace'] for w in after['windows']}
-    return {'moved': {key: [old[key], new[key]] for key in old.keys() & new.keys() if old[key] != new[key]},
-            'closed': sorted(old.keys() - new.keys()), 'opened': sorted(new.keys() - old.keys())}
+    before_assignments = {str(window['window-id']): window['workspace'] for window in before['windows']}
+    after_assignments = {str(window['window-id']): window['workspace'] for window in after['windows']}
+    surviving_ids = before_assignments.keys() & after_assignments.keys()
+    return {
+        'moved': {
+            window_id: [before_assignments[window_id], after_assignments[window_id]]
+            for window_id in surviving_ids
+            if before_assignments[window_id] != after_assignments[window_id]
+        },
+        'closed': sorted(before_assignments.keys() - after_assignments.keys()),
+        'opened': sorted(after_assignments.keys() - before_assignments.keys()),
+    }
 
 
 class NativeOperations:

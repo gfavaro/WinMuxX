@@ -62,15 +62,16 @@ final class ActionMenuTest: XCTestCase {
         """)
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        XCTAssertEqual(try XCTUnwrap(menu.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
+        let arrangements = try submenu("Arrange Windows", in: menu)
+        XCTAssertEqual(try XCTUnwrap(arrangements.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
         for arrangement in WorkspaceLayoutName.allCases {
-            let item = try XCTUnwrap(menu.items.first { $0.title == arrangement.rawValue.capitalized })
+            let item = try XCTUnwrap(arrangements.items.first { $0.title == arrangement.rawValue.capitalized })
             XCTAssertNotNil(item.image, "\(arrangement) shows its picture")
             XCTAssertEqual(item.state, focus.workspace.arrangement == arrangement ? .on : .off)
         }
-        let layout = try submenu("Container Layout", in: try submenu("Commands", in: menu))
-        XCTAssertEqual(try XCTUnwrap(layout.items.first { $0.title == "Toggle Floating" }).keyEquivalent, "t")
-        for title in ["Tiles", "Tabbed", "Accordion", "Horizontal", "Vertical"] {
+        let layout = try submenu("Arrange Windows", in: menu)
+        XCTAssertEqual(try XCTUnwrap(menu.items.first { $0.title == "Float / Tile Window" }).keyEquivalent, "t")
+        for title in ["Tiles", "Tabs", "Accordion", "Horizontal", "Vertical"] {
             let item = try XCTUnwrap(layout.items.first { $0.title == title })
             XCTAssertEqual(item.title, title)
             XCTAssertEqual(item.keyEquivalent, "", title)
@@ -91,6 +92,9 @@ final class ActionMenuTest: XCTestCase {
         let titles = menu.items.map(\.title)
         let about = try XCTUnwrap(titles.firstIndex(of: "About WinMuxX"))
         XCTAssertEqual(titles[about + 1], "Settings…")
+        if #available(macOS 27.0, *) {
+            XCTAssertEqual(menu.items[about + 1].preferredImageVisibility, .hidden)
+        }
         XCTAssertTrue(menu.items[about].isEnabled)
         let credits = aboutPanelCredits()
         XCTAssertTrue(credits.string.contains("WinMux by Zimeng Xiong"), credits.string)
@@ -105,16 +109,22 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         let titles = menu.items.map(\.title)
-        for title in ["Dwindle", "Master", "Retile", "Balance Sizes", "Fullscreen", "No Peek", "Borders",
-                      "Focus Follows Pointer", "Commands", "About WinMuxX", "Settings…", "Enabled", "Quit WinMuxX"] {
+        for title in ["Arrange Windows", "Retile", "Fullscreen", "Float / Tile Window", "Commands", "About WinMuxX", "Settings…", "Quit WinMuxX"] {
             XCTAssertTrue(titles.contains(title), title)
         }
-        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Reload Config", "Clear Saved Minimum Sizes…"] {
-            XCTAssertFalse(titles.contains(title), "\(title) is not at the top level")
+        for title in ["No Peek", "Borders", "Focus Follows Pointer", "Balance Sizes", "Join With", "Resize", "Window Group", "Workspace Arrangement"] {
+            XCTAssertFalse(titles.contains(title), title)
         }
-        XCTAssertEqual(menu.items.filter { $0.submenu != nil }.map(\.title), ["Commands"])
+        XCTAssertTrue(titles.contains("Pause Window Management") || titles.contains("Resume Window Management"))
+        for title in ["Arrange Windows", "Workspaces", "Focus", "Move Window", "Commands"] {
+            XCTAssertNotNil(menu.items.first { $0.title == title }?.submenu, title)
+        }
+        let arrange = try submenu("Arrange Windows", in: menu)
+        for title in ["Dwindle", "Master", "Balance Sizes", "Tabs", "Columns", "Accordion", "Horizontal", "Vertical", "Join With", "Resize"] {
+            XCTAssertTrue(arrange.items.contains { $0.title == title }, title)
+        }
         let commands = try submenu("Commands", in: menu)
-        for title in ["Workspaces", "Focus", "Move Window", "Join With", "Resize", "Container Layout", "Reload Config"] {
+        for title in ["No Peek", "Borders", "Focus Follows Pointer", "Reload Config"] {
             XCTAssertTrue(commands.items.contains { $0.title == title }, title)
         }
         XCTAssertFalse(titles.contains("Mode: main"))
@@ -125,13 +135,13 @@ final class ActionMenuTest: XCTestCase {
         for title in ["Advanced", "Projects", "Utilities", "Other Key Bindings", "Bring Here", "Copy Version", "Open Config", "Diagnostics…", "Close Other Windows…", "New Opposite Container", "Next Tab"] {
             XCTAssertFalse(allTitles.contains(title), title)
         }
-        let workspaces = try submenu("Workspaces", in: commands)
+        let workspaces = try submenu("Workspaces", in: menu)
         XCTAssertNotNil(workspaces.items.first { $0.title == "Move and Follow" }?.submenu)
         XCTAssertNotNil(workspaces.items.first { $0.title == "Move Window to" }?.submenu)
         if sortedMonitors.count == 1 { XCTAssertFalse(commands.items.contains { $0.title == "Display" }) }
     }
 
-    func testTopLevelShowsOnlyTheCurrentLayoutsItemsAndConfigToggles() throws {
+    func testCommandsShowsCurrentArrangementActionsAndConfigToggles() throws {
         let workspace = focus.workspace
         let previousArrangement = workspace.arrangement
         let previousBorders = config.windowBorders.enabled
@@ -147,12 +157,12 @@ final class ActionMenuTest: XCTestCase {
         let controller = NativeActionMenu()
         workspace.arrangement = .master
         controller.menuNeedsUpdate(menu)
-        XCTAssertTrue(menu.items.contains { $0.title == "Swap with Master" })
-        XCTAssertEqual(menu.items.first { $0.title == "Borders" }?.state, .on)
-        XCTAssertEqual(menu.items.first { $0.title == "Focus Follows Pointer" }?.state, .off)
+        XCTAssertTrue(try submenu("Arrange Windows", in: menu).items.contains { $0.title == "Swap with Master" })
+        XCTAssertEqual(try submenu("Commands", in: menu).items.first { $0.title == "Borders" }?.state, .on)
+        XCTAssertEqual(try submenu("Commands", in: menu).items.first { $0.title == "Focus Follows Pointer" }?.state, .off)
         workspace.arrangement = .dwindle
         controller.menuNeedsUpdate(menu)
-        XCTAssertFalse(menu.items.contains { $0.title == "Swap with Master" })
+        XCTAssertFalse(try submenu("Arrange Windows", in: menu).items.contains { $0.title == "Swap with Master" })
     }
 
     private func submenu(_ title: String, in menu: NSMenu) throws -> NSMenu {
@@ -269,8 +279,8 @@ final class ActionMenuTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = true
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        XCTAssertFalse(try XCTUnwrap(menu.items.first { $0.title == "Dwindle" }).isEnabled)
-        let workspaces = try submenu("Workspaces", in: try submenu("Commands", in: menu))
+        XCTAssertFalse(try XCTUnwrap(try submenu("Arrange Windows", in: menu).items.first { $0.title == "Dwindle" }).isEnabled)
+        let workspaces = try submenu("Workspaces", in: menu)
         XCTAssertTrue(try XCTUnwrap(workspaces.items.first { $0.title == "Next" }).isEnabled)
         XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == "Settings…" }).isEnabled)
     }
@@ -296,12 +306,12 @@ final class ActionMenuTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = false
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
-        for title in ["Enabled", "Settings…", "Quit WinMuxX"] {
+        for title in ["Resume Window Management", "Settings…", "Quit WinMuxX"] {
             XCTAssertTrue(try XCTUnwrap(menu.items.first { $0.title == title }).isEnabled, title)
         }
         let commands = try submenu("Commands", in: menu)
         XCTAssertTrue(try XCTUnwrap(commands.items.first { $0.title == "Reload Config" }).isEnabled)
-        let workspaces = try submenu("Workspaces", in: commands)
+        let workspaces = try submenu("Workspaces", in: menu)
         XCTAssertFalse(try XCTUnwrap(workspaces.items.first { $0.title == "Next" }).isEnabled)
     }
 
@@ -313,11 +323,13 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         let controller = NativeActionMenu()
         controller.menuNeedsUpdate(menu)
-        XCTAssertEqual(try XCTUnwrap(menu.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
+        let arrangements = try submenu("Arrange Windows", in: menu)
+        XCTAssertEqual(try XCTUnwrap(arrangements.items.first { $0.title == "Dwindle" }).keyEquivalent, " ")
         activeMode = "grouping"
         config.modes["grouping"] = .zero
         controller.menuNeedsUpdate(menu)
-        XCTAssertEqual(try XCTUnwrap(menu.items.first { $0.title == "Dwindle" }).keyEquivalent, "")
+        let updatedArrangements = try submenu("Arrange Windows", in: menu)
+        XCTAssertEqual(try XCTUnwrap(updatedArrangements.items.first { $0.title == "Dwindle" }).keyEquivalent, "")
         XCTAssertTrue(menu.items.contains { $0.title == "Mode: grouping" })
     }
 
@@ -385,7 +397,7 @@ final class ActionMenuTest: XCTestCase {
         let menu = NSMenu()
         NativeActionMenu().menuNeedsUpdate(menu)
         XCTAssertEqual(focus.windowOrNil, originalWindow, "Building a menu must not steal focus")
-        let workspaceMenu = try submenu("Workspaces", in: try submenu("Commands", in: menu))
+        let workspaceMenu = try submenu("Workspaces", in: menu)
         let item = try XCTUnwrap(workspaceMenu.items.first { $0.title == workspaceDisplayName(second.name) })
         let payload = try XCTUnwrap(item.representedObject as? MenuCommandPayload)
         let result = try await payload.commands.runCmdSeq(.defaultEnv, .emptyStdin)

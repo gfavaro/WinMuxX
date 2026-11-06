@@ -1,5 +1,9 @@
 # WinMuxX roadmap
 
+Current UI simplification findings and reproduction cases are tracked in the
+[review queue](REVIEW_QUEUE.md). The broader source review is recorded in
+the [refactoring audit](REFACTOR_AUDIT.md), with a file/range coverage ledger.
+
 ## Dinky fit review — 2026-10-22
 
 The [Dinky implementation plan](archive/DINKY_FIT_PLAN.md) proposes task-based guides and

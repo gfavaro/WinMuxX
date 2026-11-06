@@ -103,6 +103,26 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
         }
     }
 
+    var isAdvanced: Bool { self == .automation || self == .configuration }
+
+    @MainActor
+    func matchesSearch(_ query: String) -> Bool {
+        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+        // Sections without a dedicated page remain editable in Configuration.
+        let reference = configurationReferenceSections.filter { ($0.pane ?? .configuration) == self }
+        let text = ([label] + reference.map { "\($0.title) \($0.description) \($0.defaults ?? "") \($0.example ?? "")" }
+            + searchAliases).joined(separator: " ")
+        return terms.allSatisfy { text.localizedStandardContains($0) }
+    }
+
+    private var searchAliases: [String] {
+        switch self {
+            case .shortcuts: ["keyboard hotkeys bindings presets modifier keys"]
+            case .displays: ["monitor display assignment workspace resolution connected screen"]
+            default: []
+        }
+    }
+
     var icon: String {
         switch self {
             case .general: "gearshape"
@@ -124,10 +144,17 @@ struct ShortcutSettingsView: View {
     @ObservedObject var rules: SettingsWindowRulesModel
     @AppStorage("settings.selectedPage") private var storedPage = SettingsSidebarItem.general.rawValue
     @State private var shortcutSearch = ""
+    @State private var settingsSearch = ""
+    @State private var searchTarget: SettingsSearchDestination?
+    @State private var showsAdvanced = false
 
     private var selectedItem: SettingsSidebarItem? {
         get { SettingsSidebarItem.restored(storedPage) }
-        nonmutating set { if let newValue { storedPage = newValue.rawValue } }
+        nonmutating set {
+            guard let newValue else { return }
+            searchTarget = nil
+            storedPage = newValue.rawValue
+        }
     }
     private var selection: Binding<SettingsSidebarItem?> {
         Binding(get: { selectedItem }, set: { selectedItem = $0 })
@@ -136,13 +163,54 @@ struct ShortcutSettingsView: View {
     private let sidebarItems: [SettingsSidebarItem] = [.general, .workspaces, .displays, .windows, .sidebar, .appearance, .shortcuts, .automation, .configuration]
 
     var body: some View {
+        let hasSearchQuery = !settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let controlResults = settingsControlSearchResults(settingsSearch)
+        let matchingPages = sidebarItems.filter { $0.matchesSearch(settingsSearch) }
+
         NavigationSplitView {
             List(selection: selection) {
-                ForEach(sidebarItems) { item in
-                    NavigationLink(value: item) {
-                        Label(item.label, systemImage: item.icon)
+                if hasSearchQuery {
+                    Section("Settings") {
+                        ForEach(controlResults) { result in
+                            Button {
+                                selectedItem = result.page
+                                searchTarget = SettingsSearchDestination(id: result.id)
+                            } label: {
+                                VStack(alignment: .leading) {
+                                    Text(result.title)
+                                    Text(result.page.label).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
+                Section("Everyday") {
+                    ForEach(matchingPages.filter { !$0.isAdvanced }) { item in
+                        NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                    }
+                }
+                if !hasSearchQuery {
+                    DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
+                        ForEach(sidebarItems.filter(\.isAdvanced)) { item in
+                            NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                        }
+                    }
+                } else {
+                    Section("Advanced") {
+                        ForEach(matchingPages.filter(\.isAdvanced)) { item in
+                            NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                        }
+                    }
+                    if matchingPages.isEmpty && controlResults.isEmpty {
+                        Text("No matching settings pages").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .searchable(text: $settingsSearch, placement: .sidebar, prompt: "Find settings")
+            .onAppear { showsAdvanced = selectedItem?.isAdvanced == true }
+            .onChange(of: storedPage) { _ in
+                if selectedItem?.isAdvanced == true { showsAdvanced = true }
             }
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 220)
@@ -176,6 +244,8 @@ struct ShortcutSettingsView: View {
                 }
             }
 
+            .environment(\.settingsSearchTarget, searchTarget)
+            .onChange(of: settingsSearch) { _ in searchTarget = nil }
             .navigationTitle(selectedItem?.label ?? "")
         }
     }

@@ -45,6 +45,8 @@ func handleWorkspaceSidebarAction(
             focusWorkspaceFromSidebar(name, targetMonitorScopeId: targetMonitorScopeId)
         case .overrideWorkspaceInUse(let name):
             overrideWorkspaceInUseFromSidebar(name, targetMonitorScopeId: targetMonitorScopeId)
+        case .moveWorkspaceToDisplay(let name, let displayUUID):
+            moveWorkspaceToDisplayFromSidebar(name, displayUUID: displayUUID)
         case .selectWindow(let windowId):
             focusWindowFromSidebar(windowId)
         case .selectProject(let projectId):

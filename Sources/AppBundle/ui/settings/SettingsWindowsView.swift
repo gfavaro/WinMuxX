@@ -39,6 +39,7 @@ struct ShortcutBehaviorSettingsView: View {
             learnedMinimumsSection
             fitDiagnosticsSection
             SettingsSection("Default layout") {
+                SettingsLayoutPreviews()
                 SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
                     Text("Master").tag(Layout.master)
@@ -259,4 +260,43 @@ private func minimumSizeDescription(_ size: CGSize) -> String {
     let width = size.width == 0 ? "?" : String(Int(size.width.rounded()))
     let height = size.height == 0 ? "?" : String(Int(size.height.rounded()))
     return "\(width) × \(height)"
+}
+
+private struct SettingsLayoutPreviews: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 20) {
+            preview("Dwindle", description: "Each new window splits the focused area.", master: false)
+            preview("Master", description: "One main window with the others beside it.", master: true)
+        }
+    }
+
+    private func tile(_ number: Int) -> some View {
+        RoundedRectangle(cornerRadius: 4)
+            .fill(Color.accentColor.opacity(0.15))
+            .overlay(Text("\(number)").font(.caption).foregroundStyle(.primary))
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor.opacity(0.5)))
+    }
+
+    private func preview(_ title: String, description: String, master: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            GeometryReader { geometry in
+                HStack(spacing: 4) {
+                    tile(1).frame(width: geometry.size.width * (master ? 0.6 : 0.5) - 2)
+                    VStack(spacing: 4) {
+                        tile(2)
+                        if master { tile(3) }
+                        else { HStack(spacing: 4) { tile(3); tile(4) } }
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            .frame(height: 76)
+            .accessibilityHidden(true)
+            Text(title).font(.headline)
+            Text(description).font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
 }

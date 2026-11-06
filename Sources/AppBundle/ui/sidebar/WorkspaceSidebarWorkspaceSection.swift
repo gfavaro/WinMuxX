@@ -77,6 +77,20 @@ struct WorkspaceSidebarWorkspaceSection: View {
             .opacity(compactFocusOpacity)
             .contentShape(Rectangle())
             .contextMenu {
+                if let display = workspace.monitorName, !display.isEmpty {
+                    Text("Assigned display: \(display)")
+                }
+                if allowsWorkspaceActivation && sortedMonitors.count > 1 {
+                    Menu("Move to Display") {
+                        ForEach(Array(sortedMonitors.enumerated()), id: \.offset) { _, monitor in
+                            Button(monitor.name) {
+                                actions.send(.moveWorkspaceToDisplay(workspace.name,
+                                    displayUUID: monitor.displayUUID))
+                            }
+                        }
+                    }
+                    Divider()
+                }
                 if allowsWorkspaceActivation && (isFromOtherDisplay || isInUseOnOtherDisplay) {
                     Button("Bring Here") {
                         actions.send(.overrideWorkspaceInUse(workspace.name))
@@ -321,10 +335,9 @@ extension WorkspaceSidebarWorkspaceSection {
             }
     }
 
-    /// The display showing this workspace when it is not this one.
+    /// The owning display, including when the workspace is hidden.
     var shownOnDisplayName: String? {
-        guard isShownOnOtherDisplay else { return nil }
-        return workspace.monitorName.flatMap { $0.isEmpty ? nil : $0 } ?? "another display"
+        workspace.monitorName.flatMap { $0.isEmpty ? nil : $0 }
     }
 
     var workspaceBadgeText: String {
@@ -655,6 +668,6 @@ private extension View {
     /// Every button that activates a workspace speaks its full name and focus, in compact and expanded layouts.
     func workspaceAccessibility(name: String, isFocused: Bool, shownOn display: String?) -> some View {
         accessibilityLabel(name).accessibilityAddTraits(isFocused ? .isSelected : [])
-            .accessibilityValue(display.map { "Shown on \($0)" } ?? "")
+            .accessibilityValue(display.map { "Assigned to \($0)" } ?? "")
     }
 }
