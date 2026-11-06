@@ -34,7 +34,7 @@ final class DoubleSidedWindowController {
             : placeholderWindowFlipImages(front: frontId, back: backId, rect: rect, padding: padding, monitor: window.nodeMonitor ?? mainMonitor)
         preparation.begin(capture: {
             if let placeholders { return placeholders }
-            return try await WindowFlipCapture.shared.capture(front: frontId, back: backId, rect: bounds, padding: padding)
+            return try await captureWindowFlipImages(front: frontId, back: backId, rect: bounds, padding: padding)
         }) { [weak self, weak window, weak other, weak group] images in
             guard let self, let window, let other, let group, TrayMenuModel.shared.isEnabled,
                   group.usesDoubleSidedWindows, group.tabActiveWindow === window,

@@ -60,32 +60,35 @@ final class WindowFlipPreparation {
     isolated deinit { work?.cancel(); deadline?.cancel() }
 }
 
-actor WindowFlipCapture {
-    static let shared = WindowFlipCapture()
-
-    func capture(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) throws -> WindowFlipImages {
-        try Task.checkCancellation()
-        let first = try image(rect: .null, options: .optionIncludingWindow, id: front, trim: true)
-        try Task.checkCancellation()
-        let second = try image(rect: .null, options: .optionIncludingWindow, id: back, trim: true)
-        try Task.checkCancellation()
-        let background = try image(rect: rect.insetBy(dx: -padding, dy: -padding),
-            options: .optionOnScreenBelowWindow, id: front, trim: false)
-        try Task.checkCancellation()
-        return WindowFlipImages(front: first, back: second, background: background)
+/// Runs in the shared capture queue, so a flip never captures alongside a swipe or the overview.
+func captureWindowFlipImages(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) async throws -> WindowFlipImages {
+    try await WorkspaceSwipeSnapshotRenderer.shared.captureGate.run {
+        try windowFlipImages(front: front, back: back, rect: rect, padding: padding)
     }
+}
 
-    private func image(rect: CGRect, options: CGWindowListOption, id: UInt32, trim: Bool) throws -> CGImage {
-        try autoreleasepool {
-            guard var image = CGWindowListCreateImage(rect, options, id, [.boundsIgnoreFraming, .nominalResolution]) else {
-                throw CocoaError(.fileReadUnknown)
-            }
-            if trim, image.width > 2, image.height > 2,
-               let cropped = image.cropping(to: CGRect(x: 1, y: 1, width: image.width - 2, height: image.height - 2)) {
-                image = cropped
-            }
-            return try boundedWindowFlipImage(image)
+private func windowFlipImages(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) throws -> WindowFlipImages {
+    try Task.checkCancellation()
+    let first = try image(rect: .null, options: .optionIncludingWindow, id: front, trim: true)
+    try Task.checkCancellation()
+    let second = try image(rect: .null, options: .optionIncludingWindow, id: back, trim: true)
+    try Task.checkCancellation()
+    let background = try image(rect: rect.insetBy(dx: -padding, dy: -padding),
+        options: .optionOnScreenBelowWindow, id: front, trim: false)
+    try Task.checkCancellation()
+    return WindowFlipImages(front: first, back: second, background: background)
+}
+
+private func image(rect: CGRect, options: CGWindowListOption, id: UInt32, trim: Bool) throws -> CGImage {
+    try autoreleasepool {
+        guard var image = CGWindowListCreateImage(rect, options, id, [.boundsIgnoreFraming, .nominalResolution]) else {
+            throw CocoaError(.fileReadUnknown)
         }
+        if trim, image.width > 2, image.height > 2,
+           let cropped = image.cropping(to: CGRect(x: 1, y: 1, width: image.width - 2, height: image.height - 2)) {
+            image = cropped
+        }
+        return try boundedWindowFlipImage(image)
     }
 }
 
