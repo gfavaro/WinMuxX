@@ -454,6 +454,111 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         }
     }
 
+    /// B on the ultrawide: its fixture window, a two-tab group whose second tab is active,
+    /// a tiled window with uneven ratios, and a floating window.
+    private func furnishUltrawideWorkspace() {
+        let root = spaces[1].rootTilingContainer
+        let tabs = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .v, .tabGroup, index: INDEX_BIND_LAST)
+        TestWindow.new(id: 920, parent: tabs)
+        TestWindow.new(id: 921, parent: tabs).markAsMostRecentChild()
+        TestWindow.new(id: 922, parent: root)
+        root.dwindleChildRatios = [0.2, 0.5, 0.3]
+        TestWindow.new(id: 923, parent: spaces[1])
+    }
+
+    private func treeShape(_ node: TreeNode) -> String {
+        switch node.nodeCases {
+            case .window(let window): return "w\(window.windowId)"
+            case .tilingContainer(let container):
+                let active = container.layout == .tabGroup ? " active=\(container.tabActiveWindow?.windowId ?? 0)" : ""
+                return "\(container.layout)/\(container.orientation)\(active) \(container.dwindleChildRatios ?? [])(" +
+                    container.children.map(treeShape).joined(separator: ",") + ")"
+            default: return "?"
+        }
+    }
+
+    private func ultrawideShape() -> String {
+        let workspace = Workspace.existing(byName: spaces[1].name)
+        return (workspace.map { treeShape($0.rootTilingContainer) } ?? "missing") +
+            " floating=\(workspace?.floatingWindows.map(\.windowId).sorted() ?? [])"
+    }
+
+    private func unplugAndReplug(_ connected: [TestMonitor], whileUnplugged: () -> Void = {}) {
+        setMonitorsForTests(connected.enumerated().filter { $0.offset != 1 }.map(\.element))
+        retireDisconnectedViewports()
+        Workspace.reconcileWorkspaceState()
+        whileUnplugged()
+        setMonitorsForTests(connected)
+        Workspace.reconcileWorkspaceState()
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+    }
+
+    func testUnplugAndReplugKeepTheUltrawideWorkspacesTreeTabsAndRatios() {
+        furnishUltrawideWorkspace()
+        let connected = identifiedDisplays()
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        let before = ultrawideShape()
+        unplugAndReplug(connected)
+        XCTAssertEqual(connected[1].activeWorkspace.name, spaces[1].name)
+        XCTAssertEqual(ultrawideShape(), before)
+        XCTAssertEqual(connected[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(connected[2].activeWorkspace, spaces[4])
+    }
+
+    func testWindowsMissingAcrossUnplugReturnInAnyOrderToTheSameTree() async throws {
+        for order: [UInt32] in [[920, 921, 922, 923], [923, 922, 921, 920]] {
+            fixture.cleanUp()
+            fixture = WorkspaceNavigationFixture()
+            resetClosedWindowsCache()
+            defer { resetClosedWindowsCache() }
+            furnishUltrawideWorkspace()
+            let connected = identifiedDisplays()
+            setMonitorsForTests(connected)
+            rearrangeWorkspacesOnMonitors()
+            let before = ultrawideShape()
+            XCTAssertTrue(before.contains("active=921") && before.contains("0.2") && before.contains("floating=[923]"), before)
+            // Sleep: AX loses B's windows after the world was cached; then the ultrawide is unplugged.
+            replaceClosedWindowsCache(snapshotCurrentFrozenWorld())
+            for id in order { Window.get(byId: id)?.unbindFromParent() }
+            unplugAndReplug(connected)
+            for id in order {
+                let returned = TestWindow.new(id: id, parent: focus.workspace.rootTilingContainer)
+                let restored = try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: returned)
+                XCTAssertTrue(restored, "\(id) in \(order)")
+            }
+            XCTAssertEqual(ultrawideShape(), before, "order \(order)")
+            XCTAssertEqual(connected[1].activeWorkspace.name, spaces[1].name, "order \(order)")
+        }
+    }
+
+    func testUnplugOfTheMainUltrawideKeepsItsWorkspaceForItsReturn() {
+        furnishUltrawideWorkspace()
+        let connected = identifiedDisplays().enumerated().map { index, display -> TestMonitor in
+            var monitor = TestMonitor(monitorAppKitNsScreenScreensId: display.monitorAppKitNsScreenScreensId, name: display.name,
+                                      rect: display.rect, visibleRect: display.visibleRect, isMain: index == 1)
+            monitor.displayUUID = display.displayUUID
+            return monitor
+        }
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        let before = ultrawideShape()
+        let laptopMain = TestMonitor(monitorAppKitNsScreenScreensId: connected[0].monitorAppKitNsScreenScreensId,
+                                     name: connected[0].name, rect: connected[0].rect, visibleRect: connected[0].visibleRect, isMain: true)
+        var laptop = laptopMain
+        laptop.displayUUID = connected[0].displayUUID
+        setMonitorsForTests([laptop, connected[2]])
+        retireDisconnectedViewports()
+        Workspace.reconcileWorkspaceState()
+        XCTAssertFalse(spaces[1].isVisible)
+        XCTAssertEqual(spaces[1].workspaceMonitor.rect.topLeftCorner, laptop.rect.topLeftCorner, "Hidden on the new main display")
+        setMonitorsForTests(connected)
+        Workspace.reconcileWorkspaceState()
+        checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
+        XCTAssertEqual(connected[1].activeWorkspace.name, spaces[1].name)
+        XCTAssertEqual(ultrawideShape(), before)
+    }
+
     func testReconnectedDisplayShowsItsWorkspaceAgainEvenWhenRearranged() {
         for secondaryX: Double in [1920, 5760] {
             fixture.cleanUp()
