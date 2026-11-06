@@ -137,6 +137,10 @@ moves. `Workspace.assignedMonitor` is the ownership lookup; `workspaceMonitor` a
 a fallback for unassigned slots. Selection preserves ownership. Explicit moves
 invalidate recovery state and replace secondary slots, returning displaced owners
 to main without activating them. Startup/restoration only seed ownership.
+A configured assignment overrides all of these while its display is connected
+(`Workspace.forceAssignedMonitor`, virtual backend only): showing the workspace
+elsewhere is refused at `CGPoint.setActiveWorkspace`, fallbacks and new automatic
+names skip it, and reconciliation moves one showing elsewhere to its display.
 
 `WorkspaceGestureCoordinator` owns raw-touch lifecycle and axis routing wiring.
 `DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events instead of

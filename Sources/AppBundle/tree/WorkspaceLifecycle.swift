@@ -25,7 +25,7 @@ func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor
 
 @MainActor
 func createBlankWorkspace(projectId: WorkspaceProjectId, monitor: Monitor) -> Workspace {
-    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName())
+    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName(for: monitor))
     workspace.markAsTransientBlank()
     workspace.assignProject(projectId)
     workspace.seedMonitorIfNeeded(monitor)
@@ -90,8 +90,9 @@ func closestWorkspaceForDeletion(
         focusedWorkspace: focus.workspace,
     )
         // A workspace showing on another display cannot take this one's place: activating
-        // it here is refused, which crashed deletion (WinMux issue #45).
-        .filter { $0 === workspace || !runtime.workspaces.isWorkspaceActive($0.id, outside: MonitorViewportId(monitor)) }
+        // it here is refused, which crashed deletion (WinMux issue #45). So is one assigned elsewhere.
+        .filter { $0 === workspace || !runtime.workspaces.isWorkspaceActive($0.id, outside: MonitorViewportId(monitor)) &&
+            !isAssignedElsewhere($0.name, than: monitor) }
     let automaticCandidates = scopedCandidates.filter(\.usesAutomaticDisplayName)
     let candidates = workspace.usesAutomaticDisplayName && automaticCandidates.contains(workspace)
         ? automaticCandidates

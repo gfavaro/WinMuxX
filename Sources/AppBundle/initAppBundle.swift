@@ -88,9 +88,9 @@ import Foundation
 
 /// Startup placement is separate from display ownership during normal switching.
 /// A restored world already says which workspace each display shows, so it is kept unless
-/// `start-workspaces-on-main-monitor` discards it. Otherwise `workspace-to-monitor-force-assignment`
-/// takes effect here: each assigned workspace that exists starts on its display, and
-/// afterwards the user may show any workspace on any display.
+/// `start-workspaces-on-main-monitor` discards it. Otherwise each existing workspace that
+/// `workspace-to-monitor-force-assignment` places on a secondary display starts showing there.
+/// The assignment itself holds at all times; see `Workspace.forceAssignedMonitor`.
 @MainActor
 func applyStartupWorkspacePlacement(restoredWorld: Bool) {
     guard !restoredWorld || config.startWorkspacesOnMainMonitor else { return }

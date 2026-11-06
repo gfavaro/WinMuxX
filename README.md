@@ -508,15 +508,16 @@ workspace returns to main, hidden and reachable by shortcuts or swipes. Main can
 multiple workspaces; each secondary is replaced by the explicitly brought workspace.
 Reconciliation also returns hidden secondary assignments to main after restoration
 or display changes, keeping only the visible workspace on each secondary.
-Forced assignments do not limit this: with WinMuxX workspaces they only place each
-existing workspace on its display at a launch that does not restore a saved arrangement. The source gets a local fallback or empty workspace;
-other displays keep their current workspace.
+The source gets a local fallback or empty workspace; other displays keep their current
+workspace. Forced assignments (`workspace-to-monitor-force-assignment`) work as in
+AeroSpace: while its display is connected, an assigned workspace shows only there,
+selecting it from any display shows it there, and moving it elsewhere is refused.
 
 At launch, display ownership is restored by default, and assignments do not override it. Enable **Settings → General →
 Startup → Start workspaces on main display** (`start-workspaces-on-main-monitor = true`)
 to start existing workspaces on main instead. Secondary displays receive empty
-workspaces. Forced assignments then place each assigned workspace on its display,
-once; **Automation → After startup**
+workspaces. Each secondary display then shows its assigned workspace, if any;
+**Automation → After startup**
 can run existing `move-workspace-to-monitor` commands for optional startup placement.
 The toggle only affects launch, not configuration reloads or normal switching.
 

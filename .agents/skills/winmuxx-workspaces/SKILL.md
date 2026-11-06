@@ -11,7 +11,9 @@ Read [core principles](../../../docs/PRINCIPLES.md) and the ownership section in
 Trace the requested action from its command or sidebar adapter into
 `Sources/AppBundle/tree/WorkspaceMonitorAssignment.swift`. Distinguish ordinary
 selection, explicit relocation, configured assignment and startup restoration.
-An already-owned hidden workspace also retains its display during selection.
+An already-owned hidden workspace also retains its display during selection. A
+configured assignment overrides ownership while its display is connected, as in
+AeroSpace: selection shows it there and moves elsewhere are refused.
 
 ## Current behavior and entry points
 

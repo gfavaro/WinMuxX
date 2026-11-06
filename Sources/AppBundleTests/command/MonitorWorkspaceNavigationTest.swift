@@ -37,14 +37,43 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(displays.map { $0.activeWorkspace.id }, visibleBefore)
     }
 
-    func testSecondaryRepairAppliesToAnAssignedWorkspaceOnceHidden() {
+    func testAHiddenAssignedWorkspaceKeepsItsSecondaryDisplay() {
         config.workspaceToMonitorForceAssignment = [spaces[2].name: [.sequenceNumber(2)]]
         spaces[2].preferredMonitorPoint = displays[1].rect.topLeftCorner
         reconcileSecondaryWorkspaceAssignments()
-        XCTAssertEqual(spaces[2].assignedMonitor?.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertEqual(spaces[2].assignedMonitor?.rect.topLeftCorner, displays[1].rect.topLeftCorner)
+        XCTAssertFalse(spaces[2].isVisible)
     }
 
-    func testStartupShowsAnAssignedWorkspaceOnceAndTheUserCanReplaceIt() async throws {
+    func testAnAssignedWorkspaceOpensOnItsDisplayFromAnyDisplay() async throws {
+        config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(3)]]
+        try await run("workspace 3")
+        XCTAssertEqual(displays.map(\.activeWorkspace), [spaces[0], spaces[1], spaces[2]])
+        XCTAssertEqual(focus.workspace, spaces[2])
+        XCTAssertFalse(spaces[4].isVisible)
+    }
+
+    func testAnAssignedWorkspaceShowingElsewhereMovesToItsDisplay() {
+        XCTAssertTrue(spaces[1].focusWorkspace())
+        config.workspaceToMonitorForceAssignment = ["2": [.sequenceNumber(3)]]
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertFalse(spaces[1].isEffectivelyEmpty)
+        XCTAssertTrue(displays[1].activeWorkspace.isEffectivelyEmpty, "The display it left gets a fallback")
+        XCTAssertFalse(spaces[4].isVisible)
+        XCTAssertEqual(focus.workspace, spaces[1], "Focus follows the workspace")
+        Workspace.reconcileWorkspaceState()
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[1])
+    }
+
+    func testAnAssignmentToADisconnectedDisplayConstrainsNothing() async throws {
+        config.workspaceToMonitorForceAssignment = ["2": [.sequenceNumber(4)]]
+        try await run("move-workspace-to-monitor 3 --workspace 2")
+        XCTAssertEqual(displays[2].activeWorkspace, spaces[1])
+    }
+
+    func testStartupShowsAnAssignedWorkspaceWhichStaysOnItsDisplay() async throws {
         config.startWorkspacesOnMainMonitor = false
         config.workspaceToMonitorForceAssignment = ["5": [.sequenceNumber(2)]]
         applyStartupWorkspacePlacement(restoredWorld: false)
@@ -53,13 +82,22 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[0])
 
         try await run("move-workspace-to-monitor 2 --workspace 2")
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
-        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[1], "Another workspace may replace it")
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
         Workspace.reconcileWorkspaceState()
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1], "Nothing after startup reapplies the assignment")
-        try await run("workspace 5")
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[4], "Ordinary selection shows it on its owner, main")
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        try await run("workspace 5")
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[4], "Ordinary selection shows it on its assigned display")
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+
+        let result = try await parseCommand("move-workspace-to-monitor 1 --workspace 5").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertNotEqual(result.exitCode, 0)
+        XCTAssertTrue(result.stderr.joined().contains("workspace-to-monitor-force-assignment doesn't allow it"))
+        XCTAssertEqual(displays.map(\.activeWorkspace), [spaces[0], spaces[4], displays[2].activeWorkspace])
+        XCTAssertTrue(focusWorkspaceFromSidebar(spaces[0]))
+        let summon = try await parseCommand("summon-workspace 5").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        XCTAssertNotEqual(summon.exitCode, 0)
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[4])
     }
 
     func testSwipePreviewTargetSelectionDoesNotChangeAnyViewport() {
@@ -188,11 +226,13 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[2].rect.topLeftCorner)
     }
 
-    func testARestoredWorldKeepsItsDisplaysDespiteAssignments() {
+    func testARestoredWorldKeepsItsDisplaysWhereAssignmentsAllow() {
         config.startWorkspacesOnMainMonitor = false
         config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(2)]]
         applyStartupWorkspacePlacement(restoredWorld: true)
+        Workspace.reconcileWorkspaceState()
         XCTAssertEqual(displays.map(\.activeWorkspace), [spaces[0], spaces[1], spaces[4]])
+        XCTAssertEqual(spaces[2].workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
         XCTAssertEqual(focus.workspace, spaces[0])
     }
 
@@ -237,7 +277,7 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         applyStartupWorkspacePlacement(restoredWorld: false)
         XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
         XCTAssertFalse(spaces[4].isVisible)
-        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[1].rect.topLeftCorner)
         XCTAssertTrue(displays[2].activeWorkspace.isEffectivelyEmpty)
     }
 
@@ -364,10 +404,11 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         }
     }
 
-    func testRelativeNavigationIncludesAssignedWorkspaces() async throws {
+    func testRelativeNavigationSkipsAWorkspaceAssignedToAnotherDisplay() async throws {
         config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(2)]]
         try await run("workspace next")
-        XCTAssertEqual(focus.workspace, spaces[2])
+        XCTAssertEqual(focus.workspace, spaces[3])
+        XCTAssertFalse(spaces[2].isVisible)
     }
 
     func testSidebarFocusesWorkspaceOnItsExistingDisplay() {
@@ -407,12 +448,12 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[1])
     }
 
-    func testAssignedHiddenWorkspaceActivatesOnItsOwner() async throws {
+    func testAssignedHiddenWorkspaceActivatesOnItsAssignedDisplay() async throws {
         config.workspaceToMonitorForceAssignment = ["3": [.sequenceNumber(2)]]
         let result = try await parseCommand("workspace --name 3").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0)
-        XCTAssertEqual(displays[0].activeWorkspace, spaces[2])
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
+        XCTAssertEqual(displays[0].activeWorkspace, spaces[0])
+        XCTAssertEqual(displays[1].activeWorkspace, spaces[2])
         XCTAssertEqual(focus.workspace, spaces[2])
     }
 
@@ -683,13 +724,14 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         XCTAssertEqual(focus.workspace, spaces[0])
     }
 
-    func testOverrideUsesThirdDisplayDespiteAnAssignmentElsewhere() {
+    func testOverrideRefusesToMoveAWorkspaceAssignedElsewhere() {
         config.workspaceToMonitorForceAssignment = ["1": [.sequenceNumber(1)]]
-        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[0], targetMonitor: displays[2]))
-        XCTAssertEqual(displays[2].activeWorkspace, spaces[0])
-        XCTAssertEqual(displays[1].activeWorkspace, spaces[1])
-        XCTAssertFalse(spaces[4].isVisible)
-        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[0].rect.topLeftCorner)
+        let before = displays.map(\.activeWorkspace)
+        XCTAssertFalse(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[0], targetMonitor: displays[2]))
+        XCTAssertEqual(displays.map(\.activeWorkspace), before)
+        XCTAssertEqual(spaces[4].workspaceMonitor.rect.topLeftCorner, displays[2].rect.topLeftCorner)
+        XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(spaces[1], targetMonitor: displays[2]),
+                      "Unassigned workspaces still move")
     }
 
 }

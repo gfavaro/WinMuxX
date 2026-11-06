@@ -85,7 +85,7 @@ extension WorkspaceNamingTest {
         XCTAssertTrue(secondary.activeWorkspace !== projectWorkspace)
     }
 
-    func testConfiguredAssignmentDoesNotRestrictDisplaysAfterStartup() {
+    func testConfiguredAssignmentKeepsAWorkspaceOffOtherDisplays() {
         let main = WorkspaceNamingTestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -104,11 +104,12 @@ extension WorkspaceNamingTest {
         config.workspaceToMonitorForceAssignment["forced"] = [.sequenceNumber(2)]
         let workspace = Workspace.get(byName: "forced")
 
-        XCTAssertTrue(main.setActiveWorkspace(workspace), "Only startup places an assigned workspace")
-        XCTAssertTrue(main.activeWorkspace === workspace)
+        XCTAssertFalse(main.setActiveWorkspace(workspace))
+        XCTAssertFalse(main.activeWorkspace === workspace)
+        XCTAssertTrue(secondary.setActiveWorkspace(workspace))
     }
 
-    func testReconcileLeavesAnAssignedWorkspaceWhereItIsShown() {
+    func testReconcileMovesAnAssignedWorkspaceToItsDisplay() {
         let main = WorkspaceNamingTestMonitor(
             monitorAppKitNsScreenScreensId: 1,
             name: "Main",
@@ -131,8 +132,8 @@ extension WorkspaceNamingTest {
 
         Workspace.reconcileWorkspaceState()
 
-        XCTAssertTrue(main.activeWorkspace === workspace, "A reload or topology change does not reapply the assignment")
-        XCTAssertFalse(secondary.activeWorkspace === workspace)
+        XCTAssertTrue(secondary.activeWorkspace === workspace, "A reload or topology change reapplies the assignment")
+        XCTAssertFalse(main.activeWorkspace === workspace)
     }
 
     func testGcMonitorsReconcilesChangedMonitorPointsWithSameMonitorCount() {

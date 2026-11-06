@@ -148,7 +148,7 @@ struct SettingsDisplaysView: View {
                         pendingMove = (workspace, selectedDisplay, row.activeWorkspace, row.name)
                         confirmsMove = true
                     }.disabled(workspace.isEmpty || selectedDisplay == nil)
-                    SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. Saved assignments are unchanged.")
+                    SettingsDescription("Moves this workspace now. A secondary display keeps one workspace; its previous workspace returns to main. A workspace with a saved assignment stays on its display.")
                 }
             }
             SettingsSection("Configured assignments") {
@@ -168,7 +168,7 @@ struct SettingsDisplaysView: View {
                     }
                 }
                 assignmentEditor
-                SettingsDescription("Saved assignments place each workspace on its display when WinMuxX starts without a saved arrangement to restore, or with Start workspaces on main display. Afterwards you can show any workspace on any display; nothing reapplies them until the next launch. Native Spaces also use them to choose where new desktops are created.")
+                SettingsDescription("An assigned workspace always shows on its display while that display is connected, as in AeroSpace. Moving it elsewhere is refused, and one showing elsewhere moves back. When WinMuxX starts without a saved arrangement, or with Start workspaces on main display, each secondary display shows its first assigned workspace. Native Spaces use assignments only to choose where new desktops are created.")
                 Button("Startup options…", action: onGeneral)
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }

@@ -9,7 +9,8 @@ func focusWorkspaceFromSidebar(_ workspaceName: String, targetMonitorScopeId: St
     runWorkspaceSidebarSession {
         guard let workspace = Workspace.existing(byName: workspaceName) else { return }
         if !focusWorkspaceFromSidebar(workspace, targetMonitorScopeId: targetMonitorScopeId) {
-            showWorkspaceSidebarError("Monitor assignment prevents activating this workspace")
+            let assigned = workspace.forceAssignedMonitor.map { " to \($0.name)" } ?? ""
+            showWorkspaceSidebarError("This workspace is assigned\(assigned) in Settings › Displays, so it stays there.")
         }
     }
 }
@@ -67,7 +68,8 @@ func overrideWorkspaceInUseFromSidebar(_ workspaceName: String, targetMonitorSco
               let targetMonitor = workspaceSidebarMonitor(forScopeId: targetMonitorScopeId)
         else { return }
         if !activateWorkspaceOnMonitorPreservingSourceViewport(workspace, targetMonitor: targetMonitor) {
-            showWorkspaceSidebarError("Monitor assignment prevents activating this workspace")
+            let assigned = workspace.forceAssignedMonitor.map { " to \($0.name)" } ?? ""
+            showWorkspaceSidebarError("This workspace is assigned\(assigned) in Settings › Displays, so it stays there.")
         } else {
             _ = workspace.focusWorkspace()
         }

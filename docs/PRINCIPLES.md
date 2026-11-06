@@ -20,7 +20,8 @@ positions; the organization of the work should survive.
 
 Ordinary selection preserves display ownership, including for hidden workspaces.
 Selecting a workspace visible on another display focuses it there. Explicit move
-and summon actions change ownership. Configured assignments only place workspaces at startup.
+and summon actions change ownership. A configured assignment (`workspace-to-monitor-force-assignment`)
+holds while its display is connected, as in AeroSpace: the workspace shows only there, and moves elsewhere are refused.
 The sidebar's existing bring-here confirmation is an explicit relocation path.
 Do not make ordinary navigation silently exchange workspaces between displays.
 

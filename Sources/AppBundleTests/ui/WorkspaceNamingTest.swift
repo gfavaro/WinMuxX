@@ -202,12 +202,30 @@ final class WorkspaceNamingTest: XCTestCase {
         thirdRaw.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 209, parent: thirdRaw.rootTilingContainer)
 
-        XCTAssertEqual(nextAutomaticWorkspaceName(), "2")
+        XCTAssertEqual(nextAutomaticWorkspaceName(for: mainMonitor), "2")
     }
 
-    func testConfiguredAssignmentDoesNotReserveAWorkspaceName() {
+    func testAnAssignmentReservesItsNameOnlyForOtherDisplaysWhileItsDisplayIsConnected() {
         config.workspaceToMonitorForceAssignment["1"] = [.sequenceNumber(2)]
-        XCTAssertEqual(nextAutomaticWorkspaceName(), "1", "Assignments only place a workspace at startup")
+        XCTAssertEqual(nextAutomaticWorkspaceName(for: mainMonitor), "1", "Its display is not connected")
+        let main = WorkspaceNamingTestMonitor(
+            monitorAppKitNsScreenScreensId: 1,
+            name: "Left",
+            rect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 0, topLeftY: 0, width: 1920, height: 1080),
+            isMain: true,
+        )
+        let secondary = WorkspaceNamingTestMonitor(
+            monitorAppKitNsScreenScreensId: 2,
+            name: "Right",
+            rect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
+            visibleRect: Rect(topLeftX: 1920, topLeftY: 0, width: 1920, height: 1080),
+            isMain: false,
+        )
+        setMonitorsForTests([main, secondary])
+        defer { setMonitorsForTests(nil) }
+        XCTAssertEqual(nextAutomaticWorkspaceName(for: main), "2", "A fallback named 1 could not show on main")
+        XCTAssertEqual(nextAutomaticWorkspaceName(for: secondary), "1")
     }
 
     func testAutomaticNumericWorkspaceDisplayNamesCompactWithoutRenamingWorkspaceIds() {
@@ -395,7 +413,7 @@ final class WorkspaceNamingTest: XCTestCase {
         defaultWorkspace.markAsAutomaticallyNamed()
         _ = TestWindow.new(id: 12, parent: defaultWorkspace.rootTilingContainer)
         let project = createWorkspaceProject()
-        let projectWorkspace = Workspace.get(byName: nextAutomaticWorkspaceName())
+        let projectWorkspace = Workspace.get(byName: nextAutomaticWorkspaceName(for: mainMonitor))
         projectWorkspace.markAsAutomaticallyNamed()
         projectWorkspace.assignProject(project.id)
         projectWorkspace.seedMonitorIfNeeded(mainMonitor)

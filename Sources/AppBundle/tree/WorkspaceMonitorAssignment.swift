@@ -19,6 +19,7 @@ extension Monitor {
 
 // Selection preserves ownership; only explicit moves replace a secondary display's slot.
 // Startup/restoration may seed ownership, but never choose the destination for user input.
+// A configured assignment overrides both while its display is connected, as in AeroSpace.
 @MainActor
 func workspaceIsAvailableForMonitor(_ workspace: Workspace, monitor: Monitor) -> Bool {
     workspaceMonitorForUserActivation(workspace, on: monitor).rect.topLeftCorner == monitor.rect.topLeftCorner
@@ -72,9 +73,16 @@ func sidebarSelectionKeepsFocus(_ workspace: Workspace, on targetMonitor: Monito
 
 @MainActor
 /// `reserved` workspaces are never chosen to fill the display the workspace leaves.
+/// Fails without changes when configuration assigns the workspace to another display.
 func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, targetMonitor: Monitor, reserved: [Workspace] = []) -> Bool {
+    guard !isAssignedElsewhere(workspace.name, than: targetMonitor) else { return false }
     // A later AX recovery must not undo an explicit display move from any entry point.
     resetClosedWindowsCache()
+    return showWorkspacePreservingSourceViewport(workspace, on: targetMonitor, reserved: reserved)
+}
+
+@MainActor
+private func showWorkspacePreservingSourceViewport(_ workspace: Workspace, on targetMonitor: Monitor, reserved: [Workspace] = []) -> Bool {
     let sourceMonitor = workspace.isVisible ? workspace.workspaceMonitor : nil
     let sourceProjectId = workspace.projectId
     if let sourceMonitor,
@@ -96,14 +104,25 @@ func activateWorkspaceOnMonitorPreservingSourceViewport(_ workspace: Workspace, 
     return true
 }
 
-/// Secondary displays retain only their visible slot. Restoration, new slots and
-/// topology changes must follow the same rule as explicit monitor moves.
+/// Secondary displays retain only their visible slot, plus workspaces configuration assigns
+/// to them. Restoration, new slots and topology changes follow the same rule as explicit moves.
 @MainActor
 func reconcileSecondaryWorkspaceAssignments() {
     let mainPoint = mainMonitor.rect.topLeftCorner
-    for workspace in Workspace.all where !workspace.isVisible {
+    for workspace in Workspace.all where !workspace.isVisible && workspace.forceAssignedMonitor == nil {
         guard let assigned = workspace.assignedMonitor, assigned.rect.topLeftCorner != mainPoint else { continue }
         workspace.preferredMonitorPoint = mainPoint
+    }
+}
+
+/// An assigned workspace showing elsewhere, after a config edit, restoration or display
+/// change, moves to its display. Restart recovery stays valid: this is not a user move.
+@MainActor
+func showAssignedWorkspacesOnTheirDisplays() {
+    for workspace in Workspace.all {
+        guard let visible = workspace.visibleMonitor, let assigned = workspace.forceAssignedMonitor,
+              visible.rect.topLeftCorner != assigned.rect.topLeftCorner else { continue }
+        _ = showWorkspacePreservingSourceViewport(workspace, on: assigned)
     }
 }
 
@@ -116,7 +135,8 @@ extension CGPoint {
     @MainActor
     func setActiveWorkspace(_ workspace: Workspace) -> Bool {
         let viewportId = MonitorViewportId(topLeftCorner: self)
-        guard !runtime.workspaces.isWorkspaceActive(workspace.id, outside: viewportId) else {
+        guard !runtime.workspaces.isWorkspaceActive(workspace.id, outside: viewportId),
+              workspace.forceAssignedMonitor.map({ $0.rect.topLeftCorner == self }) != false else {
             return false
         }
         if let monitor = sortedMonitors.first(where: { $0.rect.topLeftCorner == self }),
@@ -235,6 +255,7 @@ func rearrangeWorkspacesOnMonitors() {
     }
 
     runtime.workspaces.monitorViewportsById = [:]
+    var assignedElsewhere: [Workspace] = []
 
     for newMonitor in newMonitors {
         defer { runtime.workspaces.monitorViewportsById[newMonitor]?.displayUUID = displayUUIDById[newMonitor] ?? nil }
@@ -261,6 +282,9 @@ func rearrangeWorkspacesOnMonitors() {
             runtime.workspaces.monitorViewportsById[newMonitor]?.previousWorkspaceId = preservedViewport?.previousWorkspaceId
             continue
         }
+        if let existingVisibleWorkspace, isAssignedElsewhere(existingVisibleWorkspace.name, than: newScreen.monitorApproximation) {
+            assignedElsewhere.append(existingVisibleWorkspace)
+        }
         let projectId = existingVisibleWorkspace?.projectId ?? workspaceProjectDefaultId
         let workspace = getOrCreateFallbackWorkspace(
             projectId: projectId,
@@ -269,6 +293,10 @@ func rearrangeWorkspacesOnMonitors() {
         )
         check(newScreen.setActiveWorkspace(workspace),
               "Generated incompatible fallback workspace (\(workspace)) for the display viewport (\(newScreen)")
+    }
+    // A workspace whose assignment now resolves to another display keeps showing, there.
+    for workspace in assignedElsewhere where !workspace.isVisible {
+        if let assigned = workspace.forceAssignedMonitor { _ = assigned.setActiveWorkspace(workspace) }
     }
 }
 

@@ -128,6 +128,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         }
         runtime.workspaces.pruneProjectWorkspaceIndexes()
         rearrangeWorkspacesOnMonitors()
+        showAssignedWorkspacesOnTheirDisplays()
         reconcileSecondaryWorkspaceAssignments()
         ensureMinimumWorkspaceForAllProjects()
         pruneEmptyWorkspaces()
@@ -226,7 +227,7 @@ extension Workspace {
     }
     @MainActor
     var assignedMonitor: Monitor? {
-        visibleMonitor ?? preferredMonitorPoint?.monitorApproximation
+        visibleMonitor ?? forceAssignedMonitor ?? preferredMonitorPoint?.monitorApproximation
     }
 
     @MainActor

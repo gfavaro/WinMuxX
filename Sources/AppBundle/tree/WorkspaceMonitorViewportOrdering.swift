@@ -65,7 +65,7 @@ func getOrCreateFallbackWorkspace(
     {
         return workspace
     }
-    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName())
+    let workspace = Workspace.get(byName: nextAutomaticWorkspaceName(for: monitor))
     workspace.markAsAutomaticallyNamed()
     workspace.assignProject(projectId)
     workspace.seedMonitorIfNeeded(monitor)
