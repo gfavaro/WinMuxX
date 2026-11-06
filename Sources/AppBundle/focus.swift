@@ -294,7 +294,7 @@ extension Workspace {
     runExecOnWorkspaceChange(new: newWorkspace, previous: oldWorkspace)
 }
 
-/// `exec-on-workspace-change`, shared by both backends.
+/// `exec-on-workspace-change`.
 @MainActor func runExecOnWorkspaceChange(new newWorkspace: String, previous oldWorkspace: String) {
     guard let exec = config.execOnWorkspaceChange.first else { return }
     let process = Process()

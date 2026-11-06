@@ -1,7 +1,7 @@
 @testable import AppBundle
 import XCTest
 
-final class NativeFrameRecoveryTest: XCTestCase {
+final class FrameRecoveryBudgetTest: XCTestCase {
     private let tile = Rect(topLeftX: 100, topLeftY: 50, width: 800, height: 600)
 
     func testRestingAllowsLargerWindowsAndRowSizedOnes() {

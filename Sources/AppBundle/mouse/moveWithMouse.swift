@@ -57,7 +57,7 @@ private func handleMovedEvent(windowId: UInt32?, notif: String) async {
     guard (try? await isManipulatedWithMouse(window)) == true else {
         moveWithMouseSessionWindowIdsInFlight.remove(windowId)
         moveWithMouseTrailingRerunWindowIds.remove(windowId)
-        VirtualFrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
+        FrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
         return
     }
     Task {

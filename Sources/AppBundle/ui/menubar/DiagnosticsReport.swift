@@ -207,7 +207,7 @@ private func separateSpacesDiagnosticSetting() -> String {
     return spans ? "off" : "on"
 }
 
-/// Both backends' doctor reports print these; the fork installer checks them.
+/// The doctor report prints these; the fork installer checks them.
 @MainActor
 func diagnosticsPermissionLines() -> [String] {
     ["Permissions:",

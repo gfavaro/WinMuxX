@@ -5,11 +5,9 @@ struct MoveNodeToMonitorCommand: Command {
     let args: MoveNodeToMonitorCmdArgs
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
-    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool { runVirtual(env, io) }
-
     /// Moves the node synchronously; `move` across monitors calls this directly.
     @MainActor
-    func runVirtual(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)

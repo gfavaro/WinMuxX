@@ -40,11 +40,6 @@ func workspaceProjectName(_ projectId: WorkspaceProjectId) -> String {
 }
 
 @MainActor
-func workspaceProjectDisplayName(_ projectId: WorkspaceProjectId, fallbackName: String) -> String {
-    workspaceProjects().first { $0.id == projectId }?.name ?? fallbackName
-}
-
-@MainActor
 func activeWorkspaceProjectId(for monitor: Monitor) -> WorkspaceProjectId {
     materializePersistedWorkspaceProjects()
     return runtime.workspaces.activeProjectId(for: monitor)

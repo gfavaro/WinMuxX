@@ -15,7 +15,7 @@ struct RetileCommand: Command {
         // A command's layout pass skips windows whose tile did not change; these are off it.
         for window in candidates { window.lastAppliedLayoutPhysicalRect = nil }
         let moved = candidates.count
-        VirtualFrameRecovery.shared.reset()
+        FrameRecovery.shared.reset()
         let message = moved == 0 ? "Nothing had moved" : "Put \(moved) \(moved == 1 ? "window" : "windows") back"
         NoticePanel.shared.show(title: "Retile", body: message, seconds: 1.5)
         return io.out(message)

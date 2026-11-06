@@ -590,7 +590,7 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
         if destroyedWindowId != nil { windowLifecycleChanges.notify() }
-        // Both backends: a sheet appearing or going away changes what scrolling reveals.
+        // A sheet appearing or going away changes what scrolling reveals.
         if let emittingAppPid,
            notif == kAXSheetCreatedNotification as String || notif == kAXFocusedWindowChangedNotification as String ||
             notif == kAXWindowCreatedNotification as String || notif == kAXUIElementDestroyedNotification as String {

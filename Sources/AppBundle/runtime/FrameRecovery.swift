@@ -1,12 +1,11 @@
 import AppKit
 
-/// An app's own move or resize of a
-/// tiled window is put back once the window has been still for a moment, within the
-/// window's `FrameRecoveryBudget`. Deciding only once the window is still is what lets a
+/// An app's own move or resize of a tiled window is put back once the window has been
+/// still for a moment, within the window's `FrameRecoveryBudget`. Deciding only once the window is still is what lets a
 /// fight be counted: putting it back at once kept the events coming forever.
 @MainActor
-final class VirtualFrameRecovery {
-    static let shared = VirtualFrameRecovery()
+final class FrameRecovery {
+    static let shared = FrameRecovery()
     private var budgets: [UInt32: FrameRecoveryBudget] = [:]
     private var pending: [UInt32: Task<Void, Never>] = [:]
     private let settleDelay: Duration = .milliseconds(150)
@@ -83,7 +82,7 @@ struct FrameRecoveryBudget {
 /// this, any other refresh's layout pass put it back and the fight went on.
 @MainActor
 func frameRecoveryLeavesAlone(_ window: Window, tile: Rect) -> Bool {
-    VirtualFrameRecovery.shared.leavesAlone(window.windowId, tile: tile)
+    FrameRecovery.shared.leavesAlone(window.windowId, tile: tile)
 }
 
 /// Whether a window sits on its tile. Apps that cannot shrink to it stay larger, and

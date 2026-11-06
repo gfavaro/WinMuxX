@@ -3,7 +3,7 @@ import Common
 import XCTest
 
 @MainActor
-final class VirtualFrameRecoveryTest: XCTestCase {
+final class FrameRecoveryTest: XCTestCase {
     private let tile = Rect(topLeftX: 100, topLeftY: 50, width: 800, height: 600)
     private let moved = CGRect(x: 400, y: 50, width: 800, height: 600)
     override func setUp() async throws { setUpWorkspacesForTests() }
@@ -16,7 +16,7 @@ final class VirtualFrameRecoveryTest: XCTestCase {
 
     func testAnAppThatKeepsMovingItsWindowIsLeftAlone() {
         let window = tiled()
-        let recovery = VirtualFrameRecovery()
+        let recovery = FrameRecovery()
         var frame = moved
         recovery.frame = { _ in frame }
         var putBacks = 0
@@ -31,7 +31,7 @@ final class VirtualFrameRecoveryTest: XCTestCase {
 
     func testANewTileOrRetileRenewsTheBudget() {
         let window = tiled()
-        let recovery = VirtualFrameRecovery()
+        let recovery = FrameRecovery()
         recovery.frame = { [moved] _ in moved }
         var putBacks = 0
         for _ in 0..<4 { recovery.settled(window.windowId) { putBacks += 1 } }
@@ -52,7 +52,7 @@ final class VirtualFrameRecoveryTest: XCTestCase {
         try await $refreshSessionEvent.withValue(.ax("test")) { try await workspace.layoutWorkspace() }
         let tile = try XCTUnwrap(window.lastAppliedLayoutPhysicalRect)
         let away = CGPoint(x: tile.topLeftX + 300, y: tile.topLeftY)
-        let recovery = VirtualFrameRecovery.shared
+        let recovery = FrameRecovery.shared
         defer { recovery.reset(); recovery.frame = windowServerFrame }
         recovery.frame = { _ in CGRect(origin: away, size: tile.size) }
         window.setAxFrame(away, nil) // Its app moves it.
@@ -69,7 +69,7 @@ final class VirtualFrameRecoveryTest: XCTestCase {
 
     func testWindowsWithoutATileRefreshAtOnce() {
         let window = TestWindow.new(id: 1, parent: focus.workspace)
-        let recovery = VirtualFrameRecovery()
+        let recovery = FrameRecovery()
         var putBacks = 0
         for _ in 0..<5 { recovery.windowChanged(window) { putBacks += 1 } }
         XCTAssertEqual(putBacks, 5)
