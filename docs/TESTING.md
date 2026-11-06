@@ -251,7 +251,7 @@ changing production command parsing. `make check` passed 1,026 Swift tests and
 13 Python tests. Volume policy tests cover steps, clamping, mute thresholds,
 toggle behavior and best-effort failures without changing system audio.
 
-The repository pin is Swift 6.4.0; local Apple Swift 6.4 is accepted as the same
+The repository pin is Swift 6.4.2, matching Xcode 27.2; local Apple Swift 6.4.2 is the same
 release number. Version-gate tests cover matching release forms, different minor
 and patch versions, unrecognized output and prerelease suffixes. SwiftPM checks
 now require the resolved versions before tests. The release build passes the
