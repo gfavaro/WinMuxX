@@ -23,7 +23,7 @@ func buildDiagnosticsReport() async -> String {
         io.out("    window \(window.windowId): width=\(minimum.width) height=\(minimum.height)pt (0 = unknown)")
     }
     let work = runtime.workMetrics.snapshot()
-    io.out("Runtime work measurements: \(runtime.workMetrics.isRecording ? "recording" : "off")")
+    io.out("Runtime work measurements: \(runtime.workMetrics.isRecording ? "recording" : "off (winmuxx debug-windows --events-start records AX queue waits)")")
     io.out("  Instrumented AX calls: \(work.operations.values.reduce(0, +)) (reads/writes only; direct AX paths are not all counted)")
     io.out("  AX failures: \(work.failures); bounded samples dropped: \(work.droppedSamples)")
     for (kind, samples) in work.durationsMilliseconds.sorted(by: { $0.key < $1.key }) where !samples.isEmpty {

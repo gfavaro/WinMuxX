@@ -465,10 +465,15 @@ final class MacWindow: Window {
         hiddenInCorner = nil
         WorkspaceTransitionDiagnostics.record("restore-begin", window: self, generation: token, requested: target)
         do {
+            // Elapsed times include waiting for the app's AX thread, not only the AX call.
+            let writeStarted = CACurrentMediaTime()
             try await setAxFrameBlocking(target.origin, resize ? target.size : nil, positionFirst: true)
+            let readStarted = CACurrentMediaTime()
+            WorkspaceMotionDiagnostics.record("Restore write elapsed", milliseconds: (readStarted - writeStarted) * 1000)
             try checkCancellation()
             // AX success alone does not mean the app accepted the requested position.
             let actual = try await macApp.getAxRect(windowId)
+            WorkspaceMotionDiagnostics.record("Restore readback elapsed", milliseconds: (CACurrentMediaTime() - readStarted) * 1000)
             try checkCancellation()
             let matches = actual.map { abs($0.topLeftX - target.minX) <= 2 && abs($0.topLeftY - target.minY) <= 2 } ?? false
             let current = nodeWorkspace === workspace && (workspace.isVisible || !TrayMenuModel.shared.isEnabled)
