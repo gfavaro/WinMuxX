@@ -26,7 +26,7 @@ scrolling, accessibility or physical-display correctness.
   scroll/highlight it again. Decide whether page navigation should cancel a search
   jump, then test navigation and repeated explicit selection separately.
 
-- [ ] **UI-03 · P3 · Reparenting tray items leaves adjacent separators.**
+- [x] **UI-03 · P3 · Reparenting tray items leaves adjacent separators.**
   `NativeActionMenu.menuNeedsUpdate` removes navigation/layout items from the
   temporary Commands menu, but only removes leading separators. Separators before
   the removed navigation groups and before Reload Config remain adjacent.
@@ -144,3 +144,25 @@ implementation task per concern and preserve the agreement’s deferred scope.
 Implementation status: selected agreed refactors are implemented; see
 [implementation details and validation](REFACTOR_IMPLEMENTATION.md). Deferred
 items remain deferred, and physical desktop validation remains outstanding.
+
+## Native validation on installed build 310
+
+Installer validation passed. All four surviving windows retained workspace
+assignments and identical raw layout trees across restart. Overview rendered its
+workspace cards and closed. Settings checks passed for a cold Appearance jump to
+Show window borders with visible highlighting, repeated explicit jumping after
+scrolling away, and ordinary Windows/Appearance navigation without a stale jump.
+Searching inherit-env-vars exposed Configuration and opened its editor without edits.
+Keyboard/VoiceOver, accessibility appearance settings, and physical multi-display
+movement remain untested; only the built-in display was connected.
+
+- [ ] **UI-09 · P2 · Window-menu Settings entry closes immediately.**
+  Reproduced in installed build 310. Opening Settings from the tray works. Trace
+  the implicit-window suppression/open-request path before changing semantics;
+  test both launch suppression and explicit Window-menu activation.
+
+UI-03: one recursive normalization pass now removes leading, adjacent and trailing
+separators after all section extraction. Action instances, order, shortcuts,
+payloads and enabled states are retained. The rendered-menu regression failed on
+the original implementation (four adjacent-separator assertions in Commands).
+A synthetic nested/all-separator case also covers empty menus and idempotence.

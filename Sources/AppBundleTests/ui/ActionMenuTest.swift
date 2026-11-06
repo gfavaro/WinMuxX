@@ -165,6 +165,52 @@ final class ActionMenuTest: XCTestCase {
         XCTAssertFalse(try submenu("Arrange Windows", in: menu).items.contains { $0.title == "Swap with Master" })
     }
 
+    func testSeparatorCleanupPreservesActionIdentityAndNestedMenus() {
+        let menu = NSMenu()
+        let action = NSMenuItem(title: "Action", action: nil, keyEquivalent: "a")
+        let payload = NSObject()
+        action.representedObject = payload
+        action.keyEquivalentModifierMask = .option
+        action.isEnabled = false
+        let nested = NSMenu()
+        nested.addItem(.separator())
+        nested.addItem(.separator())
+        let group = NSMenuItem(title: "Group", action: nil, keyEquivalent: "")
+        group.submenu = nested
+        for item in [NSMenuItem.separator(), .separator(), action, .separator(), .separator(), group, .separator()] {
+            menu.addItem(item)
+        }
+        normalizeActionMenuSeparators(menu)
+        XCTAssertEqual(menu.items.count, 3)
+        XCTAssertTrue(menu.items.first === action)
+        XCTAssertTrue(action.representedObject as? NSObject === payload)
+        XCTAssertEqual(action.keyEquivalent, "a")
+        XCTAssertEqual(action.keyEquivalentModifierMask, .option)
+        XCTAssertFalse(action.isEnabled)
+        XCTAssertTrue(nested.items.isEmpty)
+        normalizeActionMenuSeparators(menu)
+        XCTAssertTrue(menu.items.first === action)
+    }
+
+    func testRenderedMenusHaveNoRedundantSeparators() throws {
+        let previousMode = activeMode
+        defer { activeMode = previousMode }
+        func check(_ menu: NSMenu) {
+            XCTAssertFalse(menu.items.first?.isSeparatorItem == true, menu.title)
+            XCTAssertFalse(menu.items.last?.isSeparatorItem == true, menu.title)
+            for (previous, item) in zip(menu.items, menu.items.dropFirst()) {
+                XCTAssertFalse(previous.isSeparatorItem && item.isSeparatorItem, menu.title)
+            }
+            for item in menu.items { if let submenu = item.submenu { check(submenu) } }
+        }
+        for mode in [mainModeId, "grouping"] {
+            activeMode = mode
+            let menu = NSMenu()
+            NativeActionMenu().menuNeedsUpdate(menu)
+            check(menu)
+        }
+    }
+
     private func submenu(_ title: String, in menu: NSMenu) throws -> NSMenu {
         try XCTUnwrap(menu.items.first { $0.title == title }?.submenu, title)
     }

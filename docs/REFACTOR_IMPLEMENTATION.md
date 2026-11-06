@@ -69,17 +69,39 @@ were retained. These intermediate failures are not classified as pre-existing.
 
 A local full check does not establish hosted release success. No tag was pushed to
 exercise publishing. Native checks remain for parking across physical displays,
-restart with real app windows, and rapid overview interaction during display
-changes. Installed build 308 remains behind the current source; build 309 is stale.
+rapid overview interaction during display changes and physical gestures. Build 310
+now includes these refactors and passed real-window restart validation below.
 
 Final full gate passed: 1,504 Swift tests, zero failures, plus Python checks.
 The focused installer suite passed 21 tests, including saved-report JSON assertions.
 Claude reviewed the overview and installer extraction read-only; its identified
-serialization regression was fixed before completion. No claim of native validation
-or a hosted release run is made.
+serialization regression was fixed before completion. No hosted release run is claimed.
 
 Claude’s final source review confirmed preserved installer and restart semantics.
 Its test-gap feedback was addressed: the fixed encoding fixture now includes a
 workspace, container, window and restart identity with single-element sets, and
 a separate suspended-restore case covers the matched-window write after the await
 without expiry. The identity-query hook is restricted to unit-test execution.
+
+## Installed build 310 and tray cleanup follow-up
+
+Build 310 installed with status validated. Restart retained all four surviving
+windows' workspace assignments and identical raw layout trees. Native Settings
+checks passed for cold/repeated highlighted jumps and navigation away/back;
+Configuration fallback opened its editor. Overview rendered cards and closed.
+Only one physical display was available. Keyboard/VoiceOver and accessibility
+appearance variants remain pending. The Window-menu Settings entry closes at once;
+this separate reproduction is queued as UI-09.
+
+UI-03 now uses one recursive separator cleanup after menu assembly, replacing the
+leading-only special case. This handles extraction gaps without changing action
+identity, order, binding payloads or shortcuts. Tests cover real main/alternate
+menus and synthetic nested/all-separator menus. The real-menu test failed against
+the original implementation before the fix.
+
+The first separator-check run exposed an incorrect synthetic fixture: AppKit clears
+a key equivalent when that item becomes a submenu owner. The fixture now uses a
+separate submenu owner so the command shortcut assertion checks a real action.
+
+Final UI-03 gate: make check passed 1,506 Swift tests with zero failures and all
+Python checks. git diff --check passed. Installed build 310 predates UI-03.

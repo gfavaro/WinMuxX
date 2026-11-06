@@ -13,6 +13,21 @@ struct MenuBarAppearanceGate {
     }
 }
 
+/// Reparented sections can leave empty separator runs. Keep existing action items intact.
+@MainActor
+func normalizeActionMenuSeparators(_ menu: NSMenu) {
+    var previousWasSeparator = true
+    for item in menu.items {
+        if let submenu = item.submenu { normalizeActionMenuSeparators(submenu) }
+        if item.isSeparatorItem && previousWasSeparator {
+            menu.removeItem(item)
+        } else {
+            previousWasSeparator = item.isSeparatorItem
+        }
+    }
+    if let last = menu.items.last, last.isSeparatorItem { menu.removeItem(last) }
+}
+
 @MainActor
 public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
     NativeActionMenu.shared.install(checkForUpdates: checkForUpdates)
@@ -169,7 +184,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             }
         }
         // Keep occasional switches and maintenance actions together.
-        while commandsMenu.items.first?.isSeparatorItem == true { commandsMenu.removeItem(at: 0) }
         let commandsItem = NSMenuItem(title: "Commands", action: nil, keyEquivalent: "")
         commandsItem.submenu = commandsMenu
         menu.addItem(commandsItem)
@@ -187,6 +201,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(settingsItem)
         _ = addCommand(TrayMenuModel.shared.isEnabled ? "Pause Window Management" : "Resume Window Management", script: "enable toggle", to: menu, requiresWindow: false, allowDisabled: true)
         menu.addItem(callbackItem("Quit WinMuxX", #selector(quit)))
+        normalizeActionMenuSeparators(menu)
     }
 
     private enum CommandMenuSection {

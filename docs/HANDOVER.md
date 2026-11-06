@@ -1,82 +1,51 @@
 # WinMuxX handover — 2026-11-06
 
-The session simplified the tray menu and Settings, added sidebar display movement,
-and completed a targeted behavior-preserving refactor. The latest work fixes queued
-search/navigation and stale display-target issues. The baseline and selected
-refactors have now been committed in separate steps;
-the installed app is build 308 and does not include the latest source changes.
+Build 310 is installed and installer-validated. Agreed refactors were committed
+and pushed through 9b7be36f before that build. The subsequent UI-03 tray separator
+cleanup is described below; build 310 does not include that cleanup.
 
-## Current source
+## Implemented work
 
-- Tray: Arrange Windows groups Dwindle/Master, grouping, balance, join and resize.
-  Retile, Fullscreen and Float / Tile Window remain at root, with navigation menus
-  inspired by mikker/Dinky. Settings explicitly hides its image on macOS 27.
-- Settings: Everyday/Advanced grouping, page search and 30 direct control results.
-  Unmapped reference sections fall back to Configuration, including
-  `on-window-detected` and `inherit-env-vars`.
-- Ordinary page navigation clears stale search targets. Explicit result clicks
-  create unique requests. Fields emit a bounds-anchor preference; forms scroll
-  when the requested field is ready instead of guessing with Task.yield(). Native
-  scrolling correctness still needs desktop validation.
-- Sidebar: display ownership labels and Move to Display context actions. New move
-  actions carry display UUIDs and resolve them at execution time; missing identity,
-  disconnected displays and deleted workspaces report errors. Existing assignment
-  and whole-workspace relocation policies remain in use.
-- Refactor: typed menu-section references, separate SettingsSearch.swift, reused
-  query results, explicit search aliases, clearer recovery mutations and installer
-  comparison names. Detailed explanations are in REVIEW_QUEUE.md.
-- Agent CLI was tested against the live app: Rex window 373 was floated, queried,
-  restored to tiled mode and queried again; workspace 3 was retained.
+Tray navigation uses typed section references; Settings hides its icon on macOS 27.
+Settings search includes Configuration fallbacks, clears stale navigation targets,
+and scrolls when the target's layout anchor is ready. Sidebar Move to Display
+resolves a captured display UUID at execution and reports unavailable targets.
 
-## Verification and installation
+The agreed refactors cover release Python/schema setup, unused minimum-observation
+code removal, pure parking geometry, redundant viewport initialization removal,
+paired restart state, paired overview presentation entries and installer polling
+observations separated from validation policy. Read REFACTOR_IMPLEMENTATION.md for
+rationale and REFACTOR_AGREEMENT.md for deferred scope. The audit is targeted,
+not a completed line-by-line correctness review of every file.
 
-- Latest `make check`: 1,495 Swift tests, zero failures; Python checks passed.
-  Full log: `.build/queue-fixes-check.log`. `git diff --check` passed.
-- The first new-test build failed because TestMonitor is a value type declared
-  with let; fixtures were corrected to var, then the full gate passed.
-- Regression coverage includes unmapped search queries, repeated request identity,
-  preference reduction and UUID resolution across repositioning, coordinate reuse,
-  disconnection, missing UUID and case-insensitive matching.
-- Installed build 308 passed installer validation. Build 309 completed before the
-  review/refactor/fixes; it was not installed and is now stale relative to source.
-- Native validation remains: search to an offscreen control on a cold page,
-  repeated clicks, navigation away/back, keyboard/VoiceOver, high contrast, and
-  moving populated workspaces between real displays during topology changes.
-- No new release build/install was requested for the final fixes. If installing,
-  choose a fresh build number (310 or later after checking existing artifacts),
-  preserve signing identity, and use script/install_fork.py with a fresh report.
-  Build and installation instructions are in HACKING.md and docs/FORK.md.
+UI-03 normalizes leading, adjacent and trailing separators recursively after menu
+assembly. Commands retain their identity, ordering, shortcuts and payloads. The
+real-menu regression failed against the old implementation before the fix.
 
-## Next steps
+## Verification
 
-1. Read docs/REVIEW_QUEUE.md. UI-01/02/04/05/06 are implemented; UI-03 (separator
-   normalization), UI-07 (shared search metadata) and UI-08 (native/accessibility
-   validation) remain open. Checked items retain their native-validation caveats.
-2. Perform the desktop checks above; do not infer scrolling or physical display
-   correctness solely from pure model tests. Consider a rendered navigation test.
-3. Review the accumulated diff before committing. Preserve unrelated `.claude/`
-   contents and generated gitHashGenerated.swift changes; do not reset the tree.
-4. Follow repository CONTRIBUTING/AGENTS guidance. No commits or pushes were made
-   this session. User prefers continuing authorized work without repeated approvals.
+Before build 310, make check passed 1,504 Swift tests and Python checks; the focused
+installer suite passed 21 tests. Installation report: .build/install-310.json.
+Four surviving windows retained workspace assignments and identical raw layout
+trees across restart. Native overview open/close, Settings cold/repeated highlighted
+jumps, navigation away/back and Configuration fallback passed without config edits.
 
-## Entry points
+UI-03 logs: .build/separator-before.log reproduces the original defect;
+.build/separator-final-check.log holds the final full gate. The first new synthetic
+fixture incorrectly assigned a shortcut to a submenu owner; AppKit clears it, so
+that fixture was corrected to keep the command and submenu owner separate.
 
-- Sources/AppBundle/ui/menubar/NativeActionMenu.swift
-- Sources/AppBundle/ui/settings/{ShortcutSettingsView,SettingsControls,SettingsSearch}.swift
-- Sources/AppBundle/ui/sidebar/{WorkspaceSidebarActions,WorkspaceSidebarActionsAdapter,WorkspaceSidebarSnapshot,WorkspaceSidebarWorkspaceSection}.swift
-- Sources/AppBundle/ui/sidebar/models/WorkspaceSidebarMonitorScope.swift
-- Sources/AppBundleTests/ui/{ActionMenuTest,SettingsRefinementTest}.swift
+## Remaining queue and limitations
 
-Use git status for the complete file list; the tree includes earlier edits to
-README, docs, recovery, settings previews/shortcut labels and script/install_fork.py.
+Read REVIEW_QUEUE.md. UI-07 (shared search metadata) and UI-08 (keyboard/VoiceOver
+and accessibility validation) remain open. UI-09 records that the Window-menu
+Settings entry closes immediately, while opening Settings from the tray works.
+Trace launch suppression/open-request semantics before fixing it.
 
-## Follow-up implementation
+Only the built-in display was connected. Physical workspace movement, topology
+changes and multi-display overview behavior remain untested. No release tag was
+pushed. Preserve unrelated untracked .claude/ contents. Follow CONTRIBUTING,
+HACKING, TESTING and FORK for checks, direct main commits and installation.
 
-The agreed sequence in REFACTOR_AGREEMENT.md has been implemented. Read
-REFACTOR_IMPLEMENTATION.md for commit IDs and rationale. Release Python/schema
-prerequisites, minimum-observation cleanup, pure parking geometry, redundant
-viewport initialization removal, paired restart entries, paired overview entries,
-and separated installer polling are complete. Final make check passed 1,504 Swift
-tests plus Python checks; installer-focused tests passed 21. No app installation
-or release tag was part of this work. Remaining native checks and deferred audit
-items are unchanged. Preserve unrelated untracked `.claude/` contents.
+Final UI-03 gate: make check passed 1,506 Swift tests with zero failures and all
+Python checks. git diff --check passed. Installed build 310 predates UI-03.
