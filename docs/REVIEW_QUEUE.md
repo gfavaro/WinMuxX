@@ -140,3 +140,7 @@ unplug/reconnect checks remain pending.
 See [the Codex–Claude agreement](REFACTOR_AGREEMENT.md) before implementing audit
 recommendations. RF-06 is tracked under UI-07; RF-30 references UI-03. Keep one
 implementation task per concern and preserve the agreement’s deferred scope.
+
+Implementation status: selected agreed refactors are implemented; see
+[implementation details and validation](REFACTOR_IMPLEMENTATION.md). Deferred
+items remain deferred, and physical desktop validation remains outstanding.

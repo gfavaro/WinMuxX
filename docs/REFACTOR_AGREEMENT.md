@@ -85,3 +85,7 @@ Do not publish a tag merely to validate workflow YAML without user authorization
 - This agreement does not expand the original coverage claim: 10,838 lines were
   inspected in detail; the whole-tree scan is not a completed human review.
 - Claude Code conversation: `5a655cd2-539f-4b65-98c1-42b62a9be0e1`.
+
+Implementation status: selected agreed refactors are implemented; see
+[implementation details and validation](REFACTOR_IMPLEMENTATION.md). Deferred
+items remain deferred, and physical desktop validation remains outstanding.

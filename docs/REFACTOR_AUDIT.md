@@ -356,3 +356,10 @@ manipulation or new runtime tests were performed. The last implementation check
 before the audit passed 1,495 Swift tests plus Python checks; that result is baseline
 evidence, not proof that any proposed refactor is correct. Reference paths and
 line anchors in this report are checked against the current working tree.
+
+## Implementation status
+
+The selected Codex–Claude sequence is implemented; see
+[the implementation report](REFACTOR_IMPLEMENTATION.md) for changes, commits,
+characterization evidence and remaining native-validation limits. The other
+original candidates are not implicitly approved or implemented.

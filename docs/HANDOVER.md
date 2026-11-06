@@ -2,7 +2,8 @@
 
 The session simplified the tray menu and Settings, added sidebar display movement,
 and completed a targeted behavior-preserving refactor. The latest work fixes queued
-search/navigation and stale display-target issues. All changes remain uncommitted;
+search/navigation and stale display-target issues. The baseline and selected
+refactors have now been committed in separate steps;
 the installed app is build 308 and does not include the latest source changes.
 
 ## Current source
@@ -68,3 +69,14 @@ the installed app is build 308 and does not include the latest source changes.
 
 Use git status for the complete file list; the tree includes earlier edits to
 README, docs, recovery, settings previews/shortcut labels and script/install_fork.py.
+
+## Follow-up implementation
+
+The agreed sequence in REFACTOR_AGREEMENT.md has been implemented. Read
+REFACTOR_IMPLEMENTATION.md for commit IDs and rationale. Release Python/schema
+prerequisites, minimum-observation cleanup, pure parking geometry, redundant
+viewport initialization removal, paired restart entries, paired overview entries,
+and separated installer polling are complete. Final make check passed 1,504 Swift
+tests plus Python checks; installer-focused tests passed 21. No app installation
+or release tag was part of this work. Remaining native checks and deferred audit
+items are unchanged. Preserve unrelated untracked `.claude/` contents.
