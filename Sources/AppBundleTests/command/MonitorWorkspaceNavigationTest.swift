@@ -23,6 +23,42 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: true)
     }
 
+    func testAcceptedAssignmentInitializesMissingViewport() {
+        let fixture = WorkspaceNavigationFixture()
+        defer { fixture.cleanUp() }
+        let target = fixture.displays[1]
+        let workspace = fixture.spaces[2]
+        let viewport = MonitorViewportId(target)
+        runtime.workspaces.monitorViewportsById[viewport] = nil
+        let root = workspace.rootTilingContainer
+        let windows = workspace.allLeafWindowsRecursive.map(\.windowId)
+        XCTAssertTrue(target.rect.topLeftCorner.setActiveWorkspace(workspace))
+        XCTAssertEqual(runtime.workspaces.monitorViewportsById[viewport]?.activeWorkspaceId, workspace.id)
+        XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertEqual(workspace.allLeafWindowsRecursive.map(\.windowId), windows)
+    }
+
+    func testRejectedAssignmentDoesNotInitializeMissingViewport() {
+        let fixture = WorkspaceNavigationFixture()
+        defer { fixture.cleanUp() }
+        let target = fixture.displays[1]
+        let workspace = fixture.spaces[2]
+        let viewport = MonitorViewportId(target)
+        config.workspaceToMonitorForceAssignment[workspace.name] = [.main]
+        runtime.workspaces.monitorViewportsById[viewport] = nil
+        let before = runtime.workspaces.monitorViewportsById
+        XCTAssertFalse(target.rect.topLeftCorner.setActiveWorkspace(workspace))
+        XCTAssertNil(runtime.workspaces.monitorViewportsById[viewport])
+        XCTAssertEqual(Set(runtime.workspaces.monitorViewportsById.keys), Set(before.keys))
+        for (id, previous) in before {
+            let current = runtime.workspaces.monitorViewportsById[id]
+            XCTAssertEqual(current?.activeWorkspaceId, previous.activeWorkspaceId)
+            XCTAssertEqual(current?.previousWorkspaceId, previous.previousWorkspaceId)
+            XCTAssertEqual(current?.lastActiveWorkspaceByProject, previous.lastActiveWorkspaceByProject)
+            XCTAssertEqual(current?.displayUUID, previous.displayUUID)
+        }
+    }
+
     func testReconciliationRepairsHiddenSecondaryAssignmentsWithoutChangingVisibleSlots() {
         spaces[2].preferredMonitorPoint = displays[1].rect.topLeftCorner
         spaces[3].preferredMonitorPoint = displays[2].rect.topLeftCorner

@@ -133,9 +133,6 @@ extension CGPoint {
               workspace.forceAssignedMonitor.map({ $0.rect.topLeftCorner == self }) != false else {
             return false
         }
-        if let monitor = sortedMonitors.first(where: { $0.rect.topLeftCorner == self }),
-           runtime.workspaces.visibleWorkspace(for: monitor) !== workspace {
-        }
         _ = runtime.workspaces.setActiveWorkspace(workspace, on: viewportId)
         checkWorkspaceHierarchyInvariants()
         return true
