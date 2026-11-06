@@ -18,7 +18,6 @@ func startUnixSocketServer() {
 }
 
 func toggleReleaseServerIfDebug(_ state: EnableCmdArgs.State) async {
-    if serverArgs.isReadOnly { return }
     if !isDebug { return }
     let socketFile = "/tmp/\(stableWinMuxAppId)-\(unixUserName).sock"
     let connection = NWConnection(to: NWEndpoint.unix(path: socketFile), using: .tcp)

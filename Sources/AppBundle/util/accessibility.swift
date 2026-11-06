@@ -377,7 +377,6 @@ extension AXUIElement: AxUiElementMock {
     }
 
     @discardableResult func set<Attr: WritableAttr>(_ attr: Attr, _ value: Attr.T) -> Bool {
-        if serverArgs.isReadOnly { return false }
         let pid = axTaskLocalAppThreadToken?.pid
         if let pid, AXReadBudget.current?.permits(pid) == false { return false }
         let metrics = RuntimeWorkMetrics.shared

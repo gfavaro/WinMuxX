@@ -30,7 +30,7 @@ final class WindowRecoveryController {
     private func initializeIfNeeded() {
                 guard !didInitialize else { return }
         didInitialize = true
-        guard !isUnitTest, !serverArgs.isReadOnly else { return }
+        guard !isUnitTest else { return }
         let application = NSRunningApplication.current
         guard let launchDate = application.launchDate ?? recoveryProcessLaunchDate(application.processIdentifier) else {
             initializationError = "App launch identity is unavailable; recovery recording disabled."
@@ -102,7 +102,7 @@ final class WindowRecoveryController {
     /// Explicit disable/quit only. Each app has its own bounded AX budget and queue.
     func restoreManagedWindows() async -> [RecoveryWindowIdentity] {
         await restoreCoordinator.run { [self] in
-            guard !managedIdentities.isEmpty, !serverArgs.isReadOnly else { return [] }
+            guard !managedIdentities.isEmpty else { return [] }
             return await performManagedRestore()
         }
     }
@@ -159,7 +159,6 @@ final class WindowRecoveryController {
     /// recovered geometry. Never force-unminimize/fullscreen windows.
     func recoverAfterCrash() async -> String {
         guard !isRecovering else { return "Recovery is already running." }
-        guard !serverArgs.isReadOnly else { return "Recovery is unavailable in read-only mode." }
         let entries = recoverableEntries
         guard !entries.isEmpty else { return "No matching windows from a previous session were found." }
         isCrashRecovering = true

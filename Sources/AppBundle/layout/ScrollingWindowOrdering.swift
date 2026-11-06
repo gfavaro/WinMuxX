@@ -46,7 +46,7 @@ final class ScrollingWindowOrdering {
     }
 
     func update(workspace: Workspace, frames: [WorkspaceGroupFrame]) {
-        guard !isUnitTest, !serverArgs.isReadOnly, TrayMenuModel.shared.isEnabled,
+        guard !isUnitTest, TrayMenuModel.shared.isEnabled,
               !WindowRecoveryController.shared.isTerminating,
               workspace.isVisible, workspace.arrangement == .scrolling else { return }
         let items = frames.sorted { $0.stackingIndex < $1.stackingIndex }.flatMap { group in

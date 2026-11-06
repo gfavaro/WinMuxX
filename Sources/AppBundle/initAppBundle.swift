@@ -134,7 +134,6 @@ var isStartup: Bool { _isStartup ?? dieT("isStartup is not initialized") }
 
 struct ServerArgs: Sendable {
     var configLocation: String? = nil
-    var isReadOnly: Bool = false
 }
 
 private let serverHelp = """
@@ -145,8 +144,6 @@ private let serverHelp = """
       -v, --version           Print WinMuxX.app version
       --config-path <path>    Config path. Takes priority over ${XDG_CONFIG_HOME}/winmuxx/winmux.toml
                               (defaults to ~/.config/winmuxx/winmux.toml).
-      --read-only             Run without mutating macOS windows.
-                              Useful if you want to use only debug-windows or other query commands.
     """
 
 nonisolated(unsafe) private var _serverArgs = ServerArgs()
@@ -170,8 +167,6 @@ private func initServerArgs() {
                     exit(1, err: "Missing <path> in --config-path flag")
                 }
                 index += 1
-            case "--read-only": // todo rename to '--disabled' and unite with disabled feature
-                _serverArgs.isReadOnly = true
             case "-NSDocumentRevisionsDebugMode" where isDebug:
                 // Skip Xcode CLI args.
                 // Usually it's '-NSDocumentRevisionsDebugMode NO'/'-NSDocumentRevisionsDebugMode YES'

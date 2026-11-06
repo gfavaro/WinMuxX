@@ -205,7 +205,7 @@ private func prepareRestartStateDirectory(_ url: URL) throws {
 func persistFrozenWorldForRestartIfPossible() {
     recovery.pendingRestartSave?.cancel()
     recovery.pendingRestartSave = nil
-    guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly else { return }
+    guard !isUnitTest, isWinMuxRuntimeReady else { return }
     do {
         let url = try persistedFrozenWorldUrl()
         try recovery.restartWriter.flush(makeRestartEnvelope(), to: url)
@@ -253,7 +253,7 @@ func loadRestartEnvelope(from url: URL) -> PersistedFrozenWorldEnvelope? {
 
 @MainActor
 func schedulePersistedFrozenWorldSave() {
-    guard !isUnitTest, isWinMuxRuntimeReady, !serverArgs.isReadOnly,
+    guard !isUnitTest, isWinMuxRuntimeReady,
           TrayMenuModel.shared.isEnabled,
           !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
     // Capture current titles without adding AX round trips to every focus/layout event.
@@ -288,7 +288,7 @@ func schedulePersistedFrozenWorldSave() {
 @discardableResult
 @MainActor
 func loadPersistedFrozenWorldForStartupIfPresent() -> Bool {
-    guard !serverArgs.isReadOnly, config.automaticallyTileNewWindows else { return false }
+    guard config.automaticallyTileNewWindows else { return false }
     do {
         let url = try persistedFrozenWorldUrl()
         try prepareRestartStateDirectory(url)
