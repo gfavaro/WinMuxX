@@ -27,7 +27,7 @@ final class WindowTabStripPanel: NSPanelHud {
             currentContent = nextContent
         }
         currentPanelFrame = displayStrip.frame
-        debugFocusLog("WindowTabStripPanel.update id=\(String(describing: identifier?.rawValue)) frame=\(displayStrip.frame)")
+        debugLog(.focus, "WindowTabStripPanel.update id=\(String(describing: identifier?.rawValue)) frame=\(displayStrip.frame)")
         setWindowTabChromePanelFrame(displayStrip.frame, on: self)
         tabStripIsOccludedByFloatingWindow = displayStrip.tabStripIsOccludedByFloatingWindow
         updateMousePolicy()

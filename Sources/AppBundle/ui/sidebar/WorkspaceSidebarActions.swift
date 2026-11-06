@@ -409,7 +409,7 @@ private func workspaceSidebarDropPreviewTabs(
 
 @MainActor
 func renameWorkspaceFromSidebar(_ workspaceName: String, displayName: String) {
-    debugWorkspaceSidebarRenameLog("renameWorkspaceFromSidebar workspace=\(workspaceName) displayName=\(displayName)")
+    debugLog(.sidebarRename, "renameWorkspaceFromSidebar workspace=\(workspaceName) displayName=\(displayName)")
     runWorkspaceSidebarSession {
         try renameWorkspaceForSidebar(workspaceName: workspaceName, displayName: displayName)
         await updateWorkspaceSidebarModel()

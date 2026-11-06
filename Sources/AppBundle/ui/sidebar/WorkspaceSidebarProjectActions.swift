@@ -9,32 +9,28 @@ func selectWorkspaceSidebarProject(
 ) {
     let knownProjects = workspaceProjects()
     let resolvedTargetScopeId = targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
-    debugWorkspaceSidebarProjectLog(
-        "selectProjectBegin project=\(projectId.rawValue) known=\(knownProjects.map(\.id.rawValue)) targetScope=\(resolvedTargetScopeId) activeBefore=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+    debugLog(.sidebarProject, "selectProjectBegin project=\(projectId.rawValue) known=\(knownProjects.map(\.id.rawValue)) targetScope=\(resolvedTargetScopeId) activeBefore=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
     )
     guard knownProjects.contains(where: { $0.id == projectId }) else {
-        debugWorkspaceSidebarProjectLog("selectProjectAbort unknownProject=\(projectId.rawValue)")
+        debugLog(.sidebarProject, "selectProjectAbort unknownProject=\(projectId.rawValue)")
         return
     }
     runWorkspaceSidebarSession {
         let monitor = workspaceSidebarTargetMonitor(
             scopeId: targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
         )
-        debugWorkspaceSidebarProjectLog(
-            "selectProjectSession project=\(projectId.rawValue) monitor=\(monitor.monitorAppKitNsScreenScreensId) visibleBefore=\(monitor.activeWorkspace.name) activeProjectBefore=\(activeWorkspaceProjectId(for: monitor).rawValue)"
+        debugLog(.sidebarProject, "selectProjectSession project=\(projectId.rawValue) monitor=\(monitor.monitorAppKitNsScreenScreensId) visibleBefore=\(monitor.activeWorkspace.name) activeProjectBefore=\(activeWorkspaceProjectId(for: monitor).rawValue)"
         )
         if let workspace = switchWorkspaceProject(projectId, on: monitor) {
-            debugWorkspaceSidebarProjectLog(
-                "selectProjectSwitchResult project=\(projectId.rawValue) workspace=\(workspace.name) workspaceProject=\(workspace.projectId.rawValue)"
+            debugLog(.sidebarProject, "selectProjectSwitchResult project=\(projectId.rawValue) workspace=\(workspace.name) workspaceProject=\(workspace.projectId.rawValue)"
             )
             _ = workspace.focusWorkspace()
             viewModel.workspaceSidebarActiveProjectId = projectId
         } else {
-            debugWorkspaceSidebarProjectLog("selectProjectSwitchResult project=\(projectId.rawValue) workspace=nil")
+            debugLog(.sidebarProject, "selectProjectSwitchResult project=\(projectId.rawValue) workspace=nil")
         }
         await updateWorkspaceSidebarModel()
-        debugWorkspaceSidebarProjectLog(
-            "selectProjectEnd project=\(projectId.rawValue) activeAfter=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+        debugLog(.sidebarProject, "selectProjectEnd project=\(projectId.rawValue) activeAfter=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
         )
     }
 }

@@ -88,7 +88,7 @@ extension WorkspaceSidebarPanel {
         onKeyDown: (@MainActor (WorkspaceSidebarInlineTextKey) -> Void)? = nil
     ) {
         guard !isRetired else { return }
-        debugWorkspaceSidebarRenameLog("beginInlineTextEditing isKeyBefore=\(isKeyWindow) firstResponder=\(String(describing: firstResponder)) mouseInside=\(isMouseInsideVisibleRegion())")
+        debugLog(.sidebarRename, "beginInlineTextEditing isKeyBefore=\(isKeyWindow) firstResponder=\(String(describing: firstResponder)) mouseInside=\(isMouseInsideVisibleRegion())")
         inlineTextEditingActive = true
         inlineTextEditingLocksExpansion = locksExpansion
         inlineTextEditingCancelsOnPointerExit = cancelsOnPointerExit
@@ -108,7 +108,7 @@ extension WorkspaceSidebarPanel {
 
     func endInlineTextEditing() {
         guard inlineTextEditingActive else { return }
-        debugWorkspaceSidebarRenameLog("endInlineTextEditing isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
+        debugLog(.sidebarRename, "endInlineTextEditing isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
         inlineTextEditingActive = false
         inlineTextEditingLocksExpansion = true
         inlineTextEditingCancelsOnPointerExit = true
@@ -128,7 +128,7 @@ extension WorkspaceSidebarPanel {
 
     func prepareForInlineTextEditing(activatesWindow: Bool = true) {
         guard !isRetired else { return }
-        debugWorkspaceSidebarRenameLog("prepareForInlineTextEditing before visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder))")
+        debugLog(.sidebarRename, "prepareForInlineTextEditing before visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder))")
         // Focusing the editor must not cancel an in-flight reveal or its backing resize.
         expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), viewModel.workspaceSidebarVisibleWidth))
         ignoresMouseEvents = false
@@ -137,18 +137,18 @@ extension WorkspaceSidebarPanel {
         makeKeyAndOrderFront(nil)
         makeKey()
         NSApp.activate(ignoringOtherApps: true)
-        debugWorkspaceSidebarRenameLog("prepareForInlineTextEditing after visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder)) activeApp=\(NSApp.isActive)")
+        debugLog(.sidebarRename, "prepareForInlineTextEditing after visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder)) activeApp=\(NSApp.isActive)")
     }
 
     func cancelInlineTextEditing() {
         guard inlineTextEditingActive else { return }
-        debugWorkspaceSidebarRenameLog("cancelInlineTextEditing isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
+        debugLog(.sidebarRename, "cancelInlineTextEditing isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
         inlineTextEditingCancel?()
     }
 
     func handleInlineTextEditingKey(_ key: WorkspaceSidebarInlineTextKey) -> Bool {
         guard inlineTextEditingActive, let inlineTextEditingKeyDown else { return false }
-        debugWorkspaceSidebarRenameLog("handleInlineTextEditingKey key=\(key)")
+        debugLog(.sidebarRename, "handleInlineTextEditingKey key=\(key)")
         inlineTextEditingKeyDown(key)
         if case .ignored = key {
             return false
@@ -163,12 +163,12 @@ extension WorkspaceSidebarPanel {
             return false
         }
         if inlineTextEditingPointerEnteredVisibleRegion {
-            debugWorkspaceSidebarRenameLog("outsidePointerCancel afterEntered isMouseDown=\(isMouseDown)")
+            debugLog(.sidebarRename, "outsidePointerCancel afterEntered isMouseDown=\(isMouseDown)")
             return true
         }
         let shouldCancel = isMouseDown && Date().timeIntervalSince(inlineTextEditingStartedAt) > 0.25
         if shouldCancel {
-            debugWorkspaceSidebarRenameLog("outsidePointerCancel clickGraceElapsed")
+            debugLog(.sidebarRename, "outsidePointerCancel clickGraceElapsed")
         }
         return shouldCancel
     }
@@ -231,19 +231,19 @@ extension WorkspaceSidebarPanel {
             callback: workspaceSidebarInlineTextEventTapCallback,
             userInfo: nil
         ) else {
-            debugWorkspaceSidebarRenameLog("installKeyEventTap failed")
+            debugLog(.sidebarRename, "installKeyEventTap failed")
             return
         }
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
             CFMachPortInvalidate(tap)
-            debugWorkspaceSidebarRenameLog("installKeyEventTap source failed")
+            debugLog(.sidebarRename, "installKeyEventTap source failed")
             return
         }
         inlineTextEditingKeyEventTap = tap
         inlineTextEditingKeyEventTapRunLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        debugWorkspaceSidebarRenameLog("installKeyEventTap ok")
+        debugLog(.sidebarRename, "installKeyEventTap ok")
     }
 
     func removeInlineTextEditingKeyEventTap() {

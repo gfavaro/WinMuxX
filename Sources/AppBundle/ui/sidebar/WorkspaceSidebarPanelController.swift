@@ -217,16 +217,16 @@ final class WorkspaceSidebarPanel: NSPanelHud {
 
     override func becomeKey() {
         super.becomeKey()
-        debugWorkspaceSidebarRenameLog("panel becomeKey isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
+        debugLog(.sidebarRename, "panel becomeKey isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
     }
 
     override func resignKey() {
-        debugWorkspaceSidebarRenameLog("panel resignKey isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
+        debugLog(.sidebarRename, "panel resignKey isKey=\(isKeyWindow) firstResponder=\(String(describing: firstResponder))")
         super.resignKey()
     }
 
     override func keyDown(with event: NSEvent) {
-        debugWorkspaceSidebarRenameLog("panel keyDown keyCode=\(event.keyCode) chars=\(event.charactersIgnoringModifiers ?? "nil") firstResponder=\(String(describing: firstResponder)) inline=\(inlineTextEditingActive)")
+        debugLog(.sidebarRename, "panel keyDown keyCode=\(event.keyCode) chars=\(event.charactersIgnoringModifiers ?? "nil") firstResponder=\(String(describing: firstResponder)) inline=\(inlineTextEditingActive)")
         if handleInlineTextEditingKey(inlineTextKey(from: event)) {
             return
         }

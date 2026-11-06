@@ -296,13 +296,13 @@ func shouldIgnoreAxObserverEventForPostDragSuppression(windowId: UInt32?, notif:
     guard notif == kAXMovedNotification as String || notif == kAXResizedNotification as String else { return false }
     guard !isLeftMouseButtonDown else { return false }
     if hasActiveGlobalPostDragAxObserverSuppression() {
-        debugFocusLog("axObserver.suppressed.global notif=\(notif) window=\(String(describing: windowId))")
+        debugLog(.focus, "axObserver.suppressed.global notif=\(notif) window=\(String(describing: windowId))")
         return true
     }
     guard let windowId else { return false }
     let shouldSuppress = hasActivePostDragAxObserverSuppression(for: windowId)
     if shouldSuppress {
-        debugFocusLog("axObserver.suppressed window=\(windowId) notif=\(notif)")
+        debugLog(.focus, "axObserver.suppressed window=\(windowId) notif=\(notif)")
     }
     return shouldSuppress
 }

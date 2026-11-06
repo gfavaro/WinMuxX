@@ -194,8 +194,7 @@ final class MacWindow: Window {
         let refreshSnapshotCloseFallback = refreshSnapshot?.fallbackWhenFocusedWindowCloses?.liveOrNil
         let refreshSnapshotPreviousFocus = refreshSessionFocusSnapshot?.prevFocus?.liveOrNil
         let refreshSnapshotPreviousPreviousFocus = refreshSessionFocusSnapshot?.prevPrevFocus?.liveOrNil
-        debugFocusLog(
-            "MacWindow.garbageCollect closing=\(windowId) currentFocus=\(debugDescribe(currentFocus)) prev=\(debugDescribe(previousFocus)) prevPrev=\(debugDescribe(previousPreviousFocus)) snapshot=\(debugDescribe(refreshSnapshot))"
+        debugLog(.focus, "MacWindow.garbageCollect closing=\(windowId) currentFocus=\(debugDescribe(currentFocus)) prev=\(debugDescribe(previousFocus)) prevPrev=\(debugDescribe(previousPreviousFocus)) snapshot=\(debugDescribe(refreshSnapshot))"
         )
         if let replacementFocus = focusAfterWindowClosure(
             closingWindow: self,
@@ -212,7 +211,7 @@ final class MacWindow: Window {
         ) {
             switch parent.cases {
                 case .tilingContainer, .workspace, .macosHiddenAppsWindowsContainer, .macosFullscreenWindowsContainer:
-                    debugFocusLog("MacWindow.garbageCollect replacement closing=\(windowId) replacement=\(debugDescribe(replacementFocus))")
+                    debugLog(.focus, "MacWindow.garbageCollect replacement closing=\(windowId) replacement=\(debugDescribe(replacementFocus))")
                     _ = setFocus(to: replacementFocus)
                     if replacementFocus.windowOrNil == nil, replacementFocus.workspace === deadWindowWorkspace {
                         holdFocusAfterLastWindowClosure(on: replacementFocus.workspace, appPid: macApp.pid)

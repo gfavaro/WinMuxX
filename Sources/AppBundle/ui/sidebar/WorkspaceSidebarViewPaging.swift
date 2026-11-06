@@ -108,8 +108,7 @@ extension WorkspaceSidebarView {
             renamingProjectId: $renamingProjectId,
             renamingProjectText: $renamingProjectText,
             onSelectProject: { projectId in
-                debugWorkspaceSidebarProjectLog(
-                    "pagerSectionSelect project=\(projectId.rawValue) active=\(snapshot.activeProjectId.rawValue) browsed=\(browsedProjectId?.rawValue ?? "nil")"
+                debugLog(.sidebarProject, "pagerSectionSelect project=\(projectId.rawValue) active=\(snapshot.activeProjectId.rawValue) browsed=\(browsedProjectId?.rawValue ?? "nil")"
                 )
                 browseMode = .activeProject
                 actions.send(.selectProject(projectId))

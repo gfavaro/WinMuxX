@@ -150,7 +150,7 @@ extension TreeNode {
                 lastAppliedLayoutPhysicalRect = physicalRect
                 lastAppliedLayoutVirtualRect = virtual
                 if container.usesWindowTabBehavior {
-                    debugFocusLog("layoutRecursive tabContainer=\(ObjectIdentifier(container)) physicalRect=\(physicalRect) virtualRect=\(virtual)")
+                    debugLog(.focus, "layoutRecursive tabContainer=\(ObjectIdentifier(container)) physicalRect=\(physicalRect) virtualRect=\(virtual)")
                 }
                 switch container.layout {
                     case .tiles, .master:

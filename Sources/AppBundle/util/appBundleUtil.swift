@@ -191,29 +191,16 @@ extension CGPoint: @retroactive Hashable { // todo migrate to self written Point
     let isDebug = false
 #endif
 
-func debugFocusLog(_ message: @autoclosure () -> String) {
+enum DebugLogCategory: String {
+    case focus, sidebarRename, sidebarHover, sidebarEdgeTrap, sidebarProject
+}
+
+/// Debug builds only. `log stream --level debug --predicate 'subsystem == "com.gfavaro.winmuxx.debug"'`
+/// shows them; add `AND category == "focus"` for one category.
+func debugLog(_ category: DebugLogCategory, _ message: @autoclosure () -> String) {
     guard isDebug else { return }
-    fputs("[focus-debug] \(Date()) \(message())\n", stderr)
-}
-
-func debugWorkspaceSidebarRenameLog(_ message: @autoclosure () -> String) {
-    guard isDebug else { return }
-    fputs("[sidebar-rename-debug] \(Date()) \(message())\n", stderr)
-}
-
-func debugWorkspaceSidebarHoverLog(_ message: @autoclosure () -> String) {
-    guard isDebug, ProcessInfo.processInfo.environment["WINMUX_DEBUG_SIDEBAR_HOVER"] == "1" else { return }
-    fputs("[sidebar-hover-debug] \(Date()) \(message())\n", stderr)
-}
-
-func debugWorkspaceSidebarEdgeTrapLog(_ message: @autoclosure () -> String) {
-    guard isDebug, ProcessInfo.processInfo.environment["WINMUX_DEBUG_SIDEBAR_EDGE_TRAP"] == "1" else { return }
-    fputs("[sidebar-edge-trap-debug] \(Date()) \(message())\n", stderr)
-}
-
-func debugWorkspaceSidebarProjectLog(_ message: @autoclosure () -> String) {
-    guard isDebug, ProcessInfo.processInfo.environment["WINMUX_DEBUG_SIDEBAR_PROJECT"] == "1" else { return }
-    fputs("[sidebar-project-debug] \(Date()) \(message())\n", stderr)
+    let text = message()
+    Logger(subsystem: winMuxAppId, category: category.rawValue).debug("\(text, privacy: .public)")
 }
 
 @inlinable

@@ -165,7 +165,7 @@ func scheduleRefreshSession(
     if shouldDropScheduledRefresh(event, activeEvent: activeScheduledRefreshEvent) ||
         shouldDropScheduledRefresh(event, activeEvent: pendingRefreshRequest?.event)
     {
-        debugFocusLog("scheduleRefreshSession dropped event=\(event) active=\(activeScheduledRefreshEvent?.description ?? "nil") pending=\(pendingRefreshRequest?.event.description ?? "nil")")
+        debugLog(.focus, "scheduleRefreshSession dropped event=\(event) active=\(activeScheduledRefreshEvent?.description ?? "nil") pending=\(pendingRefreshRequest?.event.description ?? "nil")")
         return
     }
     // Coalesce instead of cancel-and-restart: cancelling the in-flight session on every event
@@ -284,7 +284,7 @@ private func performRefreshSession(
     }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
     let activation = pendingActivation
-    debugFocusLog("runRefreshSessionBlocking begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
+    debugLog(.focus, "runRefreshSessionBlocking begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
     try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
@@ -333,8 +333,7 @@ private func performRefreshSession(
                     ) {
                         let logicalFocused = focus.windowOrNil
                         if logicalFocused?.windowId != nativeFocused?.windowId {
-                            debugFocusLog(
-                                "runRefreshSessionBlocking syncFocus event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocused=\(logicalFocused?.windowId.description ?? "nil")"
+                            debugLog(.focus, "runRefreshSessionBlocking syncFocus event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocused=\(logicalFocused?.windowId.description ?? "nil")"
                             )
                             logicalFocused?.nativeFocus()
                         } else {
@@ -349,8 +348,7 @@ private func performRefreshSession(
                                ) == true {
                                 window.macApp.nativeFocus(window.windowId, forceRaise: true)
                             }
-                            debugFocusLog(
-                                "runRefreshSessionBlocking skipSyncFocus event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocused=\(logicalFocused?.windowId.description ?? "nil")"
+                            debugLog(.focus, "runRefreshSessionBlocking skipSyncFocus event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocused=\(logicalFocused?.windowId.description ?? "nil")"
                             )
                         }
                     }
@@ -362,7 +360,7 @@ private func performRefreshSession(
                 }
                 await updateWindowTabModel()
                 schedulePersistedFrozenWorldSave()
-                debugFocusLog("runRefreshSessionBlocking end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focus=\(debugDescribe(focus))")
+                debugLog(.focus, "runRefreshSessionBlocking end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focus=\(debugDescribe(focus))")
             }
         }
     }
@@ -407,7 +405,7 @@ private func performLightSession<T>(
         }
     }
     let focusSnapshot = captureRefreshSessionFocusSnapshot()
-    debugFocusLog("runLightSession begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
+    debugLog(.focus, "runLightSession begin event=\(event) snapshot=\(debugDescribe(focusSnapshot))")
     return try await $refreshSessionEvent.withValue(event) {
         try await $_isStartup.withValue(event.isStartup) {
             try await $_refreshSessionFocusSnapshot.withValue(focusSnapshot) {
@@ -434,7 +432,7 @@ private func performLightSession<T>(
                 if shouldSchedulePostRefresh || pendingRefreshRequest != nil {
                     scheduleRefreshSession(event)
                 }
-                debugFocusLog("runLightSession end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focusBefore=\(focusBefore?.windowId.description ?? "nil") focusAfter=\(focusAfter?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
+                debugLog(.focus, "runLightSession end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focusBefore=\(focusBefore?.windowId.description ?? "nil") focusAfter=\(focusAfter?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
                 return result
             }
         }
@@ -575,7 +573,7 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         : nil
     let emittingAppPid = axTaskLocalAppThreadToken?.pid
     if notif == kAXFocusedWindowChangedNotification as String || notif == kAXUIElementDestroyedNotification as String {
-        debugFocusLog("refreshObs notif=\(notif)")
+        debugLog(.focus, "refreshObs notif=\(notif)")
     }
     // Minimize state changed: drop the event-invalidated native-state cache for this window so
     // the next normalizeLayoutReason pass fetches it live. containingWindowId runs here on the

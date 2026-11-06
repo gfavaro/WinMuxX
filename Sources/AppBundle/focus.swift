@@ -243,8 +243,7 @@ extension Workspace {
         onFocusedMonitorChanged(focus)
     }
     if hasFocusChanged {
-        debugFocusLog(
-            "checkOnFocusChangedCallbacks event=\(refreshSessionEvent.prettyDescription) lastKnown=\(debugDescribe(lastKnownFocusBefore.liveOrNil)) -> focus=\(debugDescribe(focus)) prev=\(debugDescribe(prevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previous?.liveOrNil)) prevPrev=\(debugDescribe(prevPrevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previousPrevious?.liveOrNil))"
+        debugLog(.focus, "checkOnFocusChangedCallbacks event=\(refreshSessionEvent.prettyDescription) lastKnown=\(debugDescribe(lastKnownFocusBefore.liveOrNil)) -> focus=\(debugDescribe(focus)) prev=\(debugDescribe(prevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previous?.liveOrNil)) prevPrev=\(debugDescribe(prevPrevFocusBefore?.liveOrNil)) -> \(debugDescribe(runtime.focus.previousPrevious?.liveOrNil))"
         )
     }
 }

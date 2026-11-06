@@ -23,7 +23,7 @@ extension WorkspaceSidebarPanel {
         let inside = isMouseInsideVisibleRegion()
         let shouldIgnoreMouseEvents = !inside || shouldSuppressHoverForPointerPress
         if ignoresMouseEvents != shouldIgnoreMouseEvents {
-            debugWorkspaceSidebarHoverLog("mousePassthrough panel=\(monitorScopeId) ignores \(ignoresMouseEvents)->\(shouldIgnoreMouseEvents) insideVisible=\(inside) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
+            debugLog(.sidebarHover, "mousePassthrough panel=\(monitorScopeId) ignores \(ignoresMouseEvents)->\(shouldIgnoreMouseEvents) insideVisible=\(inside) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
             ignoresMouseEvents = shouldIgnoreMouseEvents
         }
     }
@@ -38,7 +38,7 @@ extension WorkspaceSidebarPanel {
         let hoverRegion = workspaceSidebarVisibleFrame(panel: frame, width: hoverWidth, position: config.workspaceSidebar.position)
         let inside = hoverRegion.contains(NSEvent.mouseLocation)
         if viewModel.workspaceSidebarVisibleWidth > workspaceSidebarRestingWidth(config.workspaceSidebar) + 0.5 || pendingCollapse != nil {
-            debugWorkspaceSidebarHoverLog("hoverRegion panel=\(monitorScopeId) inside=\(inside) hoverWidth=\(hoverWidth) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation) suppressUntil=\(splitBrowseCollapseSuppressedUntil)")
+            debugLog(.sidebarHover, "hoverRegion panel=\(monitorScopeId) inside=\(inside) hoverWidth=\(hoverWidth) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation) suppressUntil=\(splitBrowseCollapseSuppressedUntil)")
         }
         return inside
     }

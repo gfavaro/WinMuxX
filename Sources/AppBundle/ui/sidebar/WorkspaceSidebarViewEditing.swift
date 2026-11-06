@@ -4,7 +4,7 @@ import SwiftUI
 
 extension WorkspaceSidebarView {
     func beginProjectRename(_ project: WorkspaceSidebarProjectViewModel) {
-        debugWorkspaceSidebarRenameLog("beginProjectRename project=\(project.id.rawValue) displayName=\(project.displayName) active=\(snapshot.activeProjectId.rawValue) visibleWidth=\(snapshot.visibleWidth)")
+        debugLog(.sidebarRename, "beginProjectRename project=\(project.id.rawValue) displayName=\(project.displayName) active=\(snapshot.activeProjectId.rawValue) visibleWidth=\(snapshot.visibleWidth)")
         finishSidebarSearch(clearText: false)
         if project.id != snapshot.activeProjectId {
             browseMode = .split(otherProjectId: project.id)
@@ -18,7 +18,7 @@ extension WorkspaceSidebarView {
     func finishProjectRename(cancelled: Bool = false) {
         guard let projectId = renamingProjectId else { return }
         let displayName = renamingProjectText.trimmingCharacters(in: .whitespacesAndNewlines)
-        debugWorkspaceSidebarRenameLog("finishProjectRename project=\(projectId.rawValue) cancelled=\(cancelled) raw=\(renamingProjectText) trimmed=\(displayName)")
+        debugLog(.sidebarRename, "finishProjectRename project=\(projectId.rawValue) cancelled=\(cancelled) raw=\(renamingProjectText) trimmed=\(displayName)")
         renamingProjectId = nil
         renamingProjectText = ""
         currentPanel()?.endInlineTextEditing()
@@ -27,7 +27,7 @@ extension WorkspaceSidebarView {
     }
 
     func beginWorkspaceRename(_ workspace: WorkspaceSidebarWorkspaceViewModel) {
-        debugWorkspaceSidebarRenameLog("beginWorkspaceRename workspace=\(workspace.name) displayName=\(workspace.displayName) targetScope=\(snapshot.targetMonitorScopeId) activeProject=\(snapshot.activeProjectId.rawValue) visibleWidth=\(snapshot.visibleWidth)")
+        debugLog(.sidebarRename, "beginWorkspaceRename workspace=\(workspace.name) displayName=\(workspace.displayName) targetScope=\(snapshot.targetMonitorScopeId) activeProject=\(snapshot.activeProjectId.rawValue) visibleWidth=\(snapshot.visibleWidth)")
         finishSidebarSearch(clearText: false)
         finishProjectRename(cancelled: true)
         renamingWorkspaceName = workspace.name
@@ -38,7 +38,7 @@ extension WorkspaceSidebarView {
     func finishWorkspaceRename(cancelled: Bool = false) {
         guard let workspaceName = renamingWorkspaceName else { return }
         let displayName = renamingWorkspaceText.trimmingCharacters(in: .whitespacesAndNewlines)
-        debugWorkspaceSidebarRenameLog("finishWorkspaceRename workspace=\(workspaceName) cancelled=\(cancelled) raw=\(renamingWorkspaceText) trimmed=\(displayName) targetScope=\(snapshot.targetMonitorScopeId)")
+        debugLog(.sidebarRename, "finishWorkspaceRename workspace=\(workspaceName) cancelled=\(cancelled) raw=\(renamingWorkspaceText) trimmed=\(displayName) targetScope=\(snapshot.targetMonitorScopeId)")
         renamingWorkspaceName = nil
         renamingWorkspaceText = ""
         currentPanel()?.endInlineTextEditing()

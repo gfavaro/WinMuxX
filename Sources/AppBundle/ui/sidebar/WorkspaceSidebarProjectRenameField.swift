@@ -11,17 +11,17 @@ final class WorkspaceSidebarProjectRenameNSTextField: NSTextField {
 
     override func becomeFirstResponder() -> Bool {
         let result = super.becomeFirstResponder()
-        debugWorkspaceSidebarRenameLog("textField becomeFirstResponder result=\(result) windowKey=\(window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: window?.firstResponder))")
+        debugLog(.sidebarRename, "textField becomeFirstResponder result=\(result) windowKey=\(window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: window?.firstResponder))")
         return result
     }
 
     override func resignFirstResponder() -> Bool {
-        debugWorkspaceSidebarRenameLog("textField resignFirstResponder windowKey=\(window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: window?.firstResponder))")
+        debugLog(.sidebarRename, "textField resignFirstResponder windowKey=\(window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: window?.firstResponder))")
         return super.resignFirstResponder()
     }
 
     override func keyDown(with event: NSEvent) {
-        debugWorkspaceSidebarRenameLog("textField keyDown keyCode=\(event.keyCode) chars=\(event.charactersIgnoringModifiers ?? "nil") stringBefore=\(stringValue)")
+        debugLog(.sidebarRename, "textField keyDown keyCode=\(event.keyCode) chars=\(event.charactersIgnoringModifiers ?? "nil") stringBefore=\(stringValue)")
         super.keyDown(with: event)
     }
 }
@@ -33,7 +33,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
     let onPanelReady: @MainActor (WorkspaceSidebarPanel) -> Void
 
     func makeNSView(context: Context) -> NSTextField {
-        debugWorkspaceSidebarRenameLog("makeNSView text=\(text)")
+        debugLog(.sidebarRename, "makeNSView text=\(text)")
         let field = WorkspaceSidebarProjectRenameNSTextField(string: text)
         field.isBordered = false
         field.isBezeled = false
@@ -56,7 +56,7 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
     func updateNSView(_ field: NSTextField, context: Context) {
         field.textColor = context.environment.workspaceSidebarAppearance == .system ? .labelColor : .white
         field.appearance = NSAppearance(named: context.environment.colorScheme == .dark ? .darkAqua : .aqua)
-        debugWorkspaceSidebarRenameLog("updateNSView didFocus=\(context.coordinator.didFocus) text=\(text) field=\(field.stringValue) windowKey=\(field.window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: field.window?.firstResponder))")
+        debugLog(.sidebarRename, "updateNSView didFocus=\(context.coordinator.didFocus) text=\(text) field=\(field.stringValue) windowKey=\(field.window?.isKeyWindow.description ?? "nil") firstResponder=\(String(describing: field.window?.firstResponder))")
         if field.stringValue != text {
             field.stringValue = text
         }
@@ -104,14 +104,14 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
             // The field's attachment calls this again.
             guard let window = field.window else { return }
             let panel = (window as? WorkspaceSidebarPanel) ?? WorkspaceSidebarPanel.shared
-            debugWorkspaceSidebarRenameLog("focus before panelKey=\(panel.isKeyWindow) fieldWindowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder))")
+            debugLog(.sidebarRename, "focus before panelKey=\(panel.isKeyWindow) fieldWindowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder))")
             panel.prepareForInlineTextEditing()
             onPanelReady(panel)
             window.makeKeyAndOrderFront(nil)
             let didBecomeFirstResponder = window.makeFirstResponder(field)
             field.selectText(nil)
             didFocus = didBecomeFirstResponder && window.isKeyWindow && window.firstResponder === field.currentEditor()
-            debugWorkspaceSidebarRenameLog("focus result makeFirstResponder=\(didBecomeFirstResponder) didFocus=\(didFocus) windowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder)) currentEditor=\(String(describing: field.currentEditor())) selectedRange=\(field.currentEditor()?.selectedRange ?? NSRange(location: -1, length: -1))")
+            debugLog(.sidebarRename, "focus result makeFirstResponder=\(didBecomeFirstResponder) didFocus=\(didFocus) windowKey=\(window.isKeyWindow) firstResponder=\(String(describing: window.firstResponder)) currentEditor=\(String(describing: field.currentEditor())) selectedRange=\(field.currentEditor()?.selectedRange ?? NSRange(location: -1, length: -1))")
             if didFocus { stopWaitingForKey() } else if !window.isKeyWindow { focusWhenKey(field, window) }
         }
 
@@ -137,11 +137,11 @@ struct WorkspaceSidebarProjectRenameTextField: NSViewRepresentable {
         func controlTextDidChange(_ notification: Notification) {
             guard let field = notification.object as? NSTextField else { return }
             text = field.stringValue
-            debugWorkspaceSidebarRenameLog("controlTextDidChange text=\(text)")
+            debugLog(.sidebarRename, "controlTextDidChange text=\(text)")
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            debugWorkspaceSidebarRenameLog("control command=\(commandSelector) text=\(textView.string)")
+            debugLog(.sidebarRename, "control command=\(commandSelector) text=\(textView.string)")
             guard !textView.hasMarkedText() else { return false }
             switch commandSelector {
                 case #selector(NSResponder.insertNewline(_:)):
@@ -185,10 +185,10 @@ struct WorkspaceSidebarProjectRenameField: View {
                     .strokeBorder(workspaceSidebarProjectColor(projectId: project.id, configuredHex: project.colorHex).opacity(0.75), lineWidth: 0.8)
             }
             .onAppear {
-                debugWorkspaceSidebarRenameLog("renameField onAppear project=\(project.id.rawValue) text=\(text)")
+                debugLog(.sidebarRename, "renameField onAppear project=\(project.id.rawValue) text=\(text)")
             }
             .onDisappear {
-                debugWorkspaceSidebarRenameLog("renameField onDisappear project=\(project.id.rawValue) text=\(text)")
+                debugLog(.sidebarRename, "renameField onDisappear project=\(project.id.rawValue) text=\(text)")
                 WorkspaceSidebarPanel.activeInlineTextEditingPanel?.endInlineTextEditing()
             }
     }
@@ -229,10 +229,10 @@ struct WorkspaceSidebarWorkspaceRenameField: View {
                 .strokeBorder(sidebarColors.foreground.opacity(0.62), lineWidth: 0.8)
         }
         .onAppear {
-            debugWorkspaceSidebarRenameLog("workspaceRenameField onAppear workspace=\(workspaceName) text=\(text)")
+            debugLog(.sidebarRename, "workspaceRenameField onAppear workspace=\(workspaceName) text=\(text)")
         }
         .onDisappear {
-            debugWorkspaceSidebarRenameLog("workspaceRenameField onDisappear workspace=\(workspaceName) text=\(text)")
+            debugLog(.sidebarRename, "workspaceRenameField onDisappear workspace=\(workspaceName) text=\(text)")
             WorkspaceSidebarPanel.activeInlineTextEditingPanel?.endInlineTextEditing()
         }
     }

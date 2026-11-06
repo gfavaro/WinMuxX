@@ -48,8 +48,7 @@ func handleWorkspaceSidebarAction(
         case .selectWindow(let windowId):
             focusWindowFromSidebar(windowId)
         case .selectProject(let projectId):
-            debugWorkspaceSidebarProjectLog(
-                "adapterSelectProject project=\(projectId.rawValue) targetScope=\(targetMonitorScopeId ?? "nil") modelActive=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+            debugLog(.sidebarProject, "adapterSelectProject project=\(projectId.rawValue) targetScope=\(targetMonitorScopeId ?? "nil") modelActive=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
             )
             selectWorkspaceSidebarProject(projectId, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
         case .createProject:

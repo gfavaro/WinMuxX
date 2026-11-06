@@ -108,8 +108,7 @@ struct WorkspaceSidebarView: View {
             }
         }
         .onChange(of: snapshot.activeProjectId) { projectId in
-            debugWorkspaceSidebarProjectLog(
-                "snapshotActiveProjectChanged active=\(projectId.rawValue) visibleWidth=\(snapshot.visibleWidth) projects=\(snapshot.projects.map(\.id.rawValue))"
+            debugLog(.sidebarProject, "snapshotActiveProjectChanged active=\(projectId.rawValue) visibleWidth=\(snapshot.visibleWidth) projects=\(snapshot.projects.map(\.id.rawValue))"
             )
             browseMode = .activeProject
             showsPinnedActiveWorkspaceForBrowsedProject = true
@@ -145,7 +144,7 @@ struct WorkspaceSidebarView: View {
                   let panel = WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)
             else { return }
             let targetWidth = mode.isSplit ? expandedWidth * 2 : expandedWidth
-            debugWorkspaceSidebarHoverLog("browseProjectWidthChange panel=\(snapshot.targetMonitorScopeId) project=\(mode.otherProjectId?.rawValue ?? "nil") snapshotWidth=\(snapshot.visibleWidth) target=\(targetWidth) frame=\(panel.frame) mouse=\(NSEvent.mouseLocation)")
+            debugLog(.sidebarHover, "browseProjectWidthChange panel=\(snapshot.targetMonitorScopeId) project=\(mode.otherProjectId?.rawValue ?? "nil") snapshotWidth=\(snapshot.visibleWidth) target=\(targetWidth) frame=\(panel.frame) mouse=\(NSEvent.mouseLocation)")
             panel.cancelExpansionWork()
             panel.viewModel.isWorkspaceSidebarExpanded = true
             panel.splitBrowseCollapseSuppressedUntil = mode.isSplit ? Date().addingTimeInterval(0.65) : .distantPast

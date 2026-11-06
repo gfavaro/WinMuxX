@@ -36,6 +36,6 @@ func runSettledDisplayChangeHook() {
                                       shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh) {
                 _ = try await commands.runCmdSeq(context, .emptyStdin)
             }
-        } catch { debugFocusLog("Display change hook failed: \(error)") }
+        } catch { debugLog(.focus, "Display change hook failed: \(error)") }
     }
 }

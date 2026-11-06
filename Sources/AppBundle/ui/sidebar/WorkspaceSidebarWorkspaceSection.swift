@@ -85,7 +85,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
                     Divider()
                 }
                 Button {
-                    debugWorkspaceSidebarRenameLog("workspaceContextRename workspace=\(workspace.name) displayName=\(workspace.displayName) compact=\(isCompact)")
+                    debugLog(.sidebarRename, "workspaceContextRename workspace=\(workspace.name) displayName=\(workspace.displayName) compact=\(isCompact)")
                     onBeginRenameWorkspace()
                 } label: {
                     Text("Rename Workspace")

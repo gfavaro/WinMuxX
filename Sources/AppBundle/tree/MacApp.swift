@@ -284,8 +284,7 @@ final class MacApp: AbstractApp {
                 lastNativeFocusedWindowId: lastNativeFocusedWindowId,
                 logicalWindowsCount: logicalWindowCount,
             )
-        debugFocusLog(
-            "MacApp.nativeFocus app=\(nsApp.localizedName ?? rawAppBundleId ?? String(pid)) target=\(windowId) lastNative=\(lastNativeFocusedWindowId?.description ?? "nil") logicalWindowsCount=\(logicalWindowCount) windowsCount=\(windowsCount) strategy=\(useActivationOnly ? "activate" : "ax-focus")"
+        debugLog(.focus, "MacApp.nativeFocus app=\(nsApp.localizedName ?? rawAppBundleId ?? String(pid)) target=\(windowId) lastNative=\(lastNativeFocusedWindowId?.description ?? "nil") logicalWindowsCount=\(logicalWindowCount) windowsCount=\(windowsCount) strategy=\(useActivationOnly ? "activate" : "ax-focus")"
         )
         if useActivationOnly
         {

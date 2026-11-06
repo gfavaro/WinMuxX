@@ -26,8 +26,7 @@ struct FocusAfterWindowClosureReplacement {
            closeFallbackTabGroup != nil,
            closeFallbackTabGroup === previousFocusTabGroup
         {
-            debugFocusLog(
-                "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotPreviousFocusWithinSameTabGroup=\(debugDescribe(previousFocus)) snapshotCloseFallback=\(debugDescribe(closeFallback)) current=\(debugDescribe(currentFocus))"
+            debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotPreviousFocusWithinSameTabGroup=\(debugDescribe(previousFocus)) snapshotCloseFallback=\(debugDescribe(closeFallback)) current=\(debugDescribe(currentFocus))"
             )
             return previousFocus
         }
@@ -39,8 +38,7 @@ struct FocusAfterWindowClosureReplacement {
            closeFallbackTabGroup != nil,
            closeFallbackTabGroup === previousPreviousFocusTabGroup
         {
-            debugFocusLog(
-                "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotPreviousPreviousFocusWithinSameTabGroup=\(debugDescribe(previousPreviousFocus)) snapshotCloseFallback=\(debugDescribe(closeFallback)) snapshotPrev=\(debugDescribe(previousFocus)) current=\(debugDescribe(currentFocus))"
+            debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotPreviousPreviousFocusWithinSameTabGroup=\(debugDescribe(previousPreviousFocus)) snapshotCloseFallback=\(debugDescribe(closeFallback)) snapshotPrev=\(debugDescribe(previousFocus)) current=\(debugDescribe(currentFocus))"
             )
             return previousPreviousFocus
         }

@@ -8,7 +8,7 @@ extension WorkspaceSidebarPanel {
         let expandedWidth = CGFloat(config.workspaceSidebar.width)
         let collapsedWidth = workspaceSidebarRestingWidth(config.workspaceSidebar)
         if viewModel.workspaceSidebarVisibleWidth > collapsedWidth + 0.5 || pendingCollapse != nil {
-            debugWorkspaceSidebarHoverLog("setHovering panel=\(monitorScopeId) isHovering=\(isHovering) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
+            debugLog(.sidebarHover, "setHovering panel=\(monitorScopeId) isHovering=\(isHovering) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
         }
         if isHovering {
             handleHoverEnter(
@@ -161,7 +161,7 @@ extension WorkspaceSidebarPanel {
 
 extension WorkspaceSidebarPanel {
     func handleHoverExit(collapsedWidth: CGFloat) {
-        debugWorkspaceSidebarHoverLog("handleHoverExit panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) expanded=\(viewModel.isWorkspaceSidebarExpanded) suppressActive=\(Date() < splitBrowseCollapseSuppressedUntil) mouse=\(NSEvent.mouseLocation)")
+        debugLog(.sidebarHover, "handleHoverExit panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) expanded=\(viewModel.isWorkspaceSidebarExpanded) suppressActive=\(Date() < splitBrowseCollapseSuppressedUntil) mouse=\(NSEvent.mouseLocation)")
         cancelHoverReveal()
         guard !config.workspaceSidebar.alwaysExpanded else {
             cancelExpansionWork()
@@ -169,18 +169,18 @@ extension WorkspaceSidebarPanel {
             return
         }
         guard Date() >= splitBrowseCollapseSuppressedUntil else {
-            debugWorkspaceSidebarHoverLog("handleHoverExit suppressed panel=\(monitorScopeId)")
+            debugLog(.sidebarHover, "handleHoverExit suppressed panel=\(monitorScopeId)")
             return
         }
         guard !shouldLockExpansionForSidebarDrag() else {
-            debugWorkspaceSidebarHoverLog("handleHoverExit locked panel=\(monitorScopeId)")
+            debugLog(.sidebarHover, "handleHoverExit locked panel=\(monitorScopeId)")
             return
         }
         let needsCollapse =
             viewModel.isWorkspaceSidebarExpanded ||
             viewModel.workspaceSidebarVisibleWidth != collapsedWidth
         guard needsCollapse, pendingCollapse == nil else {
-            debugWorkspaceSidebarHoverLog("handleHoverExit noop panel=\(monitorScopeId) needsCollapse=\(needsCollapse) pendingCollapse=\(pendingCollapse != nil)")
+            debugLog(.sidebarHover, "handleHoverExit noop panel=\(monitorScopeId) needsCollapse=\(needsCollapse) pendingCollapse=\(pendingCollapse != nil)")
             return
         }
         scheduleCollapse(collapsedWidth: collapsedWidth)
@@ -188,21 +188,21 @@ extension WorkspaceSidebarPanel {
 
     func scheduleCollapse(collapsedWidth: CGFloat) {
         guard !config.workspaceSidebar.alwaysExpanded else { return }
-        debugWorkspaceSidebarHoverLog("scheduleCollapse panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) mouse=\(NSEvent.mouseLocation)")
+        debugLog(.sidebarHover, "scheduleCollapse panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) mouse=\(NSEvent.mouseLocation)")
         NotificationCenter.default.post(name: workspaceSidebarWillCollapseNotification, object: self)
         let collapse = DispatchWorkItem { [weak self] in
             guard let self else { return }
             self.pendingCollapse = nil
             guard !config.workspaceSidebar.alwaysExpanded else { return }
-            debugWorkspaceSidebarHoverLog("collapseFire panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
+            debugLog(.sidebarHover, "collapseFire panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
             guard Date() >= self.splitBrowseCollapseSuppressedUntil else {
-                debugWorkspaceSidebarHoverLog("collapseFire suppressed panel=\(self.monitorScopeId)")
+                debugLog(.sidebarHover, "collapseFire suppressed panel=\(self.monitorScopeId)")
                 return
             }
             let inside = self.isMouseInsideHoverRegion()
             let locked = self.shouldLockExpansionForSidebarDrag()
             guard !inside, !locked else {
-                debugWorkspaceSidebarHoverLog("collapseFire cancelled panel=\(self.monitorScopeId) inside=\(inside) locked=\(locked)")
+                debugLog(.sidebarHover, "collapseFire cancelled panel=\(self.monitorScopeId) inside=\(inside) locked=\(locked)")
                 return
             }
             self.animateVisibleSidebarWidth(collapsedWidth, animation: .easeInOut(duration: self.animationDuration))
@@ -218,12 +218,12 @@ extension WorkspaceSidebarPanel {
             guard let self else { return }
             self.pendingCollapseFinalize = nil
             guard !config.workspaceSidebar.alwaysExpanded else { return }
-            debugWorkspaceSidebarHoverLog("collapseFinalize panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
+            debugLog(.sidebarHover, "collapseFinalize panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
             guard Date() >= self.splitBrowseCollapseSuppressedUntil else { return }
             let inside = self.isMouseInsideHoverRegion()
             let locked = self.shouldLockExpansionForSidebarDrag()
             guard !inside, !locked else {
-                debugWorkspaceSidebarHoverLog("collapseFinalize cancelled panel=\(self.monitorScopeId) inside=\(inside) locked=\(locked)")
+                debugLog(.sidebarHover, "collapseFinalize cancelled panel=\(self.monitorScopeId) inside=\(inside) locked=\(locked)")
                 return
             }
             viewModel.isWorkspaceSidebarExpanded = false

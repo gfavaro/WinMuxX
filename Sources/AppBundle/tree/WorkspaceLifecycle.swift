@@ -5,7 +5,7 @@ import Common
 func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor) -> Workspace? {
     materializePersistedWorkspaceProjects()
     guard runtime.workspaces.projectsById[projectId] != nil else {
-        debugWorkspaceSidebarProjectLog("switchProjectAbort unknownProject=\(projectId.rawValue)")
+        debugLog(.sidebarProject, "switchProjectAbort unknownProject=\(projectId.rawValue)")
         return nil
     }
     let viewportId = MonitorViewportId(monitor)
@@ -17,8 +17,7 @@ func switchWorkspaceProject(_ projectId: WorkspaceProjectId, on monitor: Monitor
         ?? availablePreferredWorkspace(projectId: projectId, monitor: monitor)
         ?? createBlankWorkspace(projectId: projectId, monitor: monitor)
     let didSetActive = monitor.setActiveWorkspace(workspace)
-    debugWorkspaceSidebarProjectLog(
-        "switchProject project=\(projectId.rawValue) viewport=\(viewportId.description) remembered=\(rememberedWorkspace?.name ?? "nil") chosen=\(workspace.name) chosenProject=\(workspace.projectId.rawValue) didSetActive=\(didSetActive)"
+    debugLog(.sidebarProject, "switchProject project=\(projectId.rawValue) viewport=\(viewportId.description) remembered=\(rememberedWorkspace?.name ?? "nil") chosen=\(workspace.name) chosenProject=\(workspace.projectId.rawValue) didSetActive=\(didSetActive)"
     )
     return didSetActive ? workspace : nil
 }

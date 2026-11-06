@@ -30,7 +30,7 @@ final class DoubleSidedWindowGesture {
             eventsOfInterest: mask, callback: doubleSidedWindowEventCallback, userInfo: nil
         ), let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
         else {
-            debugFocusLog("doubleSidedWindows.eventTapUnavailable")
+            debugLog(.focus, "doubleSidedWindows.eventTapUnavailable")
             return
         }
         self.tap = tap

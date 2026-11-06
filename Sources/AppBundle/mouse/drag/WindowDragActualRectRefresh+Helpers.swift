@@ -20,8 +20,7 @@ func refreshActualRects(_ windows: [Window], sourceWindowId: UInt32) async {
             )
         }
         if let refreshedRect, !(previousRect.map { $0.isEqual(to: refreshedRect) } ?? false) {
-            debugFocusLog(
-                "windowDragActualRect.refresh source=\(sourceWindowId) target=\(window.windowId) old=\(debugDescribe(previousRect)) new=\(debugDescribe(refreshedRect)) layout=\(debugDescribe(window.lastAppliedLayoutPhysicalRect))"
+            debugLog(.focus, "windowDragActualRect.refresh source=\(sourceWindowId) target=\(window.windowId) old=\(debugDescribe(previousRect)) new=\(debugDescribe(refreshedRect)) layout=\(debugDescribe(window.lastAppliedLayoutPhysicalRect))"
             )
         }
     }

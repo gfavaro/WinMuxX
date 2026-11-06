@@ -52,7 +52,7 @@ private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?,
     let lastKnownNativeFocusedWindowIdBefore = runtime.nativeFocus.lastKnownWindowID
     if shouldIgnoreNativeFocusAfterWindowClosure(nativeFocused, now: now) {
         runtime.nativeFocus.lastKnownWindowID = nil
-        debugFocusLog("updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
+        debugLog(.focus, "updateFocusCache ignoredWindowClosure nativeFocused=\(nativeFocused?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
         return note("ignored:windowClosure")
     }
     // The launching app has its window now; focus may be taken back from it again.
@@ -80,8 +80,7 @@ private func shouldIgnoreNativeFocusAfterWindowClosure(_ nativeFocused: Window?,
         note("unchanged")
     }
     (nativeFocused?.app as? MacApp)?.lastNativeFocusedWindowId = nativeFocused?.windowId
-    debugFocusLog(
-        "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(runtime.nativeFocus.lastKnownWindowID?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
+    debugLog(.focus, "updateFocusCache event=\(refreshSessionEvent.prettyDescription) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") lastKnownNative=\(lastKnownNativeFocusedWindowIdBefore?.description ?? "nil") -> \(runtime.nativeFocus.lastKnownWindowID?.description ?? "nil") logicalFocus=\(debugDescribe(focus))"
     )
 }
 

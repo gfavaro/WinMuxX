@@ -7,7 +7,7 @@ extension WorkspaceSidebarPanel {
     func animateVisibleSidebarWidth(_ width: CGFloat, animation: Animation) {
         guard !isRetired else { return }
         loadContent()
-        debugWorkspaceSidebarHoverLog("animateWidth panel=\(monitorScopeId) from=\(viewModel.workspaceSidebarVisibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(viewModel.isWorkspaceSidebarExpanded)")
+        debugLog(.sidebarHover, "animateWidth panel=\(monitorScopeId) from=\(viewModel.workspaceSidebarVisibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(viewModel.isWorkspaceSidebarExpanded)")
         pendingBackingResize?.cancel()
         let resize = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -37,7 +37,7 @@ extension WorkspaceSidebarPanel {
 
     func expandSidebar(to expandedWidth: CGFloat) {
         guard !isRetired else { return }
-        debugWorkspaceSidebarHoverLog("expandSidebar panel=\(monitorScopeId) target=\(expandedWidth) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
+        debugLog(.sidebarHover, "expandSidebar panel=\(monitorScopeId) target=\(expandedWidth) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
         // Search focus and hover updates may request the same reveal again.
         // Keep its notification and animation intact instead of restarting them.
         if viewModel.isWorkspaceSidebarExpanded, viewModel.workspaceSidebarVisibleWidth == expandedWidth,
@@ -65,7 +65,7 @@ extension WorkspaceSidebarPanel {
     }
 
     func cancelExpansionWork() {
-        debugWorkspaceSidebarHoverLog("cancelExpansionWork panel=\(monitorScopeId) pendingExpand=\(pendingExpand != nil) pendingCollapse=\(pendingCollapse != nil) pendingFinalize=\(pendingCollapseFinalize != nil)")
+        debugLog(.sidebarHover, "cancelExpansionWork panel=\(monitorScopeId) pendingExpand=\(pendingExpand != nil) pendingCollapse=\(pendingCollapse != nil) pendingFinalize=\(pendingCollapseFinalize != nil)")
         pendingBackingResize?.cancel()
         pendingBackingResize = nil
         cancelHoverReveal()

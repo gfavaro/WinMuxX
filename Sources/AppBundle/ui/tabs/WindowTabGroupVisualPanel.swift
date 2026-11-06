@@ -29,7 +29,7 @@ final class WindowTabGroupVisualPanel: NSPanelHud {
             currentContent = nextContent
         }
         currentPanelFrame = panelFrame
-        debugFocusLog("WindowTabGroupVisualPanel.update id=\(String(describing: identifier?.rawValue)) frame=\(panelFrame)")
+        debugLog(.focus, "WindowTabGroupVisualPanel.update id=\(String(describing: identifier?.rawValue)) frame=\(panelFrame)")
         setWindowTabChromePanelFrame(panelFrame, on: self)
         ignoresMouseEvents = true
         applyWindowTabVisualStackingPolicy(for: displayStrip, to: self)

@@ -77,7 +77,7 @@ private func handleMovedEvent(windowId: UInt32?, notif: String) async {
         } catch is CancellationError {
             // A newer interaction/session superseded this coalesced event.
         } catch {
-            debugFocusLog("moveWithMouse coalesced session failed windowId=\(windowId) error=\(error)")
+            debugLog(.focus, "moveWithMouse coalesced session failed windowId=\(windowId) error=\(error)")
         }
     }
 }

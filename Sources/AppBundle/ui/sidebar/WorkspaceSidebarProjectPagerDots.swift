@@ -10,8 +10,7 @@ extension WorkspaceSidebarProjectPager {
         let isDotHovered = hoveredProjectDotId == project.id
         let projectColor = workspaceSidebarProjectColor(projectId: project.id, configuredHex: project.colorHex)
         Button {
-            debugWorkspaceSidebarProjectLog(
-                "dotButton project=\(project.id.rawValue) selected=\(selectedProjectId.rawValue) currentIndex=\(currentIndex?.description ?? "nil") compact=\(isCompact) projects=\(projects.map(\.id.rawValue))"
+            debugLog(.sidebarProject, "dotButton project=\(project.id.rawValue) selected=\(selectedProjectId.rawValue) currentIndex=\(currentIndex?.description ?? "nil") compact=\(isCompact) projects=\(projects.map(\.id.rawValue))"
             )
             projectTrackScrollTargetId = project.id
             onSelectProject(project.id)

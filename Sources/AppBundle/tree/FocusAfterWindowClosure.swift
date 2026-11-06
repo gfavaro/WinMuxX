@@ -21,13 +21,13 @@ func focusAfterWindowClosure(
     // history fallbacks below and pull focus to an older window, often another app.
     // From WinMux PR #32 by Ilya Kudravets.
     guard focusedWindowIdBeforeClosure == closingWindow.windowId else {
-        debugFocusLog("focusAfterWindowClosure closing=\(closingWindow.windowId) skippedNotFocused focusedBefore=\(focusedWindowIdBeforeClosure?.description ?? "nil")")
+        debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) skippedNotFocused focusedBefore=\(focusedWindowIdBeforeClosure?.description ?? "nil")")
         return nil
     }
     guard deadWindowWorkspace == currentFocus.workspace ||
         deadWindowWorkspace == previousFocusedWorkspace && previousFocusedWorkspaceDate.distance(to: now) < 1
     else {
-        debugFocusLog("focusAfterWindowClosure closing=\(closingWindow.windowId) skipped currentFocus=\(debugDescribe(currentFocus)) previousFocusedWorkspace=\(previousFocusedWorkspace?.name ?? "nil")")
+        debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) skipped currentFocus=\(debugDescribe(currentFocus)) previousFocusedWorkspace=\(previousFocusedWorkspace?.name ?? "nil")")
         return nil
     }
 
@@ -46,8 +46,7 @@ func focusAfterWindowClosure(
         currentFocus: currentFocus,
         previousFocus: refreshSnapshotPreviousFocus,
     ) {
-        debugFocusLog(
-            "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotCloseFallback=\(debugDescribe(refreshSnapshotCloseFallback)) current=\(debugDescribe(currentFocus)) snapshotPrev=\(debugDescribe(refreshSnapshotPreviousFocus))"
+        debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) preferSnapshotCloseFallback=\(debugDescribe(refreshSnapshotCloseFallback)) current=\(debugDescribe(currentFocus)) snapshotPrev=\(debugDescribe(refreshSnapshotPreviousFocus))"
         )
         return refreshSnapshotCloseFallback
     }
@@ -60,13 +59,12 @@ func focusAfterWindowClosure(
         (previousFocus?.windowOrNil == closingWindow) ? previousPreviousFocus : nil,
     ]
     for candidate in fallbackHistory where replacement.isValid(candidate) {
-        debugFocusLog(
-            "focusAfterWindowClosure closing=\(closingWindow.windowId) choseCandidate=\(debugDescribe(candidate)) current=\(debugDescribe(currentFocus)) snapshotCloseFallback=\(debugDescribe(refreshSnapshotCloseFallback)) snapshotPrev=\(debugDescribe(refreshSnapshotPreviousFocus)) snapshotPrevPrev=\(debugDescribe(refreshSnapshotPreviousPreviousFocus)) prev=\(debugDescribe(previousFocus)) prevPrev=\(debugDescribe(previousPreviousFocus))"
+        debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) choseCandidate=\(debugDescribe(candidate)) current=\(debugDescribe(currentFocus)) snapshotCloseFallback=\(debugDescribe(refreshSnapshotCloseFallback)) snapshotPrev=\(debugDescribe(refreshSnapshotPreviousFocus)) snapshotPrevPrev=\(debugDescribe(refreshSnapshotPreviousPreviousFocus)) prev=\(debugDescribe(previousFocus)) prevPrev=\(debugDescribe(previousPreviousFocus))"
         )
         return candidate
     }
 
     let fallback = deadWindowWorkspace.toLiveFocus()
-    debugFocusLog("focusAfterWindowClosure closing=\(closingWindow.windowId) defaultFallback=\(debugDescribe(fallback))")
+    debugLog(.focus, "focusAfterWindowClosure closing=\(closingWindow.windowId) defaultFallback=\(debugDescribe(fallback))")
     return fallback
 }

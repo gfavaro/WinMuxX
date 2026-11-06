@@ -42,7 +42,7 @@ struct WorkspaceSwipeDependencies {
                  return try await runLightSession(.globalObserver("workspaceSwipe"), token, shouldSchedulePostRefresh: false, body: activate)
              }, navigationFailed: { error in
                  if TrayMenuModel.shared.isEnabled { scheduleRefreshSession(.globalObserver("workspaceSwipeInterrupted")) }
-                 if !(error is CancellationError) { debugFocusLog("workspaceSwipe navigation failed: \(error)") }
+                 if !(error is CancellationError) { debugLog(.focus, "workspaceSwipe navigation failed: \(error)") }
              }, keepsSwipe: {
                  isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled && !WindowBorderController.shared.isMissionControlActive &&
                      (isMouseManipulationActive || isLeftMouseButtonDown || isWorkspaceSidebarDragInProgress() || WorkspaceOverviewController.shared.isOpen)
