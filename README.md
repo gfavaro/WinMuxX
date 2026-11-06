@@ -711,9 +711,9 @@ The **Windows → Default layout → Default drag stack** setting chooses Accord
 Tabbed for new groups created by dragging (`drag-stack-layout = 'accordion'` or
 `'tab-group'`). Existing groups keep their layout; edge drops still split normally.
 
-### Experimental workspace swipes
+### Workspace swipes
 
-**Settings → Windows → Workspace swipes — experimental** enables three-finger
+**Settings → Windows → Workspace swipes** enables three-finger
 workspace swipes. It is off by default:
 
 ```toml

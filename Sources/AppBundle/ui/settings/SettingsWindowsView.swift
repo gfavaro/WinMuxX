@@ -103,7 +103,7 @@ struct ShortcutBehaviorSettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
 
             }
-            SettingsSection("Workspace swipes — experimental") {
+            SettingsSection("Workspace swipes") {
                 SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
                     persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
