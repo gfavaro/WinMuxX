@@ -24,7 +24,22 @@ func workspaceGesturesNeedRawTouch(horizontal: Bool, overview: Bool, overviewOpe
 final class WorkspaceGestureCoordinator {
     static let shared = WorkspaceGestureCoordinator()
     private var applyingConfiguration = false
+    private var trackpadGestures: [Int] = []
+
+    /// macOS's three-finger gesture settings, which decide whether WinMuxX reads macOS's swipes.
+    private static func readTrackpadGestures() -> [Int] {
+        ["TrackpadThreeFingerHorizSwipeGesture", "TrackpadThreeFingerVertSwipeGesture"].map(macTrackpadGesture)
+    }
+
+    /// System Settings changes those gestures without telling other apps, so they are read again
+    /// when it stops being frontmost or quits; a change re-routes the swipes.
+    func systemSettingsDeactivated() {
+        guard Self.readTrackpadGestures() != trackpadGestures else { return }
+        syncConfiguration()
+    }
+
     func syncConfiguration() {
+        trackpadGestures = Self.readTrackpadGestures()
         applyingConfiguration = true
         defer { applyingConfiguration = false }
         cancelInteractions()
