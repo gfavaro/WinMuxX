@@ -116,16 +116,21 @@ extension WindowTabStripView {
             )
                 .frame(maxWidth: .infinity)
 
-            // In a Tabbed workspace the handle carries the tab shown.
-            Color.clear
-                .frame(width: windowTabStripTrailingGroupDragGutterWidth)
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
-                    focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
-                }
-                .gesture(groupDragGesture(for: groupDragWindowId))
+            if strip.isWorkspaceTabs, let groupDragWindowId {
+                // A Tabbed workspace's group: splitting and merging, where other bars keep a drag gutter.
+                WorkspaceTabGroupMenuButton(windowId: groupDragWindowId, tabCount: strip.tabs.count)
+                    .frame(width: windowTabStripTrailingGroupDragGutterWidth)
+            } else {
+                Color.clear
+                    .frame(width: windowTabStripTrailingGroupDragGutterWidth)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
+                        focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
+                    }
+                    .gesture(groupDragGesture(for: groupDragWindowId))
+            }
 
             WindowTabGroupHandleView(
                 windowId: groupDragWindowId,
@@ -464,11 +469,19 @@ extension WindowTabStripView {
                     removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
                 }
             } else {
-                // A tab group of a Tabbed workspace: open the tab in a new group beside this one.
+                // A tab group of a Tabbed workspace: open the tab in a new group beside this one,
+                // or move it to a group beside.
                 Button("Move to New Column") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .right) }
                     .disabled(strip.tabs.count < 2)
                 Button("Move to New Row") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .down) }
                     .disabled(strip.tabs.count < 2)
+                let sides = tabbedGroupNeighborSides(of: tab.windowId)
+                if !sides.isEmpty {
+                    Divider()
+                    ForEach(sides, id: \.self) { side in
+                        Button("Move to Group \(side.tabbedGroupSideTitle)") { moveTabToNeighborGroupFromTabStrip(tab.windowId, side) }
+                    }
+                }
             }
         }
     }
@@ -484,5 +497,39 @@ extension WindowTabStripView {
     func moveTab(_ tab: WindowTabItemViewModel, by offset: Int) {
         guard let target = windowTabStripMoveTargetIndex(tab.windowId, by: offset, in: strip.tabs) else { return }
         reorderTabInStrip(tab.windowId, stripId: strip.id, toIndex: target)
+    }
+}
+
+/// The menu at the end of a Tabbed workspace's tab group bar: splits the tab shown into a new
+/// group, or merges groups back together.
+struct WorkspaceTabGroupMenuButton: View {
+    @SidebarColors var colors
+    let windowId: UInt32
+    let tabCount: Int
+
+    var body: some View {
+        Menu {
+            Button("Split Right") { moveTabToNewGroupFromTabStrip(windowId, side: .right) }
+                .disabled(tabCount < 2)
+            Button("Split Down") { moveTabToNewGroupFromTabStrip(windowId, side: .down) }
+                .disabled(tabCount < 2)
+            let sides = tabbedGroupNeighborSides(of: windowId)
+            Divider()
+            ForEach(sides, id: \.self) { side in
+                Button("Merge With Group \(side.tabbedGroupSideTitle)") { mergeTabGroupFromTabStrip(windowId, side) }
+            }
+            Button("Merge All Groups") { mergeAllTabGroupsFromTabStrip(windowId) }
+                .disabled(sides.isEmpty)
+        } label: {
+            Image(systemName: "rectangle.split.2x1")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(colors.text(opacity: GlassToken.textSecondary))
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .help("Split or merge tab groups")
+        .accessibilityLabel("Tab Group Options")
     }
 }

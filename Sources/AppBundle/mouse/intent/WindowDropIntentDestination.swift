@@ -98,6 +98,9 @@ private func tabbedGroupDropDestination(
 ) -> WindowDragIntentDestination? {
     guard let workspace = targetWindow.nodeWorkspace,
           let target = workspace.tabbedGroup(containing: targetWindow.windowId) else { return nil }
+    // A group's handle carries the whole group, which has nowhere to go beside or into itself.
+    let carriesGroup = subject == .group && source != nil
+    if carriesGroup, target === source { return nil }
     let kind: WindowDragIntentKind
     switch resolution.intent.zone {
         case .tab, .middle:
@@ -115,8 +118,10 @@ private func tabbedGroupDropDestination(
         kind: kind,
         previewRect: preview,
         interactionRect: resolution.targetFrame,
-        title: joins ? "Move to Tab Group" : "New Tab Group",
-        subtitle: joins ? "Drop to add this tab to that group" : "Drop to open the tab in a new group on this side",
+        title: carriesGroup ? (joins ? "Merge Tab Groups" : "Move Tab Group") : (joins ? "Move to Tab Group" : "New Tab Group"),
+        subtitle: carriesGroup
+            ? (joins ? "Drop to add all these tabs to that group" : "Drop to move the whole group to this side")
+            : (joins ? "Drop to add this tab to that group" : "Drop to open the tab in a new group on this side"),
         previewStyle: joins ? .tabInsert : .stackSplit,
         previewGeometry: joins ? .tabStrip : .rounded,
         isGroup: subject == .group,

@@ -478,6 +478,122 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.tabbedGroups.count, 3)
     }
 
+    func testMergingGroups() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.mergeTabbedGroup(right, into: left))
+        XCTAssertEqual(left.windowIds, windows.map(\.windowId), "Its tabs follow the group's own")
+        XCTAssertEqual(left.activeWindowId, right.activeWindowId, "showing the tab the merged group showed")
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[1].windowId, beside: left, on: .right))
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: left, on: .down))
+        XCTAssertEqual(workspace.tabbedGroups.count, 3)
+        XCTAssertTrue(workspace.mergeAllTabbedGroups(into: left))
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+        XCTAssertEqual(Set(left.windowIds), Set(windows.map(\.windowId)))
+        XCTAssertFalse(workspace.mergeAllTabbedGroups(into: left), "One group has nothing to merge")
+    }
+
+    func testTheHandleCarriesTheWholeGroup() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertEqual(applyTabbedGroupDragIntent(.stackSplit(targetWindowId: windows[0].windowId, position: .left),
+            sourceWindow: windows[1], subject: .group), true)
+        XCTAssertEqual(workspace.tabbedGroups.map(\.windowIds), [right.windowIds, left.windowIds], "The whole group moved to the left")
+        XCTAssertEqual(right.windowIds.count, 2)
+        let area = try XCTUnwrap(left.lastFrame)
+        let merge = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[1],
+            mouseLocation: CGPoint(x: area.center.x, y: area.center.y), subject: .group, detachOrigin: .tabStrip))
+        XCTAssertEqual(merge.title, "Merge Tab Groups")
+        XCTAssertEqual(applyTabbedGroupDragIntent(merge.kind, sourceWindow: windows[1], subject: .group), true)
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+        XCTAssertEqual(left.windowIds, [windows[0], windows[1], windows[2]].map(\.windowId))
+    }
+
+    func testAHandleCarriesItsGroupToAnotherTabbedWorkspace() async throws {
+        let (workspace, windows, left, _) = try await makeTwoGroups()
+        let other = Workspace.get(byName: "elsewhere")
+        other.arrangement = .tabbed
+        let resident = TestWindow.new(id: 29950, parent: other.rootTilingContainer)
+        other.syncTabbedGroups()
+        XCTAssertEqual(applyTabbedGroupDragIntent(.tabStack(targetWindowId: resident.windowId), sourceWindow: windows[2], subject: .group), true)
+        let joined = try XCTUnwrap(other.tabbedGroup(containing: resident.windowId))
+        XCTAssertEqual(joined.activeWindowId, windows[2].windowId, "Dragged by its second tab, the group keeps its order")
+        XCTAssertEqual(joined.windowIds, [resident, windows[1], windows[2]].map(\.windowId), "Both tabs of the group came over")
+        XCTAssertTrue(windows[0].nodeWorkspace === workspace, "The rest of the tree stayed")
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(workspace.tabbedGroups.map(\.windowIds), [left.windowIds])
+    }
+
+    func testAGroupMovedToAnotherWorkspaceKeepsItsFullscreenTab() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        windows[2].bind(to: workspace.macOsNativeFullscreenWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        windows[2].layoutReason = .macos(prevParentKind: .tilingContainer, prevWorkspaceName: workspace.name)
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(right.windowIds, [windows[1], windows[2]].map(\.windowId))
+        let other = Workspace.get(byName: "elsewhere")
+        other.arrangement = .tabbed
+        let resident = TestWindow.new(id: 29960, parent: other.rootTilingContainer)
+        other.syncTabbedGroups()
+        XCTAssertEqual(applyTabbedGroupDragIntent(.tabStack(targetWindowId: resident.windowId), sourceWindow: windows[1], subject: .group), true)
+        XCTAssertTrue(windows[2].nodeWorkspace === other, "The fullscreen window belongs to the new workspace")
+        XCTAssertTrue(windows[2].parent is MacosFullscreenWindowsContainer, "and stays fullscreen")
+        guard case .macos(_, let returnsTo) = windows[2].layoutReason else { return XCTFail("Still waiting on macOS") }
+        XCTAssertEqual(returnsTo, other.name, "Leaving fullscreen, it returns to its moved group")
+        other.syncTabbedGroups()
+        XCTAssertEqual(other.tabbedGroup(containing: resident.windowId)?.windowIds, [resident, windows[1], windows[2]].map(\.windowId))
+        workspace.syncTabbedGroups()
+        XCTAssertNil(workspace.tabbedGroup(containing: windows[2].windowId))
+    }
+
+    func testAGroupMovedToAnotherWorkspaceComesWhole() async throws {
+        let (workspace, windows, left, _) = try await makeTwoGroups()
+        let other = Workspace.get(byName: "elsewhere")
+        let carried = try XCTUnwrap(tabbedGroupCarried(by: windows[2]))
+        windows[2].unbindFromParent()
+        windows[2].bind(to: other.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        bringTabbedGroupAlong(carried, after: windows[2])
+        XCTAssertTrue(windows[1].nodeWorkspace === other, "The group's other tab followed")
+        XCTAssertEqual(workspace.tabbedGroups.map(\.windowIds), [left.windowIds], "Only the left group stays behind")
+    }
+
+    func testAGroupMovedIntoATabbedWorkspaceKeepsItsOrder() async throws {
+        let (_, windows, _, _) = try await makeTwoGroups()
+        let other = Workspace.get(byName: "elsewhere")
+        other.arrangement = .tabbed
+        let resident = TestWindow.new(id: 29970, parent: other.rootTilingContainer)
+        other.syncTabbedGroups()
+        let carried = try XCTUnwrap(tabbedGroupCarried(by: windows[2]))
+        windows[2].unbindFromParent()
+        windows[2].bind(to: other.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        bringTabbedGroupAlong(carried, after: windows[2])
+        let group = try XCTUnwrap(other.tabbedGroup(containing: windows[2].windowId))
+        XCTAssertEqual(group.windowIds, [resident, windows[1], windows[2]].map(\.windowId), "Its tabs arrive in order")
+        XCTAssertEqual(group.activeWindowId, windows[2].windowId)
+    }
+
+    func testSplitAndJoinWithWorkOnGroups() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        _ = windows[1].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        let split = try await run("split vertical")
+        XCTAssertEqual(split.exitCode, 0)
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(workspace.tabbedGroups.count, 2)
+        let below = try XCTUnwrap(workspace.tabbedGroup(containing: windows[1].windowId))
+        XCTAssertEqual(below.windowIds, [windows[1].windowId], "The tab opened in a row below")
+        XCTAssertTrue(focus.windowOrNil === windows[1])
+        let joined = try await run("join-with up")
+        XCTAssertEqual(joined.exitCode, 0)
+        XCTAssertEqual(workspace.tabbedGroups.count, 1, "It joined the group above")
+        let nothing = try await run("join-with left")
+        XCTAssertEqual(nothing.exitCode, 0, "Nothing on that side is not a failure")
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+        _ = windows[0].focusWindow()
+        let explicit = try await run("split --window-id \(windows[2].windowId) horizontal")
+        XCTAssertEqual(explicit.exitCode, 0)
+        XCTAssertTrue(focus.windowOrNil === windows[0], "Splitting another window leaves focus where it was")
+        XCTAssertEqual(workspace.tabbedGroup(containing: windows[2].windowId)?.windowIds, [windows[2].windowId])
+    }
+
     func testJoiningAGroupWorksWithWindowTabsOff() {
         let previous = config.windowTabs.enabled
         config.windowTabs.enabled = false

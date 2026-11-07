@@ -62,13 +62,59 @@ func reorderWorkspaceTab(_ window: Window, stripId: ObjectIdentifier, toIndex ta
 /// Moves a tab of a Tabbed workspace into a new tab group on `side` of its own.
 @MainActor
 func moveTabToNewGroupFromTabStrip(_ windowId: UInt32, side: CardinalDirection) {
+    editTabbedGroupsFromTabStrip(windowId) { workspace, group in workspace.moveTabbedTabToNewGroup(windowId, beside: group, on: side) }
+}
+
+/// Moves a tab of a Tabbed workspace into the tab group on `direction`'s side of its own.
+@MainActor
+func moveTabToNeighborGroupFromTabStrip(_ windowId: UInt32, _ direction: CardinalDirection) {
+    editTabbedGroupsFromTabStrip(windowId) { workspace, group in
+        workspace.tabbedGroup(beside: group, direction).map { workspace.moveTabbedTab(windowId, into: $0) } ?? false
+    }
+}
+
+/// Moves every tab of the tab's group into the group on `direction`'s side.
+@MainActor
+func mergeTabGroupFromTabStrip(_ windowId: UInt32, _ direction: CardinalDirection) {
+    editTabbedGroupsFromTabStrip(windowId) { workspace, group in
+        workspace.tabbedGroup(beside: group, direction).map { workspace.mergeTabbedGroup(group, into: $0) } ?? false
+    }
+}
+
+/// Gathers every tab group of the tab's workspace into the tab's own.
+@MainActor
+func mergeAllTabGroupsFromTabStrip(_ windowId: UInt32) {
+    editTabbedGroupsFromTabStrip(windowId) { workspace, group in workspace.mergeAllTabbedGroups(into: group) }
+}
+
+@MainActor
+private func editTabbedGroupsFromTabStrip(_ windowId: UInt32, _ edit: @escaping @MainActor (Workspace, TabbedGroup) -> Bool) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task {
         try await runLightSession(.menuBarButton, token) {
             guard let window = Window.get(byId: windowId), let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
-                  let group = workspace.tabbedGroup(containing: windowId),
-                  workspace.moveTabbedTabToNewGroup(windowId, beside: group, on: side) else { return }
+                  let group = workspace.tabbedGroup(containing: windowId), edit(workspace, group) else { return }
             _ = window.focusWindow()
+        }
+    }
+}
+
+/// The sides of a tab's group where another group lies, for the bar's menus.
+@MainActor
+func tabbedGroupNeighborSides(of windowId: UInt32) -> [CardinalDirection] {
+    guard let workspace = Window.get(byId: windowId)?.nodeWorkspace, workspace.arrangement == .tabbed,
+          let group = workspace.tabbedGroup(containing: windowId) else { return [] }
+    return [.left, .right, .up, .down].filter { workspace.tabbedGroup(beside: group, $0) != nil }
+}
+
+extension CardinalDirection {
+    /// Names the group on that side in menu items: "Merge With Group on the Left".
+    var tabbedGroupSideTitle: String {
+        switch self {
+            case .left: "on the Left"
+            case .right: "on the Right"
+            case .up: "Above"
+            case .down: "Below"
         }
     }
 }

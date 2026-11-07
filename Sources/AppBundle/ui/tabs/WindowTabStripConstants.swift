@@ -52,13 +52,16 @@ func windowTabStripScrollViewportWidth(stripWidth: CGFloat) -> CGFloat {
     )
 }
 
-func windowTabStripTabWidth(stripWidth: CGFloat, count: Int) -> CGFloat {
+/// A Tabbed workspace's tabs shrink to an icon before any would scroll out of sight, as a browser's do.
+let workspaceTabStripMinimumTabWidth: CGFloat = 40
+
+func windowTabStripTabWidth(stripWidth: CGFloat, count: Int, minimum: CGFloat = windowTabStripMinimumTabWidth) -> CGFloat {
     let count = max(count, 1)
     let availableWidth = windowTabStripScrollViewportWidth(stripWidth: stripWidth)
         - (windowTabStripContentHorizontalPadding * 2)
         - CGFloat(max(count - 1, 0)) * windowTabStripTabSpacing
     return min(
-        max(availableWidth / CGFloat(count), windowTabStripMinimumTabWidth),
+        max(availableWidth / CGFloat(count), minimum),
         windowTabStripPreferredTabWidth
     )
 }

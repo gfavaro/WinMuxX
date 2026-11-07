@@ -14,6 +14,16 @@ struct JoinWithCommand: Command {
         guard currentWindow.parent is TilingContainer else {
             return io.err("join-with does not support non-tiling windows")
         }
+        // In a Tabbed workspace the tab joins the tab group on that side.
+        if target.workspace.arrangement == .tabbed {
+            target.workspace.syncTabbedGroups()
+            let group = target.workspace.tabbedGroup(containing: currentWindow.windowId)
+            let neighbor = group.flatMap { target.workspace.tabbedGroup(beside: $0, direction) }
+            if !(neighbor.map { target.workspace.moveTabbedTab(currentWindow.windowId, into: $0) } ?? false) {
+                io.out("join-with: nothing to do")
+            }
+            return true
+        }
         guard let (parent, ownIndex) = currentWindow.closestParent(hasChildrenInDirection: direction, withLayout: nil) else {
             io.out("join-with: nothing to do")
             return true

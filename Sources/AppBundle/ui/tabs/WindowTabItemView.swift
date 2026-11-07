@@ -10,17 +10,22 @@ struct WindowTabItemView: View {
     let isHovered: Bool
 
     var body: some View {
+        // A tab squeezed to its icon drops the title, which its tooltip still gives.
+        let iconOnly = width < 72
         HStack(spacing: 6) {
             appIcon(size: 14)
 
-            Text(tab.title)
-                .font(.system(size: 12, weight: tab.isActive ? .semibold : .medium))
-                .lineLimit(1)
-                .truncationMode(.tail)
+            if !iconOnly {
+                Text(tab.title)
+                    .font(.system(size: 12, weight: tab.isActive ? .semibold : .medium))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         }
         .foregroundStyle(tabForegroundStyle)
-        .padding(.horizontal, 10)
-        .frame(width: width, height: height, alignment: .leading)
+        .padding(.horizontal, iconOnly ? 0 : 10)
+        .frame(width: width, height: height, alignment: iconOnly ? .center : .leading)
+        .help(tab.title.isEmpty ? tab.appName : tab.title)
         .background {
             RoundedRectangle(cornerRadius: windowTabStripInnerCornerRadius, style: .continuous)
                 .fill(tabFill)

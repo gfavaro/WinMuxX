@@ -281,6 +281,36 @@ extension Workspace {
         return true
     }
 
+    /// Moves every tab of `group` into `target`, after its own tabs, showing the tab `group` showed.
+    @MainActor func mergeTabbedGroup(_ group: TabbedGroup, into target: TabbedGroup) -> Bool {
+        guard group !== target, tabbedGroups.contains(where: { $0 === group }), tabbedGroups.contains(where: { $0 === target })
+        else { return false }
+        target.windowIds += group.windowIds
+        target.activeWindowId = group.activeWindowId ?? target.activeWindowId
+        if lastTabbedGroup === group { lastTabbedGroup = target }
+        group.windowIds = []
+        tabbedLayout = tabbedLayout?.pruned()
+        return true
+    }
+
+    /// Gathers every tab into `group`, leaving one group again.
+    @MainActor func mergeAllTabbedGroups(into group: TabbedGroup) -> Bool {
+        let others = tabbedGroups.filter { $0 !== group }
+        guard tabbedGroups.contains(where: { $0 === group }), !others.isEmpty else { return false }
+        let active = group.activeWindowId
+        for other in others { _ = mergeTabbedGroup(other, into: group) }
+        group.activeWindowId = active ?? group.windowIds.first
+        return true
+    }
+
+    /// Moves the whole of `group`, all its tabs, to `side` of `target`.
+    @MainActor func moveTabbedGroup(_ group: TabbedGroup, beside target: TabbedGroup, on side: CardinalDirection) -> Bool {
+        guard group !== target, tabbedGroups.contains(where: { $0 === target }),
+              let rest = tabbedLayout?.pruned(keeping: { $0 !== group && !$0.windowIds.isEmpty }) else { return false }
+        tabbedLayout = rest.inserting(group, beside: target, on: side)
+        return true
+    }
+
     /// Resizes the tab group holding `window`, as `resize` and dragging a window's edge do in
     /// other arrangements. Only the groups' shares change; the tree beneath stays as it was.
     @MainActor func resizeTabbedGroup(of window: Window, along axis: Orientation, by delta: CGFloat, againstNext: Bool = true,
@@ -324,6 +354,19 @@ private func windowServerStillHas(_ windowId: UInt32) -> Bool {
 }
 
 extension Window {
+    /// A tab kept while macOS holds its window goes with its group to `target`: native fullscreen
+    /// and hidden windows to that workspace's containers, and each returns there when macOS lets go.
+    @MainActor func transferRetainedTabbedState(to target: Workspace) {
+        switch parent?.nodeCases {
+            case .macosFullscreenWindowsContainer:
+                bind(to: target.macOsNativeFullscreenWindowsContainer, adaptiveWeight: WEIGHT_DOESNT_MATTER, index: INDEX_BIND_LAST)
+            case .macosHiddenAppsWindowsContainer:
+                bind(to: target.macOsNativeHiddenAppsWindowsContainer, adaptiveWeight: WEIGHT_DOESNT_MATTER, index: INDEX_BIND_LAST)
+            default: break
+        }
+        if case .macos(let kind, _) = layoutReason { layoutReason = .macos(prevParentKind: kind, prevWorkspaceName: target.name) }
+    }
+
     /// Focusing a window of a Tabbed workspace shows it in its group. Only real focus does this:
     /// restoring a tree rebinds windows in order without anyone choosing them.
     @MainActor func noteTabbedFocus() {

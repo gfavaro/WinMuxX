@@ -13,7 +13,8 @@ struct WindowTabStripLayoutContext {
     }
 
     var tabWidth: CGFloat {
-        windowTabStripTabWidth(stripWidth: width, count: max(strip.tabs.count, 1))
+        windowTabStripTabWidth(stripWidth: width, count: max(strip.tabs.count, 1),
+                               minimum: strip.isWorkspaceTabs ? workspaceTabStripMinimumTabWidth : windowTabStripMinimumTabWidth)
     }
 
     var effectiveTabWidth: CGFloat {

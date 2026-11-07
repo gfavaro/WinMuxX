@@ -6,10 +6,25 @@ struct SplitCommand: Command {
     /*conforms*/ let shouldResetClosedWindowsCache = true
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+        guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        // In a Tabbed workspace the tab opens in a new tab group: a column, or a row below.
+        if target.workspace.arrangement == .tabbed, let window = target.windowOrNil, window.parent is TilingContainer {
+            let workspace = target.workspace
+            workspace.syncTabbedGroups()
+            guard let group = workspace.tabbedGroup(containing: window.windowId) else { return false }
+            let orientation: Orientation = switch args.arg.val {
+                case .vertical: .v
+                case .horizontal: .h
+                case .opposite: (workspace.tabbedLayout?.nearestSplitOrientation(of: group) ?? .v).opposite
+            }
+            if !workspace.moveTabbedTabToNewGroup(window.windowId, beside: group, on: orientation == .h ? .right : .down) {
+                io.out("split: nothing to do")
+            }
+            return true
+        }
         if config.enableNormalizationFlattenContainers {
             return io.err("'split' has no effect when 'enable-normalization-flatten-containers' normalization enabled. My recommendation: keep the normalizations enabled, and prefer 'join-with' over 'split'.")
         }
-        guard let target = args.resolveTargetOrReportError(env, io) else { return false }
         guard let window = target.windowOrNil else {
             return io.err(noWindowIsFocused)
         }

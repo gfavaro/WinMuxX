@@ -195,6 +195,9 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
     if let applied = applyTabbedGroupDragIntent(pendingWindowDragIntent.kind, sourceWindow: sourceWindow,
                                                 subject: pendingWindowDragIntent.sourceSubject) { return applied }
     let sourceNode = dragSubjectNode(for: sourceWindow, subject: pendingWindowDragIntent.sourceSubject)
+    // A Tabbed workspace's handle carries its whole group, which the tree does not hold.
+    let carriedGroup = pendingWindowDragIntent.sourceSubject == .group ? tabbedGroupCarried(by: sourceWindow) : nil
+    defer { if let carriedGroup { bringTabbedGroupAlong(carriedGroup, after: sourceWindow) } }
     switch pendingWindowDragIntent.kind {
         case .reorderTab(let windowId, let targetIndex):
             guard pendingWindowDragIntent.sourceSubject == .window,
@@ -279,16 +282,42 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
     syncClosedWindowsCacheToCurrentWorld()
     suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, target.windowId])
     var windowIds = [sourceWindow.windowId]
+    var importedGroupOrder: [UInt32] = []
     if workspace.tabbedGroup(containing: sourceWindow.windowId) == nil {
         // A floating window, or windows from elsewhere, first join the tree beside the target, kept
         // for the other arrangements, and then become tabs where they were dropped.
-        let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
-        let windows = sourceNode.allLeafWindowsRecursive
+        // Another Tabbed workspace's handle carries its tab group, which the tree does not hold.
+        let windows: [Window], nodes: [TreeNode]
+        if subject == .group, let from = sourceWindow.nodeWorkspace, from.arrangement == .tabbed,
+           let group = from.tabbedGroup(containing: sourceWindow.windowId) {
+            windows = group.shownWindowIds.compactMap { Window.get(byId: $0) }
+            nodes = windows
+            // Its minimized, hidden or fullscreen tabs come too, staying as they are, all in order.
+            importedGroupOrder = group.windowIds
+            let retainedIds = group.windowIds.filter { id in !windows.contains { $0.windowId == id } }
+            group.windowIds.removeAll { retainedIds.contains($0) }
+            for id in retainedIds { Window.get(byId: id)?.transferRetainedTabbedState(to: workspace) }
+        } else {
+            let sourceNode = dragSubjectNode(for: sourceWindow, subject: subject)
+            windows = sourceNode.allLeafWindowsRecursive
+            nodes = [sourceNode]
+        }
         guard let parent = target.parent as? TilingContainer, !windows.contains(where: { $0 === target }) else { return false }
-        sourceNode.unbindFromParent()
-        sourceNode.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: (target.ownIndex ?? parent.children.count - 1) + 1)
+        var index = (target.ownIndex ?? parent.children.count - 1) + 1
+        for node in nodes {
+            node.unbindFromParent()
+            node.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: index)
+            index += 1
+        }
         workspace.syncTabbedGroups()
         windowIds = [sourceWindow.windowId] + windows.map(\.windowId).filter { $0 != sourceWindow.windowId }
+    } else if subject == .group, let source = workspace.tabbedGroup(containing: sourceWindow.windowId),
+              let group = workspace.tabbedGroup(containing: targetId) {
+        // A group's handle carries the whole group: beside another group, or into it.
+        guard side.map({ workspace.moveTabbedGroup(source, beside: group, on: $0) })
+            ?? workspace.mergeTabbedGroup(source, into: group) else { return false }
+        _ = sourceWindow.focusWindow()
+        return true
     }
     // An imported window may already have joined the target's group as a newcomer.
     guard let group = workspace.tabbedGroup(containing: targetId),
@@ -297,6 +326,9 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
                 || workspace.moveTabbedTab(sourceWindow.windowId, into: group)),
           let destination = workspace.tabbedGroup(containing: sourceWindow.windowId) else { return false }
     for windowId in windowIds.dropFirst() { _ = workspace.moveTabbedTab(windowId, into: destination) }
+    if !importedGroupOrder.isEmpty {
+        destination.windowIds = destination.windowIds.filter { !importedGroupOrder.contains($0) } + importedGroupOrder
+    }
     destination.activeWindowId = sourceWindow.windowId
     _ = sourceWindow.focusWindow()
     return true
@@ -316,4 +348,40 @@ func tabbedGroupDropTarget(_ kind: WindowDragIntentKind) -> (UInt32, CardinalDir
         case .tabStack(let target), .swap(let target): return (target, nil)
         default: return nil
     }
+}
+
+/// The tabs of the Tabbed group `window` shows, in bar order, with the workspace holding them.
+@MainActor
+func tabbedGroupCarried(by window: Window) -> (workspace: Workspace, windowIds: [UInt32])? {
+    guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
+          let group = workspace.tabbedGroup(containing: window.windowId), group.windowIds.count > 1 else { return nil }
+    return (workspace, group.windowIds)
+}
+
+/// Once the window a group's handle dragged has gone to another workspace, the rest of its tab
+/// group follows, keeping its order; minimized, hidden and fullscreen tabs stay as they are.
+@MainActor
+func bringTabbedGroupAlong(_ carried: (workspace: Workspace, windowIds: [UInt32]), after window: Window) {
+    guard let target = window.nodeWorkspace, target !== carried.workspace else { return }
+    let parent = window.parent as? TilingContainer ?? target.rootTilingContainer
+    var index = window.parent === parent ? (window.ownIndex ?? parent.children.count - 1) + 1 : INDEX_BIND_LAST
+    for id in carried.windowIds where id != window.windowId {
+        guard let other = Window.get(byId: id), other.nodeWorkspace === carried.workspace || other.nodeWorkspace == nil else { continue }
+        if other.parent is TilingContainer {
+            other.unbindFromParent()
+            other.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: index)
+            if index != INDEX_BIND_LAST { index += 1 }
+        } else {
+            other.transferRetainedTabbedState(to: target)
+        }
+    }
+    carried.workspace.tabbedGroups.forEach { $0.windowIds.removeAll { carried.windowIds.contains($0) } }
+    carried.workspace.tabbedLayout = carried.workspace.tabbedLayout?.pruned()
+    guard target.arrangement == .tabbed else { return }
+    target.syncTabbedGroups()
+    guard let group = target.tabbedGroup(containing: window.windowId) else { return }
+    for other in target.tabbedGroups where other !== group { other.windowIds.removeAll { carried.windowIds.contains($0) } }
+    group.windowIds = group.windowIds.filter { !carried.windowIds.contains($0) } + carried.windowIds
+    group.activeWindowId = window.windowId
+    target.tabbedLayout = target.tabbedLayout?.pruned()
 }

@@ -39,17 +39,25 @@ tab-next`, `tab-prev` and `--tab-index` follow the bar. One border encloses the 
 the window, and the bar's surface continues behind the window.
 
 To see windows side by side, split the workspace into tab groups: columns and rows,
-each with its own bar showing one of its windows. Right-click a tab and choose Move to
-New Column or Move to New Row, or drag a tab, or the handle at the right of a bar, onto
-the edge of a window shown in the workspace: it opens a new group on that side.
-Dropping it on the middle of a window moves it into that window's group. Floating
-windows and windows dragged from another workspace land the same way. New windows
-open in the focused group, and a group whose last tab leaves closes. `focus` in a
-direction goes to the group on that side, or along the bar when there is none; `move
-left` and `right` reorder along the bar first, then carry the tab into the group beside
-it. `resize` or dragging a window's edge resizes its group against its neighbour. The
-groups are kept apart from the tree, so Dwindle and Master return to the splits they
-had, and they survive a restart.
+each with its own bar showing one of its windows. Tabs shrink to their icons before
+any would scroll out of sight. The button at the end of each bar splits the tab shown
+into a new group to the right or below, merges the group with one beside it, or
+merges all groups back into one. Right-click a tab for Move to New Column, Move to New
+Row, or Move to Group on that side. `split horizontal` and `split vertical` open the
+focused tab in a new column or row, and `join-with` moves it into the group on that
+side.
+
+Drag a tab onto the edge of a window shown in the workspace to open a new group on
+that side, or onto the middle of a window to move it into that window's group. The
+handle at the end of a bar carries the whole group: onto an edge to move it there, or
+onto the middle of another group to merge them. Floating windows and windows dragged
+from another workspace land the same way. New windows open in the focused group, and
+a group whose last tab leaves closes. `focus` in a direction goes to the group on that
+side, or along the bar when there is none; `move left` and `right` reorder along the
+bar first, then carry the tab into the group beside it. `resize` or dragging a
+window's edge resizes its group against its neighbour. The groups are kept apart from
+the tree, so Dwindle and Master return to the splits they had, and they survive a
+restart.
 
 ## Container modes and tabs
 
