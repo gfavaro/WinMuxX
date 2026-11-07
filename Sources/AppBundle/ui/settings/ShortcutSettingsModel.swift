@@ -1,4 +1,5 @@
 import AppKit
+import Common
 import Foundation
 
 @MainActor
@@ -6,9 +7,21 @@ public final class ShortcutSettingsModel: ObservableObject {
     public static let shared = ShortcutSettingsModel()
 
     @Published var sections: [Section] = []
-    @Published var assignments: [String: String] = [:]
+    @Published var assignments: [String: String] = [:] { didSet { conflictMessages = nil } }
     @Published var tapBindings: [Summary] = []
-    @Published var customBindings: [Summary] = []
+    @Published var customBindings: [Summary] = [] { didSet { conflictMessages = nil } }
+    /// macOS's own shortcuts, read when Settings loads; never changed by WinMuxX.
+    var systemShortcuts: [SystemShortcut] = isUnitTest ? [] : SystemShortcuts.current() { didSet { conflictMessages = nil } }
+    private var conflictMessages: [String: String]?
+
+    /// Why this action's shortcut clashes and which free keys would not, or nil.
+    func shortcutConflict(for actionId: String) -> String? {
+        if conflictMessages == nil {
+            conflictMessages = shortcutConflictMessages(assignments: assignments, titles: actionsById.mapValues(\.title),
+                customNotations: customBindings.map(\.notation), system: systemShortcuts)
+        }
+        return conflictMessages?[actionId]
+    }
     @Published var workspaceNumbers: [String] = []
     @Published var workspaceSwitchModifiers: NSEvent.ModifierFlags = defaultWorkspaceSwitchModifiers
     @Published var workspaceMoveModifiers: NSEvent.ModifierFlags = defaultWorkspaceMoveModifiers

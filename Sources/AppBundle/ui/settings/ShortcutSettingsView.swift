@@ -438,6 +438,13 @@ struct ShortcutRow: View {
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+                if let conflict = model.shortcutConflict(for: action.id) {
+                    Label(conflict, systemImage: "exclamationmark.triangle.fill")
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityLabel("Shortcut conflict: \(conflict)")
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
