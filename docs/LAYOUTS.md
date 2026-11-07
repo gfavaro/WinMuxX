@@ -51,8 +51,8 @@ bar showing folded groups, a thin line marks where each group's tabs begin. `spl
 focused tab in a new column or row, and `join-with` moves it into the group on that
 side.
 
-Drag a tab out of its bar and onto another group's bar: the tabs part where it would
-land, and it joins that group there. Back over its own bar it slides into its new
+Drag a tab out of its bar, sideways or down, and onto another group's bar: the tabs
+part where it would land, and it joins that group there. Back over its own bar it slides into its new
 place. Drag it onto the edge of a window shown in the workspace to open a new group on
 that side, or onto the middle of a window to move it into that window's group. The
 handle at the end of a bar carries the whole group: onto an edge to move it there, or

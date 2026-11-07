@@ -240,7 +240,13 @@ extension WindowTabStripView {
             updateDetachedTabFromTabStrip(tab.windowId)
             return
         }
-        if abs(translation.height) > tabReorderVerticalEscapeThreshold, strip.tabs.count > 1 {
+        // A Tabbed workspace's tab also comes loose once the pointer leaves its bar sideways, so it
+        // can be carried straight into the next group's bar; even a group's only tab can go.
+        let leftWorkspaceBar = strip.isWorkspaceTabs
+            && !strip.frame.insetBy(dx: -tabReorderVerticalEscapeThreshold / 2, dy: -tabReorderVerticalEscapeThreshold)
+                .contains(NSEvent.mouseLocation)
+        if leftWorkspaceBar || abs(translation.height) > tabReorderVerticalEscapeThreshold
+            && (strip.tabs.count > 1 || strip.isWorkspaceTabs) {
             hasCommittedToDetach = true
             draggingTabId = nil
             hoveredTabId = nil
