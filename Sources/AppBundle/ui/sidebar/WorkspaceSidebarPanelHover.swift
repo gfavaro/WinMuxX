@@ -118,10 +118,7 @@ extension WorkspaceSidebarPanel {
             isSidebarItemDragActive: isWorkspaceSidebarItemDragActive(),
             isSidebarOriginatedDrag: isSidebarOriginatedDrag,
         )
-        pendingCollapse?.cancel()
-        pendingCollapse = nil
-        pendingCollapseFinalize?.cancel()
-        pendingCollapseFinalize = nil
+        cancelCollapse()
         if shouldSuppressDragExpansion {
             cancelHoverReveal()
             updateMousePassthrough()
@@ -182,8 +179,9 @@ extension WorkspaceSidebarPanel {
         let needsCollapse =
             viewModel.isWorkspaceSidebarExpanded ||
             viewModel.workspaceSidebarVisibleWidth != collapsedWidth
-        guard needsCollapse, pendingCollapse == nil else {
-            debugLog(.sidebarHover, "handleHoverExit noop panel=\(monitorScopeId) needsCollapse=\(needsCollapse) pendingCollapse=\(pendingCollapse != nil)")
+        // A collapse already under way, waiting or finishing, carries on; a second would race it.
+        guard needsCollapse, pendingCollapseWork == nil else {
+            debugLog(.sidebarHover, "handleHoverExit noop panel=\(monitorScopeId) needsCollapse=\(needsCollapse) collapse=\(String(describing: pendingCollapseWork))")
             return
         }
         scheduleCollapse(collapsedWidth: collapsedWidth)
@@ -193,9 +191,11 @@ extension WorkspaceSidebarPanel {
         guard !config.workspaceSidebar.alwaysExpanded else { return }
         debugLog(.sidebarHover, "scheduleCollapse panel=\(monitorScopeId) visible=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) mouse=\(NSEvent.mouseLocation)")
         NotificationCenter.default.post(name: workspaceSidebarWillCollapseNotification, object: self)
+        weak var collapseItem: DispatchWorkItem?
         let collapse = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.pendingCollapse = nil
+            // Only the stage still current hands over; a cancelled or replaced one does nothing.
+            guard let self, self.pendingCollapseWork?.waitingItem === collapseItem else { return }
+            self.pendingCollapseWork = nil
             guard !config.workspaceSidebar.alwaysExpanded else { return }
             debugLog(.sidebarHover, "collapseFire panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
             guard Date() >= self.splitBrowseCollapseSuppressedUntil else {
@@ -211,15 +211,17 @@ extension WorkspaceSidebarPanel {
             self.animateVisibleSidebarWidth(collapsedWidth, animation: .easeInOut(duration: self.animationDuration))
             self.scheduleCollapseFinalize()
         }
-        pendingCollapse = collapse
+        collapseItem = collapse
+        pendingCollapseWork = .waiting(collapse)
         let collapseDelay: TimeInterval = viewModel.isWorkspaceSidebarExpanded ? 0.08 : 0
         DispatchQueue.main.asyncAfter(deadline: .now() + collapseDelay, execute: collapse)
     }
 
     func scheduleCollapseFinalize() {
+        weak var finalizeItem: DispatchWorkItem?
         let finalize = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            self.pendingCollapseFinalize = nil
+            guard let self, self.pendingCollapseWork?.finishingItem === finalizeItem else { return }
+            self.pendingCollapseWork = nil
             guard !config.workspaceSidebar.alwaysExpanded else { return }
             debugLog(.sidebarHover, "collapseFinalize panel=\(self.monitorScopeId) visible=\(self.viewModel.workspaceSidebarVisibleWidth) mouse=\(NSEvent.mouseLocation) suppressActive=\(Date() < self.splitBrowseCollapseSuppressedUntil)")
             guard Date() >= self.splitBrowseCollapseSuppressedUntil else { return }
@@ -232,7 +234,8 @@ extension WorkspaceSidebarPanel {
             viewModel.isWorkspaceSidebarExpanded = false
             self.updateMousePassthrough()
         }
-        pendingCollapseFinalize = finalize
+        finalizeItem = finalize
+        pendingCollapseWork = .finishing(finalize)
         DispatchQueue.main.asyncAfter(deadline: .now() + animationDuration, execute: finalize)
     }
 }

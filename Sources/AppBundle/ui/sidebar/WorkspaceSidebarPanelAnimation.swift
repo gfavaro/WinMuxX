@@ -47,10 +47,7 @@ extension WorkspaceSidebarPanel {
         }
         cancelHoverReveal()
         NotificationCenter.default.post(name: workspaceSidebarWillExpandNotification, object: self)
-        pendingCollapse?.cancel()
-        pendingCollapse = nil
-        pendingCollapseFinalize?.cancel()
-        pendingCollapseFinalize = nil
+        cancelCollapse()
         // Restore the collapsed panel before setting the expansion target. Otherwise
         // refresh() installs the full width before SwiftUI can animate its reveal.
         if !isVisible {
@@ -69,9 +66,6 @@ extension WorkspaceSidebarPanel {
         pendingBackingResize?.cancel()
         pendingBackingResize = nil
         cancelHoverReveal()
-        pendingCollapse?.cancel()
-        pendingCollapse = nil
-        pendingCollapseFinalize?.cancel()
-        pendingCollapseFinalize = nil
+        cancelCollapse()
     }
 }

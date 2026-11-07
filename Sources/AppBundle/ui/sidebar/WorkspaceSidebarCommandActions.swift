@@ -51,10 +51,7 @@ func openWorkspaceSidebarFromCommand() {
 func closeWorkspaceSidebarFromCommand(_ panel: WorkspaceSidebarPanel) {
     panel.endInlineTextEditing()
     panel.cancelHoverReveal()
-    panel.pendingCollapse?.cancel()
-    panel.pendingCollapse = nil
-    panel.pendingCollapseFinalize?.cancel()
-    panel.pendingCollapseFinalize = nil
+    panel.cancelCollapse()
     if !config.workspaceSidebar.alwaysExpanded {
         NotificationCenter.default.post(name: workspaceSidebarWillCollapseNotification, object: panel)
     }

@@ -16,8 +16,10 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     private(set) var isRetired = false
     var pendingBackingResize: DispatchWorkItem?
     var pendingExpand: DispatchWorkItem?
-    var pendingCollapse: DispatchWorkItem?
-    var pendingCollapseFinalize: DispatchWorkItem?
+    /// A collapse under way, one stage at a time; nil when none is.
+    var pendingCollapseWork: WorkspaceSidebarCollapse?
+    var pendingCollapse: DispatchWorkItem? { pendingCollapseWork?.waitingItem }
+    var pendingCollapseFinalize: DispatchWorkItem? { pendingCollapseWork?.finishingItem }
     var pendingContentUnload: DispatchWorkItem?
     var lastHoverMonitorTimestamp: CFTimeInterval = 0
     var hasPendingHoverRecheck = false
@@ -390,5 +392,28 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         clippingLayer.path = path
         surface.layer?.mask = clippingLayer
         CATransaction.commit()
+    }
+}
+
+/// A sidebar collapse: first waiting briefly for the pointer to stay out, then animating closed
+/// until the panel is marked collapsed. Cancelling it cancels whichever stage it is in.
+enum WorkspaceSidebarCollapse {
+    case waiting(DispatchWorkItem)
+    case finishing(DispatchWorkItem)
+
+    var waitingItem: DispatchWorkItem? { if case .waiting(let item) = self { item } else { nil } }
+    var finishingItem: DispatchWorkItem? { if case .finishing(let item) = self { item } else { nil } }
+
+    func cancel() {
+        switch self {
+            case .waiting(let item), .finishing(let item): item.cancel()
+        }
+    }
+}
+
+extension WorkspaceSidebarPanel {
+    func cancelCollapse() {
+        pendingCollapseWork?.cancel()
+        pendingCollapseWork = nil
     }
 }

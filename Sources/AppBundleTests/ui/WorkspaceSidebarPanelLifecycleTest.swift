@@ -78,11 +78,10 @@ final class WorkspaceSidebarPanelLifecycleTest: WorkspaceTestCase {
         let screen = monitor(x: 3840)
         WorkspaceSidebarPanel.refreshAll(on: [screen])
         let panel = try XCTUnwrap(WorkspaceSidebarPanel.panel(for: workspaceSidebarMonitorScopeId(for: screen)))
-        let work = (0..<4).map { _ in DispatchWorkItem {} }
+        let work = (0..<3).map { _ in DispatchWorkItem {} }
         panel.pendingBackingResize = work[0]
         panel.pendingExpand = work[1]
-        panel.pendingCollapse = work[2]
-        panel.pendingCollapseFinalize = work[3]
+        panel.pendingCollapseWork = .finishing(work[2])
         panel.inlineTextEditingActive = true
         WorkspaceSidebarPanel.activeInlineTextEditingPanel = panel
         panel.commandExpansionLocksCollapse = true
