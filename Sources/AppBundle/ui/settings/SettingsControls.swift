@@ -183,29 +183,22 @@ struct SettingsBorderColor: View {
     let title: String
     let id: String
     @Binding var text: String
+    /// Only the focused color offers the accent: other windows in it would look focused too.
+    let offersAccent: Bool
     let save: () -> Void
 
-    init(_ title: String, id: String? = nil, text: Binding<String>, save: @escaping () -> Void) {
+    init(_ title: String, id: String? = nil, text: Binding<String>, offersAccent: Bool = false, save: @escaping () -> Void) {
         self.title = title
         self.id = id ?? title
         _text = text
+        self.offersAccent = offersAccent
         self.save = save
     }
 
     var body: some View {
-        let followsAccent = normalizedWindowBorderColor(text) == windowBorderAccentColor
+        let followsAccent = offersAccent && normalizedWindowBorderColor(text) == windowBorderAccentColor
         VStack(alignment: .leading, spacing: 4) {
-            Toggle("\(title): follow accent color", isOn: Binding(
-                get: { followsAccent },
-                set: { follow in
-                    // Turning it off starts the picker from the accent color the border shows now.
-                    text = follow ? windowBorderAccentColor : String(format: "#%08X", windowBorderRGBA(windowBorderAccentColor))
-                    ShortcutSettingsModel.shared.activeSettingTitle = title
-                    save()
-                }
-            ))
-            .accessibilityIdentifier("\(id).accent")
-            SettingsDescription("The system accent color stays visible on light and dark windows.")
+            if offersAccent { accentToggle(followsAccent) }
             if !followsAccent {
                 ColorPicker(title, selection: Binding(
                     get: {
@@ -227,10 +220,25 @@ struct SettingsBorderColor: View {
                     }
                 ), supportsOpacity: true)
                 SettingsTextField("Hex value", id: id, text: $text,
-                                  help: "Use #RRGGBB or #RRGGBBAA, including optional opacity, or 'accent'.",
+                                  help: "Use #RRGGBB or #RRGGBBAA, including optional opacity.",
                                   validate: settingsHexColorError, save: save)
             }
         }
+    }
+
+    @ViewBuilder
+    private func accentToggle(_ followsAccent: Bool) -> some View {
+        Toggle("\(title): system accent", isOn: Binding(
+            get: { followsAccent },
+            set: { follow in
+                // Turning it off starts the picker from the accent color the border shows now.
+                text = follow ? windowBorderAccentColor : String(format: "#%08X", windowBorderRGBA(windowBorderAccentColor))
+                ShortcutSettingsModel.shared.activeSettingTitle = title
+                save()
+            }
+        ))
+        .accessibilityIdentifier("\(id).accent")
+        SettingsDescription("The system accent color stays visible on light and dark windows.")
     }
 }
 

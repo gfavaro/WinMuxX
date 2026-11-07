@@ -35,7 +35,7 @@ borders.enabled = true
 borders.width = 4
 # Colors accept 'accent' (the system accent color, visible in light and dark mode), #RRGGBB or #RRGGBBAA.
 borders.active-color = 'accent'
-borders.inactive-color = '#494d64'
+borders.inactive-color = '#00000000'   # transparent: only the focused window has a border
 # 'below' draws behind the window; 'above' draws over it.
 borders.order = 'below'
 # Exclude applications by bundle ID, e.g. ['com.apple.finder'].

@@ -132,7 +132,7 @@ struct ShortcutAppearanceSettingsView: View {
                     persist("borders", "width", String(borderWidth))
                 }
                 .disabled(!bordersEnabled)
-                SettingsBorderColor("Focused window color", id: "borders.active-color", text: $activeBorderColor) {
+                SettingsBorderColor("Focused window color", id: "borders.active-color", text: $activeBorderColor, offersAccent: true) {
                     persist("borders", "active-color", "'\(activeBorderColor)'")
                 }
                 .disabled(!bordersEnabled)

@@ -8,7 +8,7 @@ struct WindowBordersConfig: ConvenienceCopyable, Equatable {
     var enabled = true
     var width = 4.0
     var activeColor = windowBorderAccentColor
-    var inactiveColor = "#494D64"
+    var inactiveColor = "#00000000"
     var order = WindowBorderOrder.below
     var excludeApps: [String] = []
 }
