@@ -148,11 +148,11 @@ private func ensureTabGroupAnchorHasWorkspaceRootContainer(
 }
 
 /// Whether halving a tile of `size` along its longer side, as Dwindle does for a new window,
-/// leaves either half narrower than one of these learned minimum sizes.
-func newWindowSplitWouldSqueeze(tile size: CGSize, gap: CGSize, minimums: [CGSize]) -> Bool {
+/// leaves a half smaller than one of these minimum extents along that side.
+func newWindowSplitWouldSqueeze(tile size: CGSize, gap: CGSize, minimumExtents: [CGFloat]) -> Bool {
     let horizontal = size.width >= size.height
     let half = (horizontal ? size.width - gap.width : size.height - gap.height) / 2
-    return minimums.contains { (horizontal ? $0.width : $0.height) > half }
+    return minimumExtents.contains { $0 > half }
 }
 
 /// A new window joins the tile's tab group, starting one when needed, instead of splitting a
@@ -162,10 +162,14 @@ private func tabGroupBindingInsteadOfSqueezing(workspace: Workspace, anchorWindo
     var anchor: TreeNode = anchorWindow
     while let parent = anchor.parent as? TilingContainer, parent.layout == .tabGroup { anchor = parent }
     guard let splitRect = anchor.lastAppliedLayoutPhysicalRect ?? anchor.lastAppliedLayoutVirtualRect else { return nil }
-    let minimums = [anchorWindow.app.rawAppBundleId, newBundleId].compactMap { PersistedAppMinimums.shared.size(for: $0) }
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
     let gap = CGSize(width: CGFloat(gaps.inner.horizontal.toDouble()), height: CGFloat(gaps.inner.vertical.toDouble()))
-    guard newWindowSplitWouldSqueeze(tile: CGSize(width: splitRect.width, height: splitRect.height), gap: gap, minimums: minimums) else { return nil }
+    let horizontal = splitRect.width >= splitRect.height
+    // The tile's whole minimum: every tab of a group, not only the one in front, plus its chrome.
+    let tileMinimum = anchor.minimumLayoutExtent(along: horizontal ? .h : .v, gaps: gaps, rect: splitRect)
+    let newMinimum = PersistedAppMinimums.shared.size(for: newBundleId).map { horizontal ? $0.width : $0.height } ?? 0
+    guard newWindowSplitWouldSqueeze(tile: CGSize(width: splitRect.width, height: splitRect.height), gap: gap,
+        minimumExtents: [tileMinimum, newMinimum]) else { return nil }
     if let group = anchorWindow.parent as? TilingContainer, group.layout == .tabGroup {
         return BindingData(parent: group, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
     }
