@@ -145,7 +145,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         menu.addItem(.separator())
         let arrangementMenu = NSMenu(title: "Arrange Windows")
         arrangementMenu.addItem(NSMenuItem(title: "Workspace Arrangement", action: nil, keyEquivalent: ""))
-        for layout in [WorkspaceLayoutName.dwindle, .master] {
+        for layout in WorkspaceLayoutName.allCases {
             let item = addCommand(layout.rawValue.capitalized, script: "workspace-layout \(layout.rawValue)", to: arrangementMenu)
             item?.image = MenuBarLayoutIcon.image(for: layout, monochrome: true)
             item?.state = focus.workspace.arrangement == layout ? .on : .off
@@ -214,7 +214,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         switch focus.workspace.arrangement {
             case .master:
                 sections[.swapWithMaster] = addCommand("Swap with Master", script: "swap-with-master", to: menu)
-            case .dwindle:
+            case .dwindle, .tabbed:
                 break
         }
         menu.addItem(.separator())

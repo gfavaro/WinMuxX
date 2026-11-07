@@ -52,7 +52,7 @@
   "additionalProperties": false,
   "$defs": {
     "layout": {"enum": ["dwindle", "master", "tiles", "accordion", "tab-group", "tabbed"]},
-    "workspaceArrangement": {"enum": ["dwindle", "master"]},
+    "workspaceArrangement": {"enum": ["dwindle", "master", "tabbed"]},
     "orientation": {"enum": ["horizontal", "vertical", "auto"]},
     "commands": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
     "dynamicNumber": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}}]},

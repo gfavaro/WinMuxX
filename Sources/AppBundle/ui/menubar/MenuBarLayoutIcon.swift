@@ -1,7 +1,7 @@
 import AppKit
 import Common
 
-/// Draws the three workspace arrangements at menu-bar scale, independent of the
+/// Draws the workspace arrangements at menu-bar scale, independent of the
 /// workspace's current window count, nested groups, or master orientation.
 enum MenuBarLayoutIcon {
     static let size = NSSize(width: 18, height: 18)
@@ -22,6 +22,9 @@ enum MenuBarLayoutIcon {
                 case .master:
                     drawOuter()
                     drawMaster()
+                case .tabbed:
+                    drawOuter()
+                    drawTabbed()
             }
             return true
         }
@@ -43,6 +46,17 @@ enum MenuBarLayoutIcon {
         path.move(to: NSPoint(x: 8.9, y: 16.4)); path.line(to: NSPoint(x: 8.9, y: 1.6))
         path.move(to: NSPoint(x: 16.4, y: 8.7)); path.line(to: NSPoint(x: 8.9, y: 8.7))
         path.move(to: NSPoint(x: 12.7, y: 8.7)); path.line(to: NSPoint(x: 12.7, y: 1.6))
+        path.lineWidth = 1.15
+        path.lineJoinStyle = .round
+        path.stroke()
+    }
+
+    /// A row of tabs across the top above one window.
+    private static func drawTabbed() {
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: 1.6, y: 12.6)); path.line(to: NSPoint(x: 16.4, y: 12.6))
+        path.move(to: NSPoint(x: 6.6, y: 16.4)); path.line(to: NSPoint(x: 6.6, y: 12.6))
+        path.move(to: NSPoint(x: 11.4, y: 16.4)); path.line(to: NSPoint(x: 11.4, y: 12.6))
         path.lineWidth = 1.15
         path.lineJoinStyle = .round
         path.stroke()

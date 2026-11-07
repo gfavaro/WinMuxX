@@ -23,6 +23,18 @@ struct FocusCommand: Command {
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil
+                // A Tabbed workspace shows one window: left and right step through its tabs in bar
+                // order, before any strip nested in the tree, and wrap within the tab list.
+                if target.workspace.arrangement == .tabbed, let window {
+                    let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
+                    if direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === window }) {
+                        if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset) { return neighbor.focusWindow() }
+                        if args.boundariesAction == .wrapAroundTheWorkspace, tabs.count > 1 {
+                            return (direction.focusOffset > 0 ? tabs.first : tabs.last)?.focusWindow() ?? false
+                        }
+                    }
+                    return hitWorkspaceBoundaries(target, io, args, direction)
+                }
                 // Inside a strip, left and right step through its columns, scrolling hidden ones in.
                 if direction.orientation == .h, let window, let strip = window.nearestWindowTabGroup, strip.isWindowStrip,
                    let column = window.directChild(in: strip), let index = column.ownIndex,

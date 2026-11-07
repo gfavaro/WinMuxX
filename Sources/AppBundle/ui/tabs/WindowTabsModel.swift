@@ -5,6 +5,8 @@ func updateWindowTabModel() async {
     defer { WindowBorderController.shared.refresh() }
     let didClearMouseInteractionChromeSuppression =
         WindowTabStripPanelController.shared.clearMouseInteractionChromeSuppressionIfInactive()
+    // A Tabbed workspace needs its bar to switch windows even when tab strips are off.
+    if let bars = await buildWorkspaceTabBarModels() { WorkspaceTabBarController.shared.update(bars) }
     guard TrayMenuModel.shared.isEnabled, config.windowTabs.enabled else {
         TrayMenuModel.shared.setIfChanged(\.windowTabStrips, [])
         WindowTabStripPanelController.shared.refresh(updateBorders: false)

@@ -65,6 +65,7 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                     command: "fullscreen"
                 ),
                 shortcutAction(id: "layout-dwindle", title: "Workspace Arrangement: Dwindle", command: "workspace-layout dwindle"),
+                shortcutAction(id: "layout-tabbed", title: "Workspace Arrangement: Tabbed", command: "workspace-layout tabbed"),
                 shortcutAction(id: "layout-master", title: "Workspace Arrangement: Master", command: "workspace-layout master"),
                 shortcutAction(id: "layout-horizontal", title: "Horizontal Tiles", command: "layout h_tiles"),
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),

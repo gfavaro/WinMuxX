@@ -15,7 +15,8 @@ extension Workspace {
         let groups = workspaceLayoutUnits
         guard !groups.isEmpty else { return [] }
         switch arrangement {
-            case .dwindle: return []
+            // Tabbed shows one window at a time; layoutWorkspace places it under the tab bar.
+            case .dwindle, .tabbed: return []
             case .master:
                 let primary = masterGroupIndex
                 guard groups.indices.contains(primary) else { return [] }

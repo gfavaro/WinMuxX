@@ -3,9 +3,13 @@ func makeWindowTabChromeTabs(
     container: TilingContainer,
     activeWindowId: UInt32,
 ) async -> [WindowTabChromeTabItem] {
+    await makeWindowTabChromeTabs(windows: container.children.compactMap(\.tabRepresentativeWindow), activeWindowId: activeWindowId)
+}
+
+@MainActor
+func makeWindowTabChromeTabs(windows: [Window], activeWindowId: UInt32) async -> [WindowTabChromeTabItem] {
     // Fetch tab titles concurrently: expired title-cache entries each cost an AX round-trip,
     // and fetching them serially makes the strip rebuild wait on the sum of them.
-    let windows = container.children.compactMap(\.tabRepresentativeWindow)
     var tabsById: [UInt32: WindowTabChromeTabItem] = [:]
     await withTaskGroup(of: WindowTabChromeTabItem.self) { group in
         for window in windows {

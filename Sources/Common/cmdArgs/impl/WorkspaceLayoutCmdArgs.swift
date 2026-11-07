@@ -17,7 +17,8 @@ public struct WorkspaceLayoutCmdArgs: CmdArgs {
 }
 
 public enum WorkspaceLayoutName: String, CaseIterable, Equatable, Sendable, Codable {
-    case dwindle, master
+    /// `tabbed` shows every tiled window as a tab of one full-screen group, like a browser.
+    case dwindle, master, tabbed
 }
 
 private func parseWorkspaceLayoutChoices(input: PosArgParserInput) -> ParsedCliArgs<[WorkspaceLayoutName]> {

@@ -7,6 +7,8 @@ func buildWindowTabChromeItemsFromSource10Tree() async -> [WindowTabChromeItem] 
 
     var items: [WindowTabChromeItem] = []
     for workspace in Workspace.all where workspace.isVisible && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) {
+        // A Tabbed workspace lists every window in its own tab bar instead.
+        guard workspace.arrangement != .tabbed else { continue }
         for container in workspace.rootTilingContainer.allTabbedContainersRecursive {
             if let item = await makeWindowTabChromeItem(container: container, workspace: workspace) {
                 items.append(item)

@@ -34,6 +34,26 @@ extension Workspace {
             try await fullscreenWindow.layoutFullscreen(context)
             return
         }
+        if arrangement == .tabbed {
+            lastAppliedLayoutPhysicalRect = rect
+            lastAppliedLayoutVirtualRect = rect
+            rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
+            rootTilingContainer.lastAppliedLayoutVirtualRect = rect
+            if let active = rootTilingContainer.mostRecentWindowRecursive {
+                // Every other tiled window waits hidden, as a tab group's background tabs do; the
+                // tree beneath stays as it was, so returning to Dwindle or Master restores it.
+                try await rootTilingContainer.hideAllWindowsExcept(active)
+                let content = workspaceTabbedContentRect(rect)
+                try await active.layoutRecursive(content.topLeftCorner, width: content.width, height: content.height,
+                                                 virtual: content, context)
+            }
+            for window in children.filterIsInstance(of: Window.self) {
+                window.lastAppliedLayoutPhysicalRect = nil
+                window.lastAppliedLayoutVirtualRect = nil
+                try await window.layoutFloatingWindow(context)
+            }
+            return
+        }
         if arrangement == .master {
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
@@ -52,6 +72,13 @@ extension Workspace {
         // But I also faced this problem in monitors horizontal configuration. ¯\_(ツ)_/¯
         try await layoutRecursive(rect.topLeftCorner, width: rect.width, height: rect.height - 1, virtual: rect, context)
     }
+}
+
+/// The area under a Tabbed workspace's tab bar.
+@MainActor
+func workspaceTabbedContentRect(_ rect: Rect) -> Rect {
+    let bar = min(resolvedWindowTabBarHeight(), rect.height)
+    return Rect(topLeftX: rect.topLeftX, topLeftY: rect.topLeftY + bar, width: rect.width, height: rect.height - bar)
 }
 
 @MainActor

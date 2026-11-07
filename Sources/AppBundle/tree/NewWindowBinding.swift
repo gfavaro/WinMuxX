@@ -56,7 +56,7 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newl
     }
     if workspace.rootTilingContainer.layout == .dwindle {
         workspace.materializeDwindleTree()
-        if let newBundleId = newlyOpenedBundleId,
+        if workspace.arrangement == .dwindle, let newBundleId = newlyOpenedBundleId,
            let joined = tabGroupBindingInsteadOfSqueezing(workspace: workspace, anchorWindow: mruWindow, newBundleId: newBundleId) {
             return joined
         }

@@ -21,6 +21,17 @@ stack beside it. Choose it for a workspace with `workspace-layout master`; run
 Master keeps one main window on every display, including ultrawide displays. The
 remaining windows form a stack beside it. Two windows share the screen.
 
+## Tabbed
+
+Tabbed shows every tiled window of the workspace as a tab under a browser-style bar
+at the top of the display: one window fills the area below it, and clicking a tab, or
+focus left and right, switches windows. New windows open as new tabs. Choose it with
+`workspace-layout tabbed`, Arrange Windows → Tabbed in the menu, or Settings → Windows
+→ Workspace layout. The tree underneath is untouched, so `workspace-layout dwindle` or
+`master` restores the previous splits and tab groups, with new windows placed as
+Dwindle places them. Floating windows keep their own position. The bar shows even
+with tab strips off, since it is how you switch windows there.
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another, and

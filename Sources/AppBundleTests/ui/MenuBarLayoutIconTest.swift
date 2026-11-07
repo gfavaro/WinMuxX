@@ -42,8 +42,8 @@ final class MenuBarLayoutIconTest: WorkspaceTestCase {
         let images = WorkspaceLayoutName.allCases.map {
             MenuBarLayoutIcon.image(for: $0, monochrome: true)
         }
-        XCTAssertEqual(images.map(\.isTemplate), [true, true])
-        XCTAssertEqual(Set(images.map(renderedPixelSignature)).count, 2, "each arrangement needs a distinct symbol")
+        XCTAssertTrue(images.allSatisfy(\.isTemplate))
+        XCTAssertEqual(Set(images.map(renderedPixelSignature)).count, WorkspaceLayoutName.allCases.count, "each arrangement needs a distinct symbol")
 
         let tint = NSColor(deviceRed: 0.93, green: 0.21, blue: 0.37, alpha: 1)
         let tinted = try XCTUnwrap(menuBarIconImage(enabled: true, arrangement: .dwindle, appearance: .monochrome, keyboardTint: tint))

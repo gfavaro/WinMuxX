@@ -19,7 +19,8 @@ struct SettingsWorkspaceLayoutSection: View {
                 .init(value: "inherit", title: "Default", pictogram: .inherit),
                 .init(value: "dwindle", title: "Dwindle", pictogram: .dwindle),
                 .init(value: "master", title: "Master", pictogram: .master),
-            ], help: "Sets the workspace-wide arrangement. Each existing top-level group keeps its nested splits and tabs. A matching display override may take precedence.") {
+                .init(value: "tabbed", title: "Tabbed", pictogram: .tabbed),
+            ], help: "Sets the workspace-wide arrangement. Tabbed shows every window as a tab under a browser-style bar. Each existing group keeps its nested splits and tabs, so switching back restores them. A matching display override may take precedence.") {
                 save()
             }
             .disabled(workspace.isEmpty)

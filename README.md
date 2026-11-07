@@ -228,7 +228,8 @@ commands continue to affect their own group; `workspace-layout dwindle` restores
 the workspace's default arrangement mode.
 
 Dinky 0.21 command separation uses `workspace-layout dwindle master`
-to select workspace modes; `layout` changes container layouts or floating/tiling.
+to select workspace modes, and `workspace-layout tabbed` shows every window of the
+workspace as a tab under a browser-style bar (see [layouts](docs/LAYOUTS.md#tabbed)); `layout` changes container layouts or floating/tiling.
 Three-option container cycles visit every option, and `%{workspace-layout}` reports
 the workspace mode. See [migration and behavior](docs/DINKY_021_ADOPTION.md).
 
