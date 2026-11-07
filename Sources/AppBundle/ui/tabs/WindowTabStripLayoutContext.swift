@@ -13,7 +13,8 @@ struct WindowTabStripLayoutContext {
     }
 
     var tabWidth: CGFloat {
-        windowTabStripTabWidth(stripWidth: width, count: max(strip.tabs.count, 1),
+        windowTabStripTabWidth(stripWidth: strip.isWorkspaceTabs ? workspaceTabBarTabsStripWidth(width) : width,
+                               count: max(strip.tabs.count, 1),
                                minimum: strip.isWorkspaceTabs ? workspaceTabStripMinimumTabWidth : windowTabStripMinimumTabWidth)
     }
 
@@ -22,7 +23,7 @@ struct WindowTabStripLayoutContext {
     }
 
     var scrollViewportWidth: CGFloat {
-        windowTabStripScrollViewportWidth(stripWidth: width)
+        windowTabStripScrollViewportWidth(stripWidth: strip.isWorkspaceTabs ? workspaceTabBarTabsStripWidth(width) : width)
     }
 
     var scrollContentWidth: CGFloat {

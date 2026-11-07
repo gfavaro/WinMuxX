@@ -807,6 +807,22 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(groups[1].windowIds, [windows[1].windowId], "Put back where it was, a tab keeps its own group")
     }
 
+    func testTheFocusedBarOffersSplitAndFocus() async throws {
+        let (_, windows, _, _) = try await makeTwoGroups()
+        let controls = workspaceTabGroupControls(for: windows[1])
+        XCTAssertEqual(controls.map(\.title), ["Split Right", "Split Down", "Focus"])
+        XCTAssertEqual(controls.map(\.command), ["split horizontal", "split vertical", "fullscreen"].map { "\($0) --window-id \(windows[1].windowId)" })
+        XCTAssertTrue(controls.allSatisfy(\.isEnabled))
+        let alone = workspaceTabGroupControls(for: windows[0])
+        XCTAssertEqual(alone.map(\.isEnabled), [false, false, true], "A group's only tab has nothing to split from")
+    }
+
+    func testTabWidthsAndDropsShareTheBarsTabArea() {
+        let area = Rect(topLeftX: 0, topLeftY: 0, width: 600, height: 400)
+        XCTAssertEqual(tabbedBarTabsRect(area: area).width, workspaceTabBarTabsStripWidth(600))
+        XCTAssertEqual(workspaceTabBarTabsStripWidth(600), 600 - workspaceTabBarControlsWidth + windowTabStripTrailingGroupDragGutterWidth)
+    }
+
     func testJoiningAGroupWorksWithWindowTabsOff() {
         let previous = config.windowTabs.enabled
         config.windowTabs.enabled = false

@@ -16,6 +16,8 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     /// The bar of a Tabbed workspace, whose tabs are the workspace's windows rather than a group's
     /// children: there is no group to drag as a whole or to remove a tab from.
     var isWorkspaceTabs = false
+    /// Buttons at the end of the focused Tabbed group's bar: Split Right, Split Down and Focus.
+    var groupControls: [WorkspaceTabGroupControl] = []
 
     var groupFrameIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(groupFrame) }
@@ -32,4 +34,14 @@ struct WindowTabItemViewModel: Hashable, Identifiable {
     let isActive: Bool
 
     var id: UInt32 { windowId }
+}
+
+/// One button on a Tabbed group's bar: an ordinary command, with the keys bound to it.
+struct WorkspaceTabGroupControl: Equatable, Identifiable {
+    let title: String
+    let symbol: String
+    let command: String
+    let shortcutHint: String?
+    let isEnabled: Bool
+    var id: String { title }
 }

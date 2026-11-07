@@ -54,6 +54,15 @@ func windowTabStripScrollViewportWidth(stripWidth: CGFloat) -> CGFloat {
     )
 }
 
+/// The end of every Tabbed group's bar that holds the focused group's buttons, in place of the
+/// drag gutter other bars have; the same on each bar, so tabs line up however focus moves.
+let workspaceTabBarControlsWidth: CGFloat = 3 * 24
+
+/// The width a Tabbed group's bar gives its tabs, of all the bar's width.
+func workspaceTabBarTabsStripWidth(_ barWidth: CGFloat) -> CGFloat {
+    max(0, barWidth - (workspaceTabBarControlsWidth - windowTabStripTrailingGroupDragGutterWidth))
+}
+
 /// A Tabbed workspace's tabs shrink to an icon before any would scroll out of sight, as a browser's do.
 let workspaceTabStripMinimumTabWidth: CGFloat = 40
 

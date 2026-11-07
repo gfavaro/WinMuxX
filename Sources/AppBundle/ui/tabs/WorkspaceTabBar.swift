@@ -47,11 +47,14 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
                   workspace.tabbedGroups.contains(where: { $0 === group }) else { continue }
             let area = frame.toAppKitScreenRect.alignedToBackingPixels()
             let barHeight = min(resolvedWindowTabBarHeight(), area.height)
-            let strip = WindowTabStripViewModel(id: ObjectIdentifier(group), workspaceName: workspace.name,
+            var strip = WindowTabStripViewModel(id: ObjectIdentifier(group), workspaceName: workspace.name,
                 frame: CGRect(x: area.minX, y: area.maxY - barHeight, width: area.width, height: barHeight),
                 groupFrame: area, activeWindowId: active.windowId,
                 activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
                 occludingFloatingWindowFrames: [], shownWindowIds: [active.windowId], headerHeight: barHeight, isWorkspaceTabs: true)
+            if let focused = focus.windowOrNil, workspace.tabbedGroup(containing: focused.windowId)?.barGroup === group {
+                strip.groupControls = workspaceTabGroupControls(for: focused)
+            }
             models.append(WorkspaceTabBarModel(id: ObjectIdentifier(group), workspaceName: workspace.name, frame: area,
                 barHeight: barHeight, activeWindowId: active.windowId, strip: strip))
         }
@@ -136,5 +139,36 @@ struct WorkspaceTabBarView: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Workspace tabs")
+    }
+}
+
+/// The focused Tabbed group's buttons: split the window shown into a new column or row, or focus
+/// it, filling the screen. Each runs the ordinary command, so its keys show beside it.
+@MainActor
+func workspaceTabGroupControls(for window: Window) -> [WorkspaceTabGroupControl] {
+    let id = window.windowId
+    let splits = (window.nodeWorkspace?.tabbedGroup(containing: id)?.windowIds.count ?? 0) > 1
+    let controls: [(String, String, String, String, Bool)] = [
+        ("Split Right", "rectangle.split.2x1", "split horizontal --window-id \(id)", "split horizontal", splits),
+        ("Split Down", "rectangle.split.1x2", "split vertical --window-id \(id)", "split vertical", splits),
+        ("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)", "fullscreen", true),
+    ]
+    return controls.map { title, symbol, command, shortcut, enabled in
+        WorkspaceTabGroupControl(title: title, symbol: symbol, command: command,
+            shortcutHint: WindowHoverBar.shortcutHint(for: HoverBarAction(title: title, symbol: symbol, command: command, shortcut: shortcut)),
+            isEnabled: enabled)
+    }
+}
+
+/// Runs a Tabbed group button's command as a click on its window would: focusing it first.
+@MainActor
+func runWorkspaceTabGroupControl(_ control: WorkspaceTabGroupControl, windowId: UInt32) {
+    guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(control.command),
+          case .cmd(let raise) = parseCommand(["focus", "--window-id", String(windowId)]) else { return }
+    Task { @MainActor in
+        _ = try? await runLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
+            let result = try await [raise, parsed].runCmdSeq(.defaultEnv, .emptyStdin)
+            showShortcutFailure("Tab bar", result)
+        }
     }
 }

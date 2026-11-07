@@ -109,7 +109,7 @@ func recordWorkspaceTabBarScroll(_ stripId: ObjectIdentifier, contentMinX: CGFlo
 func tabbedBarTabsRect(area: Rect, host: TabbedGroup? = nil) -> Rect {
     let scrolled = host?.barScrollOffset ?? 0
     return Rect(topLeftX: area.topLeftX + windowTabStripLeadingInset + scrolled, topLeftY: area.topLeftY,
-                width: area.width, height: min(resolvedWindowTabBarHeight(), area.height))
+                width: workspaceTabBarTabsStripWidth(area.width), height: min(resolvedWindowTabBarHeight(), area.height))
 }
 
 /// Over a Tabbed workspace's bar a tab goes where the pointer is among its tabs: back along its

@@ -116,10 +116,10 @@ extension WindowTabStripView {
             )
                 .frame(maxWidth: .infinity)
 
-            if strip.isWorkspaceTabs, let groupDragWindowId {
-                // A Tabbed workspace's group: splitting and merging, where other bars keep a drag gutter.
-                WorkspaceTabGroupMenuButton(windowId: groupDragWindowId, tabCount: strip.tabs.count)
-                    .frame(width: windowTabStripTrailingGroupDragGutterWidth)
+            if strip.isWorkspaceTabs {
+                // The focused Tabbed group's buttons; other groups' bars leave the same room empty.
+                WorkspaceTabGroupControlsView(controls: strip.groupControls, windowId: groupDragWindowId)
+                    .frame(width: workspaceTabBarControlsWidth)
             } else {
                 Color.clear
                     .frame(width: windowTabStripTrailingGroupDragGutterWidth)
@@ -488,6 +488,11 @@ extension WindowTabStripView {
                     ForEach(sides, id: \.self) { side in
                         Button("Move to Group \(side.tabbedGroupSideTitle)") { moveTabToNeighborGroupFromTabStrip(tab.windowId, side) }
                     }
+                    Divider()
+                    ForEach(sides, id: \.self) { side in
+                        Button("Merge With Group \(side.tabbedGroupSideTitle)") { mergeTabGroupFromTabStrip(tab.windowId, side) }
+                    }
+                    Button("Merge All Groups") { mergeAllTabGroupsFromTabStrip(tab.windowId) }
                 }
             }
         }
@@ -507,36 +512,32 @@ extension WindowTabStripView {
     }
 }
 
-/// The menu at the end of a Tabbed workspace's tab group bar: splits the tab shown into a new
-/// group, or merges groups back together.
-struct WorkspaceTabGroupMenuButton: View {
+/// The buttons at the end of the focused Tabbed group's bar, each with its title and keys as its
+/// tooltip, as the hover bar shows them.
+struct WorkspaceTabGroupControlsView: View {
     @SidebarColors var colors
-    let windowId: UInt32
-    let tabCount: Int
+    let controls: [WorkspaceTabGroupControl]
+    let windowId: UInt32?
 
     var body: some View {
-        Menu {
-            Button("Split Right") { moveTabToNewGroupFromTabStrip(windowId, side: .right) }
-                .disabled(tabCount < 2)
-            Button("Split Down") { moveTabToNewGroupFromTabStrip(windowId, side: .down) }
-                .disabled(tabCount < 2)
-            let sides = tabbedGroupNeighborSides(of: windowId)
-            Divider()
-            ForEach(sides, id: \.self) { side in
-                Button("Merge With Group \(side.tabbedGroupSideTitle)") { mergeTabGroupFromTabStrip(windowId, side) }
+        HStack(spacing: 0) {
+            ForEach(controls) { control in
+                Button {
+                    guard let windowId else { return }
+                    runWorkspaceTabGroupControl(control, windowId: windowId)
+                } label: {
+                    Image(systemName: control.symbol)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(colors.text(opacity: control.isEnabled ? GlassToken.textSecondary : GlassToken.textTertiary))
+                        .frame(width: 24, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(!control.isEnabled)
+                .help(control.shortcutHint.map { "\(control.title)  \($0)" } ?? control.title)
+                .accessibilityLabel(control.title)
             }
-            Button("Merge All Groups") { mergeAllTabGroupsFromTabStrip(windowId) }
-                .disabled(sides.isEmpty)
-        } label: {
-            Image(systemName: "rectangle.split.2x1")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(colors.text(opacity: GlassToken.textSecondary))
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .fixedSize()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .help("Split or merge tab groups")
-        .accessibilityLabel("Tab Group Options")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
     }
 }

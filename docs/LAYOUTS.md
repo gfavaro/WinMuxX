@@ -40,10 +40,11 @@ the window, and the bar's surface continues behind the window.
 
 To see windows side by side, split the workspace into tab groups: columns and rows,
 each with its own bar showing one of its windows. Tabs shrink to their icons before
-any would scroll out of sight. The button at the end of each bar splits the tab shown
-into a new group to the right or below, merges the group with one beside it, or
-merges all groups back into one. Right-click a tab for Move to New Column, Move to New
-Row, or Move to Group on that side. `split horizontal` and `split vertical` open the
+any would scroll out of sight. The focused group's bar ends in three buttons: Split
+Right and Split Down open the tab shown in a new column or row, and Focus fills the
+screen with it, as `fullscreen` does; each tooltip gives the keys bound to it.
+Right-click a tab for Move to New Column, Move to New Row, Move to Group on that side,
+Merge With Group on that side, or Merge All Groups. `split horizontal` and `split vertical` open the
 focused tab in a new column or row, and `join-with` moves it into the group on that
 side.
 
