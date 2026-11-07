@@ -14,8 +14,8 @@ struct MoveCommand: Command {
         let currentNode = currentWindow.moveNode
         // In a Tabbed workspace left and right move the tab along the bar, as dragging it does.
         if target.workspace.arrangement == .tabbed, currentWindow.parent is TilingContainer {
-            let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
-            guard direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === currentWindow }),
+            let tabs = target.workspace.tabbedUnits
+            guard direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === target.workspace.tabbedUnit(containing: currentWindow) }),
                   tabs.indices.contains(index + direction.focusOffset) else {
                 return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
             }
@@ -247,7 +247,11 @@ extension TilingTreeNodeCases {
 extension Window {
     @MainActor
     var moveNode: TreeNode {
-        if let parent = parent as? TilingContainer, parent.layout == .tabGroup {
+        // In a Tabbed workspace a window moves as its tab in the bar: a side-by-side tab as one,
+        // any other window alone, even inside a tab group the tree keeps underneath.
+        if parent is TilingContainer, let workspace = nodeWorkspace, workspace.arrangement == .tabbed {
+            return workspace.tabbedUnit(containing: self) ?? self
+        } else if let parent = parent as? TilingContainer, parent.layout == .tabGroup {
             return parent
         } else {
             return self

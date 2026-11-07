@@ -39,6 +39,13 @@ tab-next`, `tab-prev` and `--tab-index` follow the bar. Reordering swaps windows
 their places in the tree, so the splits Dwindle returns to keep their shape. One border
 encloses the bar and the window, and the bar's surface continues behind the window.
 
+To compare two windows, right-click a tab and choose Show Beside Current Tab: that
+window joins the tab shown, side by side, and the bar lists them as one tab. Left and
+right move between them first, then to the next tab. Split Into Tabs on that tab makes
+each window a tab again; in Dwindle or Master they stay side by side. The handle at the
+right of the bar, or dragging the tab out, carries the tab shown, with all its windows,
+to another workspace, display or window.
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another, and

@@ -26,11 +26,16 @@ struct FocusCommand: Command {
                 // A Tabbed workspace shows one window: left and right step through its tabs in bar
                 // order, before any strip nested in the tree, and wrap within the tab list.
                 if target.workspace.arrangement == .tabbed, let window {
-                    let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
-                    if direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === window }) {
-                        if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset) { return neighbor.focusWindow() }
+                    let tabs = target.workspace.tabbedUnits
+                    // Within a side-by-side tab, first move to the window on that side, as placed on screen.
+                    if let split = target.workspace.tabbedUnit(containing: window) as? TilingContainer,
+                       let neighbor = spatialNeighbor(of: window, among: split.allLeafWindowsRecursive, direction) {
+                        return neighbor.focusWindow()
+                    }
+                    if direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === target.workspace.tabbedUnit(containing: window) }) {
+                        if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset)?.tabbedRepresentative { return neighbor.focusWindow() }
                         if args.boundariesAction == .wrapAroundTheWorkspace, tabs.count > 1 {
-                            return (direction.focusOffset > 0 ? tabs.first : tabs.last)?.focusWindow() ?? false
+                            return (direction.focusOffset > 0 ? tabs.first : tabs.last)?.tabbedRepresentative?.focusWindow() ?? false
                         }
                     }
                     return hitWorkspaceBoundaries(target, io, args, direction)
@@ -69,7 +74,7 @@ struct FocusCommand: Command {
             case .tabIndex(let tabIndex):
                 // In a Tabbed workspace the tabs are the workspace's windows, as its bar lists them.
                 if target.workspace.arrangement == .tabbed {
-                    guard let window = target.workspace.rootTilingContainer.allLeafWindowsRecursive.getOrNil(atIndex: Int(tabIndex) - 1) else {
+                    guard let window = target.workspace.tabbedUnits.getOrNil(atIndex: Int(tabIndex) - 1)?.tabbedRepresentative else {
                         return io.err("Can't find tab with index \(tabIndex) in this workspace")
                     }
                     return window.focusWindow()
@@ -314,8 +319,9 @@ private func focusRelativeInWorkspaceTabs(
     _ boundariesAction: FocusCmdArgs.WhenBoundariesCrossed,
     _ nextPrev: TabNextPrev,
 ) -> Bool {
-    let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
-    guard let current = tabs.firstIndex(where: { $0 === target.windowOrNil }) else { return false }
+    let tabs = target.workspace.tabbedUnits
+    guard let window = target.windowOrNil, let unit = target.workspace.tabbedUnit(containing: window),
+          let current = tabs.firstIndex(where: { $0 === unit }) else { return false }
     var index = current + nextPrev.focusOffset
     if !tabs.indices.contains(index) {
         switch boundariesAction {
@@ -325,5 +331,23 @@ private func focusRelativeInWorkspaceTabs(
             case .wrapAroundAllMonitors: return dieT("Must be discarded by args parser")
         }
     }
-    return tabs[index].focusWindow()
+    return tabs[index].tabbedRepresentative?.focusWindow() ?? false
+}
+
+/// The nearest of `windows` on `direction`'s side of `window`, overlapping it across that axis,
+/// from their last laid-out frames.
+@MainActor
+func spatialNeighbor(of window: Window, among windows: [Window], _ direction: CardinalDirection) -> Window? {
+    guard let from = window.lastAppliedLayoutPhysicalRect else { return nil }
+    let candidates = windows.compactMap { other -> (Window, CGFloat)? in
+        guard other !== window, let to = other.lastAppliedLayoutPhysicalRect else { return nil }
+        let (gap, overlaps): (CGFloat, Bool) = switch direction {
+            case .right: (to.minX - from.maxX, to.minY < from.maxY && to.maxY > from.minY)
+            case .left: (from.minX - to.maxX, to.minY < from.maxY && to.maxY > from.minY)
+            case .down: (to.minY - from.maxY, to.minX < from.maxX && to.maxX > from.minX)
+            case .up: (from.minY - to.maxY, to.minX < from.maxX && to.maxX > from.minX)
+        }
+        return overlaps && gap > -1 ? (other, gap) : nil
+    }
+    return candidates.min(by: { $0.1 < $1.1 })?.0
 }

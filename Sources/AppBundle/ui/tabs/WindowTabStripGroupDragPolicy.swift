@@ -17,5 +17,6 @@ func shouldAllowTabStripChromeGroupDrag(windowId: UInt32) -> Bool {
         return true
     }
     guard let window = Window.get(byId: windowId) else { return false }
-    return isWindowInDraggableTabGroup(window)
+    // A Tabbed workspace's handle carries the tab shown, alone or side by side, through its moveNode.
+    return isWindowInDraggableTabGroup(window) || window.nodeWorkspace?.arrangement == .tabbed && window.parent is TilingContainer
 }

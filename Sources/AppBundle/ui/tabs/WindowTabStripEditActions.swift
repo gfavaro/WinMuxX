@@ -55,8 +55,8 @@ func reorderTabGroupChild(showing window: Window, stripId: ObjectIdentifier, toI
 @MainActor
 func reorderWorkspaceTab(_ window: Window, stripId: ObjectIdentifier, toIndex targetIndex: Int) -> Bool {
     guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, ObjectIdentifier(workspace) == stripId else { return false }
-    var tabs = workspace.rootTilingContainer.allLeafWindowsRecursive
-    guard var index = tabs.firstIndex(where: { $0 === window }) else { return false }
+    var tabs = workspace.tabbedUnits
+    guard var index = tabs.firstIndex(where: { $0 === workspace.tabbedUnit(containing: window) }) else { return false }
     let target = max(0, min(targetIndex, tabs.count - 1))
     while index != target {
         let next = index + (target > index ? 1 : -1)
@@ -66,6 +66,28 @@ func reorderWorkspaceTab(_ window: Window, stripId: ObjectIdentifier, toIndex ta
     }
     window.markAsMostRecentChild()
     return true
+}
+
+@MainActor
+func showTabBesideCurrentFromTabStrip(_ windowId: UInt32) {
+    guard let token: RunSessionGuard = .isServerEnabled else { return }
+    Task {
+        try await runLightSession(.menuBarButton, token) {
+            guard let window = Window.get(byId: windowId), showTabbedTabBesideCurrent(window) else { return }
+            _ = window.focusWindow()
+        }
+    }
+}
+
+@MainActor
+func splitTabIntoTabsFromTabStrip(_ windowId: UInt32) {
+    guard let token: RunSessionGuard = .isServerEnabled else { return }
+    Task {
+        try await runLightSession(.menuBarButton, token) {
+            guard let window = Window.get(byId: windowId) else { return }
+            _ = splitTabbedTabIntoTabs(window)
+        }
+    }
 }
 
 /// Strip index a keyboard or VoiceOver move lands on, or nil at either end of the strip.

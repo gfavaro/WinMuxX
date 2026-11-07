@@ -39,9 +39,10 @@ extension Workspace {
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
             rootTilingContainer.lastAppliedLayoutVirtualRect = rect
-            if let active = rootTilingContainer.mostRecentWindowRecursive {
-                // Every other tiled window waits hidden, as a tab group's background tabs do; the
-                // tree beneath stays as it was, so returning to Dwindle or Master restores it.
+            if let active = tabbedActiveUnit {
+                // Every other tab waits hidden, as a tab group's background tabs do; the tree
+                // beneath stays as it was, so returning to Dwindle or Master restores it. A
+                // side-by-side tab lays out its windows in the area as a split.
                 try await rootTilingContainer.hideAllWindowsExcept(active)
                 let content = workspaceTabbedContentRect(rect)
                 try await active.layoutRecursive(content.topLeftCorner, width: content.width, height: content.height,

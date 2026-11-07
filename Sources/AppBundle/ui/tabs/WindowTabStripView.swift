@@ -116,22 +116,21 @@ extension WindowTabStripView {
             )
                 .frame(maxWidth: .infinity)
 
-            if !strip.isWorkspaceTabs {
-                Color.clear
-                    .frame(width: windowTabStripTrailingGroupDragGutterWidth)
-                    .frame(maxHeight: .infinity)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
-                        focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
-                    }
-                    .gesture(groupDragGesture(for: groupDragWindowId))
+            // In a Tabbed workspace the handle carries the tab shown, with its side-by-side windows.
+            Color.clear
+                .frame(width: windowTabStripTrailingGroupDragGutterWidth)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
+                    focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
+                }
+                .gesture(groupDragGesture(for: groupDragWindowId))
 
-                WindowTabGroupHandleView(
-                    windowId: groupDragWindowId,
-                    workspaceName: strip.workspaceName
-                )
-            }
+            WindowTabGroupHandleView(
+                windowId: groupDragWindowId,
+                workspaceName: strip.workspaceName
+            )
         }
         .padding(.leading, 2)
         .padding(.trailing, 8)
@@ -201,7 +200,7 @@ extension WindowTabStripView {
             focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
         }
         .simultaneousGesture(tabScrollBackgroundGroupDragGesture(
-            for: strip.isWorkspaceTabs ? nil : groupDragWindowId,
+            for: groupDragWindowId,
             context: context,
         ))
     }
@@ -459,11 +458,16 @@ extension WindowTabStripView {
                 .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: -1, in: strip.tabs) == nil)
             Button("Move Tab Right") { moveTab(tab, by: 1) }
                 .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: 1, in: strip.tabs) == nil)
+            Divider()
             if !strip.isWorkspaceTabs {
-                Divider()
                 Button("Remove Tab From Stack") {
                     removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
                 }
+            } else if !tab.isActive {
+                // Compare two windows: this one joins the tab shown, side by side.
+                Button("Show Beside Current Tab") { showTabBesideCurrentFromTabStrip(tab.windowId) }
+            } else if strip.shownWindowIds.count > 1 {
+                Button("Split Into Tabs") { splitTabIntoTabsFromTabStrip(tab.windowId) }
             }
         }
     }

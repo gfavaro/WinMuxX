@@ -34,10 +34,21 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
     for workspace in Workspace.all where workspace.isVisible && workspace.arrangement == .tabbed
         && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) && !workspace.presentsManagedFullscreen
     {
-        let windows = workspace.rootTilingContainer.allLeafWindowsRecursive
-        guard let active = workspace.rootTilingContainer.mostRecentWindowRecursive, !windows.isEmpty else { continue }
-        let tabs = await makeWindowTabChromeTabs(windows: windows, activeWindowId: active.windowId)
+        let units = workspace.tabbedUnits
+        let representatives = units.compactMap(\.tabbedRepresentative)
+        guard let activeUnit = workspace.tabbedActiveUnit, let active = activeUnit.tabbedRepresentative,
+              representatives.count == units.count, !units.isEmpty else { continue }
+        var tabs = await makeWindowTabChromeTabs(windows: representatives, activeWindowId: active.windowId)
             .map { $0.legacyTabItem(workspaceName: workspace.name) }
+        // A side-by-side tab names all of its windows.
+        for (index, unit) in units.enumerated() where tabs.indices.contains(index) {
+            guard let split = unit as? TilingContainer else { continue }
+            let names = split.allLeafWindowsRecursive.map { cachedWindowTitle(for: $0) ?? $0.app.name ?? "Window" }
+            let tab = tabs[index]
+            tabs[index] = WindowTabItemViewModel(windowId: tab.windowId, workspaceName: tab.workspaceName, appName: tab.appName,
+                appBundleId: tab.appBundleId, appBundlePath: tab.appBundlePath, title: names.joined(separator: " | "), isActive: tab.isActive)
+        }
+        let shown = Set(((activeUnit as? TilingContainer)?.allLeafWindowsRecursive ?? [active]).map(\.windowId))
         if Task.isCancelled { return nil }
         guard workspace.isVisible, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen else { continue }
         let rect = workspaceTilingRect(workspace)
@@ -47,7 +58,7 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
             frame: CGRect(x: frame.minX, y: frame.maxY - barHeight, width: frame.width, height: barHeight),
             groupFrame: frame, activeWindowId: active.windowId,
             activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
-            occludingFloatingWindowFrames: [], shownWindowIds: [active.windowId], headerHeight: barHeight, isWorkspaceTabs: true)
+            occludingFloatingWindowFrames: [], shownWindowIds: shown, headerHeight: barHeight, isWorkspaceTabs: true)
         models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: frame, barHeight: barHeight,
             activeWindowId: active.windowId, strip: strip))
     }
@@ -101,11 +112,9 @@ final class WorkspaceTabBarPanel: NSPanelHud {
         }
         updateMousePolicy()
         if current?.frame != model.frame { setWindowTabChromePanelFrame(model.frame, on: self) }
-        // Just behind the window shown, reasserted on every refresh like the tab-group panels:
-        // raising that window or another one changes the order outside this model.
-        order(.below, relativeTo: Int(model.activeWindowId))
-        // Never in front of the window: without it, the back of this level is the fallback.
-        if !isVisible { order(.below, relativeTo: 0) }
+        // At the back of the window level, reasserted on every refresh: behind every window of a
+        // side-by-side tab at once, while nothing but floating windows ever covers the bar.
+        orderBack(nil)
         current = model
     }
 

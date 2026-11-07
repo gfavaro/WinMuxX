@@ -18,6 +18,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let dwindleChildRatios: [CGFloat]?
     let stripColumnWidth: CGFloat?
     let presentsAsStrip: Bool?
+    let isTabbedSplit: Bool?
 
     @MainActor init(_ container: TilingContainer) {
         let children: [FrozenTreeNode] = container.children.map {
@@ -72,6 +73,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         self.dwindleChildRatios = dwindleChildRatios
         stripColumnWidth = container.stripColumnWidth
         presentsAsStrip = container.presentsAsStrip ? true : nil
+        isTabbedSplit = container.isTabbedSplit ? true : nil
     }
 }
 
