@@ -39,16 +39,17 @@ struct ShortcutBehaviorSettingsView: View {
             learnedMinimumsSection
             fitDiagnosticsSection
             SettingsSection("Default layout") {
-                SettingsLayoutPreviews()
-                SettingsPicker(.defaultLayout, selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
-                    Text("Dwindle").tag(Layout.dwindle)
-                    Text("Master").tag(Layout.master)
-                    Text("Tiles").tag(Layout.tiles)
-                    Text("Stacked: Tabbed").tag(Layout.tabGroup)
-                    Text("Stacked: Accordion").tag(Layout.stacked)
-                } onChange: { persistRootString("default-root-container-layout", defaultLayout.rawValue) }
-                Text("Defaults apply to new workspaces. Selecting Dwindle also updates existing tiled workspaces.")
-                    .font(.callout).foregroundStyle(.secondary)
+                SettingsPictogramPicker(title: SettingsControl.defaultLayout.title, id: SettingsControl.defaultLayout.id,
+                    selection: $defaultLayout, options: [
+                        .init(value: Layout.dwindle, title: "Dwindle", pictogram: .dwindle),
+                        .init(value: Layout.master, title: "Master", pictogram: .master),
+                        .init(value: Layout.tiles, title: "Tiles", pictogram: .tiles),
+                        .init(value: Layout.tabGroup, title: "Tabbed", pictogram: .tabbed),
+                        .init(value: Layout.stacked, title: "Accordion", pictogram: .accordion),
+                    ],
+                    help: "Used for new workspaces. Dwindle splits the focused area for each new window; Master keeps one main window with the others beside it. Selecting Dwindle also updates existing tiled workspaces.") {
+                    persistRootString("default-root-container-layout", defaultLayout.rawValue)
+                }
                 SettingsPicker(.defaultOrientation, selection: $defaultOrientation, help: "Controls how new tiled containers split.") {
                     Text("Automatic").tag(DefaultContainerOrientation.auto)
                     Text("Horizontal").tag(DefaultContainerOrientation.horizontal)
@@ -57,6 +58,7 @@ struct ShortcutBehaviorSettingsView: View {
                 .pickerStyle(.segmented)
 
             }
+            SettingsWorkspaceLayoutSection(model: model)
             SettingsSection("Lone windows and fullscreen") {
                 SettingsStepper(.fullscreenWidth, value: Binding(
                     get: { Int((fullscreenWidth * 100).rounded()) },
@@ -263,45 +265,6 @@ private func minimumSizeDescription(_ size: CGSize) -> String {
     let width = size.width == 0 ? "?" : String(Int(size.width.rounded()))
     let height = size.height == 0 ? "?" : String(Int(size.height.rounded()))
     return "\(width) × \(height)"
-}
-
-private struct SettingsLayoutPreviews: View {
-    var body: some View {
-        HStack(alignment: .top, spacing: 20) {
-            preview("Dwindle", description: "Each new window splits the focused area.", master: false)
-            preview("Master", description: "One main window with the others beside it.", master: true)
-        }
-    }
-
-    private func tile(_ number: Int) -> some View {
-        RoundedRectangle(cornerRadius: 4)
-            .fill(Color.accentColor.opacity(0.15))
-            .overlay(Text("\(number)").font(.caption).foregroundStyle(.primary))
-            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.accentColor.opacity(0.5)))
-    }
-
-    private func preview(_ title: String, description: String, master: Bool) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            GeometryReader { geometry in
-                HStack(spacing: 4) {
-                    tile(1).frame(width: geometry.size.width * (master ? 0.6 : 0.5) - 2)
-                    VStack(spacing: 4) {
-                        tile(2)
-                        if master { tile(3) }
-                        else { HStack(spacing: 4) { tile(3); tile(4) } }
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(height: 76)
-            .accessibilityHidden(true)
-            Text(title).font(.headline)
-            Text(description).font(.caption).foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-    }
 }
 
 /// The pointer and trackpad gestures WinMuxX responds to, listed on Settings → Windows.

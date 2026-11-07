@@ -100,6 +100,16 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         XCTAssertEqual(Set(full).count, full.count, "Gestures are the list's identity")
     }
 
+    func testLayoutPictogramsStayInsideTheirCardAndDoNotOverlap() {
+        let size = CGSize(width: 76, height: 50)
+        for kind in [LayoutPictogram.dwindle, .master, .tiles, .tabbed] {
+            let rects = layoutPictogramRects(kind, in: size)
+            XCTAssertGreaterThanOrEqual(rects.count, 3, "\(kind) draws several windows")
+            for rect in rects { XCTAssertTrue(CGRect(origin: .zero, size: size).insetBy(dx: -0.001, dy: -0.001).contains(rect), "\(kind)") }
+            for (i, a) in rects.enumerated() { for b in rects[(i + 1)...] { XCTAssertFalse(a.insetBy(dx: 0.01, dy: 0.01).intersects(b), "\(kind) windows overlap") } }
+        }
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })
