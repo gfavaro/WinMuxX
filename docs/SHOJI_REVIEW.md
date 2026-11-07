@@ -181,15 +181,15 @@ or more with layout or new UI surfaces.
 
 | # | Feature | Effort | Why |
 | --- | --- | --- | --- |
-| 1 | **Pill tab strip:** pills at rest, full strip with hover actions on hover (proposal above) | L | The Shoji idea that was liked most; returns about 26 pt to every tab group |
+| 1 | ~~**Pill tab strip**~~ shipped 2026-11-05 (e5e47d9e, 289af69f): groups reserve no space, pills sit on the top edge, tabs show in the hover bar | L | The Shoji idea that was liked most; returns about 26 pt to every tab group |
 | 2 | ~~**⌥-click Float in the hover bar**~~ declined 2026-11-06; the menu's Float Windows by Title… stays the way to add the rule | S | Reuses `Sources/AppBundle/ui/settings/QuickFloatingRule.swift`; removes a trip to the menu |
 | 3 | **Switcher key-hint footer** (done 2026-11-06): shows the palette's real keys, "↑↓ select · ↩ open · ⌘1–9 jump · esc close" | S | Teaches the palette without documentation |
-| 4 | **Settings search across all pages,** with synonym keywords | M | Nine deep pages; search exists only on Shortcuts |
-| 5 | **Workspace layout as pictograms on Windows** (Dwindle, Master, Scrolling), replacing the form under Displays; UUIDs and hardware selectors behind a disclosure | M | The most used choice is hard to find today |
-| 6 | **Menu-bar panel:** mini-map of the current workspace with tab groups as pills, layout pictograms, toggles for borders, dimming, No peek, pointer focus and tab strips, a float switch for the frontmost app, existing warnings | L | Shows state the command menu cannot; keep the command menu reachable from the keyboard |
-| 7 | **Per-shortcut conflicts** on Shortcuts: name the owner, suggest free keys | M | Builds on the existing shortcut diagnostics |
-| 8 | **Captioned previews** for borders and tab strips, next to the spacing preview | M | Makes appearance choices visible before they apply |
-| 9 | **Stack instead of shrinking:** when a tile would fall below an app's learned minimum size, join the active tab group | M | Pairs with pill strips; needs a policy decision before code |
+| 4 | **Settings search across all pages** (done with UI-07/UI-08): every page and indexed control, page aliases, ⌘F and Return | M | Nine deep pages; search exists only on Shortcuts |
+| 5 | **Workspace layout as pictograms** (done 2026-11-06): pictogram cards for the default layout; a workspace's own layout moved from Displays to Windows; display identifiers behind a disclosure | M | The most used choice is hard to find today |
+| 6 | ~~**Menu-bar panel**~~ dropped 2026-11-06; the menu stays native | L | Shows state the command menu cannot; keep the command menu reachable from the keyboard |
+| 7 | **Per-shortcut conflicts** (done 2026-11-06): macOS shortcuts and duplicate WinMuxX shortcuts named under the row, with free keys suggested; other apps' global shortcuts cannot be listed | M | Builds on the existing shortcut diagnostics |
+| 8 | **Captioned previews** (done 2026-11-06): border preview on Appearance, tab group preview on Windows | M | Makes appearance choices visible before they apply |
+| 9 | **Stack instead of shrinking** (done 2026-11-06, Dwindle): a newly opened window joins the tile's tab group when either half would fall below a learned minimum; explicit moves and tiling commands are unchanged | M | Pairs with pill strips; needs a policy decision before code |
 | 10 | **Mouse gestures list** (done 2026-11-06): Settings → Windows → Mouse and trackpad, showing optional gestures only when enabled | S | Gestures exist but are undiscoverable |
 
 Later or uncertain:
