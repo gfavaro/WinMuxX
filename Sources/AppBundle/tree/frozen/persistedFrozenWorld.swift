@@ -192,6 +192,16 @@ struct PersistedFrozenWorldEnvelope: Codable, Equatable, Sendable {
     let pending: [PendingRestartSnapshot]?
 }
 
+extension PersistedFrozenWorldEnvelope {
+    /// An unreadable pending restart snapshot is left out; the current layout still loads.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        world = try container.decode(FrozenWorld.self, forKey: .world)
+        pending = try container.decodeIfPresent(LossyDecodableArray<PendingRestartSnapshot>.self, forKey: .pending)?.elements
+    }
+}
+
 @MainActor
 private func persistedFrozenWorldUrl() throws -> URL {
     let appSupport = try FileManager.default.url(for: .applicationSupportDirectory,

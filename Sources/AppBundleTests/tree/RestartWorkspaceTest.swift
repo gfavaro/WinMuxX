@@ -85,6 +85,27 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertEqual(decoded.pending?.first?.remainingWindowIds, [1])
     }
 
+    func testOneUnreadableSavedEntryDoesNotLoseTheRest() throws {
+        let url = projectRoot.appendingPathComponent("resources/test-fixtures/restart-envelope-v2.json")
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        // A newer build's workspace and pending snapshot this build cannot read.
+        var world = try XCTUnwrap(json["world"] as? [String: Any])
+        var workspaces = try XCTUnwrap(world["workspaces"] as? [Any])
+        var unreadable = try XCTUnwrap(workspaces.first as? [String: Any])
+        unreadable["name"] = "from-the-future"
+        unreadable["rootTilingNode"] = ["kind": "scrollingStrip"]
+        workspaces.append(unreadable)
+        world["workspaces"] = workspaces
+        json["world"] = world
+        json["pending"] = ((json["pending"] as? [Any]) ?? []) + [["world": 42]]
+        let decoded = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self,
+                                               from: JSONSerialization.data(withJSONObject: json))
+        XCTAssertEqual(decoded.world.workspaces.map(\.name), [try XCTUnwrap((workspaces.first as? [String: Any])?["name"] as? String)],
+                       "The readable workspace keeps its layout")
+        XCTAssertEqual(decoded.pending?.count, 1, "and the readable pending snapshot is kept")
+        XCTAssertEqual(decoded.pending?.first?.remainingWindowIds, [1])
+    }
+
     func testAppLaunchedAfterWorkspaceSelectionKeepsNewPlacementAcrossFurtherNavigation() async throws {
         let oldWorkspace = Workspace.get(byName: "1")
         let old = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)
