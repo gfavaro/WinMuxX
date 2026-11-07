@@ -3,16 +3,10 @@ import PrivateApi
 import Common
 
 @MainActor
-private var activeRefreshTask: Task<(), any Error>? {
-    get { runtime.refresh.activeRefreshTask }
-    set { runtime.refresh.activeRefreshTask = newValue }
-}
+private var activeRefreshTask: Task<(), any Error>? { runtime.refresh.activeRefreshTask }
 
 @MainActor
-private var activeScheduledRefreshEvent: RefreshSessionEvent? {
-    get { runtime.refresh.activeScheduledRefreshEvent }
-    set { runtime.refresh.activeScheduledRefreshEvent = newValue }
-}
+private var activeScheduledRefreshEvent: RefreshSessionEvent? { runtime.refresh.activeScheduledRefreshEvent }
 
 @MainActor
 private var activeScheduledRefreshGeneration: UInt64 {
@@ -125,9 +119,18 @@ func shouldSyncFocusBackToMacOs(
 }
 
 @MainActor
-private var pendingRefreshRequest: (event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool)? {
+private var pendingRefreshRequest: RefreshRequest? {
     get { runtime.refresh.pendingRefreshRequest }
     set { runtime.refresh.pendingRefreshRequest = newValue }
+}
+
+/// Adds an event to the follow-up owed, keeping the most demanding of them.
+@MainActor
+private func queueRefreshFollowUp(_ event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool) {
+    pendingRefreshRequest = pendingRefreshRequest.map {
+        RefreshRequest(event: mergeRefreshEvents($0.event, event),
+                       optimisticallyPreLayoutWorkspaces: $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
+    } ?? RefreshRequest(event: event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
 }
 
 /// When two refresh requests coalesce, keep the event whose session does more work, so the
@@ -174,28 +177,22 @@ func scheduleRefreshSession(
     // run a single follow-up session on behalf of all events that arrived in the meantime.
     if activeRefreshTask != nil {
         runtime.events.record(.refreshCoalesced, source: .refresh, generation: activeScheduledRefreshGeneration)
-        pendingRefreshRequest = pendingRefreshRequest.map {
-            (mergeRefreshEvents($0.event, event), $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
-        } ?? (event, optimisticallyPreLayoutWorkspaces)
+        queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
         return
     }
     // A light session may cancel the active task while leaving a heavier request pending.
-    let request = pendingRefreshRequest.map {
-        (event: mergeRefreshEvents($0.event, event),
-         optimisticallyPreLayoutWorkspaces: $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
-    } ?? (event: event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
+    queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
+    let request = pendingRefreshRequest!
     pendingRefreshRequest = nil
     activeScheduledRefreshGeneration += 1
     let generation = activeScheduledRefreshGeneration
-    activeScheduledRefreshEvent = request.event
     let override = scheduledRefreshOverrideForTests
-    activeRefreshTask = runtime.throwingTask {
+    let task = runtime.throwingTask {
         defer {
             // Generation mismatch means someone took over (light session, test setup); they are
             // responsible for the next refresh, so don't drain the pending request from here.
             if activeScheduledRefreshGeneration == generation {
-                activeRefreshTask = nil
-                activeScheduledRefreshEvent = nil
+                runtime.refresh.active = nil
                 if let pending = pendingRefreshRequest {
                     pendingRefreshRequest = nil
                     scheduleRefreshSession(pending.event, optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
@@ -216,6 +213,7 @@ func scheduleRefreshSession(
             return
         }
     }
+    runtime.refresh.active = ActiveRefresh(task: task, event: request.event)
 }
 
 @MainActor
@@ -382,17 +380,14 @@ private func performLightSession<T>(
     defer { signposter.endInterval(#function, state) }
     // Keep work that a native event already requested. A cheap command/swipe may
     // skip its own follow-up, but must not lose an interrupted creation/wake pass.
-    if activeRefreshTask != nil, let event = activeScheduledRefreshEvent {
-        pendingRefreshRequest = pendingRefreshRequest.map {
-            (mergeRefreshEvents($0.event, event), $0.optimisticallyPreLayoutWorkspaces)
-        } ?? (event, false)
+    if let event = activeScheduledRefreshEvent {
+        queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: false)
     }
-    activeRefreshTask?.cancel() // Give priority to runSession
-    activeRefreshTask = nil
-    // Invalidate the cancelled task's generation so its defer doesn't spawn a coalesced
-    // follow-up session in the middle of this light session. The post-refresh scheduled at
-    // the end of the light session (or any later event) picks the pending request up instead.
-    activeScheduledRefreshGeneration += 1
+    // Give priority to runSession. Taking the generation keeps the cancelled task's completion
+    // from spawning a coalesced follow-up session in the middle of this light session. The
+    // post-refresh scheduled at the end of the light session (or any later event) picks the
+    // pending request up instead.
+    runtime.refresh.stopActive()
     let generation = activeScheduledRefreshGeneration
     // Errors and cancellation must also drain interrupted native work. A newer
     // session owns its own completion and must not be disturbed by this one.
@@ -443,12 +438,9 @@ private func performLightSession<T>(
 func setScheduledRefreshOverrideForTests(
     _ override: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)?
 ) {
-    activeRefreshTask?.cancel()
-    activeRefreshTask = nil
-    activeScheduledRefreshEvent = nil
+    runtime.refresh.stopActive()
     pendingRefreshRequest = nil
     pendingActivation = nil
-    activeScheduledRefreshGeneration += 1
     scheduledRefreshOverrideForTests = override
 }
 
@@ -457,12 +449,9 @@ func setBlockingRefreshOverridesForTests(
     refresh: (@MainActor @Sendable () async throws -> Void)? = nil,
     normalizeLayoutReason: (@MainActor @Sendable () async throws -> Void)? = nil,
 ) {
-    activeRefreshTask?.cancel()
-    activeRefreshTask = nil
-    activeScheduledRefreshEvent = nil
+    runtime.refresh.stopActive()
     pendingRefreshRequest = nil
     pendingActivation = nil
-    activeScheduledRefreshGeneration += 1
     refreshOverrideForTests = refresh
     normalizeLayoutReasonOverrideForTests = normalizeLayoutReason
 }

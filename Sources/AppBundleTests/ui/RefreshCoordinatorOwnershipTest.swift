@@ -12,7 +12,7 @@ final class RefreshCoordinatorOwnershipTest: WorkspaceTestCase {
             // Deliberately ignore cancellation to model an already-running native call.
             recordRefreshActivation(workspaceName: "old", pid: 11)
         }
-        first.refresh.activeRefreshTask = task
+        first.refresh.active = ActiveRefresh(task: task, event: .globalObserver("test"))
         await fulfillment(of: [started], timeout: 2)
         second.withValue { recordRefreshActivation(workspaceName: "new", pid: 22) }
         first.refresh.invalidate()

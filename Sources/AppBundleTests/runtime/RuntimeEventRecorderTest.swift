@@ -30,8 +30,8 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         var args = DebugWindowsCmdArgs(rawArgs: [])
         args.checkModel = true
         let active = Task<Void, Error> { }
-        runtime.refresh.activeRefreshTask = active
-        defer { runtime.refresh.activeRefreshTask = nil; active.cancel() }
+        runtime.refresh.active = ActiveRefresh(task: active, event: .globalObserver("test"))
+        defer { runtime.refresh.active = nil; active.cancel() }
         let accepted = try await DebugWindowsCommand(args: args).run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(accepted.exitCode, 1)
     }
