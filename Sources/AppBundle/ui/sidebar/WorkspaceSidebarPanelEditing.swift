@@ -17,6 +17,17 @@ enum WorkspaceSidebarInlineTextKey: Equatable {
 
 
 private let workspaceSidebarInlineTextEventTapCallback: CGEventTapCallBack = { _, type, event, _ in
+    // macOS switches a tap off when the main thread stalls or the user interrupts it; a rename
+    // under way must keep its keys rather than send them to the app behind it. The tap's source
+    // is on the main run loop, so this runs on the main thread.
+    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+        MainActor.assumeIsolated {
+            if let tap = WorkspaceSidebarPanel.activeInlineTextEditingPanel?.inlineTextEditingKeyEventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+        }
+        return Unmanaged.passUnretained(event)
+    }
     guard type == .keyDown else { return Unmanaged.passUnretained(event) }
     let key = workspaceSidebarInlineTextKey(from: event)
     if case .ignored = key {

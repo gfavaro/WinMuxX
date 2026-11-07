@@ -150,6 +150,8 @@ final class MacWindow: Window {
         }
         WindowMotion.shared.forget(windowId)
         WindowBorderController.shared.remove(windowId: windowId)
+        // macOS reuses window IDs; a later window must not inherit this one's corner radius.
+        windowPreviewCornerRadiusCache.removeValue(forKey: windowId)
         if MacWindow.allWindowsMap.removeValue(forKey: windowId) == nil {
             return
         }
