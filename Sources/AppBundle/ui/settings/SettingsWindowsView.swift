@@ -32,15 +32,15 @@ struct ShortcutBehaviorSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("New windows") {
-                SettingsToggle("Tile new windows automatically", id: "automatically-tile-new-windows", isOn: $automaticallyTileNewWindows, help: "Place new windows in the current tiled layout.") { persistRootBool("automatically-tile-new-windows", automaticallyTileNewWindows) }
-                SettingsToggle("Add new windows to the current tab group", id: "auto-add-new-windows-to-tab-group", isOn: $autoAddNewWindowsToTabGroup, help: "Keep new windows in the selected stack instead of creating a new tile.") { persistRootBool("auto-add-new-windows-to-tab-group", autoAddNewWindowsToTabGroup) }
-                SettingsToggle("Unhide macOS-hidden apps", id: "automatically-unhide-macos-hidden-apps", isOn: $automaticallyUnhideMacosHiddenApps, help: "Restore apps macOS has hidden when they receive focus.") { persistRootBool("automatically-unhide-macos-hidden-apps", automaticallyUnhideMacosHiddenApps) }
+                SettingsToggle(.automaticallyTileNewWindows, isOn: $automaticallyTileNewWindows, help: "Place new windows in the current tiled layout.") { persistRootBool("automatically-tile-new-windows", automaticallyTileNewWindows) }
+                SettingsToggle(.autoAddNewWindowsToTabGroup, isOn: $autoAddNewWindowsToTabGroup, help: "Keep new windows in the selected stack instead of creating a new tile.") { persistRootBool("auto-add-new-windows-to-tab-group", autoAddNewWindowsToTabGroup) }
+                SettingsToggle(.automaticallyUnhideApps, isOn: $automaticallyUnhideMacosHiddenApps, help: "Restore apps macOS has hidden when they receive focus.") { persistRootBool("automatically-unhide-macos-hidden-apps", automaticallyUnhideMacosHiddenApps) }
             }
             learnedMinimumsSection
             fitDiagnosticsSection
             SettingsSection("Default layout") {
                 SettingsLayoutPreviews()
-                SettingsPicker("Root layout", id: "default-root-container-layout", selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
+                SettingsPicker(.defaultLayout, selection: $defaultLayout, help: "Used for new workspaces. Selecting Dwindle also updates existing tiled workspaces.") {
                     Text("Dwindle").tag(Layout.dwindle)
                     Text("Master").tag(Layout.master)
                     Text("Tiles").tag(Layout.tiles)
@@ -49,7 +49,7 @@ struct ShortcutBehaviorSettingsView: View {
                 } onChange: { persistRootString("default-root-container-layout", defaultLayout.rawValue) }
                 Text("Defaults apply to new workspaces. Selecting Dwindle also updates existing tiled workspaces.")
                     .font(.callout).foregroundStyle(.secondary)
-                SettingsPicker("Root orientation", id: "default-root-container-orientation", selection: $defaultOrientation, help: "Controls how new tiled containers split.") {
+                SettingsPicker(.defaultOrientation, selection: $defaultOrientation, help: "Controls how new tiled containers split.") {
                     Text("Automatic").tag(DefaultContainerOrientation.auto)
                     Text("Horizontal").tag(DefaultContainerOrientation.horizontal)
                     Text("Vertical").tag(DefaultContainerOrientation.vertical)
@@ -58,7 +58,7 @@ struct ShortcutBehaviorSettingsView: View {
 
             }
             SettingsSection("Lone windows and fullscreen") {
-                SettingsStepper("Width", id: "fullscreen-width", value: Binding(
+                SettingsStepper(.fullscreenWidth, value: Binding(
                     get: { Int((fullscreenWidth * 100).rounded()) },
                     set: { fullscreenWidth = Double($0) / 100 }), range: 10...100,
                     help: "Share of the available width for a lone tiled window or WinMuxX fullscreen. Display and workspace overrides take priority.", unit: "%") {
@@ -78,7 +78,7 @@ struct ShortcutBehaviorSettingsView: View {
 
             }
             SettingsSection("Workspace swipes") {
-                SettingsToggle("Enable workspace swipes", id: "workspace-swipe.enabled", isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
+                SettingsToggle(.workspaceSwipes, isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
                     persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
                 Text(DockWorkspaceSwipeSource.shared.status)
@@ -87,7 +87,7 @@ struct ShortcutBehaviorSettingsView: View {
                     .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Workspace overview") {
-                SettingsToggle("Three-finger swipe up", id: "workspace-overview.three-finger-up", isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
+                SettingsToggle(.overviewGesture, isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
                     persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
                 }
                 Text("Use workspace-overview from a shortcut or the CLI. The swipe needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes it and it opens the overview instead; Mission Control stays on its keyboard shortcut. Minimized windows, hidden apps and native full-screen windows are excluded.")
@@ -98,12 +98,12 @@ struct ShortcutBehaviorSettingsView: View {
             SettingsSection("Hover bar") {
             }
             SettingsSection("Pointer focus") {
-                SettingsToggle("Focus windows under the pointer", id: "focus-follows-mouse", isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
+                SettingsToggle(.focusFollowsMouse, isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
                 }
                 Text("A delay of 0 focuses immediately. Mouse clicks and window manipulation always take priority.")
                     .font(.callout).foregroundStyle(.secondary)
-                SettingsToggle("Follow app activation", id: "follow-app-activation.enabled", isOn: $followAppActivation,
+                SettingsToggle(.followAppActivation, isOn: $followAppActivation,
                     help: "When another app comes to the front (Dock, Cmd-Tab, a notification), focus follows it to its workspace. A floating window on a hidden workspace comes to the current one instead.") {
                     persistConfig(section: "follow-app-activation", key: "enabled", value: followAppActivation ? "true" : "false")
                 }
@@ -115,7 +115,7 @@ struct ShortcutBehaviorSettingsView: View {
             }
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
-                SettingsToggle("Show tab strips", id: "window-tabs.enabled", isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
+                SettingsToggle(.tabEnabled, isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
                 SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the tab strip, and of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
@@ -135,7 +135,7 @@ struct ShortcutBehaviorSettingsView: View {
 
             }
             SettingsSection("Advanced layout") {
-                SettingsToggle("Shake to toggle tiling", id: "enable-shake-to-toggle-tiling", isOn: $enableShakeToToggleTiling, help: "Shake a window by its title bar to switch between floating and tiled.") { persistRootBool("enable-shake-to-toggle-tiling", enableShakeToToggleTiling) }
+                SettingsToggle(.shakeToToggleTiling, isOn: $enableShakeToToggleTiling, help: "Shake a window by its title bar to switch between floating and tiled.") { persistRootBool("enable-shake-to-toggle-tiling", enableShakeToToggleTiling) }
                 DisclosureGroup("Container normalization") {
                 SettingsToggle("Flatten matching containers", id: "enable-normalization-flatten-containers", isOn: $flattenContainers, help: "Simplify adjacent containers with the same layout orientation.") { persistRootBool("enable-normalization-flatten-containers", flattenContainers) }
                 SettingsToggle("Normalize nested orientations", id: "enable-normalization-opposite-orientation-for-nested-containers", isOn: $normalizeNestedContainers, help: "Avoid nested tiled containers with the same orientation.") { persistRootBool("enable-normalization-opposite-orientation-for-nested-containers", normalizeNestedContainers) }

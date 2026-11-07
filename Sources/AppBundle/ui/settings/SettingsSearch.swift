@@ -23,51 +23,107 @@ extension EnvironmentValues {
     }
 }
 
-struct SettingsControlSearchResult: Identifiable {
-    let id: String
-    let title: String
-    let page: SettingsSidebarItem
+/// Shared by the page controls and their direct search results.
+enum SettingsControl: String, CaseIterable, Identifiable {
+    case startWorkspacesOnMain = "start-workspaces-on-main-monitor"
+    case startAtLogin = "start-at-login"
+    case autoReloadConfig = "auto-reload-config"
+    case appearance = "appearance"
+    case chromeStyle = "workspace-sidebar.chrome-style"
+    case menuBarIndicator = "menu-bar.indicator"
+    case glideEnabled = "animations.enabled"
+    case glideDuration = "animations.duration-ms"
+    case bordersEnabled = "borders.enabled"
+    case borderOrder = "borders.order"
+    case dimInactive = "dimming.inactive-windows"
+    case sidebarEnabled = "workspace-sidebar.enabled"
+    case sidebarDisplayMode = "workspace-sidebar.display-mode"
+    case sidebarPosition = "workspace-sidebar.position"
+    case showClock = "workspace-sidebar.show-clock"
+    case showSeconds = "workspace-sidebar.show-seconds"
+    case showDate = "workspace-sidebar.show-date"
+    case showWeekday = "workspace-sidebar.show-weekday"
+    case automaticallyTileNewWindows = "automatically-tile-new-windows"
+    case autoAddNewWindowsToTabGroup = "auto-add-new-windows-to-tab-group"
+    case automaticallyUnhideApps = "automatically-unhide-macos-hidden-apps"
+    case defaultLayout = "default-root-container-layout"
+    case defaultOrientation = "default-root-container-orientation"
+    case fullscreenWidth = "fullscreen-width"
+    case workspaceSwipes = "workspace-swipe.enabled"
+    case overviewGesture = "workspace-overview.three-finger-up"
+    case focusFollowsMouse = "focus-follows-mouse"
+    case followAppActivation = "follow-app-activation.enabled"
+    case tabEnabled = "window-tabs.enabled"
+    case shakeToToggleTiling = "enable-shake-to-toggle-tiling"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+            case .startWorkspacesOnMain: "Start workspaces on main display"
+            case .startAtLogin: "Start at login"
+            case .autoReloadConfig: "Reload config when it changes"
+            case .appearance: "Theme"
+            case .chromeStyle: "Shared appearance"
+            case .menuBarIndicator: "Menu bar indicator"
+            case .glideEnabled: "Glide windows"
+            case .glideDuration: "Glide duration"
+            case .bordersEnabled: "Show window borders"
+            case .borderOrder: "Border placement"
+            case .dimInactive: "Dim inactive windows"
+            case .sidebarEnabled: "Show sidebar"
+            case .sidebarDisplayMode: "Sidebar display"
+            case .sidebarPosition: "Sidebar position"
+            case .showClock: "Show clock"
+            case .showSeconds: "Show seconds"
+            case .showDate: "Show date"
+            case .showWeekday: "Show weekday"
+            case .automaticallyTileNewWindows: "Tile new windows automatically"
+            case .autoAddNewWindowsToTabGroup: "Add new windows to the current tab group"
+            case .automaticallyUnhideApps: "Unhide macOS-hidden apps"
+            case .defaultLayout: "Root layout"
+            case .defaultOrientation: "Root orientation"
+            case .fullscreenWidth: "Width"
+            case .workspaceSwipes: "Enable workspace swipes"
+            case .overviewGesture: "Three-finger swipe up"
+            case .focusFollowsMouse: "Focus windows under the pointer"
+            case .followAppActivation: "Follow app activation"
+            case .tabEnabled: "Show tab strips"
+            case .shakeToToggleTiling: "Shake to toggle tiling"
+        }
+    }
+
+    var page: SettingsSidebarItem {
+        switch self {
+            case .startWorkspacesOnMain, .startAtLogin, .autoReloadConfig: .general
+            case .appearance, .chromeStyle, .menuBarIndicator, .glideEnabled, .glideDuration, .bordersEnabled, .borderOrder, .dimInactive: .appearance
+            case .sidebarEnabled, .sidebarDisplayMode, .sidebarPosition, .showClock, .showSeconds, .showDate, .showWeekday: .sidebar
+            case .automaticallyTileNewWindows, .autoAddNewWindowsToTabGroup, .automaticallyUnhideApps, .defaultLayout, .defaultOrientation, .fullscreenWidth, .workspaceSwipes, .overviewGesture, .focusFollowsMouse, .followAppActivation, .tabEnabled, .shakeToToggleTiling: .windows
+        }
+    }
 }
 
-func settingsControlSearchResults(_ query: String) -> [SettingsControlSearchResult] {
+func settingsControlSearchResults(_ query: String) -> [SettingsControl] {
     let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
     guard !terms.isEmpty else { return [] }
-    return settingsControlSearchIndex.filter { result in
+    return SettingsControl.allCases.filter { result in
         let text = "\(result.title) \(result.id) \(result.page.label)"
         return terms.allSatisfy { text.localizedStandardContains($0) }
     }
 }
 
-// Searchable controls that are always present on their destination page.
-private let settingsControlSearchIndex: [SettingsControlSearchResult] = [
-    .init(id: "start-workspaces-on-main-monitor", title: "Start workspaces on main display", page: .general),
-    .init(id: "start-at-login", title: "Start at login", page: .general),
-    .init(id: "auto-reload-config", title: "Reload config when it changes", page: .general),
-    .init(id: "appearance", title: "Theme", page: .appearance),
-    .init(id: "workspace-sidebar.chrome-style", title: "Shared appearance", page: .appearance),
-    .init(id: "menu-bar.indicator", title: "Menu bar indicator", page: .appearance),
-    .init(id: "animations.enabled", title: "Glide windows", page: .appearance),
-    .init(id: "animations.duration-ms", title: "Glide duration", page: .appearance),
-    .init(id: "borders.enabled", title: "Show window borders", page: .appearance),
-    .init(id: "borders.order", title: "Border placement", page: .appearance),
-    .init(id: "dimming.inactive-windows", title: "Dim inactive windows", page: .appearance),
-    .init(id: "workspace-sidebar.enabled", title: "Show sidebar", page: .sidebar),
-    .init(id: "workspace-sidebar.display-mode", title: "Sidebar display", page: .sidebar),
-    .init(id: "workspace-sidebar.position", title: "Sidebar position", page: .sidebar),
-    .init(id: "workspace-sidebar.show-clock", title: "Show clock", page: .sidebar),
-    .init(id: "workspace-sidebar.show-seconds", title: "Show seconds", page: .sidebar),
-    .init(id: "workspace-sidebar.show-date", title: "Show date", page: .sidebar),
-    .init(id: "workspace-sidebar.show-weekday", title: "Show weekday", page: .sidebar),
-    .init(id: "automatically-tile-new-windows", title: "Tile new windows automatically", page: .windows),
-    .init(id: "auto-add-new-windows-to-tab-group", title: "Add new windows to the current tab group", page: .windows),
-    .init(id: "automatically-unhide-macos-hidden-apps", title: "Unhide macOS-hidden apps", page: .windows),
-    .init(id: "default-root-container-layout", title: "Root layout", page: .windows),
-    .init(id: "default-root-container-orientation", title: "Root orientation", page: .windows),
-    .init(id: "fullscreen-width", title: "Width", page: .windows),
-    .init(id: "workspace-swipe.enabled", title: "Enable workspace swipes", page: .windows),
-    .init(id: "workspace-overview.three-finger-up", title: "Three-finger swipe up", page: .windows),
-    .init(id: "focus-follows-mouse", title: "Focus windows under the pointer", page: .windows),
-    .init(id: "follow-app-activation.enabled", title: "Follow app activation", page: .windows),
-    .init(id: "window-tabs.enabled", title: "Show tab strips", page: .windows),
-    .init(id: "enable-shake-to-toggle-tiling", title: "Shake to toggle tiling", page: .windows),
-]
+
+/// Build the reference inventory once for all destinations in this query.
+@MainActor
+func settingsPageSearchResults(_ query: String, pages: [SettingsSidebarItem]) -> [SettingsSidebarItem] {
+    let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
+    guard !terms.isEmpty else { return pages }
+    let references = Dictionary(grouping: configurationReferenceSections) { $0.pane ?? .configuration }
+    return pages.filter { page in
+        let referenceText = (references[page] ?? []).map {
+            "\($0.title) \($0.description) \($0.defaults ?? "") \($0.example ?? "")"
+        }
+        let text = ([page.label] + referenceText + page.searchAliases).joined(separator: " ")
+        return terms.allSatisfy { text.localizedStandardContains($0) }
+    }
+}

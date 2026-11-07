@@ -30,14 +30,14 @@ struct ShortcutAppearanceSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Shared style") {
-                SettingsPicker("Theme", id: "appearance", selection: $appearance,
+                SettingsPicker(.appearance, selection: $appearance,
                                help: "Apply System, Light or Dark to WinMuxX windows, the sidebar, palette, workspace overview and tab groups.") {
                     Text("System").tag(AppAppearance.system)
                     Text("Light").tag(AppAppearance.light)
                     Text("Dark").tag(AppAppearance.dark)
                 } onChange: { persist(nil, "appearance", "'\(appearance.rawValue)'") }
 
-                SettingsPicker("Shared appearance", id: "workspace-sidebar.chrome-style", selection: $chromeStyle,
+                SettingsPicker(.chromeStyle, selection: $chromeStyle,
                                help: "Choose the shared appearance for the sidebar, tab groups and switcher.") {
                     Text("Liquid Glass").tag(ChromeStyle.liquidGlass)
                     Text("Solid color").tag(ChromeStyle.solid)
@@ -54,7 +54,7 @@ struct ShortcutAppearanceSettingsView: View {
 
             }
             SettingsSection("Menu bar") {
-                SettingsPicker("Menu bar indicator", id: "menu-bar.indicator", selection: $menuBarIndicator,
+                SettingsPicker(.menuBarIndicator, selection: $menuBarIndicator,
                                help: "Workspace follows the focused display: label initial when named, workspace number otherwise.") {
                     Text("Icon").tag(MenuBarIndicator.icon)
                     Text("Workspace").tag(MenuBarIndicator.workspace)
@@ -76,11 +76,11 @@ struct ShortcutAppearanceSettingsView: View {
 
 
             SettingsSection("Window motion") {
-                SettingsToggle("Glide windows", id: "animations.enabled", isOn: $glideEnabled,
+                SettingsToggle(.glideEnabled, isOn: $glideEnabled,
                                help: "Animate windows as they move into their layout tiles. Reduce Motion disables the glide.") {
                     persist("animations", "enabled", glideEnabled ? "true" : "false")
                 }
-                SettingsStepper("Glide duration", id: "animations.duration-ms", value: $glideDurationMs, range: 50...1000,
+                SettingsStepper(.glideDuration, value: $glideDurationMs, range: 50...1000,
                                 help: "Duration of the window glide. Lower values are faster.", unit: "ms") {
                     persist("animations", "duration-ms", "\(glideDurationMs)")
                 }
@@ -123,7 +123,7 @@ struct ShortcutAppearanceSettingsView: View {
                 }
             }
             SettingsSection("Window borders") {
-                SettingsToggle("Show window borders", id: "borders.enabled", isOn: $bordersEnabled, help: "Draw a border around each visible managed window.") {
+                SettingsToggle(.bordersEnabled, isOn: $bordersEnabled, help: "Draw a border around each visible managed window.") {
                     persist("borders", "enabled", bordersEnabled ? "true" : "false")
                 }
                 SettingsDoubleStepper(title: "Border width", value: $borderWidth, range: 0...20, step: 0.5, help: "Width in points; zero hides the border.") {
@@ -138,7 +138,7 @@ struct ShortcutAppearanceSettingsView: View {
                     persist("borders", "inactive-color", "'\(inactiveBorderColor)'")
                 }
                 .disabled(!bordersEnabled)
-                SettingsPicker("Border placement", id: "borders.order", selection: $borderOrder, help: "Draw the border behind or over the window.") {
+                SettingsPicker(.borderOrder, selection: $borderOrder, help: "Draw the border behind or over the window.") {
                     Text("Behind").tag(WindowBorderOrder.below)
                     Text("In front").tag(WindowBorderOrder.above)
                 } onChange: {
@@ -152,7 +152,7 @@ struct ShortcutAppearanceSettingsView: View {
                 }
             }
             SettingsSection("Dimming") {
-                SettingsStepper("Dim inactive windows", id: "dimming.inactive-windows", value: $dimInactive, range: 0...80,
+                SettingsStepper(.dimInactive, value: $dimInactive, range: 0...80,
                     help: "Darken every window except the focused one by this much. 0 turns it off. No Peek, in the menu, darkens and blurs them fully.", unit: "%") {
                     persist("dimming", "inactive-windows", String(Double(dimInactive) / 100))
                 }

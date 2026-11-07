@@ -105,3 +105,24 @@ separate submenu owner so the command shortcut assertion checks a real action.
 
 Final UI-03 gate: make check passed 1,506 Swift tests with zero failures and all
 Python checks. git diff --check passed. Installed build 310 predates UI-03.
+
+## Shared Settings descriptors and explicit opening
+
+UI-07 removes duplicated labels and IDs for the 30 indexed controls. SettingsControl
+provides each control's stable ID, title and page; typed control initializers feed
+those exact values to the existing primitives. Bindings, save closures and control
+order are unchanged. Search still uses case-insensitive all-term matching and the
+same catalog order. One page-search operation now builds the reference inventory
+once and reuses its grouped sections across destinations, including Configuration
+fallbacks. The rendered-page regression verifies actual accessibility identifiers
+for all indexed targets on their declared pages without configuration writes.
+Its first run expected numeric anchor IDs directly; it was corrected for the
+existing .value accessibility child convention.
+
+UI-09 replaces SwiftUI's generated scene command with an explicit Window-menu
+command that requests Settings through the same model path as the tray. This fixes
+both immediate closing on the first open and a blank window after a tray open/close.
+The asynchronous launch-suppression close checks again for an explicit request
+before closing. Startup suppression and release of closed Settings pages remain.
+Tests cover distinct repeated opening requests without configuration writes;
+native opening and keyboard acceptance are recorded separately.

@@ -33,6 +33,10 @@ struct SettingsToggle: View {
     var help: String? = nil
     let save: () -> Void
 
+    init(_ control: SettingsControl, isOn: Binding<Bool>, help: String? = nil, save: @escaping () -> Void) {
+        self.init(control.title, id: control.id, isOn: isOn, help: help, save: save)
+    }
+
     init(_ title: String, id: String? = nil, isOn: Binding<Bool>, help: String? = nil, save: @escaping () -> Void) {
         self.title = title
         self.id = id ?? title
@@ -77,6 +81,10 @@ struct SettingsStepper: View {
     let save: () -> Void
     @FocusState private var focused: Bool
     @State private var submitted: Int?
+
+    init(_ control: SettingsControl, value: Binding<Int>, range: ClosedRange<Int>, help: String, unit: String = "pt", save: @escaping () -> Void) {
+        self.init(control.title, id: control.id, value: value, range: range, help: help, unit: unit, save: save)
+    }
 
     init(_ title: String, id: String? = nil, value: Binding<Int>, range: ClosedRange<Int>, help: String, unit: String = "pt", save: @escaping () -> Void) {
         self.title = title
@@ -342,6 +350,10 @@ struct SettingsPicker<Selection: Hashable, Content: View>: View {
     let help: String
     @ViewBuilder let content: Content
     let onChange: () -> Void
+    init(_ control: SettingsControl, selection: Binding<Selection>, help: String, @ViewBuilder content: () -> Content, onChange: @escaping () -> Void) {
+        self.init(control.title, id: control.id, selection: selection, help: help, content: content, onChange: onChange)
+    }
+
     init(_ title: String, id: String? = nil, selection: Binding<Selection>, help: String, @ViewBuilder content: () -> Content, onChange: @escaping () -> Void) {
         self.title = title; self.id = id ?? title; _selection = selection
         self.help = help; self.content = content(); self.onChange = onChange

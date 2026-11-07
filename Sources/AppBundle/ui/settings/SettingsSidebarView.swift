@@ -20,7 +20,7 @@ struct ShortcutSidebarSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Sidebar") {
-                SettingsToggle("Show sidebar", id: "workspace-sidebar.enabled", isOn: $sidebarEnabled, help: "Show the workspace rail on configured displays.") { sidebarBool("enabled", sidebarEnabled) }
+                SettingsToggle(.sidebarEnabled, isOn: $sidebarEnabled, help: "Show the workspace rail on configured displays.") { sidebarBool("enabled", sidebarEnabled) }
                 if chromeStyle == .liquidGlass {
                     SettingsToggle("Show background", id: "workspace-sidebar.menu-bar-background", isOn: $menuBarBackground,
                                    help: "Show native glass when collapsed. The expanded sidebar always uses a frosted background. Reduce Transparency takes priority.") {
@@ -30,7 +30,7 @@ struct ShortcutSidebarSettingsView: View {
                 }
                 SettingsToggle("Show focused-display filter", id: "workspace-sidebar.enable-focus", isOn: $sidebarFocusEnabled, help: "Add Focused to the sidebar's monitor selector. This filters the listed workspaces; it does not hide sidebars on other displays.") { sidebarBool("enable-focus", sidebarFocusEnabled) }
                 .disabled(!sidebarEnabled)
-                SettingsPicker("Sidebar display", id: "workspace-sidebar.display-mode", selection: $sidebarDisplayMode, help: "Choose a compact rail, reveal at the display edge, or keep the sidebar expanded with reserved window space.") {
+                SettingsPicker(.sidebarDisplayMode, selection: $sidebarDisplayMode, help: "Choose a compact rail, reveal at the display edge, or keep the sidebar expanded with reserved window space.") {
                     Text("Compact rail").tag(SettingsSidebarDisplayMode.compact)
                     Text("Auto-hide").tag(SettingsSidebarDisplayMode.autoHide)
                     Text("Always expanded").tag(SettingsSidebarDisplayMode.expanded)
@@ -56,7 +56,7 @@ struct ShortcutSidebarSettingsView: View {
                     }
                 } onChange: { sidebarInt("collapsed-width", collapsedWidth) }
                 .disabled(!sidebarEnabled || sidebarDisplayMode == .expanded)
-                SettingsPicker("Sidebar position", id: "workspace-sidebar.position", selection: $sidebarPosition, help: "Choose the display edge. Windows reserve space on the selected side.") {
+                SettingsPicker(.sidebarPosition, selection: $sidebarPosition, help: "Choose the display edge. Windows reserve space on the selected side.") {
                     Text("Left").tag(WorkspaceSidebarPosition.left)
                     Text("Right").tag(WorkspaceSidebarPosition.right)
                 } onChange: { persist("workspace-sidebar", "position", "'\(sidebarPosition.rawValue)'") }
@@ -72,13 +72,13 @@ struct ShortcutSidebarSettingsView: View {
             SettingsSection("Sidebar content") {
                 if !showClock { Text("Enable Show clock to display seconds, date, and weekday.").font(.callout).foregroundStyle(.secondary) }
                 if !sidebarEnabled { Text("Enable Show sidebar to change its content.").font(.callout).foregroundStyle(.secondary) }
-                SettingsToggle("Show clock", id: "workspace-sidebar.show-clock", isOn: $showClock) { sidebarBool("show-clock", showClock) }
+                SettingsToggle(.showClock, isOn: $showClock) { sidebarBool("show-clock", showClock) }
                 .disabled(!sidebarEnabled)
-                SettingsToggle("Show seconds", id: "workspace-sidebar.show-seconds", isOn: $showSeconds) { sidebarBool("show-seconds", showSeconds) }
+                SettingsToggle(.showSeconds, isOn: $showSeconds) { sidebarBool("show-seconds", showSeconds) }
                 .disabled(!sidebarEnabled || !showClock)
-                SettingsToggle("Show date", id: "workspace-sidebar.show-date", isOn: $showDate, help: "Show the month and day below the clock when the sidebar is expanded.") { sidebarBool("show-date", showDate) }
+                SettingsToggle(.showDate, isOn: $showDate, help: "Show the month and day below the clock when the sidebar is expanded.") { sidebarBool("show-date", showDate) }
                 .disabled(!sidebarEnabled || !showClock)
-                SettingsToggle("Show weekday", id: "workspace-sidebar.show-weekday", isOn: $showWeekday, help: "Show the day of the week below the clock when the sidebar is expanded.") { sidebarBool("show-weekday", showWeekday) }
+                SettingsToggle(.showWeekday, isOn: $showWeekday, help: "Show the day of the week below the clock when the sidebar is expanded.") { sidebarBool("show-weekday", showWeekday) }
                 .disabled(!sidebarEnabled || !showClock)
             }
         }

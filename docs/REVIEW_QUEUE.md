@@ -1,7 +1,7 @@
 # UI simplification review queue
 
 Review scope: uncommitted Settings search, tray menu, layout previews and sidebar
-movement changes, 2026-11-06. Items below are queued, not fixed. Source inspection
+movement changes, 2026-11-06. Checkboxes distinguish implemented items from remaining work. Source inspection
 is distinguished from native reproduction; existing passing tests do not establish
 scrolling, accessibility or physical-display correctness.
 
@@ -62,7 +62,7 @@ scrolling, accessibility or physical-display correctness.
   Resolved in the refactoring pass: typed section keys retain item references;
   display titles no longer determine placement.
 
-- [ ] **UI-07 · P3 · Search metadata duplicates control declarations.**
+- [x] **UI-07 · P3 · Search metadata duplicates control declarations.**
   The manual 30-control index can drift from actual labels, IDs and destinations.
   Page matching also rebuilds the complete reference inventory for each page on
   repeated filter passes. Use shared setting descriptors and compute matches once
@@ -156,7 +156,7 @@ Searching inherit-env-vars exposed Configuration and opened its editor without e
 Keyboard/VoiceOver, accessibility appearance settings, and physical multi-display
 movement remain untested; only the built-in display was connected.
 
-- [ ] **UI-09 · P2 · Window-menu Settings entry closes immediately.**
+- [x] **UI-09 · P2 · Window-menu Settings entry closes immediately.**
   Reproduced in installed build 310. Opening Settings from the tray works. Trace
   the implicit-window suppression/open-request path before changing semantics;
   test both launch suppression and explicit Window-menu activation.
@@ -166,3 +166,20 @@ separators after all section extraction. Action instances, order, shortcuts,
 payloads and enabled states are retained. The rendered-menu regression failed on
 the original implementation (four adjacent-separator assertions in Commands).
 A synthetic nested/all-separator case also covers empty menus and idempotence.
+
+## Remaining queue implementation
+
+UI-07: SettingsControl is the single descriptor for each of the 30 indexed controls.
+Toggle, picker and stepper declarations consume its title and ID; search uses the
+same enum cases and destination mapping. Page matching builds the configuration
+reference inventory once per query, preserves page order and keeps unmapped
+sections under Configuration. Rendered accessibility-tree coverage checks that
+every descriptor exists on its declared page, including numeric editable children.
+No measured performance improvement is claimed.
+
+UI-09: the generated Window scene command bypassed requestWindowOpen. Before the
+first tray open it closed immediately; after a tray open/close it showed a blank
+window because isWindowShown stayed false. An explicit Window-menu command now
+uses requestWindowOpen, matching the tray. The deferred launch close also rechecks
+the request counter, protecting a later explicit request from that queued close.
+Native validation of the new build is recorded separately below.

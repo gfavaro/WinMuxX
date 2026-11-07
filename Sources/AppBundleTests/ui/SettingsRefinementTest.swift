@@ -54,6 +54,27 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         XCTAssertTrue(SettingsSidebarItem.windows.matchesSearch("fullscreen-width"))
     }
 
+    func testPageSearchKeepsOrderFallbacksAndMultiwordMatching() {
+        let pages: [SettingsSidebarItem] = [.configuration, .windows, .general, .shortcuts]
+        XCTAssertEqual(settingsPageSearchResults("  ", pages: pages), pages)
+        XCTAssertEqual(settingsPageSearchResults("inherit-env-vars", pages: pages), [.configuration])
+        XCTAssertEqual(settingsPageSearchResults("keyboard hotkeys", pages: pages), [.shortcuts])
+        XCTAssertTrue(settingsPageSearchResults("keyboard nonexistent", pages: pages).isEmpty)
+        XCTAssertEqual(Set(SettingsControl.allCases.map(\.id)).count, SettingsControl.allCases.count)
+    }
+
+    func testExplicitSettingsOpenRequestsRemainDistinct() {
+        let model = ShortcutSettingsModel(configAccess: .init(edit: { _ in
+            XCTFail("Opening Settings must not write configuration")
+            return URL(filePath: "/unused-open-fixture")
+        }, reload: { _ in true }), drafts: SettingsDraftStore())
+        XCTAssertEqual(model.openRequestId, 0)
+        model.requestWindowOpen()
+        XCTAssertEqual(model.openRequestId, 1)
+        model.requestWindowOpen()
+        XCTAssertEqual(model.openRequestId, 2)
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })

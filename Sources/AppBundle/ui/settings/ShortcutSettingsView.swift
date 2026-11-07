@@ -22,6 +22,7 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
                 // dismiss that implicit scene and keep explicit requests intact.
                 if model.openRequestId == 0 {
                     DispatchQueue.main.async {
+                        guard model.openRequestId == 0 else { return }
                         shortcutSettingsWindow()?.close()
                     }
                 }
@@ -29,6 +30,13 @@ public func getShortcutSettingsWindow(model: ShortcutSettingsModel) -> some Scen
     }
     .defaultSize(width: settingsWindowWidth, height: 700)
     .windowResizability(.contentSize)
+    // The generated Window command bypasses requestWindowOpen and the launch
+    // suppression guard. Route explicit menu opens through the tray's path.
+    .commandsReplaced {
+        CommandGroup(after: .windowArrangement) {
+            Button("WinMuxX Settings") { model.requestWindowOpen() }
+        }
+    }
 }
 
 @MainActor
@@ -107,15 +115,10 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
 
     @MainActor
     func matchesSearch(_ query: String) -> Bool {
-        let terms = query.split(whereSeparator: \.isWhitespace).map(String.init)
-        // Sections without a dedicated page remain editable in Configuration.
-        let reference = configurationReferenceSections.filter { ($0.pane ?? .configuration) == self }
-        let text = ([label] + reference.map { "\($0.title) \($0.description) \($0.defaults ?? "") \($0.example ?? "")" }
-            + searchAliases).joined(separator: " ")
-        return terms.allSatisfy { text.localizedStandardContains($0) }
+        settingsPageSearchResults(query, pages: [self]).contains(self)
     }
 
-    private var searchAliases: [String] {
+    var searchAliases: [String] {
         switch self {
             case .shortcuts: ["keyboard hotkeys bindings presets modifier keys"]
             case .displays: ["monitor display assignment workspace resolution connected screen"]
@@ -165,7 +168,7 @@ struct ShortcutSettingsView: View {
     var body: some View {
         let hasSearchQuery = !settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let controlResults = settingsControlSearchResults(settingsSearch)
-        let matchingPages = sidebarItems.filter { $0.matchesSearch(settingsSearch) }
+        let matchingPages = settingsPageSearchResults(settingsSearch, pages: sidebarItems)
 
         NavigationSplitView {
             List(selection: selection) {

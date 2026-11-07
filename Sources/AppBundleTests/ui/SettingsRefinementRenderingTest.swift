@@ -87,6 +87,48 @@ final class SettingsRefinementRenderingTest: WorkspaceTestCase {
         XCTAssertEqual(writes, 0, "Loading Settings must not save existing config values")
     }
 
+    func testEverySearchDescriptorExistsOnItsDestinationPage() throws {
+        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+        defer { NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")) }
+        var writes = 0
+        let model = ShortcutSettingsModel(configAccess: .init(edit: { _ in
+            writes += 1
+            return URL(filePath: "/unused-search-fixture")
+        }, reload: { _ in true }), drafts: SettingsDraftStore())
+        let pages: [(SettingsSidebarItem, AnyView)] = [
+            (.general, AnyView(ShortcutGeneralSettingsView(model: model))),
+            (.appearance, AnyView(ShortcutAppearanceSettingsView(model: model))),
+            (.sidebar, AnyView(ShortcutSidebarSettingsView(model: model))),
+            (.windows, AnyView(ShortcutBehaviorSettingsView(model: model))),
+        ]
+        for (page, view) in pages {
+            let size = CGSize(width: settingsWindowWidth, height: 8000)
+            let host = NSHostingView(rootView: view)
+            let window = NSWindow(contentRect: CGRect(origin: CGPoint(x: -20000, y: -20000), size: size), styleMask: [.borderless], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = host
+            window.orderFront(nil)
+            defer { window.close() }
+            host.layoutSubtreeIfNeeded()
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            let identifiers = accessibilityIdentifiers(host)
+            for control in SettingsControl.allCases.filter({ $0.page == page }) {
+                // Numeric controls expose their editable child as <anchor>.value.
+                XCTAssertTrue(identifiers.contains(control.id) || identifiers.contains(control.id + ".value"), "Missing \(control.id) on \(page)")
+            }
+        }
+        XCTAssertEqual(writes, 0, "Rendering search destinations must not save config")
+        XCTAssertEqual(Set(SettingsControl.allCases.map(\.page)), Set(pages.map(\.0)))
+    }
+
+    private func accessibilityIdentifiers(_ element: AnyObject) -> Set<String> {
+        var result = Set([element.accessibilityIdentifier?()].compactMap { $0 })
+        for child in element.accessibilityChildren?() ?? [] {
+            result.formUnion(accessibilityIdentifiers(child as AnyObject))
+        }
+        return result
+    }
+
     private func accessibilityLabels(_ element: AnyObject) -> [String] {
         var labels = [element.accessibilityLabel?(), element.accessibilityTitle?()].compactMap { $0 }
         for child in element.accessibilityChildren?() ?? [] { labels += accessibilityLabels(child as AnyObject) }

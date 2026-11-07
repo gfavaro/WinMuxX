@@ -10,15 +10,15 @@ struct ShortcutGeneralSettingsView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Startup") {
-                SettingsToggle("Start workspaces on main display", id: "start-workspaces-on-main-monitor", isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
+                SettingsToggle(.startWorkspacesOnMain, isOn: $startWorkspacesOnMain, help: "Start existing workspaces on main instead of restoring their displays. Explicit assignments and After startup commands can choose other displays. Takes effect next launch.") {
                     persistRootBool("start-workspaces-on-main-monitor", startWorkspacesOnMain)
                 }
-                SettingsToggle("Start at login", id: "start-at-login", isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
+                SettingsToggle(.startAtLogin, isOn: $startAtLogin, help: "Launch WinMuxX after you sign in.") {
                     persistRootBool("start-at-login", startAtLogin)
                 }
             }
             SettingsSection("Configuration") {
-                SettingsToggle("Reload config when it changes", id: "auto-reload-config", isOn: $autoReloadConfig, help: "Apply valid edits saved from another editor automatically.") {
+                SettingsToggle(.autoReloadConfig, isOn: $autoReloadConfig, help: "Apply valid edits saved from another editor automatically.") {
                     persistRootBool("auto-reload-config", autoReloadConfig)
                 }
             }
