@@ -71,7 +71,7 @@ final class ActionMenuTest: XCTestCase {
         }
         let layout = try submenu("Arrange Windows", in: menu)
         XCTAssertEqual(try XCTUnwrap(menu.items.first { $0.title == "Float / Tile Window" }).keyEquivalent, "t")
-        for title in ["Tiles", "Tabs", "Accordion", "Horizontal", "Vertical"] {
+        for title in ["Tiles", "Tabs", "Horizontal", "Vertical"] {
             let item = try XCTUnwrap(layout.items.first { $0.title == title })
             XCTAssertEqual(item.title, title)
             XCTAssertEqual(item.keyEquivalent, "", title)
@@ -120,9 +120,10 @@ final class ActionMenuTest: XCTestCase {
             XCTAssertNotNil(menu.items.first { $0.title == title }?.submenu, title)
         }
         let arrange = try submenu("Arrange Windows", in: menu)
-        for title in ["Dwindle", "Master", "Balance Sizes", "Tabs", "Columns", "Accordion", "Horizontal", "Vertical", "Join With", "Resize"] {
+        for title in ["Dwindle", "Master", "Balance Sizes", "Tabs", "Columns", "Horizontal", "Vertical", "Join With", "Resize"] {
             XCTAssertTrue(arrange.items.contains { $0.title == title }, title)
         }
+        XCTAssertFalse(arrange.items.contains { $0.title == "Accordion" }, "The accordion layout was removed")
         let commands = try submenu("Commands", in: menu)
         for title in ["No Peek", "Borders", "Focus Follows Pointer", "Reload Config"] {
             XCTAssertTrue(commands.items.contains { $0.title == title }, title)

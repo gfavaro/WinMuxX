@@ -282,7 +282,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         }
         sections[.windowGroup] = addSubmenu("Window Group", to: menu) { submenu in
             for (title, script) in [("Tiles", "layout tiles"),
-                                    ("Tabs", "layout tab-group"), ("Columns", "layout strip"), ("Accordion", "layout accordion")] {
+                                    ("Tabs", "layout tab-group"), ("Columns", "layout strip")] {
                 addCommand(title, script: script, to: submenu)
             }
             submenu.addItem(.separator())

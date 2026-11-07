@@ -1,7 +1,7 @@
 import AppKit
 import Common
 
-/// Space around the windows of a tab group or accordion, in points.
+/// Space around the windows of a tab group whose tab strip is off, in points.
 let tabGroupPadding: CGFloat = 30
 
 extension Workspace {

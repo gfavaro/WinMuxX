@@ -70,7 +70,6 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                 shortcutAction(id: "layout-vertical", title: "Vertical Tiles", command: "layout v_tiles"),
                 shortcutAction(id: "layout-tabs", title: "Window Group: Tabs", command: "layout tab-group"),
                 shortcutAction(id: "layout-strip", title: "Window Group: Columns", command: "layout strip"),
-                shortcutAction(id: "layout-stacked", title: "Window Group: Accordion", command: "layout accordion"),
                 shortcutAction(id: "layout-orientation", title: "Toggle Orientation", command: "layout horizontal vertical"),
                 shortcutAction(id: "balance", title: "Balance Sizes", command: "balance-sizes"),
                 shortcutAction(id: "flatten", title: "Flatten Workspace Tree", command: "flatten-workspace-tree"),
