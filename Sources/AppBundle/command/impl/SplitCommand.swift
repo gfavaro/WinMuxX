@@ -18,7 +18,13 @@ struct SplitCommand: Command {
                 case .opposite: (workspace.presentedTabbedLayout?.nearestSplitOrientation(of: group.barGroup)
                     ?? workspace.tabbedLayout?.nearestSplitOrientation(of: group) ?? .v).opposite
             }
-            if !workspace.moveTabbedTabToNewGroup(window.windowId, beside: group, on: orientation == .h ? .right : .down) {
+            let side: CardinalDirection = orientation == .h ? .right : .down
+            // Where the windows would not fit, the new group would only fold back into this bar.
+            if group.barGroup.barWindowIds.count > 1,
+               let blocker = workspace.tabbedSplitBlocker(placing: window.windowId, beside: group.barGroup, on: side) {
+                return io.err(blocker)
+            }
+            if !workspace.moveTabbedTabToNewGroup(window.windowId, beside: group.barGroup, on: side) {
                 io.out("split: nothing to do")
             }
             return true

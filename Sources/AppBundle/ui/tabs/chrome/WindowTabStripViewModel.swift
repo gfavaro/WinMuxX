@@ -43,5 +43,7 @@ struct WorkspaceTabGroupControl: Equatable, Identifiable {
     let command: String
     let shortcutHint: String?
     let isEnabled: Bool
+    /// Why it is unavailable, shown as its tooltip.
+    var unavailableReason: String? = nil
     var id: String { title }
 }

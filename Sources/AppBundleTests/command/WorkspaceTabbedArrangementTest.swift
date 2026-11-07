@@ -823,6 +823,34 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(workspaceTabBarTabsStripWidth(600), 600 - workspaceTabBarControlsWidth + windowTabStripTrailingGroupDragGutterWidth)
     }
 
+    func testASplitWithoutRoomSaysSo() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        let rect = workspaceTilingRect(workspace)
+        for window in windows { window.testMinimumSize = CGSize(width: rect.width * 0.6, height: 100) }
+        _ = windows[1].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        try await workspace.layoutWorkspace()
+        let group = try XCTUnwrap(workspace.tabbedGroups.first)
+        XCTAssertNotNil(workspace.tabbedSplitBlocker(placing: windows[1].windowId, beside: group, on: .right), "Two such columns cannot fit")
+        XCTAssertNil(workspace.tabbedSplitBlocker(placing: windows[1].windowId, beside: group, on: .down), "Rows can")
+        let controls = workspaceTabGroupControls(for: windows[1])
+        XCTAssertFalse(controls[0].isEnabled, "Split Right is unavailable")
+        XCTAssertNotNil(controls[0].unavailableReason)
+        XCTAssertTrue(controls[1].isEnabled, "Split Down is not")
+        let right = try await run("split horizontal")
+        XCTAssertNotEqual(right.exitCode, 0, "The command says why instead of doing nothing")
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+        let area = try XCTUnwrap(group.lastFrame)
+        let edge = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[2],
+            mouseLocation: CGPoint(x: area.maxX - 4, y: area.center.y), subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(edge.kind, .unavailable, "Dropping on that edge does nothing")
+        XCTAssertEqual(Set(edge.dropIntentOverlay?.unavailableZones ?? []), [.left, .right])
+        XCTAssertNotNil(edge.dropIntentOverlay?.unavailableReason)
+        let down = try await run("split vertical")
+        XCTAssertEqual(down.exitCode, 0)
+        XCTAssertEqual(workspace.tabbedGroups.count, 2, "A row fits")
+    }
+
     func testJoiningAGroupWorksWithWindowTabsOff() {
         let previous = config.windowTabs.enabled
         config.windowTabs.enabled = false

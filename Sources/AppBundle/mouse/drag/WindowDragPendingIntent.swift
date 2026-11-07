@@ -277,7 +277,7 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
                 projectId: projectId,
                 monitorScopeId: monitorScopeId,
             )
-        case .sidebarHover:
+        case .sidebarHover, .unavailable:
             return false
     }
 }

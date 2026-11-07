@@ -52,9 +52,9 @@ final class TabbedGroup {
     }
 
     /// The room its area needs: as much as the most demanding of its windows, shown or not, so no
-    /// tab is ever squeezed below what its window allows.
+    /// tab is ever squeezed below what its window allows, a minimized one when it returns included.
     var minimumWindowSize: CGSize {
-        let sizes = ([self] + foldedGroups).flatMap(\.shownWindowIds).compactMap { Window.get(byId: $0)?.minimumLayoutSize }
+        let sizes = ([self] + foldedGroups).flatMap(\.windowIds).compactMap { Window.get(byId: $0)?.minimumLayoutSize }
         return CGSize(width: sizes.map(\.width).max() ?? 0, height: sizes.map(\.height).max() ?? 0)
     }
 }
@@ -104,6 +104,15 @@ indirect enum TabbedLayout {
                     return .split(orientation, children, weights)
                 }
                 return .split(orientation, children.map { $0.inserting(newGroup, beside: target, on: side) }, weights)
+        }
+    }
+
+    /// The same layout with `new` where `old` was.
+    func replacing(_ old: TabbedGroup, with new: TabbedGroup) -> TabbedLayout {
+        switch self {
+            case .group(let group): group === old ? .group(new) : self
+            case .split(let orientation, let children, let weights):
+                .split(orientation, children.map { $0.replacing(old, with: new) }, weights)
         }
     }
 
@@ -316,6 +325,33 @@ extension Workspace {
         // Whichever bar now shows the group last used here shows it, even after its host changed.
         if let used { used.barGroup.displayedMember = used }
         return layout
+    }
+
+    /// Why a tab cannot open in a new group on `side` of `bar`'s: the windows would no longer fit,
+    /// side by side or stacked, at the sizes they allow. Nil when they fit. The bars it leaves
+    /// give up its room, as they would.
+    @MainActor func tabbedSplitBlocker(placing windowId: UInt32, beside bar: TabbedGroup, on side: CardinalDirection) -> String? {
+        tabbedSplitBlocker(placing: [windowId], beside: bar, on: side)
+    }
+
+    /// As for one tab, with `windowIds` moving together, as a group's handle carries them.
+    @MainActor func tabbedSplitBlocker(placing windowIds: [UInt32], beside bar: TabbedGroup, on side: CardinalDirection) -> String? {
+        guard var layout = presentedTabbedLayout ?? visibleTabbedLayout else { return nil }
+        var anchor = bar
+        for host in layout.groups where host.barWindowIds.contains(where: windowIds.contains) {
+            let rest = TabbedGroup(windowIds: host.barWindowIds.filter { !windowIds.contains($0) })
+            layout = layout.replacing(host, with: rest)
+            if host === bar { anchor = rest }
+        }
+        guard !anchor.windowIds.isEmpty, let placed = layout.inserting(TabbedGroup(windowIds: windowIds), beside: anchor, on: side).pruned()
+        else { return nil }
+        let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor).inner
+        let rect = workspaceTilingRect(self)
+        let across = side.orientation == .h
+        let needed = placed.minimumExtent(horizontal: across, gap: CGSize(width: gaps.horizontal, height: gaps.vertical))
+        let available = across ? rect.width : rect.height
+        guard needed > available + 0.5 else { return nil }
+        return "No room: these windows need \(Int(needed.rounded())) pt \(across ? "across" : "down"), and there are \(Int(available))"
     }
 
     /// Whether a window out of the tiled tree keeps its tab: while WinMuxX briefly lost track of it,

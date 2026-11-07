@@ -1,3 +1,4 @@
+import Common
 import CoreGraphics
 
 @MainActor
@@ -16,7 +17,9 @@ func destinationFromWindowDropIntent(
         result.dropIntentOverlay = WindowDropIntentOverlayModel(
             targetFrame: resolution.targetFrame,
             activeZone: resolution.intent.zone,
-            cornerRadius: resolution.targetCornerRadius.map(CGFloat.init)
+            cornerRadius: resolution.targetCornerRadius.map(CGFloat.init),
+            unavailableZones: destination.dropIntentOverlay?.unavailableZones ?? [],
+            unavailableReason: destination.dropIntentOverlay?.unavailableReason,
         )
         return result
     }
@@ -101,6 +104,15 @@ private func tabbedGroupDropDestination(
     // A group's handle carries the whole group, which has nowhere to go beside or into itself.
     let carriesGroup = subject == .group && source != nil
     if carriesGroup, target === source?.barGroup { return nil }
+    // Edges where the windows would have no room side by side or stacked are marked as such, as
+    // the bar's split buttons are; the new group would only fold back into a bar.
+    let splitsAt: [(WindowDropZone, CardinalDirection)] = [(.left, .left), (.right, .right), (.top, .up), (.bottom, .down)]
+    // A group's handle moves every tab of the group.
+    let moving = carriesGroup ? source?.windowIds ?? [sourceWindow.windowId] : [sourceWindow.windowId]
+    let blockers: [WindowDropZone: String] = target === source?.barGroup && target.barWindowIds.count < 2 ? [:]
+        : Dictionary(uniqueKeysWithValues: splitsAt.compactMap { zone, side in
+            workspace.tabbedSplitBlocker(placing: moving, beside: target, on: side).map { (zone, $0) }
+        })
     let kind: WindowDragIntentKind
     switch resolution.intent.zone {
         case .tab, .middle:
@@ -110,7 +122,7 @@ private func tabbedGroupDropDestination(
             // A group's only tab beside itself would change nothing.
             guard let position = resolution.intent.zone.stackSplitPosition,
                   target !== source?.barGroup || target.barWindowIds.count > 1 else { return nil }
-            kind = .stackSplit(targetWindowId: targetWindow.windowId, position: position)
+            kind = blockers[resolution.intent.zone] == nil ? .stackSplit(targetWindowId: targetWindow.windowId, position: position) : .unavailable
     }
     let joins = if case .tabStack = kind { true } else { false }
     let preview = windowDropIntentActivePreviewRect(for: resolution)
@@ -125,6 +137,9 @@ private func tabbedGroupDropDestination(
         previewStyle: joins ? .tabInsert : .stackSplit,
         previewGeometry: joins ? .tabStrip : .rounded,
         isGroup: subject == .group,
+        dropIntentOverlay: WindowDropIntentOverlayModel(targetFrame: resolution.targetFrame, activeZone: resolution.intent.zone,
+                                                        cornerRadius: nil, unavailableZones: Array(blockers.keys),
+                                                        unavailableReason: blockers[resolution.intent.zone]),
     )
 }
 

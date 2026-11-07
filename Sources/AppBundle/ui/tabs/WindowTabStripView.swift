@@ -534,7 +534,8 @@ struct WorkspaceTabGroupControlsView: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(!control.isEnabled)
-                .help(control.shortcutHint.map { "\(control.title)  \($0)" } ?? control.title)
+                .help(control.unavailableReason.map { "\(control.title): \($0)" }
+                    ?? control.shortcutHint.map { "\(control.title)  \($0)" } ?? control.title)
                 .accessibilityLabel(control.title)
             }
         }

@@ -4,6 +4,9 @@ struct WindowDropIntentOverlayModel: Equatable {
     let targetFrame: Rect
     let activeZone: WindowDropZone?
     let cornerRadius: CGFloat?
+    /// Zones a drop cannot use, marked as such; over one of them, why.
+    var unavailableZones: [WindowDropZone] = []
+    var unavailableReason: String? = nil
 
     static func == (lhs: WindowDropIntentOverlayModel, rhs: WindowDropIntentOverlayModel) -> Bool {
         lhs.targetFrame.topLeftX == rhs.targetFrame.topLeftX &&
@@ -11,6 +14,8 @@ struct WindowDropIntentOverlayModel: Equatable {
             lhs.targetFrame.width == rhs.targetFrame.width &&
             lhs.targetFrame.height == rhs.targetFrame.height &&
             lhs.activeZone == rhs.activeZone &&
+            lhs.unavailableZones == rhs.unavailableZones &&
+            lhs.unavailableReason == rhs.unavailableReason &&
             lhs.cornerRadius == rhs.cornerRadius
     }
 }

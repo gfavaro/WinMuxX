@@ -38,5 +38,7 @@ func debugDescribe(_ kind: WindowDragIntentKind) -> String {
             "createWorkspace"
         case .sidebarHover:
             "sidebarHover"
+        case .unavailable:
+            "unavailable"
     }
 }

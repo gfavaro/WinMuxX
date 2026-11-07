@@ -1,4 +1,5 @@
 import AppKit
+import Common
 import SwiftUI
 
 /// The tab bar of a Tabbed workspace: one browser-style tab per tiled window, in tree order.
@@ -147,16 +148,22 @@ struct WorkspaceTabBarView: View {
 @MainActor
 func workspaceTabGroupControls(for window: Window) -> [WorkspaceTabGroupControl] {
     let id = window.windowId
-    let splits = (window.nodeWorkspace?.tabbedGroup(containing: id)?.windowIds.count ?? 0) > 1
-    let controls: [(String, String, String, String, Bool)] = [
-        ("Split Right", "rectangle.split.2x1", "split horizontal --window-id \(id)", "split horizontal", splits),
-        ("Split Down", "rectangle.split.1x2", "split vertical --window-id \(id)", "split vertical", splits),
-        ("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)", "fullscreen", true),
+    let workspace = window.nodeWorkspace
+    let bar = workspace?.tabbedGroup(containing: id)?.barGroup
+    let splits = (bar?.barWindowIds.count ?? 0) > 1
+    // A split the windows have no room for would only fold back into this bar.
+    let blocker = { (side: CardinalDirection) in
+        bar.flatMap { bar in splits ? workspace?.tabbedSplitBlocker(placing: id, beside: bar, on: side) : nil }
+    }
+    let controls: [(String, String, String, String, Bool, String?)] = [
+        ("Split Right", "rectangle.split.2x1", "split horizontal --window-id \(id)", "split horizontal", splits, blocker(.right)),
+        ("Split Down", "rectangle.split.1x2", "split vertical --window-id \(id)", "split vertical", splits, blocker(.down)),
+        ("Focus", "arrow.up.left.and.arrow.down.right", "fullscreen --window-id \(id)", "fullscreen", true, nil),
     ]
-    return controls.map { title, symbol, command, shortcut, enabled in
+    return controls.map { title, symbol, command, shortcut, enabled, blocked in
         WorkspaceTabGroupControl(title: title, symbol: symbol, command: command,
             shortcutHint: WindowHoverBar.shortcutHint(for: HoverBarAction(title: title, symbol: symbol, command: command, shortcut: shortcut)),
-            isEnabled: enabled)
+            isEnabled: enabled && blocked == nil, unavailableReason: blocked)
     }
 }
 

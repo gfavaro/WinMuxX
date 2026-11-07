@@ -34,7 +34,8 @@ struct WindowDropIntentOverlayView: View {
     }
 
     private func dropZoneView(_ zone: WindowIntentZone) -> some View {
-        let isActive = zone.zone == model.activeZone
+        let unavailable = model.unavailableZones.contains(zone.zone)
+        let isActive = zone.zone == model.activeZone && !unavailable
         let style = config.workspaceSidebar.chromeStyle
         let solidColor = config.workspaceSidebar.resolvedSolidChromeColor
         let activeShape = RoundedRectangle(cornerRadius: activeZoneCornerRadius(for: zone.frame), style: .continuous)
@@ -52,7 +53,20 @@ struct WindowDropIntentOverlayView: View {
                     .shadow(color: WindowIntentPreviewPalette.activeZoneGlow(style: style, solidColor: solidColor), radius: 10)
                     .transition(.opacity)
             }
-            if let name = symbolName(for: zone.zone) {
+            if unavailable {
+                // No room for a split here: say so where the pointer is, and drop nothing.
+                VStack(spacing: 6) {
+                    Image(systemName: "nosign")
+                        .font(.system(size: iconSize(for: zone.frame) * 0.8, weight: .semibold))
+                    if zone.zone == model.activeZone, let reason = model.unavailableReason {
+                        Text(reason)
+                            .font(.system(size: 11, weight: .medium))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: max(zone.frame.width - 16, 60))
+                    }
+                }
+                .foregroundStyle(WindowIntentPreviewPalette.zoneSymbol(isActive: false).opacity(0.6))
+            } else if let name = symbolName(for: zone.zone) {
                 Image(systemName: name)
                     .font(.system(size: iconSize(for: zone.frame), weight: .semibold))
                     .foregroundStyle(WindowIntentPreviewPalette.zoneSymbol(isActive: isActive))

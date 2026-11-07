@@ -10,6 +10,9 @@ enum WindowDragIntentKind: Equatable {
     case moveToWorkspaceZone(workspaceName: String, zone: WindowDropZone)
     case createWorkspace(projectId: WorkspaceProjectId? = nil, monitorScopeId: String? = nil)
     case sidebarHover
+    /// Over a place a drop cannot go, such as a split the windows have no room for: the overlay says
+    /// why, and dropping does nothing.
+    case unavailable
 }
 
 @MainActor
@@ -22,7 +25,7 @@ func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
             return true
         case .reorderTab(let windowId, _):
             return config.windowTabs.enabled || Window.get(byId: windowId)?.nodeWorkspace?.arrangement == .tabbed
-        case .createWorkspace, .sidebarHover, .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone:
+        case .createWorkspace, .sidebarHover, .unavailable, .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone:
             return true
     }
 }
