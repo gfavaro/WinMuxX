@@ -67,6 +67,13 @@ struct FocusCommand: Command {
                     return io.err("Can't find window with DFS index \(dfsIndex)")
                 }
             case .tabIndex(let tabIndex):
+                // In a Tabbed workspace the tabs are the workspace's windows, as its bar lists them.
+                if target.workspace.arrangement == .tabbed {
+                    guard let window = target.workspace.rootTilingContainer.allLeafWindowsRecursive.getOrNil(atIndex: Int(tabIndex) - 1) else {
+                        return io.err("Can't find tab with index \(tabIndex) in this workspace")
+                    }
+                    return window.focusWindow()
+                }
                 guard let windowToFocus = tabWindowToFocus(target, tabIndex) else {
                     return io.err("Can't find tab with index \(tabIndex) in the current tab group")
                 }
@@ -90,6 +97,9 @@ struct FocusCommand: Command {
                 }
                 return windows[targetIndex].focusWindow()
             case .tabRelative(let nextPrev):
+                if target.workspace.arrangement == .tabbed {
+                    return focusRelativeInWorkspaceTabs(target, args.boundariesAction, nextPrev)
+                }
                 return focusRelativeInCurrentTabGroup(target, args.boundariesAction, nextPrev)
         }
     }
@@ -295,4 +305,25 @@ extension TreeNode {
                 die("Impossible")
         }
     }
+}
+
+/// `tab-next` and `tab-prev` in a Tabbed workspace, through the windows its bar lists.
+@MainActor
+private func focusRelativeInWorkspaceTabs(
+    _ target: LiveFocus,
+    _ boundariesAction: FocusCmdArgs.WhenBoundariesCrossed,
+    _ nextPrev: TabNextPrev,
+) -> Bool {
+    let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
+    guard let current = tabs.firstIndex(where: { $0 === target.windowOrNil }) else { return false }
+    var index = current + nextPrev.focusOffset
+    if !tabs.indices.contains(index) {
+        switch boundariesAction {
+            case .stop: return true
+            case .fail: return false
+            case .wrapAroundTheWorkspace: index = (index + tabs.count) % tabs.count
+            case .wrapAroundAllMonitors: return dieT("Must be discarded by args parser")
+        }
+    }
+    return tabs[index].focusWindow()
 }

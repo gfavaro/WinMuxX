@@ -96,6 +96,36 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(workspace.presentsManagedFullscreen, "The bar is left out while a window is fullscreen")
     }
 
+    func testTheBorderEnclosesTheTabBarAndTheWindow() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        let rect = workspaceTilingRect(workspace)
+        let content = workspaceTabbedContentRect(rect)
+        let windowFrame = CGRect(x: content.topLeftX, y: content.topLeftY, width: content.width, height: content.height)
+        let target = try XCTUnwrap(windowBorderTarget(for: windows[0], nativeFrame: windowFrame))
+        XCTAssertEqual(target.frame.minY, rect.topLeftY, "The border starts at the top of the tab bar")
+        XCTAssertEqual(target.frame.maxY, windowFrame.maxY)
+        XCTAssertEqual(target.frame.width, windowFrame.width)
+        windows[0].isFullscreen = true
+        XCTAssertEqual(windowBorderTarget(for: windows[0], nativeFrame: windowFrame)?.frame, windowFrame,
+            "In fullscreen there is no bar to enclose")
+    }
+
+    func testTabCommandsUseTheWorkspaceTabs() async throws {
+        let (_, windows, _) = makeNestedWorkspace()
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        _ = try await run("focus tab-next")
+        XCTAssertTrue(focus.windowOrNil === windows[1], "tab-next leaves the left window for the next tab, not a nested group")
+        _ = try await run("focus --tab-index 3")
+        XCTAssertTrue(focus.windowOrNil === windows[2])
+        _ = try await run("focus --boundaries-action wrap-around-the-workspace tab-next")
+        XCTAssertTrue(focus.windowOrNil === windows[0])
+        let missing = try await run("focus --tab-index 9")
+        XCTAssertNotEqual(missing.exitCode, 0)
+    }
+
     func testConfigSelectsTabbedWhileTabGroupKeepsItsRootMeaning() {
         let parsed = parseConfig("""
         [workspace.'1']
@@ -110,8 +140,8 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
 
     func testTabsShareTheBarWithinComfortableWidths() {
         XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 4, spacing: 4), 240, "Few tabs stop at 240 points")
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 8, spacing: 4), 121)
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 30, spacing: 4), 90, "Many tabs keep 90 points and scroll")
+        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 6, spacing: 4), 163)
+        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 30, spacing: 4), 132, "Many tabs keep 132 points and scroll")
         XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 0, spacing: 4), 0)
     }
 }

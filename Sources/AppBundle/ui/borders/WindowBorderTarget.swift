@@ -16,6 +16,15 @@ struct WindowBorderTarget: Equatable {
 func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorderTarget? {
     let ordinary = WindowBorderTarget(frame: nativeFrame,
         corners: .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius()))
+    // In a Tabbed workspace the tab bar belongs to the window shown under it: one border
+    // encloses both, from the top of the bar to the bottom of the window.
+    if let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen,
+       workspace.rootTilingContainer.mostRecentWindowRecursive === window {
+        let top = workspaceTilingRect(workspace).topLeftY
+        guard nativeFrame.maxY > top else { return ordinary }
+        return WindowBorderTarget(frame: CGRect(x: nativeFrame.minX, y: top, width: nativeFrame.width, height: nativeFrame.maxY - top),
+            corners: .init(top: windowTabStripCornerRadius, bottom: systemWindowCornerRadius()))
+    }
     guard let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior else { return ordinary }
     // Only the representative owns the group's outline, including during a tab switch
     // before the previously visible window has finished parking.

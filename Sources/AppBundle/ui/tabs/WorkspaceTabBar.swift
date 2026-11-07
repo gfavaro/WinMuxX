@@ -92,7 +92,7 @@ final class WorkspaceTabBarPanel: NSPanelHud {
 struct WorkspaceTabBarView: View {
     let model: WorkspaceTabBarModel
     @State private var hovered: UInt32?
-    private let spacing: CGFloat = 4
+    private let spacing = windowTabStripTabSpacing
     private let padding: CGFloat = 6
 
     var body: some View {
@@ -118,7 +118,7 @@ struct WorkspaceTabBarView: View {
             .onChange(of: model.tabs.first(where: \.isActive)?.windowId) { _ in scrollToActive(proxy) }
             }
         }
-        .background { OverlaySurface() }
+        .background { OverlaySurface(cornerRadius: windowTabStripCornerRadius) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Workspace tabs")
     }
@@ -131,9 +131,9 @@ extension WorkspaceTabBarView {
     }
 }
 
-/// Each tab's width when `count` tabs share `barWidth`, between 90 and 240 points.
+/// Each tab's width when `count` tabs share `barWidth`, within the tab strip's widths.
 func workspaceTabWidth(barWidth: CGFloat, count: Int, spacing: CGFloat) -> CGFloat {
     guard count > 0 else { return 0 }
     let shared = (barWidth - spacing * CGFloat(count - 1)) / CGFloat(count)
-    return min(240, max(90, shared.rounded(.down)))
+    return min(windowTabStripPreferredTabWidth, max(windowTabStripMinimumTabWidth, shared.rounded(.down)))
 }
