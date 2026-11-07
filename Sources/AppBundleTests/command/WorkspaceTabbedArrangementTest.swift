@@ -689,6 +689,45 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertNotNil(shownWindow.lastAppliedLayoutPhysicalRect, "The tab in use is still shown")
     }
 
+    func testMovingPastTheEdgeOpensAGroupThereAndLeavesTheTree() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        _ = windows[1].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        let tree = workspace.rootTilingContainer.allLeafWindowsRecursive.map { ObjectIdentifier($0.parent!) }
+        let result = try await run("move up")
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(workspace.tabbedGroups.count, 2)
+        XCTAssertEqual(workspace.tabbedGroups.first?.windowIds, [windows[1].windowId], "The tab opened in a row along the top")
+        XCTAssertEqual(workspace.rootTilingContainer.allLeafWindowsRecursive.map { ObjectIdentifier($0.parent!) }, tree,
+                       "The tree kept for other arrangements is untouched")
+        let again = try await run("move up")
+        XCTAssertEqual(again.exitCode, 0, "A group's only tab at the edge stays put")
+        XCTAssertEqual(workspace.tabbedGroups.count, 2)
+    }
+
+    func testMovingABackgroundTabKeepsTheTabShown() async throws {
+        let (_, windows, _, right) = try await makeTwoGroups()
+        _ = windows[1].focusWindow()
+        _ = windows[0].focusWindow()
+        XCTAssertEqual(right.activeWindowId, windows[1].windowId)
+        let result = try await run("move --window-id \(windows[2].windowId) left")
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(right.windowIds, [windows[2], windows[1]].map(\.windowId))
+        XCTAssertEqual(right.activeWindowId, windows[1].windowId, "The shown tab stays shown")
+    }
+
+    func testMoveGoesAlongAFoldedBar() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(groups[1].barWindowIds, [windows[1], windows[2]].map(\.windowId))
+        let result = try await run("move right")
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(groups[2].windowIds, [windows[2], windows[1]].map(\.windowId), "It moved past the folded tab, joining its group")
+        XCTAssertFalse(workspace.tabbedGroups.contains { $0 === groups[1] }, "Its own group, left empty, closed")
+    }
+
     func testTabNextGoesThroughFoldedTabs() async throws {
         let rect = workspaceTilingRect(focus.workspace)
         let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)

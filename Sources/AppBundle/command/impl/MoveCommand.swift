@@ -12,14 +12,16 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
-        // In a Tabbed workspace left and right move the tab along its group's bar; past the end,
-        // or up and down, it moves into the tab group on that side.
+        // In a Tabbed workspace left and right move the tab along its bar, folded tabs included; past
+        // the end, or up and down, it moves into the tab group on that side.
         if target.workspace.arrangement == .tabbed { target.workspace.syncTabbedGroups() }
         if target.workspace.arrangement == .tabbed, currentWindow.parent is TilingContainer,
            let group = target.workspace.tabbedGroup(containing: currentWindow.windowId) {
-            if direction.orientation == .h, let index = group.shownWindowIds.firstIndex(of: currentWindow.windowId),
-               group.shownWindowIds.indices.contains(index + direction.focusOffset) {
-                return target.workspace.reorderTabbedTab(currentWindow.windowId, toIndex: index + direction.focusOffset)
+            let bar = group.barGroup.barWindowIds
+            if direction.orientation == .h, let index = bar.firstIndex(of: currentWindow.windowId),
+               bar.indices.contains(index + direction.focusOffset) {
+                return target.workspace.insertTabbedTab(currentWindow.windowId, intoBarOf: group.barGroup, at: index + direction.focusOffset,
+                                                        activate: focus.windowOrNil === currentWindow)
             }
             if let neighbor = target.workspace.tabbedGroup(beside: group, direction) {
                 return target.workspace.moveTabbedTab(currentWindow.windowId, into: neighbor)
@@ -158,6 +160,12 @@ private func moveNodeToSiblingIndex(_ node: TreeNode, _ parent: TilingContainer,
         case .stop: return true
         case .fail: return false
         case .createImplicitContainer:
+            // A Tabbed workspace's tab opens a new group along that edge; the tree kept for other
+            // arrangements stays as it was.
+            if workspace.arrangement == .tabbed {
+                if let window = node as? Window { _ = workspace.moveTabbedTabToEdge(window.windowId, on: direction) }
+                return true
+            }
             createImplicitContainerAndMoveNode(node, workspace, direction)
             return true
     }

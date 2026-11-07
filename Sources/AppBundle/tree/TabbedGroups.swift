@@ -107,6 +107,18 @@ indirect enum TabbedLayout {
         }
     }
 
+    /// Puts `newGroup` along the whole layout's `side`, as moving past a workspace's edge does.
+    func insertingAtEdge(_ newGroup: TabbedGroup, on side: CardinalDirection) -> TabbedLayout {
+        let first = side == .left || side == .up
+        if case .split(let orientation, var children, var weights) = self, orientation == side.orientation {
+            let share = weights.reduce(0, +) / CGFloat(max(weights.count, 1))
+            children.insert(.group(newGroup), at: first ? 0 : children.count)
+            weights.insert(share, at: first ? 0 : weights.count)
+            return .split(orientation, children, weights)
+        }
+        return .split(side.orientation, first ? [.group(newGroup), self] : [self, .group(newGroup)], [1, 1])
+    }
+
     /// Grows `group` by `delta` points along `axis` at the expense of its neighbour before or after
     /// it, in the nearest split of that direction. Nil when no split of that direction holds it.
     /// `strictSide` keeps to the neighbour on that side, leaving an outer boundary to the enclosing
@@ -345,12 +357,13 @@ extension Workspace {
 
     /// Puts a tab at `index` among the other tabs `bar`'s bar shows, as dropping it there does: into
     /// the group of the tab it lands before, or after the last tab, staying in its own group when it
-    /// lands beside one of its own tabs. Shows it there.
-    @MainActor func insertTabbedTab(_ windowId: UInt32, intoBarOf bar: TabbedGroup, at index: Int) -> Bool {
+    /// lands beside one of its own tabs. Shows it there, unless `activate` is false, as for a command
+    /// rearranging a tab in the background.
+    @MainActor func insertTabbedTab(_ windowId: UInt32, intoBarOf bar: TabbedGroup, at index: Int, activate: Bool = true) -> Bool {
         guard let source = tabbedGroup(containing: windowId) else { return false }
         // Put back where it was, it stays: no group changes hands for a gesture that moved nothing.
         if source.barGroup === bar, bar.barWindowIds.firstIndex(of: windowId) == index {
-            source.activeWindowId = windowId
+            if activate { source.activeWindowId = windowId }
             return true
         }
         let tabs = bar.barWindowIds.filter { $0 != windowId }
@@ -368,10 +381,25 @@ extension Workspace {
         if source === group {
             ids.insert(windowId, at: position)
             group.windowIds = ids
-            group.activeWindowId = windowId
+            if activate { group.activeWindowId = windowId }
             return true
         }
-        return moveTabbedTab(windowId, into: group, at: position)
+        let shown = group.activeWindowId
+        guard moveTabbedTab(windowId, into: group, at: position) else { return false }
+        if !activate, let shown { group.activeWindowId = shown }
+        return true
+    }
+
+    /// Opens a new group holding the tab along the workspace's `side`, as moving past that edge
+    /// does elsewhere. A group's only tab has nowhere new to go.
+    @MainActor func moveTabbedTabToEdge(_ windowId: UInt32, on side: CardinalDirection) -> Bool {
+        guard let source = tabbedGroup(containing: windowId), source.windowIds.count > 1, let layout = tabbedLayout else { return false }
+        source.windowIds.removeAll { $0 == windowId }
+        if source.activeWindowId == windowId { source.activeWindowId = source.windowIds.first }
+        let group = TabbedGroup(windowIds: [windowId])
+        tabbedLayout = layout.insertingAtEdge(group, on: side).pruned()
+        if lastTabbedFocusedWindowId == windowId { lastTabbedGroup = group }
+        return true
     }
 
     /// Opens a new group on `side` of `target` holding the tab, as dropping it on that edge does.
