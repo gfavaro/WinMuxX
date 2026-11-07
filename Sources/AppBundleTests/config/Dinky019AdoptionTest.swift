@@ -166,9 +166,9 @@ final class Dinky019AdoptionTest: XCTestCase {
 
     func testDisablingClearsDragStateImmediately() async throws {
         TrayMenuModel.shared.isEnabled = true
-        currentlyManipulatedWithMouseWindowId = 99004
-        setCurrentMouseManipulationKind(.move)
-        WindowMouseInteractionDriver.shared.moveSession = .init(windowId: 99004, subject: .window, detachOrigin: .window, startedInSidebar: false)
+        let move = WindowMouseInteractionDriver.MoveSession(windowId: 99004, subject: .window, detachOrigin: .window, startedInSidebar: false)
+        currentMouseManipulation = .move(move)
+        WindowMouseInteractionDriver.shared.session = .move(move)
         let result = try await parseCommand("enable off").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertNil(currentlyManipulatedWithMouseWindowId)

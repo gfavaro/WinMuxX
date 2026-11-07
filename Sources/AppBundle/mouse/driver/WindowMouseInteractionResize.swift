@@ -196,13 +196,12 @@ extension WindowMouseInteractionDriver {
             resetResizeTrackingState()
             clearPendingWindowDragIntent()
         }
-        resizeSession = session
-        currentlyManipulatedWithMouseWindowId = windowId
+        self.session = .resize(session)
+        beginMouseResizeManipulation(windowId: windowId)
         WindowMouseInteractionOpacityController.shared.update(
             activeWindowId: windowId,
             hidesPassiveTabGroupChrome: true,
         )
-        setCurrentMouseManipulationKind(.resize)
         configureResizeChrome(windowId: windowId)
         startDisplayLoop()
         sampleResizeFrame(force: true)

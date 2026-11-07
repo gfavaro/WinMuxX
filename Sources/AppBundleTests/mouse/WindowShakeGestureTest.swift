@@ -171,7 +171,7 @@ final class WindowShakeLayoutToggleTest: XCTestCase {
             detachOrigin: .window,
             startedInSidebar: false,
         )
-        setCurrentMouseManipulationKind(.move)
+        currentMouseManipulation = .move(session)
         pendingWindowDragIntent = testPendingShakeDragIntent(windowId: window.windowId)
 
         beginShakeRecognition(driver: driver, window: window, session: session, startingAt: 10)
@@ -204,7 +204,7 @@ final class WindowShakeLayoutToggleTest: XCTestCase {
             startedInSidebar: false,
         )
         config.enableShakeToToggleTiling = false
-        setCurrentMouseManipulationKind(.move)
+        currentMouseManipulation = .move(session)
 
         beginShakeRecognition(driver: driver, window: tiled, session: session, startingAt: 20)
 

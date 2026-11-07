@@ -532,15 +532,22 @@ final class TreeNodeTest: XCTestCase {
         XCTAssertEqual(restorableWorkspaces([emptyWorkspace, occupiedWorkspace]), [occupiedWorkspace])
     }
 
+    func testAResizeReplacesAMoveWhole() {
+        currentMouseManipulation = .move(.init(windowId: 7, subject: .group, detachOrigin: .tabStrip, startedInSidebar: true))
+        beginMouseResizeManipulation(windowId: 8)
+        defer { currentMouseManipulation = .none }
+        XCTAssertEqual(currentlyManipulatedWithMouseWindowId, 8)
+        XCTAssertEqual(getCurrentMouseManipulationKind(), .resize)
+        XCTAssertEqual(getCurrentMouseDragSubject(), .window, "No move's details outlive the move")
+        XCTAssertEqual(getCurrentMouseTabDetachOrigin(), .window)
+        XCTAssertFalse(getCurrentMouseDragStartedInSidebar())
+    }
+
     func testCancelManipulatedWithMouseStateClearsDragTracking() {
         let workspace = Workspace.get(byName: "a")
         let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
         setDraggedWindowAnchorRect(Rect(topLeftX: 0, topLeftY: 0, width: 100, height: 100), for: window.windowId)
-        currentlyManipulatedWithMouseWindowId = window.windowId
-        setCurrentMouseManipulationKind(.move)
-        setCurrentMouseDragSubject(.group)
-        setCurrentMouseTabDetachOrigin(.tabStrip)
-        setCurrentMouseDragStartedInSidebar(true)
+        currentMouseManipulation = .move(.init(windowId: window.windowId, subject: .group, detachOrigin: .tabStrip, startedInSidebar: true))
 
         cancelManipulatedWithMouseState()
 

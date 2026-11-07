@@ -238,15 +238,16 @@ import XCTest
     @MainActor
     func testApplyWindowSwapDragIntentRejectsSelfTabGroupTabStripDrags() {
         setUpWorkspacesForTests()
-        let previousDetachOrigin = getCurrentMouseTabDetachOrigin()
-        setCurrentMouseTabDetachOrigin(.tabStrip)
-        defer { setCurrentMouseTabDetachOrigin(previousDetachOrigin) }
 
         let workspace = Workspace.get(byName: "tabs")
         let root = workspace.rootTilingContainer
         let tabGroup = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .v, .tabGroup, index: INDEX_BIND_LAST)
         let source = TestWindow.new(id: 1, parent: tabGroup)
         let target = TestWindow.new(id: 2, parent: tabGroup)
+        // A tab dragged out of its strip.
+        let previous = currentMouseManipulation
+        currentMouseManipulation = .move(.init(windowId: source.windowId, subject: .window, detachOrigin: .tabStrip, startedInSidebar: false))
+        defer { currentMouseManipulation = previous }
 
         XCTAssertFalse(applyWindowSwapDragIntent(
             sourceWindow: source,

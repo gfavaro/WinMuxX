@@ -142,7 +142,7 @@ extension WindowMouseInteractionDriver {
             shakeGesture = WindowShakeGestureRecognizer()
             didToggleLayoutWithShake = false
         }
-        moveSession = session
+        self.session = .move(session)
         WindowMouseInteractionOpacityController.shared.restore()
         if isNewSession {
             configureMoveChrome(windowId: windowId, session: session)

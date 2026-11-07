@@ -13,9 +13,10 @@ import XCTest
         let source = TestWindow.new(id: 1, parent: root)
         let target = TestWindow.new(id: 2, parent: root)
         _ = TestWindow.new(id: 3, parent: root)
-        let previousDetachOrigin = getCurrentMouseTabDetachOrigin()
-        setCurrentMouseTabDetachOrigin(.tabStrip)
-        defer { setCurrentMouseTabDetachOrigin(previousDetachOrigin) }
+        // A tab dragged out of its strip.
+        let previous = currentMouseManipulation
+        currentMouseManipulation = .move(.init(windowId: source.windowId, subject: .window, detachOrigin: .tabStrip, startedInSidebar: false))
+        defer { currentMouseManipulation = previous }
 
         XCTAssertTrue(applyWindowStackSplitDragIntent(
             sourceWindow: source,

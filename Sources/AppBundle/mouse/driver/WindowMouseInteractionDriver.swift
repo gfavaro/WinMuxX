@@ -34,8 +34,17 @@ final class WindowMouseInteractionDriver {
         let mouseOffset: CGPoint
     }
 
-    var moveSession: MoveSession?
-    var resizeSession: ResizeSession?
+    /// The gesture the driver samples frames for: a move or a resize, never both. It ends at mouse
+    /// up, before the manipulation it belongs to is reset.
+    enum Session: Equatable {
+        case idle
+        case move(MoveSession)
+        case resize(ResizeSession)
+    }
+
+    var session: Session = .idle
+    var moveSession: MoveSession? { if case .move(let session) = session { session } else { nil } }
+    var resizeSession: ResizeSession? { if case .resize(let session) = session { session } else { nil } }
     var dragSourcePreviewState: DragSourcePreviewState?
     var pendingResizeCandidate: PendingResizeCandidate?
     var resizeGesture: ResizeGestureSessionState?
@@ -108,8 +117,7 @@ extension WindowMouseInteractionDriver {
     func stop() {
         logWindowDragLive("driver.stop moveSession=\(String(describing: moveSession)) resizeSession=\(String(describing: resizeSession)) manipulated=\(currentlyManipulatedWithMouseWindowId?.description ?? "nil") kind=\(getCurrentMouseManipulationKind()) mouseDown=\(isLeftMouseButtonDown)")
         DisplayRefreshDriver.shared.remove(owner: self)
-        moveSession = nil
-        resizeSession = nil
+        session = .idle
         dragSourcePreviewState = nil
         pendingResizeCandidate = nil
         shakeGesture = nil
@@ -123,7 +131,7 @@ extension WindowMouseInteractionDriver {
 
     func finishResizeFlush(session: ResizeSession) {
         if resizeSession == session {
-            resizeSession = nil
+            self.session = .idle
         }
         pendingResizeCandidate = nil
         resetResizeTrackingState()

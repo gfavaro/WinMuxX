@@ -6,6 +6,35 @@ enum MouseManipulationKind: Equatable {
     case resize
 }
 
+/// What the pointer is doing to a window: nothing, moving it (what it carries, and where the
+/// drag began), or resizing it. One value, so the window, the kind and a move's details can never
+/// disagree, and ending a manipulation is one assignment.
+enum MouseManipulation: Equatable {
+    case none
+    case move(WindowMouseInteractionDriver.MoveSession)
+    case resize(windowId: UInt32)
+
+    var windowId: UInt32? {
+        switch self {
+            case .none: nil
+            case .move(let session): session.windowId
+            case .resize(let windowId): windowId
+        }
+    }
+
+    var kind: MouseManipulationKind {
+        switch self {
+            case .none: .none
+            case .move: .move
+            case .resize: .resize
+        }
+    }
+
+    var moveSession: WindowMouseInteractionDriver.MoveSession? {
+        if case .move(let session) = self { session } else { nil }
+    }
+}
+
 private let postDragAxObserverSuppressionDuration: Duration = .seconds(2)
 
 struct MousePointerSample: Equatable {
@@ -46,13 +75,10 @@ final class MousePointerTracker {
     }
 }
 
-@MainActor var currentlyManipulatedWithMouseWindowId: UInt32? = nil
+@MainActor var currentMouseManipulation: MouseManipulation = .none
+@MainActor var currentlyManipulatedWithMouseWindowId: UInt32? { currentMouseManipulation.windowId }
 @MainActor private var pinnedDraggedWindowId: UInt32? = nil
-@MainActor private var currentMouseDragSubject: WindowDragSubject = .window
-@MainActor private var currentMouseTabDetachOrigin: TabDetachOrigin = .window
-@MainActor private var currentMouseDragStartedInSidebar: Bool = false
-@MainActor private var currentMouseManipulationKind: MouseManipulationKind = .none
-@MainActor var isMouseManipulationActive: Bool { currentMouseManipulationKind != .none }
+@MainActor var isMouseManipulationActive: Bool { currentMouseManipulation != .none }
 @MainActor private var draggedWindowAnchorRectById: [UInt32: Rect] = [:]
 @MainActor private var suppressedPostDragAxObserverEventsUntil: ContinuousClock.Instant? = nil
 @MainActor private var suppressedPostDragAxObserverEventsByWindowId: [UInt32: ContinuousClock.Instant] = [:]
@@ -79,43 +105,29 @@ func hasPinnedDraggedWindow() -> Bool {
 }
 
 @MainActor
-func setCurrentMouseDragSubject(_ subject: WindowDragSubject) {
-    currentMouseDragSubject = subject
-}
-
-@MainActor
 func getCurrentMouseDragSubject() -> WindowDragSubject {
-    currentMouseDragSubject
-}
-
-@MainActor
-func setCurrentMouseTabDetachOrigin(_ origin: TabDetachOrigin) {
-    currentMouseTabDetachOrigin = origin
+    currentMouseManipulation.moveSession?.subject ?? .window
 }
 
 @MainActor
 func getCurrentMouseTabDetachOrigin() -> TabDetachOrigin {
-    currentMouseTabDetachOrigin
-}
-
-@MainActor
-func setCurrentMouseDragStartedInSidebar(_ startedInSidebar: Bool) {
-    currentMouseDragStartedInSidebar = startedInSidebar
+    currentMouseManipulation.moveSession?.detachOrigin ?? .window
 }
 
 @MainActor
 func getCurrentMouseDragStartedInSidebar() -> Bool {
-    currentMouseDragStartedInSidebar
-}
-
-@MainActor
-func setCurrentMouseManipulationKind(_ kind: MouseManipulationKind) {
-    currentMouseManipulationKind = kind
+    currentMouseManipulation.moveSession?.startedInSidebar ?? false
 }
 
 @MainActor
 func getCurrentMouseManipulationKind() -> MouseManipulationKind {
-    currentMouseManipulationKind
+    currentMouseManipulation.kind
+}
+
+/// The pointer is resizing `windowId`, whatever it was doing before.
+@MainActor
+func beginMouseResizeManipulation(windowId: UInt32) {
+    currentMouseManipulation = .resize(windowId: windowId)
 }
 
 @MainActor
@@ -203,17 +215,10 @@ func beginWindowMoveWithMouseSessionIfNeeded(
     refreshActualRects: Bool = true,
 ) -> Bool {
     let previousWindowId = currentlyManipulatedWithMouseWindowId
-    let previousKind = getCurrentMouseManipulationKind()
-    let previousSubject = getCurrentMouseDragSubject()
-    let previousDetachOrigin = getCurrentMouseTabDetachOrigin()
-    let previousStartedInSidebar = getCurrentMouseDragStartedInSidebar()
+    let move = MouseManipulation.move(WindowMouseInteractionDriver.MoveSession(
+        windowId: windowId, subject: subject, detachOrigin: detachOrigin, startedInSidebar: startedInSidebar))
 
-    if previousKind == .move,
-       previousWindowId == windowId,
-       previousSubject == subject,
-       previousDetachOrigin == detachOrigin,
-       previousStartedInSidebar == startedInSidebar
-    {
+    if currentMouseManipulation == move {
         return false
     }
 
@@ -224,11 +229,7 @@ func beginWindowMoveWithMouseSessionIfNeeded(
         }
     }
 
-    currentlyManipulatedWithMouseWindowId = windowId
-    setCurrentMouseManipulationKind(.move)
-    setCurrentMouseDragSubject(subject)
-    setCurrentMouseTabDetachOrigin(detachOrigin)
-    setCurrentMouseDragStartedInSidebar(startedInSidebar)
+    currentMouseManipulation = move
     setDraggedWindowAnchorRect(anchorRect, for: windowId)
     if refreshActualRects {
         refreshVisibleWindowActualRectsForCurrentDrag(sourceWindowId: windowId)
@@ -244,11 +245,7 @@ func cancelManipulatedWithMouseState() {
     cancelWindowDragActualRectRefresh()
     clearDraggedWindowAnchorRect(for: currentlyManipulatedWithMouseWindowId)
     WindowDragFrameGate.shared.resetAll()
-    setCurrentMouseManipulationKind(.none)
-    setCurrentMouseDragSubject(.window)
-    setCurrentMouseTabDetachOrigin(.window)
-    setCurrentMouseDragStartedInSidebar(false)
-    currentlyManipulatedWithMouseWindowId = nil
+    currentMouseManipulation = .none
     for workspace in Workspace.all {
         workspace.resetResizeWeightBeforeResizeRecursive()
     }

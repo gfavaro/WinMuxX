@@ -67,8 +67,7 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
             return
         }
         WindowResizePreviewPanel.shared.beginStableFrame(workspace.workspaceMonitor.rect.toAppKitScreenRect)
-        currentlyManipulatedWithMouseWindowId = window.windowId
-        setCurrentMouseManipulationKind(.resize)
+        beginMouseResizeManipulation(windowId: window.windowId)
         WindowResizePreviewPanel.shared.show(tabbedResizePreviewItems(in: workspace, layout: layout, excluding: window),
                                              presentation: .resizeOverlay)
         return
@@ -95,8 +94,7 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
         WindowResizePreviewPanel.shared.hide(reason: "resizePreview.no-items")
         return
     }
-    currentlyManipulatedWithMouseWindowId = window.windowId
-    setCurrentMouseManipulationKind(.resize)
+    beginMouseResizeManipulation(windowId: window.windowId)
     WindowResizePreviewPanel.shared.show(items, presentation: .resizeOverlay)
 }
 
@@ -142,14 +140,12 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     // that edge; the tree kept for other arrangements stays as it was.
     if let (workspace, layout) = proposedTabbedMouseResize(window, rect: rect) {
         workspace.tabbedLayout = layout
-        currentlyManipulatedWithMouseWindowId = window.windowId
-        setCurrentMouseManipulationKind(.resize)
+        beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()
         return
     }
     if floatSingleWindowAfterHeightResize(window, rect: rect) {
-        currentlyManipulatedWithMouseWindowId = window.windowId
-        setCurrentMouseManipulationKind(.resize)
+        beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()
         return
     }
@@ -158,8 +154,7 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     if let previous = window.lastAppliedLayoutPhysicalRect,
        abs(rect.width - previous.width) > 1,
        applySingleWindowManualResize(window, width: rect.width) {
-        currentlyManipulatedWithMouseWindowId = window.windowId
-        setCurrentMouseManipulationKind(.resize)
+        beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()
         return
     }
@@ -170,8 +165,7 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     for change in weightMap.dwindleChanges {
         change.container.setDwindleSplitRatio(change.ratio, at: change.index)
     }
-    currentlyManipulatedWithMouseWindowId = window.windowId
-    setCurrentMouseManipulationKind(.resize)
+    beginMouseResizeManipulation(windowId: window.windowId)
     clearPendingWindowDragIntent()
 }
 
