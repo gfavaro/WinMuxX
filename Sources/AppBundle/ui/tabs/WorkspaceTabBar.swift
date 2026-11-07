@@ -4,8 +4,12 @@ import SwiftUI
 /// The tab bar of a Tabbed workspace: one browser-style tab per tiled window, in tree order.
 struct WorkspaceTabBarModel: Equatable, Identifiable {
     let workspaceName: String
-    /// AppKit screen coordinates of the bar, above the area the windows use.
+    /// AppKit screen coordinates of the bar and the window area under it together. The panel
+    /// fills all of it behind the window, so the window's rounded corners show the bar's
+    /// surface instead of the desktop and the two read as one piece.
     let frame: CGRect
+    let barHeight: CGFloat
+    let activeWindowId: UInt32
     let tabs: [WindowTabItemViewModel]
     var id: String { workspaceName }
 }
@@ -35,9 +39,8 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
         if Task.isCancelled { return nil }
         guard workspace.isVisible, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen else { continue }
         let rect = workspaceTilingRect(workspace)
-        let bar = Rect(topLeftX: rect.topLeftX, topLeftY: rect.topLeftY, width: rect.width,
-                       height: min(resolvedWindowTabBarHeight(), rect.height))
-        models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: bar.toAppKitScreenRect.alignedToBackingPixels(), tabs: tabs))
+        models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: rect.toAppKitScreenRect.alignedToBackingPixels(),
+            barHeight: min(resolvedWindowTabBarHeight(), rect.height), activeWindowId: active.windowId, tabs: tabs))
     }
     return models
 }
@@ -79,12 +82,16 @@ final class WorkspaceTabBarPanel: NSPanelHud {
     override var canBecomeMain: Bool { false }
 
     func show(_ model: WorkspaceTabBarModel) {
-        if current?.tabs != model.tabs || current?.workspaceName != model.workspaceName {
+        if current?.tabs != model.tabs || current?.workspaceName != model.workspaceName || current?.barHeight != model.barHeight {
             hostingView.rootView = AnyView(WorkspaceTabBarView(model: model))
         }
         if current?.frame != model.frame { setWindowTabChromePanelFrame(model.frame, on: self) }
+        // Just behind the window shown, reasserted on every refresh like the tab-group panels:
+        // raising that window or another one changes the order outside this model.
+        order(.below, relativeTo: Int(model.activeWindowId))
+        // Never in front of the window: without it, the back of this level is the fallback.
+        if !isVisible { order(.below, relativeTo: 0) }
         current = model
-        if !isVisible { orderFrontRegardless() }
     }
 }
 
@@ -96,6 +103,17 @@ struct WorkspaceTabBarView: View {
     private let padding: CGFloat = 6
 
     var body: some View {
+        VStack(spacing: 0) {
+            tabs.frame(height: model.barHeight)
+            // The window covers this part; only its rounded corners show the surface.
+            Color.clear.allowsHitTesting(false)
+        }
+        .background { OverlaySurface(cornerRadius: windowTabStripCornerRadius) }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Workspace tabs")
+    }
+
+    private var tabs: some View {
         GeometryReader { geometry in
             let height = geometry.size.height - 2 * padding
             let width = workspaceTabWidth(barWidth: geometry.size.width - 2 * padding, count: model.tabs.count, spacing: spacing)
@@ -118,9 +136,6 @@ struct WorkspaceTabBarView: View {
             .onChange(of: model.tabs.first(where: \.isActive)?.windowId) { _ in scrollToActive(proxy) }
             }
         }
-        .background { OverlaySurface(cornerRadius: windowTabStripCornerRadius) }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Workspace tabs")
     }
 }
 
