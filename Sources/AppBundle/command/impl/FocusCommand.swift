@@ -27,8 +27,8 @@ struct FocusCommand: Command {
                 // left and right, through the group's own tabs, before any strip nested in the tree.
                 if target.workspace.arrangement == .tabbed { target.workspace.syncTabbedGroups() }
                 if target.workspace.arrangement == .tabbed, let window, let group = target.workspace.tabbedGroup(containing: window.windowId) {
-                    if let neighbor = target.workspace.tabbedGroup(beside: group, direction)?.activeWindow { return neighbor.focusWindow() }
-                    let tabs = group.shownWindowIds
+                    if let neighbor = target.workspace.tabbedGroup(beside: group, direction)?.displayedWindow { return neighbor.focusWindow() }
+                    let tabs = group.barGroup.barWindowIds
                     if direction.orientation == .h, let index = tabs.firstIndex(of: window.windowId) {
                         if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset).flatMap({ Window.get(byId: $0) }) { return neighbor.focusWindow() }
                         if args.boundariesAction == .wrapAroundTheWorkspace, tabs.count > 1 {
@@ -73,7 +73,7 @@ struct FocusCommand: Command {
                 if target.workspace.arrangement == .tabbed {
                     target.workspace.syncTabbedGroups()
                     let group = target.windowOrNil.flatMap { target.workspace.tabbedGroup(containing: $0.windowId) } ?? target.workspace.tabbedFocusedGroup
-                    guard let window = group?.shownWindowIds.getOrNil(atIndex: Int(tabIndex) - 1)
+                    guard let window = group?.barGroup.barWindowIds.getOrNil(atIndex: Int(tabIndex) - 1)
                         .flatMap({ Window.get(byId: $0) }) else {
                         return io.err("Can't find tab with index \(tabIndex) in this tab group")
                     }
@@ -320,7 +320,7 @@ private func focusRelativeInWorkspaceTabs(
     _ boundariesAction: FocusCmdArgs.WhenBoundariesCrossed,
     _ nextPrev: TabNextPrev,
 ) -> Bool {
-    guard let window = target.windowOrNil, let tabs = target.workspace.tabbedGroup(containing: window.windowId)?.shownWindowIds,
+    guard let window = target.windowOrNil, let tabs = target.workspace.tabbedGroup(containing: window.windowId)?.barGroup.barWindowIds,
           let current = tabs.firstIndex(of: window.windowId) else { return false }
     var index = current + nextPrev.focusOffset
     if !tabs.indices.contains(index) {

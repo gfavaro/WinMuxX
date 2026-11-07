@@ -9,8 +9,15 @@ import PrivateApi
 final class TabbedGroup {
     var windowIds: [UInt32]
     var activeWindowId: UInt32?
-    /// The group's area from the last layout: tab bar and window together.
+    /// The group's area from the last layout: tab bar and window together. Nil while hidden or folded.
     var lastFrame: Rect?
+    /// Groups the display had no room for at the last layout, shown for now as tabs in this group's
+    /// bar and area. The groups themselves stay as they are, and come back when there is room.
+    var foldedGroups: [TabbedGroup] = []
+    /// The group whose bar shows this one's tabs while it is folded.
+    weak var foldedInto: TabbedGroup?
+    /// Which of this group and those folded into it was used last, and so is shown in its area.
+    weak var displayedMember: TabbedGroup?
 
     init(windowIds: [UInt32], activeWindowId: UInt32? = nil) {
         self.windowIds = windowIds
@@ -28,6 +35,25 @@ final class TabbedGroup {
     /// The tabs its bar shows: windows in the workspace's tiled tree, without any kept only while
     /// WinMuxX has briefly lost track of them.
     var shownWindowIds: [UInt32] { windowIds.filter { Window.get(byId: $0)?.parent is TilingContainer } }
+
+    /// The group whose area and bar show this one: itself, or the one it is folded into.
+    var barGroup: TabbedGroup { foldedInto ?? self }
+
+    /// The tabs its bar shows, those of groups folded into it included.
+    var barWindowIds: [UInt32] { shownWindowIds + foldedGroups.flatMap(\.shownWindowIds) }
+
+    /// The window its area shows: the chosen tab of the group used last among it and those folded in.
+    var displayedWindow: Window? {
+        let member = displayedMember.flatMap { used in foldedGroups.first { $0 === used } } ?? self
+        return member.activeWindow ?? activeWindow ?? foldedGroups.lazy.compactMap(\.activeWindow).first
+    }
+
+    /// The room its area needs: as much as the most demanding of its windows, shown or not, so no
+    /// tab is ever squeezed below what its window allows.
+    var minimumWindowSize: CGSize {
+        let sizes = ([self] + foldedGroups).flatMap(\.shownWindowIds).compactMap { Window.get(byId: $0)?.minimumLayoutSize }
+        return CGSize(width: sizes.map(\.width).max() ?? 0, height: sizes.map(\.height).max() ?? 0)
+    }
 }
 
 /// Groups side by side (columns) or stacked (rows), each sharing the area by its weight.
@@ -159,10 +185,13 @@ indirect enum TabbedLayout {
     func minimumExtent(horizontal: Bool, gap: CGSize) -> CGFloat {
         switch self {
             case .group(let group):
-                let minimum = group.activeWindow?.minimumLayoutSize ?? .zero
+                // A folded group's windows count in the bar that shows them.
+                if group.foldedInto != nil { return 0 }
+                let minimum = group.minimumWindowSize
                 return horizontal ? minimum.width : minimum.height + resolvedWindowTabBarHeight()
             case .split(let orientation, let children, _):
-                let extents = children.map { $0.minimumExtent(horizontal: horizontal, gap: gap) }
+                let extents = children.filter { $0.groups.contains { $0.foldedInto == nil } }
+                    .map { $0.minimumExtent(horizontal: horizontal, gap: gap) }
                 return (orientation == .h) == horizontal
                     ? extents.reduce(0, +) + (horizontal ? gap.width : gap.height) * CGFloat(max(extents.count - 1, 0))
                     : extents.max() ?? 0
@@ -212,7 +241,10 @@ extension Workspace {
             if let target {
                 target.windowIds += newcomers
                 // A window that opened and took focus is shown in the group it joined.
-                if let focused = lastTabbedFocusedWindowId, newcomers.contains(focused) { target.activeWindowId = focused }
+                if let focused = lastTabbedFocusedWindowId, newcomers.contains(focused) {
+                    target.activeWindowId = focused
+                    target.barGroup.displayedMember = target
+                }
             } else {
                 layout = .group(TabbedGroup(windowIds: newcomers, activeWindowId: lastTabbedFocusedWindowId.flatMap { newcomers.contains($0) ? $0 : nil }))
             }
@@ -230,6 +262,45 @@ extension Workspace {
     @MainActor func visibleTabbedLayout(_ layout: TabbedLayout) -> TabbedLayout? {
         let present = Set(rootTilingContainer.allLeafWindowsRecursive.map(\.windowId))
         return layout.pruned(keeping: { $0.windowIds.contains(where: present.contains) })
+    }
+
+    /// The groups that fit in `rect`, each sized as the layout gives it. When the windows' minimum
+    /// sizes leave no room for every group, the group farthest from the one in use folds into its
+    /// neighbour's bar, and so on until the rest fit. Only presentation changes: `tabbedLayout` and
+    /// its groups stay, so a folded group returns when there is room again.
+    @MainActor func foldedTabbedLayout(_ base: TabbedLayout? = nil, in rect: Rect, gap: CGSize) -> TabbedLayout? {
+        // Groups folded last time fold again first, into the same bar, so choosing a folded tab
+        // shows it there instead of reshuffling the bars under the pointer.
+        let used = (lastTabbedFocusedWindowId ?? focus.windowOrNil?.windowId).flatMap { tabbedGroup(containing: $0) }
+        let inUse = used?.barGroup
+        var previous = tabbedGroups.compactMap { group in group.foldedInto.map { (group, $0) } }
+        for group in tabbedGroups {
+            group.foldedGroups = []
+            group.foldedInto = nil
+        }
+        guard var layout = (base ?? tabbedLayout).flatMap(visibleTabbedLayout) else { return nil }
+        while layout.minimumExtent(horizontal: true, gap: gap) > rect.width + 0.5
+            || layout.minimumExtent(horizontal: false, gap: gap) > rect.height + 0.5
+        {
+            let groups = layout.groups
+            guard groups.count > 1 else { break }
+            let folded: TabbedGroup, host: TabbedGroup
+            if let again = previous.firstIndex(where: { pair in groups.contains { $0 === pair.0 } && groups.contains { $0 === pair.1 } }) {
+                (folded, host) = previous.remove(at: again)
+            } else {
+                let kept = inUse.flatMap { used in groups.firstIndex { $0 === used } } ?? 0
+                let index = kept >= groups.count - 1 - kept ? 0 : groups.count - 1
+                (folded, host) = (groups[index], groups[index == 0 ? 1 : groups.count - 2])
+            }
+            for member in [folded] + folded.foldedGroups { member.foldedInto = host }
+            host.foldedGroups += [folded] + folded.foldedGroups
+            folded.foldedGroups = []
+            guard let rest = layout.pruned(keeping: { $0 !== folded }) else { break }
+            layout = rest
+        }
+        // Whichever bar now shows the group last used here shows it, even after its host changed.
+        if let used { used.barGroup.displayedMember = used }
+        return layout
     }
 
     /// Whether a window out of the tiled tree keeps its tab: while WinMuxX briefly lost track of it,
@@ -327,13 +398,14 @@ extension Workspace {
                                  by delta: CGFloat, againstNext: Bool, strictSide: Bool) -> TabbedLayout? {
         let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor).inner
         let gap = CGFloat(axis == .h ? gaps.horizontal : gaps.vertical)
-        guard let group = tabbedGroup(containing: window.windowId) else { return nil }
+        guard let group = tabbedGroup(containing: window.windowId)?.barGroup else { return nil }
         return layout.resizing(group, along: axis, by: delta, againstNext: againstNext, strictSide: true, gap: gap)
             ?? (strictSide ? nil : layout.resizing(group, along: axis, by: delta, againstNext: againstNext, gap: gap))
     }
 
     /// The group whose last area lies on `direction`'s side of `group`, nearest first.
     @MainActor func tabbedGroup(beside group: TabbedGroup, _ direction: CardinalDirection) -> TabbedGroup? {
+        let group = group.barGroup
         guard let from = group.lastFrame else { return nil }
         return tabbedGroups.compactMap { other -> (TabbedGroup, CGFloat)? in
             guard other !== group, let to = other.lastFrame else { return nil }
@@ -374,6 +446,7 @@ extension Window {
         workspace.lastTabbedFocusedWindowId = windowId
         guard let group = workspace.tabbedGroup(containing: windowId) else { return }
         group.activeWindowId = windowId
+        group.barGroup.displayedMember = group
         workspace.lastTabbedGroup = group
     }
 }

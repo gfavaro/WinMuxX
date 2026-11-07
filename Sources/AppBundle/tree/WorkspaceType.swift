@@ -21,6 +21,8 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     @MainActor weak var lastTabbedGroup: TabbedGroup?
     /// The window last focused in this Tabbed workspace, which a group joined later shows.
     @MainActor var lastTabbedFocusedWindowId: UInt32?
+    /// The groups as the last layout showed them, without those folded into another's bar.
+    @MainActor var presentedTabbedLayout: TabbedLayout?
     var arrangement: WorkspaceLayoutName = .dwindle {
         didSet { if arrangement != .dwindle { preservesTopLevelGroups = true } }
     }

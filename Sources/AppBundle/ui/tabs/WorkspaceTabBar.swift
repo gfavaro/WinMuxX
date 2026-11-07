@@ -36,9 +36,10 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
         && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) && !workspace.presentsManagedFullscreen
     {
         workspace.syncTabbedGroups()
-        for group in workspace.visibleTabbedLayout?.groups ?? [] {
-            let windows = group.shownWindowIds.compactMap { Window.get(byId: $0) }
-            guard let active = group.activeWindow, let frame = group.lastFrame, !windows.isEmpty else { continue }
+        // Groups folded into another's bar have no area of their own; their tabs are in that bar.
+        for group in workspace.visibleTabbedLayout?.groups ?? [] where group.foldedInto == nil {
+            let windows = group.barWindowIds.compactMap { Window.get(byId: $0) }
+            guard let active = group.displayedWindow, let frame = group.lastFrame, !windows.isEmpty else { continue }
             let tabs = await makeWindowTabChromeTabs(windows: windows, activeWindowId: active.windowId)
                 .map { $0.legacyTabItem(workspaceName: workspace.name) }
             if Task.isCancelled { return nil }

@@ -594,6 +594,130 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.tabbedGroup(containing: windows[2].windowId)?.windowIds, [windows[2].windowId])
     }
 
+    /// Three columns, [0] [1] [2], each window needing `width` points.
+    private func makeThreeColumns(width: CGFloat) async throws -> (Workspace, [TestWindow], [TabbedGroup]) {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: right, on: .right))
+        for window in windows { window.testMinimumSize = CGSize(width: width, height: 100) }
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        return (workspace, windows, workspace.tabbedGroups)
+    }
+
+    func testAGroupWithoutRoomFoldsIntoItsNeighboursBar() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        XCTAssertEqual(groups.count, 3, "The groups themselves stay")
+        XCTAssertTrue(groups[2].foldedInto === groups[1], "The group farthest from the one in use folded into its neighbour")
+        XCTAssertNil(groups[2].lastFrame, "It has no area of its own")
+        XCTAssertEqual(groups[1].barWindowIds, [windows[1], windows[2]].map(\.windowId), "Its tab shows in that bar")
+        let a = try XCTUnwrap(groups[0].lastFrame), b = try XCTUnwrap(groups[1].lastFrame)
+        XCTAssertLessThanOrEqual(a.maxX, b.minX + 1, "The two groups shown no longer overlap")
+        _ = windows[2].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(groups[1].displayedWindow === windows[2], "Choosing the folded tab shows it in that area")
+        XCTAssertNotNil(windows[2].lastAppliedLayoutPhysicalRect)
+        XCTAssertNil(windows[1].lastAppliedLayoutPhysicalRect)
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(groups[2].foldedInto === groups[1], "The folds stay as they were")
+        let result = try await run("focus --tab-index 2")
+        XCTAssertNotEqual(result.exitCode, 0, "Tab indices count the focused bar's own tabs, here one")
+        for window in windows { window.testMinimumSize = .zero }
+        try await workspace.layoutWorkspace()
+        XCTAssertNil(groups[2].foldedInto, "With room again the group returns")
+        XCTAssertNotNil(groups[2].lastFrame)
+    }
+
+    func testReorderingInAFoldedBarKeepsEachTabInItsGroup() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        let extra = TestWindow.new(id: 29980, parent: workspace.rootTilingContainer)
+        extra.testMinimumSize = windows[2].testMinimumSize
+        workspace.syncTabbedGroups()
+        XCTAssertTrue(workspace.moveTabbedTab(extra.windowId, into: groups[2]))
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(groups[1].barWindowIds, [windows[1], windows[2], extra].map(\.windowId))
+        XCTAssertTrue(reorderWorkspaceTab(extra, stripId: ObjectIdentifier(groups[1]), toIndex: 1))
+        XCTAssertEqual(groups[2].windowIds, [extra, windows[2]].map(\.windowId), "It moved before its own group's tab")
+        XCTAssertTrue(reorderWorkspaceTab(extra, stripId: ObjectIdentifier(groups[1]), toIndex: 0))
+        XCTAssertEqual(groups[1].windowIds, [windows[1].windowId], "but never into the host's group")
+    }
+
+    func testAFoldedGroupDoesNotCountTwiceWhenResizing() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, _, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        XCTAssertTrue(groups[2].foldedInto === groups[1])
+        let layout = try XCTUnwrap(workspace.tabbedLayout)
+        XCTAssertEqual(layout.minimumExtent(horizontal: true, gap: .zero),
+                       try XCTUnwrap(workspace.presentedTabbedLayout).minimumExtent(horizontal: true, gap: .zero), accuracy: 0.5,
+                       "The stored layout needs no more room than what is shown")
+    }
+
+    func testANewWindowShowsInAFoldedBar() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        _ = windows[2].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(groups[1].displayedWindow === windows[2])
+        workspace.lastTabbedGroup = groups[1]
+        let newcomer = TestWindow.new(id: 29990, parent: workspace.rootTilingContainer)
+        _ = newcomer.focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(workspace.tabbedGroup(containing: newcomer.windowId)?.barGroup === groups[1])
+        XCTAssertTrue(groups[1].displayedWindow === newcomer, "The window that opened and took focus shows")
+    }
+
+    func testAFoldedTabInUseStaysShownWhenItsHostCloses() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        let extra = TestWindow.new(id: 29985, parent: workspace.rootTilingContainer)
+        extra.testMinimumSize = windows[0].testMinimumSize
+        workspace.syncTabbedGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(extra.windowId, beside: groups[0], on: .left))
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        let folded = try XCTUnwrap(workspace.tabbedGroups.first { $0.foldedInto != nil })
+        let shownWindow = try XCTUnwrap(folded.activeWindow)
+        _ = shownWindow.focusWindow()
+        try await workspace.layoutWorkspace()
+        let host = try XCTUnwrap(folded.foldedInto)
+        for id in host.windowIds { Window.get(byId: id)?.unbindFromParent() }
+        workspace.syncTabbedGroups()
+        try await workspace.layoutWorkspace()
+        XCTAssertNotNil(shownWindow.lastAppliedLayoutPhysicalRect, "The tab in use is still shown")
+    }
+
+    func testTabNextGoesThroughFoldedTabs() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(groups[1].foldedGroups.isEmpty == false || groups[0].foldedGroups.isEmpty == false)
+        let bar = try XCTUnwrap(workspace.tabbedGroup(containing: windows[1].windowId)?.barGroup.barWindowIds)
+        XCTAssertGreaterThan(bar.count, 1)
+        let result = try await run("focus --boundaries-action wrap-around-the-workspace tab-next")
+        XCTAssertEqual(result.exitCode, 0)
+        XCTAssertEqual(focus.windowOrNil?.windowId, bar[(bar.firstIndex(of: windows[1].windowId)! + 1) % bar.count])
+    }
+
+    func testAGroupIsNeverResizedBelowItsWidestWindow() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        windows[1].testMinimumSize = CGSize(width: 300, height: 100)
+        windows[2].testMinimumSize = CGSize(width: 700, height: 100)
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(right.displayedWindow === windows[1])
+        _ = windows[0].focusWindow()
+        let result = try await run("resize width +5000")
+        XCTAssertEqual(result.exitCode, 0)
+        try await workspace.layoutWorkspace()
+        XCTAssertGreaterThanOrEqual(try XCTUnwrap(right.lastFrame).width, 700 - 1,
+            "The tab not shown still keeps its group wide enough for its window")
+        _ = left
+    }
+
     func testJoiningAGroupWorksWithWindowTabsOff() {
         let previous = config.windowTabs.enabled
         config.windowTabs.enabled = false

@@ -97,19 +97,19 @@ private func tabbedGroupDropDestination(
     subject: WindowDragSubject,
 ) -> WindowDragIntentDestination? {
     guard let workspace = targetWindow.nodeWorkspace,
-          let target = workspace.tabbedGroup(containing: targetWindow.windowId) else { return nil }
+          let target = workspace.tabbedGroup(containing: targetWindow.windowId)?.barGroup else { return nil }
     // A group's handle carries the whole group, which has nowhere to go beside or into itself.
     let carriesGroup = subject == .group && source != nil
-    if carriesGroup, target === source { return nil }
+    if carriesGroup, target === source?.barGroup { return nil }
     let kind: WindowDragIntentKind
     switch resolution.intent.zone {
         case .tab, .middle:
-            guard target !== source else { return nil }
+            guard target !== source?.barGroup else { return nil }
             kind = .tabStack(targetWindowId: targetWindow.windowId)
         case .left, .right, .top, .bottom:
             // A group's only tab beside itself would change nothing.
             guard let position = resolution.intent.zone.stackSplitPosition,
-                  target !== source || target.shownWindowIds.count > 1 else { return nil }
+                  target !== source?.barGroup || target.barWindowIds.count > 1 else { return nil }
             kind = .stackSplit(targetWindowId: targetWindow.windowId, position: position)
     }
     let joins = if case .tabStack = kind { true } else { false }

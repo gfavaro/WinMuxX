@@ -312,7 +312,7 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
         workspace.syncTabbedGroups()
         windowIds = [sourceWindow.windowId] + windows.map(\.windowId).filter { $0 != sourceWindow.windowId }
     } else if subject == .group, let source = workspace.tabbedGroup(containing: sourceWindow.windowId),
-              let group = workspace.tabbedGroup(containing: targetId) {
+              let group = workspace.tabbedGroup(containing: targetId)?.barGroup {
         // A group's handle carries the whole group: beside another group, or into it.
         guard side.map({ workspace.moveTabbedGroup(source, beside: group, on: $0) })
             ?? workspace.mergeTabbedGroup(source, into: group) else { return false }
@@ -320,7 +320,7 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
         return true
     }
     // An imported window may already have joined the target's group as a newcomer.
-    guard let group = workspace.tabbedGroup(containing: targetId),
+    guard let group = workspace.tabbedGroup(containing: targetId)?.barGroup,
           side.map({ workspace.moveTabbedTabToNewGroup(sourceWindow.windowId, beside: group, on: $0) })
             ?? (workspace.tabbedGroup(containing: sourceWindow.windowId) === group
                 || workspace.moveTabbedTab(sourceWindow.windowId, into: group)),

@@ -51,12 +51,17 @@ func reorderTabGroupChild(showing window: Window, stripId: ObjectIdentifier, toI
 }
 
 /// Moves a tab along a Tabbed workspace's tab group bar. Returns false when the strip is not
-/// one of those groups.
+/// one of those groups. A bar showing folded groups keeps each tab in its own group: it moves
+/// as far toward the drop as its group's tabs reach.
 @MainActor
 func reorderWorkspaceTab(_ window: Window, stripId: ObjectIdentifier, toIndex targetIndex: Int) -> Bool {
     guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
-          let group = workspace.tabbedGroup(containing: window.windowId), ObjectIdentifier(group) == stripId else { return false }
-    return workspace.reorderTabbedTab(window.windowId, toIndex: targetIndex)
+          let group = workspace.tabbedGroup(containing: window.windowId), ObjectIdentifier(group.barGroup) == stripId else { return false }
+    let bar = group.barGroup.barWindowIds, own = group.shownWindowIds
+    guard let anchor = bar.getOrNil(atIndex: max(0, min(targetIndex, bar.count - 1))) else { return false }
+    let index = own.firstIndex(of: anchor)
+        ?? ((bar.firstIndex(of: anchor) ?? 0) < (bar.firstIndex(of: own.first ?? anchor) ?? 0) ? 0 : own.count - 1)
+    return workspace.reorderTabbedTab(window.windowId, toIndex: index)
 }
 
 /// Moves a tab of a Tabbed workspace into a new tab group on `side` of its own.

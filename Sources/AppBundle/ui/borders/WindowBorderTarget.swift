@@ -19,8 +19,8 @@ func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorder
     // In a Tabbed workspace each tab group's bar belongs to the window shown under it: one border
     // encloses both, from the top of the bar to the bottom of the group's area.
     if let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen,
-       let group = workspace.tabbedGroup(containing: window.windowId) {
-        guard group.activeWindow === window, let area = group.lastFrame else { return nil }
+       let group = workspace.tabbedGroup(containing: window.windowId)?.barGroup {
+        guard group.displayedWindow === window, let area = group.lastFrame else { return nil }
         return WindowBorderTarget(frame: CGRect(x: area.topLeftX, y: area.topLeftY, width: area.width, height: area.height),
             corners: .init(top: windowTabStripCornerRadius, bottom: systemWindowCornerRadius()))
     }

@@ -75,7 +75,7 @@ func tabbedWindowSurfaceDestination(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> WindowDragIntentDestination? {
-    guard let area = workspace.tabbedGroup(containing: targetWindow.windowId)?.lastFrame, area.contains(mouseLocation),
+    guard let area = workspace.tabbedGroup(containing: targetWindow.windowId)?.barGroup.lastFrame, area.contains(mouseLocation),
           let zone = WindowIntentZoneBuilder.zone(at: mouseLocation, in: area) else { return nil }
     let resolution = WindowDropIntentResolution(
         intent: WindowDropIntent(sourceWindowId: sourceWindow.windowId, targetWindowId: targetWindow.windowId, zone: zone),

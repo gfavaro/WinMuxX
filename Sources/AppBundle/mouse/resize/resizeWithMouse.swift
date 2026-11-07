@@ -127,10 +127,10 @@ func proposedTabbedMouseResize(_ window: Window, rect: Rect) -> (Workspace, Tabb
 @MainActor
 func tabbedResizePreviewItems(in workspace: Workspace, layout: TabbedLayout, excluding window: Window) -> [WindowResizePreviewItem] {
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor).inner
-    let frames = workspace.visibleTabbedLayout(layout)?
-        .frames(in: workspaceTilingRect(workspace), gap: CGSize(width: gaps.horizontal, height: gaps.vertical)) ?? []
+    let gap = CGSize(width: gaps.horizontal, height: gaps.vertical), rect = workspaceTilingRect(workspace)
+    let frames = workspace.foldedTabbedLayout(layout, in: rect, gap: gap)?.frames(in: rect, gap: gap) ?? []
     return frames.compactMap { group, frame in
-        guard let shown = group.activeWindow, shown !== window else { return nil }
+        guard let shown = group.displayedWindow, shown !== window else { return nil }
         return WindowResizePreviewItem(window: shown, rect: frame)
     }
 }

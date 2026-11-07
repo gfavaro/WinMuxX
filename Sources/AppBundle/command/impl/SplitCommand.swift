@@ -15,7 +15,8 @@ struct SplitCommand: Command {
             let orientation: Orientation = switch args.arg.val {
                 case .vertical: .v
                 case .horizontal: .h
-                case .opposite: (workspace.tabbedLayout?.nearestSplitOrientation(of: group) ?? .v).opposite
+                case .opposite: (workspace.presentedTabbedLayout?.nearestSplitOrientation(of: group.barGroup)
+                    ?? workspace.tabbedLayout?.nearestSplitOrientation(of: group) ?? .v).opposite
             }
             if !workspace.moveTabbedTabToNewGroup(window.windowId, beside: group, on: orientation == .h ? .right : .down) {
                 io.out("split: nothing to do")

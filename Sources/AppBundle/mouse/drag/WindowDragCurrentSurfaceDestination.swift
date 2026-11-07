@@ -10,7 +10,7 @@ func currentWindowSurfaceDestination(
     if let workspace = tabbedDragWorkspace(sourceWindow: sourceWindow,
                                            targetWorkspace: mouseLocation.monitorApproximation.activeWorkspace) {
         // The window shown by the tab group under the pointer, its bar included.
-        guard let target = workspace.tabbedGroups.first(where: { $0.lastFrame?.contains(mouseLocation) == true })?.activeWindow
+        guard let target = workspace.tabbedGroups.first(where: { $0.lastFrame?.contains(mouseLocation) == true })?.displayedWindow
         else { return nil }
         return tabbedWindowSurfaceDestination(in: workspace, sourceWindow: sourceWindow, targetWindow: target,
                                               mouseLocation: mouseLocation, subject: subject, detachOrigin: detachOrigin)

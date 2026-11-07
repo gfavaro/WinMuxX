@@ -59,6 +59,12 @@ window's edge resizes its group against its neighbour. The groups are kept apart
 the tree, so Dwindle and Master return to the splits they had, and they survive a
 restart.
 
+A group is never narrower or shorter than the most demanding of its windows needs,
+shown or not, and resizing stops there. When the display has no room for every group
+at those sizes, the group farthest from the one in use folds into its neighbour's bar:
+its tabs show there, and choosing one shows it in that area. The group itself stays,
+and returns on its own once there is room, on a larger display or after a merge.
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another, and

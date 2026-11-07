@@ -44,16 +44,19 @@ extension Workspace {
             // Dwindle or Master restores it.
             syncTabbedGroups()
             let gaps = context.resolvedGaps.inner
-            let frames = visibleTabbedLayout?.frames(in: rect, gap: CGSize(width: gaps.horizontal, height: gaps.vertical)) ?? []
-            // A group not shown now (its windows briefly missing) is no neighbour to move to.
+            let gap = CGSize(width: gaps.horizontal, height: gaps.vertical)
+            presentedTabbedLayout = foldedTabbedLayout(in: rect, gap: gap)
+            let frames = presentedTabbedLayout?.frames(in: rect, gap: gap) ?? []
+            // A group not shown now (its windows briefly missing, or folded into another's bar) is no
+            // neighbour to move to.
             for group in tabbedGroups { group.lastFrame = nil }
-            let shown = Set(frames.compactMap { $0.0.activeWindow?.windowId })
+            let shown = Set(frames.compactMap { $0.0.displayedWindow?.windowId })
             for window in rootTilingContainer.allLeafWindowsRecursive where !shown.contains(window.windowId) {
                 try await window.parkHiddenLayoutWindow()
             }
             for (group, frame) in frames {
                 group.lastFrame = frame
-                guard let window = group.activeWindow else { continue }
+                guard let window = group.displayedWindow else { continue }
                 let content = workspaceTabbedContentRect(frame)
                 try await window.layoutRecursive(content.topLeftCorner, width: content.width, height: content.height,
                                                  virtual: content, context)
