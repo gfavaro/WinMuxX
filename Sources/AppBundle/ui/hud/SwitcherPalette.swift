@@ -5,6 +5,9 @@ import SwiftUI
 private let switcherPalettePanelId = "WinMux.switcherPalette"
 private let switcherPaletteWidth: CGFloat = 560
 private let switcherPaletteMaxHeight: CGFloat = 440
+private let switcherPaletteFooterHeight: CGFloat = 26
+/// The palette's keys, shown so it can be used without reading the documentation.
+let switcherPaletteKeyHints = "↑↓ select · ↩ open · ⌘1–9 jump · esc close"
 
 struct SwitcherPaletteItem: Identifiable {
     let id: UInt32
@@ -423,7 +426,17 @@ struct SwitcherPaletteView: View {
                     if let id { proxy.scrollTo(id, anchor: nil) }
                 }
             }
-            .frame(height: switcherPaletteMaxHeight - 44)
+            .frame(height: switcherPaletteMaxHeight - 44 - switcherPaletteFooterHeight)
+
+            Divider()
+
+            Text(switcherPaletteKeyHints)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity)
+                .frame(height: switcherPaletteFooterHeight - 1)
+                .accessibilityLabel("Up and down arrows select, Return opens, Command 1 to 9 jumps to a result, Escape closes")
         }
         .frame(width: switcherPaletteWidth)
         .background {

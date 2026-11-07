@@ -95,8 +95,6 @@ struct ShortcutBehaviorSettingsView: View {
             }
 
             masterSettingsSection
-            SettingsSection("Hover bar") {
-            }
             SettingsSection("Pointer focus") {
                 SettingsToggle(.focusFollowsMouse, isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
@@ -112,6 +110,11 @@ struct ShortcutBehaviorSettingsView: View {
                     persistConfig(section: "follow-app-activation", key: "exclude-apps", value: tomlCommaSeparatedStringArray(followAppActivationExcluded))
                 }
                 .disabled(!followAppActivation)
+            }
+            SettingsSection("Mouse and trackpad") {
+                ForEach(windowMouseGestures(shakeEnabled: config.enableShakeToToggleTiling, doubleSided: doubleSidedWindows), id: \.gesture) { item in
+                    LabeledContent(item.gesture) { Text(item.effect).multilineTextAlignment(.trailing) }
+                }
             }
             SettingsSection("Window tabs") {
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
@@ -299,4 +302,23 @@ private struct SettingsLayoutPreviews: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
     }
+}
+
+/// The pointer and trackpad gestures WinMuxX responds to, listed on Settings → Windows.
+/// They have no controls of their own, so they were only discoverable from the README.
+func windowMouseGestures(shakeEnabled: Bool, doubleSided: Bool) -> [(gesture: String, effect: String)] {
+    var gestures: [(gesture: String, effect: String)] = [
+        ("Drag a window onto another's middle", "Swap the two windows"),
+        ("Drag onto another window's side", "Place it beside that window"),
+        ("Drag onto another window's top strip", "Add it to that window's tabs"),
+        ("Drag a tab out of its strip", "Take the window out of the group"),
+        ("Drag a tiled window's edge", "Resize it and its neighbours"),
+        ("Drag a window onto a sidebar workspace", "Move it to that workspace"),
+        ("Rest the pointer on a tab group's top edge", "Open the hover bar"),
+        ("Three-finger swipe left or right", "Switch workspace, when Workspace swipes is on"),
+        ("Three-finger swipe up", "Open the workspace overview, with Mission Control on three fingers"),
+    ]
+    if doubleSided { gestures.insert(("Option-click a two-window group", "Flip to the other window"), at: 6) }
+    if shakeEnabled { gestures.insert(("Shake a window while dragging it", "Toggle floating and tiling"), at: 6) }
+    return gestures
 }

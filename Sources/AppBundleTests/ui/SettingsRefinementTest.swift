@@ -92,6 +92,14 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         XCTAssertFalse(isSettingsFindShortcut([], "f"))
     }
 
+    func testGestureListShowsOptionalGesturesOnlyWhenEnabled() {
+        let minimal = windowMouseGestures(shakeEnabled: false, doubleSided: false).map(\.gesture)
+        let full = windowMouseGestures(shakeEnabled: true, doubleSided: true).map(\.gesture)
+        XCTAssertFalse(minimal.contains { $0.hasPrefix("Shake") || $0.hasPrefix("Option-click") })
+        XCTAssertEqual(full.count, minimal.count + 2)
+        XCTAssertEqual(Set(full).count, full.count, "Gestures are the list's identity")
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })
