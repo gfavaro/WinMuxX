@@ -225,6 +225,14 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             titleRule.isAlternate = true
             titleRule.keyEquivalentModifierMask = .option
             menu.addItem(titleRule)
+            // A minimum learned for the app, which layout and Tabbed splits keep to, can be relearned
+            // once the app allows smaller windows.
+            let learned = target.window.minimumLayoutSize
+            let minimum = learned != .zero ? learned : PersistedAppMinimums.shared.size(for: target.bundleId) ?? .zero
+            if minimum != .zero {
+                let size = [minimum.width, minimum.height].filter { $0 > 0 }.map { "\(Int($0))" }.joined(separator: " × ")
+                menu.addItem(callbackItem("Forget Minimum Size of “\(appName)” (\(size) pt)", #selector(forgetAppMinimum)))
+            }
         }
         addCommand("No Peek", script: "no-peek", to: menu, requiresWindow: false)?.state = InactiveWindowDimmer.shared.noPeek ? .on : .off
         menu.addItem(configToggleItem("Borders", isOn: config.windowBorders.enabled, #selector(toggleBorders)))
@@ -404,6 +412,13 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         NSApp.orderFrontStandardAboutPanel(options: [.credits: aboutPanelCredits()])
     }
     @objc private func alwaysFloatApp() { createQuickFloatingRule(match: .application) }
+    @objc private func forgetAppMinimum() {
+        guard let target = capturedRuleTarget else { return }
+        PersistedAppMinimums.shared.forget(target.bundleId)
+        // A minimum learned this session but never saved is the window's own.
+        target.window.resetLearnedMinimum()
+        scheduleRefreshSession(.globalObserver("forgetAppMinimum"), optimisticallyPreLayoutWorkspaces: true)
+    }
     @objc private func floatThisWindow() { createQuickFloatingRule(match: nil) }
 
     private func createQuickFloatingRule(match requestedMatch: QuickFloatingRuleMatch?) {
