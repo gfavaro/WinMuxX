@@ -70,22 +70,6 @@ func moveTabToNewGroupFromTabStrip(_ windowId: UInt32, side: CardinalDirection) 
     editTabbedGroupsFromTabStrip(windowId) { workspace, group in workspace.moveTabbedTabToNewGroup(windowId, beside: group, on: side) }
 }
 
-/// Moves a tab of a Tabbed workspace into the tab group on `direction`'s side of its own.
-@MainActor
-func moveTabToNeighborGroupFromTabStrip(_ windowId: UInt32, _ direction: CardinalDirection) {
-    editTabbedGroupsFromTabStrip(windowId) { workspace, group in
-        workspace.tabbedGroup(beside: group, direction).map { workspace.moveTabbedTab(windowId, into: $0) } ?? false
-    }
-}
-
-/// Moves every tab of the tab's group into the group on `direction`'s side.
-@MainActor
-func mergeTabGroupFromTabStrip(_ windowId: UInt32, _ direction: CardinalDirection) {
-    editTabbedGroupsFromTabStrip(windowId) { workspace, group in
-        workspace.tabbedGroup(beside: group, direction).map { workspace.mergeTabbedGroup(group, into: $0) } ?? false
-    }
-}
-
 /// Gathers every tab group of the tab's workspace into the tab's own.
 @MainActor
 func mergeAllTabGroupsFromTabStrip(_ windowId: UInt32) {
@@ -104,25 +88,6 @@ private func editTabbedGroupsFromTabStrip(_ windowId: UInt32, _ edit: @escaping 
     }
 }
 
-/// The sides of a tab's group where another group lies, for the bar's menus.
-@MainActor
-func tabbedGroupNeighborSides(of windowId: UInt32) -> [CardinalDirection] {
-    guard let workspace = Window.get(byId: windowId)?.nodeWorkspace, workspace.arrangement == .tabbed,
-          let group = workspace.tabbedGroup(containing: windowId) else { return [] }
-    return [.left, .right, .up, .down].filter { workspace.tabbedGroup(beside: group, $0) != nil }
-}
-
-extension CardinalDirection {
-    /// Names the group on that side in menu items: "Merge With Group on the Left".
-    var tabbedGroupSideTitle: String {
-        switch self {
-            case .left: "on the Left"
-            case .right: "on the Right"
-            case .up: "Above"
-            case .down: "Below"
-        }
-    }
-}
 
 /// Strip index a keyboard or VoiceOver move lands on, or nil at either end of the strip.
 func windowTabStripMoveTargetIndex(_ windowId: UInt32, by offset: Int, in tabs: [WindowTabItemViewModel]) -> Int? {

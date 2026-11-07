@@ -465,6 +465,16 @@ extension WindowTabStripView {
         .onHover { hovering in
             updateHoveredTab(tab.windowId, hovering: hovering)
         }
+        // In a bar showing folded groups, a thin line marks where each group's tabs begin.
+        .overlay(alignment: .leading) {
+            if strip.groupStartWindowIds.contains(tab.windowId) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.25))
+                    .frame(width: 1, height: itemHeight * 0.6)
+                    .offset(x: -(windowTabStripTabSpacing / 2) - 0.5)
+                    .allowsHitTesting(false)
+            }
+        }
         .contextMenu {
             Button("Move Tab Left") { moveTab(tab, by: -1) }
                 .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: -1, in: strip.tabs) == nil)
@@ -476,24 +486,15 @@ extension WindowTabStripView {
                     removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
                 }
             } else {
-                // A tab group of a Tabbed workspace: open the tab in a new group beside this one,
-                // or move it to a group beside.
+                // A tab group of a Tabbed workspace: open the tab in a new group beside this one, or
+                // gather every group back into one. Dragging a tab or a group's handle does the rest.
                 Button("Move to New Column") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .right) }
                     .disabled(strip.tabs.count < 2)
                 Button("Move to New Row") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .down) }
                     .disabled(strip.tabs.count < 2)
-                let sides = tabbedGroupNeighborSides(of: tab.windowId)
-                if !sides.isEmpty {
-                    Divider()
-                    ForEach(sides, id: \.self) { side in
-                        Button("Move to Group \(side.tabbedGroupSideTitle)") { moveTabToNeighborGroupFromTabStrip(tab.windowId, side) }
-                    }
-                    Divider()
-                    ForEach(sides, id: \.self) { side in
-                        Button("Merge With Group \(side.tabbedGroupSideTitle)") { mergeTabGroupFromTabStrip(tab.windowId, side) }
-                    }
-                    Button("Merge All Groups") { mergeAllTabGroupsFromTabStrip(tab.windowId) }
-                }
+                Divider()
+                Button("Merge All Groups") { mergeAllTabGroupsFromTabStrip(tab.windowId) }
+                    .disabled(!strip.hasOtherTabGroups)
             }
         }
     }
@@ -515,30 +516,47 @@ extension WindowTabStripView {
 /// The buttons at the end of the focused Tabbed group's bar, each with its title and keys as its
 /// tooltip, as the hover bar shows them.
 struct WorkspaceTabGroupControlsView: View {
-    @SidebarColors var colors
     let controls: [WorkspaceTabGroupControl]
     let windowId: UInt32?
 
     var body: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 2) {
             ForEach(controls) { control in
-                Button {
-                    guard let windowId else { return }
-                    runWorkspaceTabGroupControl(control, windowId: windowId)
-                } label: {
-                    Image(systemName: control.symbol)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(colors.text(opacity: control.isEnabled ? GlassToken.textSecondary : GlassToken.textTertiary))
-                        .frame(width: 24, height: 22)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(!control.isEnabled)
-                .help(control.unavailableReason.map { "\(control.title): \($0)" }
-                    ?? control.shortcutHint.map { "\(control.title)  \($0)" } ?? control.title)
-                .accessibilityLabel(control.title)
+                WorkspaceTabGroupControlButton(control: control, windowId: windowId)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+    }
+}
+
+/// One of those buttons, lit on hover as a resting tab is.
+private struct WorkspaceTabGroupControlButton: View {
+    @SidebarColors var colors
+    let control: WorkspaceTabGroupControl
+    let windowId: UInt32?
+    @State private var isHovered = false
+
+    var body: some View {
+        Button {
+            guard let windowId else { return }
+            runWorkspaceTabGroupControl(control, windowId: windowId)
+        } label: {
+            Image(systemName: control.symbol)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(colors.text(opacity: !control.isEnabled ? GlassToken.textTertiary
+                    : isHovered ? GlassToken.textPrimary : GlassToken.textSecondary))
+                .frame(width: workspaceTabBarControlWidth - 2, height: 22)
+                .background {
+                    RoundedRectangle(cornerRadius: windowTabStripInnerCornerRadius, style: .continuous)
+                        .fill(isHovered && control.isEnabled ? colors.foreground.opacity(GlassToken.fillFaint) : .clear)
+                }
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!control.isEnabled)
+        .onHover { isHovered = $0 }
+        .help(control.unavailableReason.map { "\(control.title): \($0)" }
+            ?? control.shortcutHint.map { "\(control.title)  \($0)" } ?? control.title)
+        .accessibilityLabel(control.title)
     }
 }

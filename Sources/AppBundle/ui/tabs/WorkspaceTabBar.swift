@@ -53,6 +53,8 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
                 groupFrame: area, activeWindowId: active.windowId,
                 activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
                 occludingFloatingWindowFrames: [], shownWindowIds: [active.windowId], headerHeight: barHeight, isWorkspaceTabs: true)
+            strip.groupStartWindowIds = Set(group.foldedGroups.compactMap(\.shownWindowIds.first))
+            strip.hasOtherTabGroups = workspace.tabbedGroups.count > 1
             if let focused = focus.windowOrNil, workspace.tabbedGroup(containing: focused.windowId)?.barGroup === group {
                 strip.groupControls = workspaceTabGroupControls(for: focused)
             }

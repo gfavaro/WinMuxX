@@ -46,8 +46,8 @@ screen with it, as `fullscreen` does; each tooltip gives the keys bound to it. A
 the windows have no room for, side by side or stacked at the sizes they allow, is
 unavailable: the button is greyed out with the reason as its tooltip, `split` reports
 it, and the drop zones on those edges show a no-entry sign and the reason instead.
-Right-click a tab for Move to New Column, Move to New Row, Move to Group on that side,
-Merge With Group on that side, or Merge All Groups. `split horizontal` and `split vertical` open the
+Right-click a tab for Move to New Column, Move to New Row, or Merge All Groups. In a
+bar showing folded groups, a thin line marks where each group's tabs begin. `split horizontal` and `split vertical` open the
 focused tab in a new column or row, and `join-with` moves it into the group on that
 side.
 

@@ -18,6 +18,10 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     var isWorkspaceTabs = false
     /// Buttons at the end of the focused Tabbed group's bar: Split Right, Split Down and Focus.
     var groupControls: [WorkspaceTabGroupControl] = []
+    /// In a Tabbed bar showing folded groups, the first tab of each group after the bar's own.
+    var groupStartWindowIds: Set<UInt32> = []
+    /// Whether the Tabbed workspace has groups besides this bar's, for Merge All Groups.
+    var hasOtherTabGroups = false
 
     var groupFrameIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(groupFrame) }
