@@ -62,7 +62,7 @@ let join_with_help_generated = """
     """
 let layout_help_generated = """
     USAGE: layout [-h|--help] [--window-id <window-id>]
-                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|strip|accordion|horizontal|vertical|auto|tiling|floating)...
+                  (h_tiles|v_tiles|h_tab_group|v_tab_group|tiles|tab-group|strip|horizontal|vertical|auto|tiling|floating)...
        OR: layout [-h|--help] --for-next-detected-window (tiling|floating)
 
     Change the focused window's container, or float/tile the window.

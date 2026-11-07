@@ -76,7 +76,7 @@ struct MoveCommand: Command {
 @discardableResult
 func ensureRootSupportsColumns(_ workspace: Workspace) -> TilingContainer {
     let previousRoot = workspace.rootTilingContainer
-    guard previousRoot.layout == .tabGroup || previousRoot.layout == .stacked else { return previousRoot }
+    guard previousRoot.layout == .tabGroup else { return previousRoot }
     let orientation = previousRoot.orientation
     previousRoot.unbindFromParent()
     let root = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)

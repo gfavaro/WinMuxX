@@ -11,7 +11,6 @@ enum MasterSide: String, CaseIterable {
 struct MasterConfig: ConvenienceCopyable, Equatable {
     var size = 0.6
     var side = MasterSide.left
-    var stackLayout = Layout.tiles
 }
 
 
@@ -23,12 +22,6 @@ func parseMaster(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ errors: 
         },
         "side": Parser(\.side) { raw, trace in
             parseString(raw, trace).flatMap { MasterSide(rawValue: $0).orFailure(.semantic(trace, "Expected left, right, top or bottom")) }
-        },
-        "stack-layout": Parser(\.stackLayout) { raw, trace in
-            parseString(raw, trace).flatMap { value in
-                value.parseLayout().orFailure(.semantic(trace, "Expected tiles or accordion"))
-                    .filter(.semantic(trace, "Expected tiles or accordion")) { $0 == .tiles || $0 == .stacked }
-            }
         },
     ], trace, &errors)
 }

@@ -394,7 +394,7 @@ extension TreeNode {
                         container.orientation == .h
                             ? .h_tiles(container.children.map(\.layoutDescription))
                             : .v_tiles(container.children.map(\.layoutDescription))
-                    case .tabGroup, .stacked:
+                    case .tabGroup:
                         container.orientation == .h
                             ? .h_tab_group(container.children.map(\.layoutDescription))
                             : .v_tab_group(container.children.map(\.layoutDescription))

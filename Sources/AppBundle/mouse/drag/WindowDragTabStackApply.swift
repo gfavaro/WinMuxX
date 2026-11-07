@@ -3,7 +3,7 @@ import Common
 @MainActor
 func dragStackLayout(for targetWindow: Window, defaultLayout: Layout? = nil) -> Layout {
     if let parent = targetWindow.parent as? TilingContainer,
-       parent.layout == .tabGroup || parent.layout == .stacked {
+       parent.layout == .tabGroup {
         return parent.layout
     }
     return defaultLayout ?? .tabGroup
@@ -16,7 +16,7 @@ func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Windo
     let targetRect = layout == .tabGroup
         ? normalizeTabStackSourceWindowFrame(sourceWindow: sourceWindow, targetWindow: targetWindow) : nil
     if let targetParent = targetWindow.parent as? TilingContainer,
-       targetParent.layout == .tabGroup || targetParent.layout == .stacked
+       targetParent.layout == .tabGroup
     {
         appendWindowToExistingStack(
             sourceWindow: sourceWindow,

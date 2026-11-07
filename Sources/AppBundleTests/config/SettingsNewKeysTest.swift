@@ -14,14 +14,13 @@ final class SettingsNewKeysTest: XCTestCase {
 
     func testSettingsWritesForEveryNewKeyParseBack() {
         let config = write("", [
-            ("master", "size", "0.7"), ("master", "side", "'right'"), ("master", "stack-layout", "'accordion'"),
+            ("master", "size", "0.7"), ("master", "side", "'right'"),
             ("dimming", "inactive-windows", "0.25"),
             ("follow-app-activation", "enabled", "false"),
             ("follow-app-activation", "exclude-apps", tomlCommaSeparatedStringArray("com.apple.finder")),
         ])
         XCTAssertEqual(config.master.size, 0.7)
         XCTAssertEqual(config.master.side, .right)
-        XCTAssertEqual(config.master.stackLayout, .stacked)
         XCTAssertEqual(config.dimming.inactiveWindows, 0.25)
         XCTAssertFalse(config.followAppActivation.enabled)
         XCTAssertEqual(config.followAppActivation.excludeApps, ["com.apple.finder"])

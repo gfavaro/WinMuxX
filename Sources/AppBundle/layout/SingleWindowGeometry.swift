@@ -30,7 +30,7 @@ func singleWindowWidthTarget(in workspace: Workspace) -> Window? {
     let ratio = config.singleWindowAspectRatio.getValue(for: monitor)
     guard ratio.isFinite, ratio > 0, monitor.rect.height > 0,
           monitor.rect.width / monitor.rect.height >= 2.3 else { return nil }
-    guard !window.parents.contains(where: { ($0 as? TilingContainer).map { $0.layout == .tabGroup || $0.layout == .stacked } == true }) else { return nil }
+    guard !window.parents.contains(where: { ($0 as? TilingContainer).map { $0.layout == .tabGroup } == true }) else { return nil }
     return window
 }
 

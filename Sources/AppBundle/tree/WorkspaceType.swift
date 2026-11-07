@@ -35,7 +35,6 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         }
     }
     var masterRatio: CGFloat?
-    var masterStackLayout: Layout = .tiles
 
     @MainActor
     private init(_ name: String) {

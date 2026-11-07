@@ -56,7 +56,7 @@
     "orientation": {"enum": ["horizontal", "vertical", "auto"]},
     "commands": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}]},
     "dynamicNumber": {"oneOf": [{"type": "number", "minimum": 0}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}}}]},
-    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}, "stack-layout": {"enum": ["tiles", "accordion"]}}, "additionalProperties": false},
+    "master": {"type": "object", "properties": {"size": {"type": "number", "minimum": 0.1, "maximum": 0.9}, "side": {"enum": ["left", "right", "top", "bottom"]}}, "additionalProperties": false},
     "followAppActivation": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "exclude-apps": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false},
     "dynamicInt": {"oneOf": [{"type": "integer"}, {"type": "array", "items": {"type": "object", "additionalProperties": {"type": "integer"}}}]},
     "gaps": {"type": "object", "properties": {"inner": {"type": "object", "properties": {"horizontal": {"$ref": "#/$defs/dynamicInt"}, "vertical": {"$ref": "#/$defs/dynamicInt"}}, "additionalProperties": false}, "outer": {"type": "object", "properties": {"left": {"$ref": "#/$defs/dynamicInt"}, "right": {"$ref": "#/$defs/dynamicInt"}, "top": {"$ref": "#/$defs/dynamicInt"}, "bottom": {"$ref": "#/$defs/dynamicInt"}}, "additionalProperties": false}}, "additionalProperties": false},

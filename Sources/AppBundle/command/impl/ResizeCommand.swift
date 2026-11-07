@@ -26,7 +26,7 @@ struct ResizeCommand: Command {
             switch parent.layout {
                 case .tiles, .master: return [.tiles(node, parent)]
                 case .dwindle: return node.dwindleResizeTargets().map(WindowResizeCommandTarget.dwindle)
-                case .tabGroup, .stacked: return []
+                case .tabGroup: return []
             }
         } ?? []
         let selected: WindowResizeCommandTarget?

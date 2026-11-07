@@ -14,9 +14,7 @@ longer axis. Closing or moving windows lets the tree rebalance. The
 Master gives one window a larger area and arranges the remaining windows in a
 stack beside it. Choose it for a workspace with `workspace-layout master`; run
 `workspace-layout dwindle` to return to a splitting tree. The
-[master tiles](assets/layouts/master-tiles.svg) and
-[master accordion](assets/layouts/master-accordion.svg) diagrams show the stack
-in each mode. `swap-with-master` exchanges the selected pane with the master.
+[master tiles](assets/layouts/master-tiles.svg) diagram shows the stack. `swap-with-master` exchanges the selected pane with the master.
 `balance-sizes` resets split shares; it does not rebuild the tree. See
 [master settings](archive/DINKY_020_ADOPTION.md#master-layout).
 
@@ -25,11 +23,11 @@ remaining windows form a stack beside it. Two windows share the screen.
 
 ## Container modes and tabs
 
-`layout tiles` places the focused container's children beside one another.
-`layout accordion` gives the selected child the visible area and lets you cycle
-through its neighbours. Run `layout tiles accordion` to cycle these choices.
-In master mode, this applies to the stack. A tab group keeps its windows together;
-see the [tab group diagram](assets/layouts/tabs.svg).
+`layout tiles` places the focused container's children beside one another, and
+`layout tabbed` keeps them together as a tab group showing one at a time; see the
+[tab group diagram](assets/layouts/tabs.svg). Run `layout tiles tabbed` to cycle
+these choices. The accordion layout was removed: `layout accordion` and
+`layout stacked` now give a tab group, so existing bindings keep working.
 
 `layout strip` shows a tab group as a strip instead: its windows sit side by side as
 columns inside the group's tile, in Dwindle or Master. Each column takes just under half
@@ -57,6 +55,6 @@ whole workspace. `layout` changes the focused window's container, or toggles its
 floating state. Layout choices preserve existing nested containers as described
 in the [0.21 migration notes](DINKY_021_ADOPTION.md).
 
-The query value `fixed` describes a tiles, accordion or tab-group root. It does
+The query value `fixed` describes a tiles or tab-group root. It does
 not provide Dinky's reserved-cell fixed grid. See
 [workspace layout commands](DINKY_021_ADOPTION.md#migrating-commands).

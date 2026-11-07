@@ -29,13 +29,6 @@ struct FocusCommand: Command {
                    let neighbor = strip.children.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive {
                     return neighbor.focusWindow()
                 }
-                if target.workspace.usesSpatialFocus, let window,
-                   let (group, index) = window.closestParent(hasChildrenInDirection: direction, withLayout: nil),
-                   group.layout == .stacked,
-                   target.workspace.arrangement == .dwindle || group !== target.workspace.rootTilingContainer,
-                   let neighbor = group.children.getOrNil(atIndex: index + direction.focusOffset)?.findLeafWindowRecursive(snappedTo: direction.opposite) {
-                    return neighbor.focusWindow()
-                }
                 if target.workspace.usesSpatialFocus, let window {
                     if let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction) {
                         return neighbor.focusWindow()

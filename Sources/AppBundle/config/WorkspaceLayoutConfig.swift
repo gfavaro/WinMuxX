@@ -6,7 +6,7 @@ import TOMLKit
 /// layouts these sections accepted before arrangements existed.
 enum WorkspaceLayoutSetting: Equatable {
     case arrangement(WorkspaceLayoutName)
-    /// tiles, accordion or tab-group: the root's own layout under the Dwindle arrangement.
+    /// tiles or tab-group (accordion reads as tab-group): the root's own layout under the Dwindle arrangement.
     case rootLayout(Layout)
 }
 
@@ -72,8 +72,8 @@ private func parseOptionalWorkspaceLayout(_ raw: TOMLValueConvertible, _ trace: 
     parseString(raw, trace).flatMap { value in
         if let arrangement = WorkspaceLayoutName(rawValue: value) { return .success(.arrangement(arrangement)) }
         // Configs written before arrangements existed set the root layout here.
-        if let root = value.parseLayout(), [.tiles, .stacked, .tabGroup].contains(root) { return .success(.rootLayout(root)) }
-        return .failure(.semantic(trace, "Expected dwindle, master, tiles, accordion or tab-group"))
+        if let root = value.parseLayout(), [.tiles, .tabGroup].contains(root) { return .success(.rootLayout(root)) }
+        return .failure(.semantic(trace, "Expected dwindle, master, tiles or tab-group"))
     }
 }
 

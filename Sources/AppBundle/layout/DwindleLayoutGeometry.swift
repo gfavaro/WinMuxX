@@ -16,9 +16,6 @@ indirect enum LayoutMinimumSnapshot {
             }
             let values = children.map { $0.extent(horizontal: horizontal, in: rect, gap: gap) }
             if layout == .tabGroup { return (values.max() ?? 0) + (horizontal ? chrome.width : chrome.height) }
-            if layout == .stacked {
-                return (values.max() ?? 0) + (orientationHorizontal == horizontal && values.count > 1 ? padding * 2 : 0)
-            }
             return orientationHorizontal == horizontal
                 ? values.reduce(0, +) + (horizontal ? gap.width : gap.height) * CGFloat(max(values.count - 1, 0))
                 : values.max() ?? 0

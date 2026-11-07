@@ -25,7 +25,7 @@ changes. It does not move the workspace. Add this root-level configuration:
 layout = 'master'
 
 [workspace.Code.display.'Built-in']
-layout = 'accordion'
+layout = 'tab-group'
 ```
 
 Replace `Code` and `Built-in` with the workspace's internal name and a display

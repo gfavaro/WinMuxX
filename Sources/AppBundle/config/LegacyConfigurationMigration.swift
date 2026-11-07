@@ -59,7 +59,7 @@ func removingRetiredConfigKeys(in text: String) throws -> String {
     // user configuration remains loadable after the parser stops accepting them.
     let retiredPaths: Set<[String]> = [
         ["focus-follows-mouse-dwell"], ["drag-stack-layout"], ["tab-group-padding"],
-        ["master", "ultrawide-mains"], ["window-tabs", "style"], ["hover-bar", "enabled"],
+        ["master", "ultrawide-mains"], ["master", "stack-layout"], ["window-tabs", "style"], ["hover-bar", "enabled"],
         ["workspace-swipe", "reverse-direction"], ["workspace-swipe", "animation-duration-ms"],
         ["workspace-sidebar", "hover-open-delay-ms"], ["workspace-sidebar", "menu-bar-reserve-height"],
         ["workspace-sidebar", "show-status-pills"], ["workspace-sidebar", "project-deletion-action"],

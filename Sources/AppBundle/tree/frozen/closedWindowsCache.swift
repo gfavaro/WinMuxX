@@ -38,7 +38,6 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let preservesTopLevelGroups: Bool?
     let masterGroupIndex: Int?
     let masterRatio: CGFloat?
-    let masterStackLayout: Layout?
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -53,7 +52,6 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         case preservesTopLevelGroups
         case masterGroupIndex
         case masterRatio
-        case masterStackLayout
     }
 
     @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
@@ -66,7 +64,6 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         preservesTopLevelGroups = workspace.preservesTopLevelGroups
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
-        masterStackLayout = workspace.masterStackLayout
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -99,7 +96,6 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         preservesTopLevelGroups = try container.decodeIfPresent(Bool.self, forKey: .preservesTopLevelGroups)
         masterGroupIndex = try container.decodeIfPresent(Int.self, forKey: .masterGroupIndex)
         masterRatio = try container.decodeIfPresent(CGFloat.self, forKey: .masterRatio)
-        masterStackLayout = try container.decodeIfPresent(Layout.self, forKey: .masterStackLayout)
     }
 }
 
@@ -206,7 +202,6 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         workspace.arrangement = frozenWorkspace.arrangement ?? (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle)
         workspace.preservesTopLevelGroups = (frozenWorkspace.preservesTopLevelGroups ?? false) || workspace.arrangement != .dwindle
         workspace.masterRatio = frozenWorkspace.masterRatio
-        workspace.masterStackLayout = frozenWorkspace.masterStackLayout ?? .tiles
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex
@@ -281,7 +276,6 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
     container.isMasterStack = frozenContainer.isMasterStack ?? false
     container.presentsAsStrip = frozenContainer.presentsAsStrip ?? false
     container.masterRatio = frozenContainer.masterRatio
-    container.masterStackLayout = frozenContainer.masterStackLayout
     container.dwindleOrientation = frozenContainer.dwindleOrientation
     for child in frozenContainer.children {
         switch child {
@@ -340,7 +334,6 @@ func migrateLegacyMasterTree(_ workspace: Workspace) {
             group.bind(to: root, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         }
         stack.unbindFromParent()
-        workspace.masterStackLayout = root.masterStackLayout ?? .tiles
     }
     workspace.masterGroupIndex = 0
     root.layout = .dwindle

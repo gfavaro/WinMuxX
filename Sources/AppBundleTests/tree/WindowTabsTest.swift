@@ -38,7 +38,7 @@ func cgWindowBounds(windowNumber: Int) -> CGRect? {
 final class WindowTabsTest: XCTestCase {
     @MainActor
     func testDragStackMakesATabGroupAndKeepsAnExistingGroupLayout() throws {
-        for existing: Layout in [.stacked, .tabGroup] {
+        for existing: Layout in [.tabGroup] {
             setUpWorkspacesForTests()
             let root = Workspace.get(byName: "drag-stack").rootTilingContainer
             let target = TestWindow.new(id: 1, parent: root)

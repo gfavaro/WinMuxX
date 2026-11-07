@@ -17,7 +17,7 @@ extension Workspace {
     @MainActor
     private func preserveAtomicRootAsArrangementGroup() {
         let previousRoot = rootTilingContainer
-        guard previousRoot.layout == .tabGroup || previousRoot.layout == .stacked else { return }
+        guard previousRoot.layout == .tabGroup else { return }
         let orientation = previousRoot.orientation
         previousRoot.unbindFromParent()
         let outer = TilingContainer(parent: self, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)
@@ -84,7 +84,7 @@ extension TreeNode {
     @MainActor
     var topLevelWorkspaceGroup: TreeNode {
         if let workspace = nodeWorkspace,
-           workspace.rootTilingContainer.layout == .tabGroup || workspace.rootTilingContainer.layout == .stacked {
+           workspace.rootTilingContainer.layout == .tabGroup {
             return workspace.rootTilingContainer
         }
         let groups = nodeWorkspace?.arrangementGroupParent
@@ -103,16 +103,16 @@ extension Workspace {
     @MainActor
     var arrangementGroupParent: TilingContainer {
         let root = rootTilingContainer
-        guard arrangement == .master, root.layout != .tabGroup, root.layout != .stacked,
+        guard arrangement == .master, root.layout != .tabGroup,
               let split = root.children.singleOrNil() as? TilingContainer,
-              split.layout != .tabGroup, split.layout != .stacked, split.children.count > 1 else { return root }
+              split.layout != .tabGroup, split.children.count > 1 else { return root }
         return split
     }
 
     @MainActor
     var workspaceLayoutUnits: [TreeNode] {
         let root = arrangementGroupParent
-        let units = root.layout == .tabGroup || root.layout == .stacked ? [root] : root.children
+        let units = root.layout == .tabGroup ? [root] : root.children
         return units
     }
 }

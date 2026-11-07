@@ -16,7 +16,7 @@ final class ConfigUpgradeCompatibilityTest: XCTestCase {
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
         let first = parsed.config.workspaceLayouts["1"]?.defaults
         XCTAssertEqual(first?.layout, .dwindle)
-        XCTAssertEqual(first?.rootLayout, .stacked)
+        XCTAssertEqual(first?.rootLayout, .tabGroup, "Accordion was removed and reads as a tab group")
         XCTAssertEqual(parsed.config.workspaceLayouts["2"]?.defaults.layout, .master)
         XCTAssertNil(parsed.config.workspaceLayouts["2"]?.defaults.rootLayout)
         XCTAssertEqual(parsed.config.workspaceLayouts["3"]?.displays.first?.settings.rootLayout, .tiles)

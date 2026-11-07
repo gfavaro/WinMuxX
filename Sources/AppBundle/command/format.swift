@@ -189,7 +189,6 @@ private func toLayoutString(tc: TilingContainer) -> String {
         case (.tiles, .v): return LayoutCmdArgs.LayoutDescription.v_tiles.rawValue
         case (.dwindle, .h), (.dwindle, .v): return "dwindle"
         case (.master, _): return "master"
-        case (.stacked, _): return LayoutCmdArgs.LayoutDescription.stacked.rawValue
         case (.tabGroup, .h): return LayoutCmdArgs.LayoutDescription.hTabGroup.rawValue
         case (.tabGroup, .v): return LayoutCmdArgs.LayoutDescription.vTabGroup.rawValue
     }

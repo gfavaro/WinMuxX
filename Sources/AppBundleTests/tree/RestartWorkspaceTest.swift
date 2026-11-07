@@ -75,6 +75,16 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertEqual(bytes, fixture)
     }
 
+    func testSavedStateFromBeforeAccordionWasRemovedStillRestores() throws {
+        let url = projectRoot.appendingPathComponent("resources/test-fixtures/restart-envelope-v2.json")
+        var text = try String(contentsOf: url, encoding: .utf8)
+        // Older builds wrote a master stack layout, which could name the accordion.
+        text = text.replacingOccurrences(of: "\"masterGroupIndex\" : 0,", with: "\"masterGroupIndex\" : 0, \"masterStackLayout\" : \"accordion\",")
+        let decoded = try JSONDecoder().decode(PersistedFrozenWorldEnvelope.self, from: Data(text.utf8))
+        XCTAssertEqual(decoded.world.windowIds, [1])
+        XCTAssertEqual(decoded.pending?.first?.remainingWindowIds, [1])
+    }
+
     func testAppLaunchedAfterWorkspaceSelectionKeepsNewPlacementAcrossFurtherNavigation() async throws {
         let oldWorkspace = Workspace.get(byName: "1")
         let old = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)

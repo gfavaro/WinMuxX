@@ -114,7 +114,7 @@ final class WindowWidthTest: WorkspaceTestCase {
         config.workspaceLayouts[workspace.name]?.defaults.fullscreenWidth = 0.6
         workspace.applyConfiguredLayout()
         XCTAssertEqual(root.layout, .dwindle)
-        for layout in [Layout.tiles, .dwindle, .master, .tabGroup, .stacked] {
+        for layout in [Layout.tiles, .dwindle, .master, .tabGroup] {
             root.layout = layout
             try await workspace.layoutWorkspace()
             XCTAssertEqual(workspaceTilingRect(workspace).width,

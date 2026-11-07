@@ -446,15 +446,14 @@ is not ready within 80 ms, the window switches without a delayed animation.
 
 ### Stacked layouts
 
-Stacked windows have three variants: **Tabbed** keeps the current tab strip and
-shows one window at a time; **Strip** (`layout strip`) shows them side by side as
-columns that scroll within the group, see [layouts](docs/LAYOUTS.md#container-modes-and-tabs);
-**Accordion** keeps overlapping windows visible with
-peeking edges, like AeroSpace. Choose either in Settings → Windows for new roots,
-or use `winmuxx layout tabbed accordion` to toggle the focused container.
-`layout tab-group` remains supported. `layout horizontal` and `layout vertical`
-choose the accordion axis; peeking edges use a fixed 30-point spacing.
-Accordion never shows tab strips or uses double-sided windows.
+Stacked windows have two variants: **Tabbed** shows one window at a time, with a
+pill per window on the group's top edge; **Strip** (`layout strip`) shows them side
+by side as columns that scroll within the group, see
+[layouts](docs/LAYOUTS.md#container-modes-and-tabs). Choose Tabbed in Settings →
+Windows for new roots, or use `winmuxx layout tabbed strip` to toggle the focused
+container. `layout tab-group` remains supported. The accordion layout was removed;
+`accordion` and `stacked` in configuration and commands now give a tab group, as an
+imported AeroSpace configuration already did.
 
 ### Tiling and floating
 
@@ -705,8 +704,8 @@ starter config. `--config-path` selects an explicit file. See
 WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
 build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
 
-Dragging a window onto another creates a tab group. Existing accordion or tab groups
-keep their layout; edge drops still split normally.
+Dragging a window onto another creates a tab group. Existing tab groups keep their
+layout; edge drops still split normally.
 
 ### Workspace swipes
 

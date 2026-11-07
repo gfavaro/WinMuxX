@@ -2,7 +2,7 @@
 
 WinMuxX groups work into **projects**, each with its own **workspaces**. A
 workspace contains a tree of tiled windows and containers. Containers arrange
-windows as tiles, an accordion or tabs. Floating windows keep their own position
+windows as tiles or tabs. Floating windows keep their own position
 above tiled windows.
 
 The sidebar shows projects and workspace labels. A label can differ from the

@@ -109,7 +109,7 @@ extension TreeNode {
                         try await container.layoutTiles(point, width: width, height: height, virtual: virtual, context)
                     case .dwindle:
                         try await container.layoutDwindle(point, width: width, height: height, virtual: virtual, context)
-                    case .tabGroup, .stacked:
+                    case .tabGroup:
                         try await container.layoutTabGroup(point, width: width, height: height, virtual: virtual, context)
                 }
             case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
@@ -331,10 +331,7 @@ extension TreeNode {
                 }
                 let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
                 guard !minimums.isEmpty else { return 0 }
-                if container.layout == .tabGroup || container.layout == .stacked {
-                    if container.layout == .stacked {
-                        return (minimums.max() ?? 0) + (container.orientation == axis && minimums.count > 1 ? tabGroupPadding * 2 : 0)
-                    }
+                if container.layout == .tabGroup {
                     let chrome = container.showsWindowTabs
                         ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()
                             : resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0

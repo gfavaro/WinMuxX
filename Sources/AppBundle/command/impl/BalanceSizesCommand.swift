@@ -24,7 +24,7 @@ private func balance(_ parent: TilingContainer) {
             case .tiles: child.setWeight(parent.orientation, 1)
             case .master:
                 child.setWeight(parent.orientation, child === parent.children.first ? CGFloat(config.master.size) : 1 - CGFloat(config.master.size))
-            case .tabGroup, .stacked, .dwindle: break
+            case .tabGroup, .dwindle: break
         }
         if let child = child as? TilingContainer {
             balance(child)

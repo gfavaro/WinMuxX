@@ -11,7 +11,6 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
-    @SettingsDraft("master.stack-layout", load: { config.master.stackLayout }) private var masterStackLayout: Layout
     @SettingsDraft("follow-app-activation.enabled", load: { config.followAppActivation.enabled }) private var followAppActivation: Bool
     @SettingsDraft("follow-app-activation.exclude-apps", load: { config.followAppActivation.excludeApps.joined(separator: ", ") }) private var followAppActivationExcluded: String
     @SettingsDraft("window-tabs.double-sided-windows", load: { config.windowTabs.doubleSidedWindows }) private var doubleSidedWindows: Bool
@@ -45,7 +44,6 @@ struct ShortcutBehaviorSettingsView: View {
                         .init(value: Layout.master, title: "Master", pictogram: .master),
                         .init(value: Layout.tiles, title: "Tiles", pictogram: .tiles),
                         .init(value: Layout.tabGroup, title: "Tabbed", pictogram: .tabbed),
-                        .init(value: Layout.stacked, title: "Accordion", pictogram: .accordion),
                     ],
                     help: "Used for new workspaces. Dwindle splits the focused area for each new window; Master keeps one main window with the others beside it. Selecting Dwindle also updates existing tiled workspaces.") {
                     persistRootString("default-root-container-layout", defaultLayout.rawValue)
@@ -230,10 +228,6 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Top").tag(MasterSide.top)
                 Text("Bottom").tag(MasterSide.bottom)
             } onChange: { persistConfig(section: "master", key: "side", value: "'\(masterSide.rawValue)'") }
-            SettingsPicker("Stack layout", id: "master.stack-layout", selection: $masterStackLayout, help: "How the windows beside the main one share their space.") {
-                Text("Tiles").tag(Layout.tiles)
-                Text("Accordion").tag(Layout.stacked)
-            } onChange: { persistConfig(section: "master", key: "stack-layout", value: "'\(masterStackLayout.rawValue)'") }
         }
     }
 

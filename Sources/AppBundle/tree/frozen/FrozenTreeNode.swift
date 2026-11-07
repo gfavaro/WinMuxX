@@ -13,7 +13,6 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let weight: CGFloat
     let isMasterStack: Bool?
     let masterRatio: CGFloat?
-    let masterStackLayout: Layout?
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
@@ -65,7 +64,6 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         self.children = children
         isMasterStack = container.isMasterStack ? true : nil
         masterRatio = container.masterRatio
-        masterStackLayout = container.masterStackLayout
         layout = container.layout
         orientation = container.orientation
         weight = getWeightOrNil(container) ?? 1

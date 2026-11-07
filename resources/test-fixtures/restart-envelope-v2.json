@@ -29,7 +29,6 @@
 
             ],
             "masterGroupIndex" : 0,
-            "masterStackLayout" : "tiles",
             "monitor" : {
               "displayUUID" : "fixture-display",
               "topLeftCorner" : [
@@ -104,7 +103,6 @@
 
         ],
         "masterGroupIndex" : 0,
-        "masterStackLayout" : "tiles",
         "monitor" : {
           "displayUUID" : "fixture-display",
           "topLeftCorner" : [

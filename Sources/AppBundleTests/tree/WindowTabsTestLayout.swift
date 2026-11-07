@@ -248,56 +248,13 @@ import XCTest
 }
 
 @MainActor extension WindowTabsTest {
-    func testAccordionKeepsAllWindowsVisibleAndSwitchesBackToTabs() async throws {
-        setUpWorkspacesForTests()
-        let workspace = Workspace.get(byName: "accordion")
-        let group = workspace.rootTilingContainer
-        group.layout = .stacked
-        let first = TestWindow.new(id: 1, parent: group)
-        let second = TestWindow.new(id: 2, parent: group)
-        first.markAsMostRecentChild()
-        XCTAssertFalse(group.usesWindowTabBehavior)
-        XCTAssertFalse(group.showsWindowTabs)
-        for orientation in [Orientation.h, .v] {
-            group.changeOrientation(orientation)
-            try await workspace.layoutWorkspace()
-            let a = try XCTUnwrap(first.lastAppliedLayoutPhysicalRect)
-            let b = try XCTUnwrap(second.lastAppliedLayoutPhysicalRect)
-            if orientation == .h {
-                XCTAssertLessThan(a.topLeftX, b.topLeftX)
-                XCTAssertEqual(a.topLeftY, b.topLeftY)
-            } else {
-                XCTAssertLessThan(a.topLeftY, b.topLeftY)
-                XCTAssertEqual(a.topLeftX, b.topLeftX)
-            }
-        }
-        group.layout = .tabGroup
-        try await workspace.layoutWorkspace()
-        XCTAssertTrue(group.showsWindowTabs)
-        XCTAssertNotNil(first.lastAppliedLayoutPhysicalRect)
-        XCTAssertNil(second.lastAppliedLayoutPhysicalRect)
-    }
-}
-
-@MainActor extension WindowTabsTest {
-    func testStackedAliasesAndPersistenceKeepVariantsDistinct() throws {
+    func testAccordionNamesAndSavedStateBecomeTabGroups() throws {
         XCTAssertEqual("tabbed".parseLayout(), .tabGroup)
-        XCTAssertEqual("accordion".parseLayout(), .stacked)
-        XCTAssertEqual("stacked".parseLayout(), .stacked)
-        for layout in [Layout.tabGroup, .stacked] {
-            XCTAssertEqual(try JSONDecoder().decode(Layout.self, from: JSONEncoder().encode(layout)), layout)
-        }
-    }
-
-    func testAccordionDirectionalFocusInsideDwindle() {
-        setUpWorkspacesForTests()
-        let workspace = Workspace.get(byName: "accordion")
-        let root = workspace.rootTilingContainer
-        root.layout = .dwindle
-        let group = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .h, .stacked, index: INDEX_BIND_LAST)
-        let first = TestWindow.new(id: 1, parent: group)
-        let second = TestWindow.new(id: 2, parent: group)
-        XCTAssertTrue(dwindleDirectionalFocusTarget(from: first, direction: .right) === second)
-        XCTAssertTrue(dwindleDirectionalFocusTarget(from: second, direction: .left) === first)
+        XCTAssertEqual("accordion".parseLayout(), .tabGroup, "Configs naming the removed accordion keep loading")
+        XCTAssertEqual("stacked".parseLayout(), .tabGroup)
+        XCTAssertEqual(try JSONDecoder().decode(Layout.self, from: Data(#""accordion""#.utf8)), .tabGroup,
+            "Saved state from before the removal restores as a tab group")
+        XCTAssertEqual(try JSONDecoder().decode(Layout.self, from: JSONEncoder().encode(Layout.tabGroup)), .tabGroup)
+        XCTAssertThrowsError(try JSONDecoder().decode(Layout.self, from: Data(#""diagonal""#.utf8)))
     }
 }

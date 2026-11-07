@@ -40,7 +40,7 @@ extension Workspace {
                     minimumExtents: stack.map { $0.minimumLayoutExtent(along: stackAxis, gaps: gaps, rect: stackRect) },
                     master: true, reversed: false))
                 result += zip(stack, stackFrames).map { node, frame in
-                    WorkspaceGroupFrame(node: node, physical: masterStackLayout == .stacked ? stackRect : frame.physical.layoutRect,
+                    WorkspaceGroupFrame(node: node, physical: frame.physical.layoutRect,
                                         virtual: frame.virtual.layoutRect, stackingIndex: result.count)
                 }
                 return result

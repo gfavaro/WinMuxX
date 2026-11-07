@@ -15,8 +15,9 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         let window = TestWindow.new(id: 28001, parent: root)
         TestWindow.new(id: 28002, parent: root)
         _ = window.focusWindow()
-        for expected: Layout in [.stacked, .tabGroup, .tiles] {
-            let result = try await parseCommand("layout tiles accordion tab-group").cmdOrDie.run(.defaultEnv, .emptyStdin)
+        // `accordion` names the removed accordion layout and now gives a tab group.
+        for expected: Layout in [.tabGroup, .tiles, .tabGroup] {
+            let result = try await parseCommand("layout tiles accordion").cmdOrDie.run(.defaultEnv, .emptyStdin)
             XCTAssertEqual(result.exitCode, 0)
             XCTAssertEqual(focus.workspace.rootTilingContainer.layout, expected)
             XCTAssertTrue(focus.windowOrNil === window)
@@ -59,7 +60,7 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         let tab = TestWindow.new(id: 28101, parent: tabs)
         let otherTab = TestWindow.new(id: 28102, parent: tabs)
         let other = Workspace.get(byName: "other")
-        other.rootTilingContainer.layout = .stacked
+        other.rootTilingContainer.layout = .tabGroup
         let unrelated = TestWindow.new(id: 28103, parent: other.rootTilingContainer)
         _ = unrelated.focusWindow()
         let result = try await run("workspace-layout --window-id \(tab.windowId) master")
@@ -67,7 +68,7 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.arrangement, .master)
         XCTAssertTrue(workspace.rootTilingContainer.children.contains(where: { $0 === tabs }))
         XCTAssertEqual(tabs.children, [tab, otherTab])
-        XCTAssertEqual(other.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(other.rootTilingContainer.layout, .tabGroup)
         XCTAssertEqual(other.rootTilingContainer.children, [unrelated])
         XCTAssertTrue(focus.windowOrNil === unrelated)
         let exit = try await run("workspace-layout --window-id \(first.windowId) dwindle")
@@ -77,7 +78,7 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         XCTAssertTrue(focus.windowOrNil === unrelated)
     }
 
-    func testWorkspaceTogglePreservesManualAccordionStackOnExit() async throws {
+    func testWorkspaceTogglePreservesManualTabbedStackOnExit() async throws {
         let root = focus.workspace.rootTilingContainer
         root.layout = .tiles
         let windows = (0..<3).map { TestWindow.new(id: UInt32(28200 + $0), parent: root) }
@@ -86,13 +87,12 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
         XCTAssertEqual(enter.exitCode, 0)
         let change = try await run("layout accordion")
         XCTAssertEqual(change.exitCode, 0)
-        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .tabGroup)
         XCTAssertEqual(focus.workspace.rootTilingContainer.children, windows)
-        config.master.stackLayout = .tiles
         let exit = try await run("workspace-layout dwindle master")
         XCTAssertEqual(exit.exitCode, 0)
         XCTAssertEqual(focus.workspace.layoutName, "dwindle")
-        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .stacked)
+        XCTAssertEqual(focus.workspace.rootTilingContainer.layout, .tabGroup)
         XCTAssertEqual(focus.workspace.rootTilingContainer.children, windows)
         XCTAssertTrue(focus.windowOrNil === windows[0])
     }

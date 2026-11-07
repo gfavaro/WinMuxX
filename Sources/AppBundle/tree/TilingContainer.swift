@@ -7,7 +7,6 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
     var isMasterStack = false
     var appliedMasterConfig: MasterConfig?
     var masterRatio: CGFloat?
-    var masterStackLayout: Layout?
     /// A tab group shown as a strip: its children sit side by side as columns that scroll
     /// within the group instead of one tab at a time.
     var presentsAsStrip = false
@@ -17,7 +16,6 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
         didSet {
             if oldValue != layout, oldValue == .master || layout == .master {
                 masterRatio = nil
-                masterStackLayout = nil
                 appliedMasterConfig = nil
             }
         }
@@ -195,16 +193,32 @@ extension TilingContainer {
     }
 }
 
-enum Layout: String, Codable {
+enum Layout: String {
     case tiles
     case tabGroup = "tab-group"
     case dwindle
     case master
-    case stacked = "accordion"
+}
+
+/// Saved state from before accordion was removed still says "accordion"; it loads as a tab group.
+extension Layout: Codable {
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        guard let layout = raw.parseLayout() else {
+            throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "Unknown layout \(raw)"))
+        }
+        self = layout
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
 }
 
 extension String {
     func parseLayout() -> Layout? {
-        Layout(rawValue: self == "tabbed" ? "tab-group" : self == "stacked" ? "accordion" : self)
+        // Accordion was removed; configs and commands naming it get a tab group, as AeroSpace import does.
+        Layout(rawValue: ["tabbed", "accordion", "stacked"].contains(self) ? "tab-group" : self)
     }
 }

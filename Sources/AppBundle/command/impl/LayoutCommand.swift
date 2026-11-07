@@ -33,8 +33,6 @@ struct LayoutCommand: Command {
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: nil, window: window)
             case .strip:
                 return changeTilingLayout(io, targetLayout: .tabGroup, targetOrientation: .h, window: window, strip: true)
-            case .stacked:
-                return changeTilingLayout(io, targetLayout: .stacked, targetOrientation: nil, window: window)
             case .tiles:
                 return changeTilingLayout(io, targetLayout: .tiles, targetOrientation: nil, window: window)
             case .auto:
@@ -102,7 +100,6 @@ extension Window {
     @MainActor fileprivate func matchesDescription(_ layout: LayoutCmdArgs.LayoutDescription) -> Bool {
         let layoutParent = parent as? TilingContainer
         return switch layout {
-            case .stacked: layoutParent?.layout == .stacked
             case .tabGroup:   layoutParent.map { $0.layout == .tabGroup && !$0.presentsAsStrip } == true
             case .strip:      layoutParent.map { $0.layout == .tabGroup && $0.presentsAsStrip } == true
             case .tiles:       layoutParent?.layout == .tiles
