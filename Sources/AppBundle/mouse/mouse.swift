@@ -285,19 +285,24 @@ private func hasActivePostDragAxObserverSuppression(for windowId: UInt32) -> Boo
 }
 
 @MainActor
-func shouldIgnoreAxObserverEventForPostDragSuppression(windowId: UInt32?, notif: String) -> Bool {
+func shouldIgnoreAxObserverEventForPostDragSuppression(windowId: UInt32?, notif: String,
+                                                       liveFrame: (UInt32) -> CGRect? = windowServerFrame) -> Bool {
     guard notif == kAXMovedNotification as String || notif == kAXResizedNotification as String else { return false }
     guard !isLeftMouseButtonDown else { return false }
-    if hasActiveGlobalPostDragAxObserverSuppression() {
-        debugLog(.focus, "axObserver.suppressed.global notif=\(notif) window=\(String(describing: windowId))")
-        return true
+    let global = hasActiveGlobalPostDragAxObserverSuppression()
+    guard global || windowId.map(hasActivePostDragAxObserverSuppression(for:)) == true else { return false }
+    // Within the window after a drop, only our own settling is ignored: an event that leaves the
+    // window somewhere else than where WinMuxX put it is the app's own change, and counts.
+    // Where WinMuxX last measured it and where layout last put it: right after a drop either may
+    // lag the other, so matching one is ours.
+    if let windowId, let window = Window.get(byId: windowId),
+       case let ours = [window.lastKnownActualRect, window.lastAppliedLayoutPhysicalRect].compactMap({ $0 }), !ours.isEmpty,
+       let frame = liveFrame(windowId), !ours.contains(where: { windowRestsOnTile(frame, tile: $0) }) {
+        debugLog(.focus, "axObserver.postDrag.appChange window=\(windowId) notif=\(notif) frame=\(frame) ours=\(ours)")
+        return false
     }
-    guard let windowId else { return false }
-    let shouldSuppress = hasActivePostDragAxObserverSuppression(for: windowId)
-    if shouldSuppress {
-        debugLog(.focus, "axObserver.suppressed window=\(windowId) notif=\(notif)")
-    }
-    return shouldSuppress
+    debugLog(.focus, "axObserver.suppressed\(global ? ".global" : "") window=\(String(describing: windowId)) notif=\(notif)")
+    return true
 }
 
 @MainActor

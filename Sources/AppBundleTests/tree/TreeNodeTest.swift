@@ -532,6 +532,23 @@ final class TreeNodeTest: XCTestCase {
         XCTAssertEqual(restorableWorkspaces([emptyWorkspace, occupiedWorkspace]), [occupiedWorkspace])
     }
 
+    func testAfterADropOnlyOurOwnSettlingIsIgnored() {
+        let workspace = Workspace.get(byName: "a")
+        let window = TestWindow.new(id: 9101, parent: workspace.rootTilingContainer)
+        let tile = Rect(topLeftX: 100, topLeftY: 50, width: 800, height: 600)
+        window.lastAppliedLayoutPhysicalRect = tile
+        suppressPostDragAxObserverEvents(for: [window.windowId])
+        let moved = kAXMovedNotification as String
+        XCTAssertTrue(shouldIgnoreAxObserverEventForPostDragSuppression(windowId: window.windowId, notif: moved,
+            liveFrame: { _ in CGRect(x: 100, y: 50, width: 800, height: 600) }), "Our own settling on the tile is ignored")
+        XCTAssertFalse(shouldIgnoreAxObserverEventForPostDragSuppression(windowId: window.windowId, notif: moved,
+            liveFrame: { _ in CGRect(x: 400, y: 300, width: 500, height: 400) }), "The app moving it elsewhere counts")
+        window.lastAppliedLayoutPhysicalRect = nil
+        XCTAssertTrue(shouldIgnoreAxObserverEventForPostDragSuppression(windowId: window.windowId, notif: moved,
+            liveFrame: { _ in CGRect(x: 400, y: 300, width: 500, height: 400) }), "Without a record of ours, it is ignored as before")
+        XCTAssertFalse(shouldIgnoreAxObserverEventForPostDragSuppression(windowId: 9102, notif: moved), "Other windows are untouched")
+    }
+
     func testAResizeReplacesAMoveWhole() {
         currentMouseManipulation = .move(.init(windowId: 7, subject: .group, detachOrigin: .tabStrip, startedInSidebar: true))
         beginMouseResizeManipulation(windowId: 8)
