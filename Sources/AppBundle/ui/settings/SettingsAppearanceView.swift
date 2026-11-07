@@ -123,6 +123,8 @@ struct ShortcutAppearanceSettingsView: View {
                 }
             }
             SettingsSection("Window borders") {
+                SettingsBorderPreview(enabled: bordersEnabled, width: borderWidth, activeColor: activeBorderColor,
+                    inactiveColor: inactiveBorderColor, order: borderOrder, dimPercent: dimInactive)
                 SettingsToggle(.bordersEnabled, isOn: $bordersEnabled, help: "Draw a border around each visible managed window.") {
                     persist("borders", "enabled", bordersEnabled ? "true" : "false")
                 }

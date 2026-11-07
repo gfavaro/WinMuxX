@@ -110,6 +110,16 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         }
     }
 
+    func testPreviewCaptionsDescribeTheCurrentBorderAndDimming() {
+        XCTAssertEqual(settingsBorderPreviewCaption(enabled: true, width: 4, order: .below, dimPercent: 0),
+            "4-point border drawn behind the window, so only the outer part shows.")
+        XCTAssertEqual(settingsBorderPreviewCaption(enabled: true, width: 2.5, order: .above, dimPercent: 20),
+            "2.5-point border drawn over the window's edge. Other windows are dimmed by 20%.")
+        XCTAssertEqual(settingsBorderPreviewCaption(enabled: false, width: 4, order: .above, dimPercent: 0), "Borders are off.")
+        XCTAssertNotNil(settingsPreviewColor(hex: "#e1e3e480"))
+        XCTAssertNil(settingsPreviewColor(hex: "#e1e3"))
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })
