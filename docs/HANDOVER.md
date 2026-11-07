@@ -1,51 +1,38 @@
 # WinMuxX handover — 2026-11-06
 
-Build 310 is installed and installer-validated. Agreed refactors were committed
-and pushed through 9b7be36f before that build. The subsequent UI-03 tray separator
-cleanup is described below; build 310 does not include that cleanup.
+Build 312 is built from main but not installed: the installer stopped because the
+Mac was locked (`.build/install-312.json`, `blocked_locked`). Build 311 is installed.
+Install 312 with `python3 script/install_fork.py --install --app .release/WinMuxX.app
+--report .build/install-312.json` once the session is unlocked.
 
-## Implemented work
+## Since build 310
 
-Tray navigation uses typed section references; Settings hides its icon on macOS 27.
-Settings search includes Configuration fallbacks, clears stale navigation targets,
-and scrolls when the target's layout anchor is ready. Sidebar Move to Display
-resolves a captured display UUID at execution and reports unavailable targets.
+- UI-03: tray separators are normalized after section extraction (77a8270c).
+- UI-07: Settings search uses shared descriptors; rendered coverage checks each
+  descriptor exists on its declared page (889788c1).
+- UI-09: the Window-menu Settings entry goes through requestWindowOpen, like the
+  tray (889788c1). Natively validated on build 311: open, close and reopen work.
+- UI-08 fix: control results are selectable sidebar rows and Return in the search
+  field opens the first result. Unit-tested; the native check is pending (build 312).
 
-The agreed refactors cover release Python/schema setup, unused minimum-observation
-code removal, pure parking geometry, redundant viewport initialization removal,
-paired restart state, paired overview presentation entries and installer polling
-observations separated from validation policy. Read REFACTOR_IMPLEMENTATION.md for
-rationale and REFACTOR_AGREEMENT.md for deferred scope. The audit is targeted,
-not a completed line-by-line correctness review of every file.
+## Next steps
 
-UI-03 normalizes leading, adjacent and trailing separators recursively after menu
-assembly. Commands retain their identity, ordering, shortcuts and payloads. The
-real-menu regression failed against the old implementation before the fix.
+1. Install build 312 and check Settings search with the keyboard only: type a
+   query, arrow/Tab through control results and pages, Return in the search field,
+   and confirm focus lands on the destination control.
+2. Finish UI-08's remaining checks: VoiceOver announcement, Increase Contrast and
+   Reduce Motion. Then tick UI-08 in REVIEW_QUEUE.md.
+3. Choosing the already-selected control row by clicking does not re-scroll (List
+   selection does not change); Return re-scrolls. Decide whether that matters.
 
 ## Verification
 
-Before build 310, make check passed 1,504 Swift tests and Python checks; the focused
-installer suite passed 21 tests. Installation report: .build/install-310.json.
-Four surviving windows retained workspace assignments and identical raw layout
-trees across restart. Native overview open/close, Settings cold/repeated highlighted
-jumps, navigation away/back and Configuration fallback passed without config edits.
+make check passed 1,510 Swift tests and all Python checks with the UI-08 fix.
+Only the built-in display was connected; multi-display behavior remains untested.
 
-UI-03 logs: .build/separator-before.log reproduces the original defect;
-.build/separator-final-check.log holds the final full gate. The first new synthetic
-fixture incorrectly assigned a shortcut to a submenu owner; AppKit clears it, so
-that fixture was corrected to keep the command and submenu owner separate.
+## Limitations
 
-## Remaining queue and limitations
-
-Read REVIEW_QUEUE.md. UI-07 (shared search metadata) and UI-08 (keyboard/VoiceOver
-and accessibility validation) remain open. UI-09 records that the Window-menu
-Settings entry closes immediately, while opening Settings from the tray works.
-Trace launch suppression/open-request semantics before fixing it.
-
-Only the built-in display was connected. Physical workspace movement, topology
-changes and multi-display overview behavior remain untested. No release tag was
-pushed. Preserve unrelated untracked .claude/ contents. Follow CONTRIBUTING,
-HACKING, TESTING and FORK for checks, direct main commits and installation.
-
-Final UI-03 gate: make check passed 1,506 Swift tests with zero failures and all
-Python checks. git diff --check passed. Installed build 310 predates UI-03.
+Read REVIEW_QUEUE.md for the open queue, REFACTOR_IMPLEMENTATION.md and
+REFACTOR_AGREEMENT.md for refactor scope. Preserve unrelated untracked .claude/
+contents. Follow CONTRIBUTING, HACKING, TESTING and FORK for checks, direct main
+commits and installation.

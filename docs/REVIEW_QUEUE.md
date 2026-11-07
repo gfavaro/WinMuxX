@@ -183,3 +183,16 @@ window because isWindowShown stayed false. An explicit Window-menu command now
 uses requestWindowOpen, matching the tray. The deferred launch close also rechecks
 the request counter, protecting a later explicit request from that queued close.
 Native validation of the new build is recorded separately below.
+
+UI-09 native check (build 311): Settings opened from the Window menu, closed and
+reopened with its content each time. Launch suppression was not retested on a cold
+start.
+
+UI-08 keyboard fix (build 312, not yet natively validated): the build 311 check
+showed Tab and arrow keys skipping direct control results and Return in the search
+field doing nothing. Control results were plain Buttons beside the page links. Every
+sidebar row is now a NavigationLink on one `SettingsSidebarSelection`, so control
+results take part in List selection, and Return opens the first control result or
+else the first page. Choosing a control again issues a fresh scroll request. Still
+pending: native keyboard navigation and Return, focus after jumping, VoiceOver
+announcement, Increase Contrast and Reduce Motion.

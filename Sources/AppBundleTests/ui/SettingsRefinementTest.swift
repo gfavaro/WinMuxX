@@ -75,6 +75,14 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         XCTAssertEqual(model.openRequestId, 2)
     }
 
+    func testReturnOpensTheFirstControlResultThenTheFirstPage() {
+        let controls = settingsControlSearchResults("login")
+        let pages = settingsPageSearchResults("login", pages: SettingsSidebarItem.allCases)
+        XCTAssertEqual(settingsSearchSubmitSelection(controls: controls, pages: pages), controls.first.map { .control($0) })
+        XCTAssertEqual(settingsSearchSubmitSelection(controls: [], pages: [.displays, .general]), .page(.displays))
+        XCTAssertNil(settingsSearchSubmitSelection(controls: [], pages: []))
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })

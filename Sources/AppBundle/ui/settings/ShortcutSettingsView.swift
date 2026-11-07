@@ -149,6 +149,7 @@ struct ShortcutSettingsView: View {
     @State private var shortcutSearch = ""
     @State private var settingsSearch = ""
     @State private var searchTarget: SettingsSearchDestination?
+    @State private var selectedControl: SettingsControl?
     @State private var showsAdvanced = false
 
     private var selectedItem: SettingsSidebarItem? {
@@ -156,11 +157,24 @@ struct ShortcutSettingsView: View {
         nonmutating set {
             guard let newValue else { return }
             searchTarget = nil
+            selectedControl = nil
             storedPage = newValue.rawValue
         }
     }
-    private var selection: Binding<SettingsSidebarItem?> {
-        Binding(get: { selectedItem }, set: { selectedItem = $0 })
+    private var selection: Binding<SettingsSidebarSelection?> {
+        Binding(get: { selectedControl.map { .control($0) } ?? selectedItem.map { .page($0) } }, set: { select($0) })
+    }
+
+    /// Choosing a control result again issues a fresh request, so it scrolls back to the control.
+    private func select(_ selection: SettingsSidebarSelection?) {
+        switch selection {
+            case .page(let page): selectedItem = page
+            case .control(let control):
+                selectedItem = control.page
+                searchTarget = SettingsSearchDestination(id: control.id)
+                selectedControl = control
+            case nil: break
+        }
     }
 
     private let sidebarItems: [SettingsSidebarItem] = [.general, .workspaces, .displays, .windows, .sidebar, .appearance, .shortcuts, .automation, .configuration]
@@ -175,34 +189,31 @@ struct ShortcutSettingsView: View {
                 if hasSearchQuery {
                     Section("Settings") {
                         ForEach(controlResults) { result in
-                            Button {
-                                selectedItem = result.page
-                                searchTarget = SettingsSearchDestination(id: result.id)
-                            } label: {
+                            NavigationLink(value: SettingsSidebarSelection.control(result)) {
                                 VStack(alignment: .leading) {
                                     Text(result.title)
                                     Text(result.page.label).font(.caption).foregroundStyle(.secondary)
                                 }
                             }
-                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(result.title), \(result.page.label)")
                         }
                     }
                 }
                 Section("Everyday") {
                     ForEach(matchingPages.filter { !$0.isAdvanced }) { item in
-                        NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                        NavigationLink(value: SettingsSidebarSelection.page(item)) { Label(item.label, systemImage: item.icon) }
                     }
                 }
                 if !hasSearchQuery {
                     DisclosureGroup("Advanced", isExpanded: $showsAdvanced) {
                         ForEach(sidebarItems.filter(\.isAdvanced)) { item in
-                            NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                            NavigationLink(value: SettingsSidebarSelection.page(item)) { Label(item.label, systemImage: item.icon) }
                         }
                     }
                 } else {
                     Section("Advanced") {
                         ForEach(matchingPages.filter(\.isAdvanced)) { item in
-                            NavigationLink(value: item) { Label(item.label, systemImage: item.icon) }
+                            NavigationLink(value: SettingsSidebarSelection.page(item)) { Label(item.label, systemImage: item.icon) }
                         }
                     }
                     if matchingPages.isEmpty && controlResults.isEmpty {
@@ -211,6 +222,7 @@ struct ShortcutSettingsView: View {
                 }
             }
             .searchable(text: $settingsSearch, placement: .sidebar, prompt: "Find settings")
+            .onSubmit(of: .search) { select(settingsSearchSubmitSelection(controls: controlResults, pages: matchingPages)) }
             .onAppear { showsAdvanced = selectedItem?.isAdvanced == true }
             .onChange(of: storedPage) { _ in
                 if selectedItem?.isAdvanced == true { showsAdvanced = true }
@@ -248,7 +260,7 @@ struct ShortcutSettingsView: View {
             }
 
             .environment(\.settingsSearchTarget, searchTarget)
-            .onChange(of: settingsSearch) { _ in searchTarget = nil }
+            .onChange(of: settingsSearch) { _ in searchTarget = nil; selectedControl = nil }
             .navigationTitle(selectedItem?.label ?? "")
         }
     }

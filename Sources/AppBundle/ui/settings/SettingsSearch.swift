@@ -5,6 +5,19 @@ struct SettingsSearchDestination: Equatable {
     let request = UUID()
 }
 
+/// One selection for every sidebar row. Control results used to be plain buttons beside the
+/// page links, so arrow keys and Tab skipped them and Return in the search field did nothing.
+enum SettingsSidebarSelection: Hashable {
+    case page(SettingsSidebarItem)
+    case control(SettingsControl)
+}
+
+/// What Return in the search field opens: the first control result, otherwise the first page.
+func settingsSearchSubmitSelection(controls: [SettingsControl], pages: [SettingsSidebarItem]) -> SettingsSidebarSelection? {
+    if let control = controls.first { return .control(control) }
+    return pages.first.map { .page($0) }
+}
+
 /// Emitted by the requested field during SwiftUI's layout preference pass.
 struct SettingsSearchReadyKey: PreferenceKey {
     static let defaultValue: SettingsSearchDestination? = nil
