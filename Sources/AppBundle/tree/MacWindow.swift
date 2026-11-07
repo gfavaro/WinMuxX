@@ -80,6 +80,7 @@ final class MacWindow: Window {
                 ? (rect?.center.monitorApproximation ?? mainMonitor).activeWorkspace
                 : creationWorkspace ?? focus.workspace,
             window: nil,
+            newlyOpened: !isStartup,
         )
 
         // atomic synchronous section

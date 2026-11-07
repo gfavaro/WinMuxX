@@ -2,7 +2,8 @@ import AppKit
 import Common
 
 @MainActor
-func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?) async throws -> BindingData {
+func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?,
+                                          newlyOpened: Bool = false) async throws -> BindingData {
     let parent = window?.parent
     let windowLevel = getWindowLevel(for: windowId)
     let type = try await macApp.getAxUiElementWindowType(windowId, windowLevel)
@@ -10,29 +11,33 @@ func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _
     if let window {
         guard window.parent === parent, Window.get(byId: windowId) === window else { throw CancellationError() }
     }
-    return bindingDataForNewWindow(type: type, workspace: workspace, window: window)
+    return bindingDataForNewWindow(type: type, workspace: workspace, window: window,
+        newlyOpenedBundleId: newlyOpened ? .some(macApp.rawAppBundleId) : nil)
 }
 
 @MainActor
-func bindingDataForNewWindow(type: AxUiElementWindowType, workspace: Workspace, window: Window?) -> BindingData {
+/// `newlyOpenedBundleId` is set only for a window that just opened (its app's bundle ID, which
+/// may itself be nil). Explicit moves and tiling commands leave it nil and are never redirected.
+func bindingDataForNewWindow(type: AxUiElementWindowType, workspace: Workspace, window: Window?,
+                             newlyOpenedBundleId: String?? = nil) -> BindingData {
     switch type {
         case .popup: BindingData(parent: macosPopupWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .dialog: BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        case .window: bindingDataForNewRegularWindow(workspace, window: window)
+        case .window: bindingDataForNewRegularWindow(workspace, window: window, newlyOpenedBundleId: newlyOpenedBundleId)
     }
 }
 
 @MainActor
-func bindingDataForNewRegularWindow(_ workspace: Workspace, window: Window?) -> BindingData {
+func bindingDataForNewRegularWindow(_ workspace: Workspace, window: Window?, newlyOpenedBundleId: String?? = nil) -> BindingData {
     guard config.automaticallyTileNewWindows else {
         window?.unbindFromParent()
         return BindingData(parent: workspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
     }
-    return bindingDataForNewTilingWindow(workspace, window: window)
+    return bindingDataForNewTilingWindow(workspace, window: window, newlyOpenedBundleId: newlyOpenedBundleId)
 }
 
 @MainActor
-func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> BindingData {
+func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newlyOpenedBundleId: String?? = nil) -> BindingData {
     window?.unbindFromParent()
     if let tabGroupBinding = autoAddNewWindowToFocusedTabGroupBinding(workspace) {
         return tabGroupBinding
@@ -51,6 +56,10 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?) -> B
     }
     if workspace.rootTilingContainer.layout == .dwindle {
         workspace.materializeDwindleTree()
+        if let newBundleId = newlyOpenedBundleId,
+           let joined = tabGroupBindingInsteadOfSqueezing(workspace: workspace, anchorWindow: mruWindow, newBundleId: newBundleId) {
+            return joined
+        }
         return bindingDataBySplittingDwindleAnchor(workspace: workspace, focusedWindow: mruWindow)
     }
     if tilingParent.layout == .tabGroup {
@@ -136,4 +145,39 @@ private func ensureTabGroupAnchorHasWorkspaceRootContainer(
     previousRoot.unbindFromParent()
     _ = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, tabGroup.orientation.opposite, .tiles, index: 0)
     previousRoot.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
+}
+
+/// Whether halving a tile of `size` along its longer side, as Dwindle does for a new window,
+/// leaves either half narrower than one of these learned minimum sizes.
+func newWindowSplitWouldSqueeze(tile size: CGSize, gap: CGSize, minimums: [CGSize]) -> Bool {
+    let horizontal = size.width >= size.height
+    let half = (horizontal ? size.width - gap.width : size.height - gap.height) / 2
+    return minimums.contains { (horizontal ? $0.width : $0.height) > half }
+}
+
+/// A new window joins the tile's tab group, starting one when needed, instead of splitting a
+/// tile into halves smaller than either app's learned minimum size.
+@MainActor
+private func tabGroupBindingInsteadOfSqueezing(workspace: Workspace, anchorWindow: Window, newBundleId: String?) -> BindingData? {
+    var anchor: TreeNode = anchorWindow
+    while let parent = anchor.parent as? TilingContainer, parent.layout == .tabGroup { anchor = parent }
+    guard let splitRect = anchor.lastAppliedLayoutPhysicalRect ?? anchor.lastAppliedLayoutVirtualRect else { return nil }
+    let minimums = [anchorWindow.app.rawAppBundleId, newBundleId].compactMap { PersistedAppMinimums.shared.size(for: $0) }
+    let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+    let gap = CGSize(width: CGFloat(gaps.inner.horizontal.toDouble()), height: CGFloat(gaps.inner.vertical.toDouble()))
+    guard newWindowSplitWouldSqueeze(tile: CGSize(width: splitRect.width, height: splitRect.height), gap: gap, minimums: minimums) else { return nil }
+    if let group = anchorWindow.parent as? TilingContainer, group.layout == .tabGroup {
+        return BindingData(parent: group, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    }
+    // Keep the surrounding Dwindle split exactly as it was, as splitting an anchor does.
+    let parent = anchorWindow.parent as? TilingContainer
+    let ratios = parent?.dwindleSplitRatios
+    let siblingRatios = parent?.dwindleChildRatios
+    let binding = anchorWindow.unbindFromParent()
+    let group = TilingContainer(parent: binding.parent, adaptiveWeight: binding.adaptiveWeight,
+        (binding.parent as? TilingContainer)?.orientation.opposite ?? .h, .tabGroup, index: binding.index)
+    if let ratios { parent?.dwindleSplitRatios = ratios }
+    if let siblingRatios { parent?.dwindleChildRatios = siblingRatios }
+    anchorWindow.bind(to: group, adaptiveWeight: WEIGHT_AUTO, index: 0)
+    return BindingData(parent: group, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
 }
