@@ -12,14 +12,19 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
-        // In a Tabbed workspace left and right move the tab along the bar, as dragging it does.
-        if target.workspace.arrangement == .tabbed, currentWindow.parent is TilingContainer {
-            let tabs = target.workspace.tabbedUnits
-            guard direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === target.workspace.tabbedUnit(containing: currentWindow) }),
-                  tabs.indices.contains(index + direction.focusOffset) else {
-                return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
+        // In a Tabbed workspace left and right move the tab along its group's bar; past the end,
+        // or up and down, it moves into the tab group on that side.
+        if target.workspace.arrangement == .tabbed { target.workspace.syncTabbedGroups() }
+        if target.workspace.arrangement == .tabbed, currentWindow.parent is TilingContainer,
+           let group = target.workspace.tabbedGroup(containing: currentWindow.windowId) {
+            if direction.orientation == .h, let index = group.shownWindowIds.firstIndex(of: currentWindow.windowId),
+               group.shownWindowIds.indices.contains(index + direction.focusOffset) {
+                return target.workspace.reorderTabbedTab(currentWindow.windowId, toIndex: index + direction.focusOffset)
             }
-            return reorderWorkspaceTab(currentWindow, stripId: ObjectIdentifier(target.workspace), toIndex: index + direction.focusOffset)
+            if let neighbor = target.workspace.tabbedGroup(beside: group, direction) {
+                return target.workspace.moveTabbedTab(currentWindow.windowId, into: neighbor)
+            }
+            return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
         }
         // Inside a strip, left and right reorder its columns; at either end the whole strip moves.
         if direction.orientation == .h, let strip = currentWindow.nearestWindowTabGroup, strip.isWindowStrip,
@@ -247,10 +252,10 @@ extension TilingTreeNodeCases {
 extension Window {
     @MainActor
     var moveNode: TreeNode {
-        // In a Tabbed workspace a window moves as its tab in the bar: a side-by-side tab as one,
-        // any other window alone, even inside a tab group the tree keeps underneath.
-        if parent is TilingContainer, let workspace = nodeWorkspace, workspace.arrangement == .tabbed {
-            return workspace.tabbedUnit(containing: self) ?? self
+        // In a Tabbed workspace a window moves as its own tab, even inside a tab group the tree
+        // keeps underneath: its siblings there are tabs of their own.
+        if parent is TilingContainer, nodeWorkspace?.arrangement == .tabbed {
+            return self
         } else if let parent = parent as? TilingContainer, parent.layout == .tabGroup {
             return parent
         } else {

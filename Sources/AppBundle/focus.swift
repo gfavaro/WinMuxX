@@ -138,6 +138,7 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
     runtime.focus.requested = newFocus.frozen
     if leavingWorkspace { runtime.refresh.workspaceSelectionGeneration &+= 1 }
     newFocus.windowOrNil?.markAsMostRecentChild()
+    newFocus.windowOrNil?.noteTabbedFocus()
     return true
 }
 extension Window {

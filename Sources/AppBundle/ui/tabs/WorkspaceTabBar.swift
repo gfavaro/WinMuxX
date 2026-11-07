@@ -3,6 +3,8 @@ import SwiftUI
 
 /// The tab bar of a Tabbed workspace: one browser-style tab per tiled window, in tree order.
 struct WorkspaceTabBarModel: Equatable, Identifiable {
+    /// The tab group the bar belongs to.
+    let id: ObjectIdentifier
     let workspaceName: String
     /// AppKit screen coordinates of the bar and the window area under it together. The panel
     /// fills all of it behind the window, so the window's rounded corners show the bar's
@@ -13,7 +15,6 @@ struct WorkspaceTabBarModel: Equatable, Identifiable {
     /// The bar itself, drawn by the tab strip view the original WinMux used for tab groups.
     let strip: WindowTabStripViewModel
     var tabs: [WindowTabItemViewModel] { strip.tabs }
-    var id: String { workspaceName }
 }
 
 extension Workspace {
@@ -25,8 +26,8 @@ extension Workspace {
     }
 }
 
-/// The bars for the visible Tabbed workspaces, with the windows each one lists, or nil when the
-/// refresh was cancelled while titles were fetched, so a stale bar is never published.
+/// One bar per tab group of each visible Tabbed workspace, or nil when the refresh was cancelled
+/// while titles were fetched, so a stale bar is never published.
 @MainActor
 func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
     guard TrayMenuModel.shared.isEnabled else { return [] }
@@ -34,33 +35,25 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
     for workspace in Workspace.all where workspace.isVisible && workspace.arrangement == .tabbed
         && !shouldSuppressChromeForFullscreenContent(on: workspace.workspaceMonitor) && !workspace.presentsManagedFullscreen
     {
-        let units = workspace.tabbedUnits
-        let representatives = units.compactMap(\.tabbedRepresentative)
-        guard let activeUnit = workspace.tabbedActiveUnit, let active = activeUnit.tabbedRepresentative,
-              representatives.count == units.count, !units.isEmpty else { continue }
-        var tabs = await makeWindowTabChromeTabs(windows: representatives, activeWindowId: active.windowId)
-            .map { $0.legacyTabItem(workspaceName: workspace.name) }
-        // A side-by-side tab names all of its windows.
-        for (index, unit) in units.enumerated() where tabs.indices.contains(index) {
-            guard let split = unit as? TilingContainer else { continue }
-            let names = split.allLeafWindowsRecursive.map { cachedWindowTitle(for: $0) ?? $0.app.name ?? "Window" }
-            let tab = tabs[index]
-            tabs[index] = WindowTabItemViewModel(windowId: tab.windowId, workspaceName: tab.workspaceName, appName: tab.appName,
-                appBundleId: tab.appBundleId, appBundlePath: tab.appBundlePath, title: names.joined(separator: " | "), isActive: tab.isActive)
+        workspace.syncTabbedGroups()
+        for group in workspace.visibleTabbedLayout?.groups ?? [] {
+            let windows = group.shownWindowIds.compactMap { Window.get(byId: $0) }
+            guard let active = group.activeWindow, let frame = group.lastFrame, !windows.isEmpty else { continue }
+            let tabs = await makeWindowTabChromeTabs(windows: windows, activeWindowId: active.windowId)
+                .map { $0.legacyTabItem(workspaceName: workspace.name) }
+            if Task.isCancelled { return nil }
+            guard workspace.isVisible, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen,
+                  workspace.tabbedGroups.contains(where: { $0 === group }) else { continue }
+            let area = frame.toAppKitScreenRect.alignedToBackingPixels()
+            let barHeight = min(resolvedWindowTabBarHeight(), area.height)
+            let strip = WindowTabStripViewModel(id: ObjectIdentifier(group), workspaceName: workspace.name,
+                frame: CGRect(x: area.minX, y: area.maxY - barHeight, width: area.width, height: barHeight),
+                groupFrame: area, activeWindowId: active.windowId,
+                activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
+                occludingFloatingWindowFrames: [], shownWindowIds: [active.windowId], headerHeight: barHeight, isWorkspaceTabs: true)
+            models.append(WorkspaceTabBarModel(id: ObjectIdentifier(group), workspaceName: workspace.name, frame: area,
+                barHeight: barHeight, activeWindowId: active.windowId, strip: strip))
         }
-        let shown = Set(((activeUnit as? TilingContainer)?.allLeafWindowsRecursive ?? [active]).map(\.windowId))
-        if Task.isCancelled { return nil }
-        guard workspace.isVisible, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen else { continue }
-        let rect = workspaceTilingRect(workspace)
-        let frame = rect.toAppKitScreenRect.alignedToBackingPixels()
-        let barHeight = min(resolvedWindowTabBarHeight(), rect.height)
-        let strip = WindowTabStripViewModel(id: ObjectIdentifier(workspace), workspaceName: workspace.name,
-            frame: CGRect(x: frame.minX, y: frame.maxY - barHeight, width: frame.width, height: barHeight),
-            groupFrame: frame, activeWindowId: active.windowId,
-            activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
-            occludingFloatingWindowFrames: [], shownWindowIds: shown, headerHeight: barHeight, isWorkspaceTabs: true)
-        models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: frame, barHeight: barHeight,
-            activeWindowId: active.windowId, strip: strip))
     }
     return models
 }
@@ -68,7 +61,7 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
 @MainActor
 final class WorkspaceTabBarController {
     static let shared = WorkspaceTabBarController()
-    private var panels: [String: WorkspaceTabBarPanel] = [:]
+    private var panels: [ObjectIdentifier: WorkspaceTabBarPanel] = [:]
 
     private init() {}
 

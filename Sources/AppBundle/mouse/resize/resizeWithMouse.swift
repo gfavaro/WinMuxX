@@ -60,6 +60,19 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
     // The actively resized content stays real. Hide all tab chrome, including the active
     // group, so every inactive group can be represented by one uninterrupted glass pane.
     WindowTabStripPanelController.shared.hideChromeDuringMouseInteraction(showFrameOnly: false)
+    if let (workspace, layout) = proposedTabbedMouseResize(window, rect: rect) {
+        guard workspace.isVisible else {
+            WindowResizePreviewPanel.shared.endStableFrame()
+            WindowResizePreviewPanel.shared.hide(reason: "resizePreview.tabbed-hidden")
+            return
+        }
+        WindowResizePreviewPanel.shared.beginStableFrame(workspace.workspaceMonitor.rect.toAppKitScreenRect)
+        currentlyManipulatedWithMouseWindowId = window.windowId
+        setCurrentMouseManipulationKind(.resize)
+        WindowResizePreviewPanel.shared.show(tabbedResizePreviewItems(in: workspace, layout: layout, excluding: window),
+                                             presentation: .resizeOverlay)
+        return
+    }
     guard let workspace = window.nodeWorkspace,
           workspace.isVisible,
           let weightMap = proposedResizeWeightMap(window, rect: rect)
@@ -87,9 +100,53 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
     WindowResizePreviewPanel.shared.show(items, presentation: .resizeOverlay)
 }
 
+/// The tab groups of a Tabbed workspace after dragging `window`'s edges to `rect`: the group is
+/// resized against the one beside each moved edge. Nil outside a Tabbed workspace's groups.
+@MainActor
+func proposedTabbedMouseResize(_ window: Window, rect: Rect) -> (Workspace, TabbedLayout)? {
+    guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, window.parent is TilingContainer,
+          let previous = window.lastAppliedLayoutPhysicalRect, var layout = workspace.tabbedLayout else { return nil }
+    func resize(_ axis: Orientation, by delta: CGFloat, againstNext: Bool) {
+        layout = workspace.tabbedLayout(layout, resizingGroupOf: window, along: axis, by: delta,
+                                        againstNext: againstNext, strictSide: true) ?? layout
+    }
+    if abs(rect.minX - previous.minX) > 1 {
+        resize(.h, by: previous.minX - rect.minX, againstNext: false)
+    } else if abs(rect.maxX - previous.maxX) > 1 {
+        resize(.h, by: rect.maxX - previous.maxX, againstNext: true)
+    }
+    if abs(rect.minY - previous.minY) > 1 {
+        resize(.v, by: previous.minY - rect.minY, againstNext: false)
+    } else if abs(rect.maxY - previous.maxY) > 1 {
+        resize(.v, by: rect.maxY - previous.maxY, againstNext: true)
+    }
+    return (workspace, layout)
+}
+
+/// Each other tab group of the proposed layout, drawn as its shown window over the group's area.
+@MainActor
+func tabbedResizePreviewItems(in workspace: Workspace, layout: TabbedLayout, excluding window: Window) -> [WindowResizePreviewItem] {
+    let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor).inner
+    let frames = workspace.visibleTabbedLayout(layout)?
+        .frames(in: workspaceTilingRect(workspace), gap: CGSize(width: gaps.horizontal, height: gaps.vertical)) ?? []
+    return frames.compactMap { group, frame in
+        guard let shown = group.activeWindow, shown !== window else { return nil }
+        return WindowResizePreviewItem(window: shown, rect: frame)
+    }
+}
+
 @MainActor
 func applyResizeWithMouse(_ window: Window, rect: Rect) {
     syncClosedWindowsCacheToCurrentWorld()
+    // In a Tabbed workspace dragging a window's edge resizes its tab group against the one beside
+    // that edge; the tree kept for other arrangements stays as it was.
+    if let (workspace, layout) = proposedTabbedMouseResize(window, rect: rect) {
+        workspace.tabbedLayout = layout
+        currentlyManipulatedWithMouseWindowId = window.windowId
+        setCurrentMouseManipulationKind(.resize)
+        clearPendingWindowDragIntent()
+        return
+    }
     if floatSingleWindowAfterHeightResize(window, rect: rect) {
         currentlyManipulatedWithMouseWindowId = window.windowId
         setCurrentMouseManipulationKind(.resize)

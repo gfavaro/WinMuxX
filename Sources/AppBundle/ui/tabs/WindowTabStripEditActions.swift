@@ -1,3 +1,4 @@
+import Common
 @MainActor
 func removeWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
@@ -49,43 +50,25 @@ func reorderTabGroupChild(showing window: Window, stripId: ObjectIdentifier, toI
     return false
 }
 
-/// Moves a Tabbed workspace's tab by swapping windows between their places in the tree one step
-/// at a time, so the hidden splits keep their shape and only which window sits where changes.
-/// Returns false when the strip is not that workspace's bar.
+/// Moves a tab along a Tabbed workspace's tab group bar. Returns false when the strip is not
+/// one of those groups.
 @MainActor
 func reorderWorkspaceTab(_ window: Window, stripId: ObjectIdentifier, toIndex targetIndex: Int) -> Bool {
-    guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, ObjectIdentifier(workspace) == stripId else { return false }
-    var tabs = workspace.tabbedUnits
-    guard var index = tabs.firstIndex(where: { $0 === workspace.tabbedUnit(containing: window) }) else { return false }
-    let target = max(0, min(targetIndex, tabs.count - 1))
-    while index != target {
-        let next = index + (target > index ? 1 : -1)
-        swapNodes(tabs[index], tabs[next])
-        tabs.swapAt(index, next)
-        index = next
-    }
-    window.markAsMostRecentChild()
-    return true
+    guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
+          let group = workspace.tabbedGroup(containing: window.windowId), ObjectIdentifier(group) == stripId else { return false }
+    return workspace.reorderTabbedTab(window.windowId, toIndex: targetIndex)
 }
 
+/// Moves a tab of a Tabbed workspace into a new tab group on `side` of its own.
 @MainActor
-func showTabBesideCurrentFromTabStrip(_ windowId: UInt32) {
+func moveTabToNewGroupFromTabStrip(_ windowId: UInt32, side: CardinalDirection) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task {
         try await runLightSession(.menuBarButton, token) {
-            guard let window = Window.get(byId: windowId), showTabbedTabBesideCurrent(window) else { return }
+            guard let window = Window.get(byId: windowId), let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
+                  let group = workspace.tabbedGroup(containing: windowId),
+                  workspace.moveTabbedTabToNewGroup(windowId, beside: group, on: side) else { return }
             _ = window.focusWindow()
-        }
-    }
-}
-
-@MainActor
-func splitTabIntoTabsFromTabStrip(_ windowId: UInt32) {
-    guard let token: RunSessionGuard = .isServerEnabled else { return }
-    Task {
-        try await runLightSession(.menuBarButton, token) {
-            guard let window = Window.get(byId: windowId) else { return }
-            _ = splitTabbedTabIntoTabs(window)
         }
     }
 }

@@ -116,7 +116,7 @@ extension WindowTabStripView {
             )
                 .frame(maxWidth: .infinity)
 
-            // In a Tabbed workspace the handle carries the tab shown, with its side-by-side windows.
+            // In a Tabbed workspace the handle carries the tab shown.
             Color.clear
                 .frame(width: windowTabStripTrailingGroupDragGutterWidth)
                 .frame(maxHeight: .infinity)
@@ -463,11 +463,12 @@ extension WindowTabStripView {
                 Button("Remove Tab From Stack") {
                     removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
                 }
-            } else if !tab.isActive {
-                // Compare two windows: this one joins the tab shown, side by side.
-                Button("Show Beside Current Tab") { showTabBesideCurrentFromTabStrip(tab.windowId) }
-            } else if strip.shownWindowIds.count > 1 {
-                Button("Split Into Tabs") { splitTabIntoTabsFromTabStrip(tab.windowId) }
+            } else {
+                // A tab group of a Tabbed workspace: open the tab in a new group beside this one.
+                Button("Move to New Column") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .right) }
+                    .disabled(strip.tabs.count < 2)
+                Button("Move to New Row") { moveTabToNewGroupFromTabStrip(tab.windowId, side: .down) }
+                    .disabled(strip.tabs.count < 2)
             }
         }
     }

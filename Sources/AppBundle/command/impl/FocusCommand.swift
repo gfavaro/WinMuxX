@@ -23,19 +23,16 @@ struct FocusCommand: Command {
         switch args.target {
             case .direction(let direction):
                 let window = target.windowOrNil
-                // A Tabbed workspace shows one window: left and right step through its tabs in bar
-                // order, before any strip nested in the tree, and wrap within the tab list.
-                if target.workspace.arrangement == .tabbed, let window {
-                    let tabs = target.workspace.tabbedUnits
-                    // Within a side-by-side tab, first move to the window on that side, as placed on screen.
-                    if let split = target.workspace.tabbedUnit(containing: window) as? TilingContainer,
-                       let neighbor = spatialNeighbor(of: window, among: split.allLeafWindowsRecursive, direction) {
-                        return neighbor.focusWindow()
-                    }
-                    if direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === target.workspace.tabbedUnit(containing: window) }) {
-                        if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset)?.tabbedRepresentative { return neighbor.focusWindow() }
+                // In a Tabbed workspace a direction first moves to the tab group on that side, then,
+                // left and right, through the group's own tabs, before any strip nested in the tree.
+                if target.workspace.arrangement == .tabbed { target.workspace.syncTabbedGroups() }
+                if target.workspace.arrangement == .tabbed, let window, let group = target.workspace.tabbedGroup(containing: window.windowId) {
+                    if let neighbor = target.workspace.tabbedGroup(beside: group, direction)?.activeWindow { return neighbor.focusWindow() }
+                    let tabs = group.shownWindowIds
+                    if direction.orientation == .h, let index = tabs.firstIndex(of: window.windowId) {
+                        if let neighbor = tabs.getOrNil(atIndex: index + direction.focusOffset).flatMap({ Window.get(byId: $0) }) { return neighbor.focusWindow() }
                         if args.boundariesAction == .wrapAroundTheWorkspace, tabs.count > 1 {
-                            return (direction.focusOffset > 0 ? tabs.first : tabs.last)?.tabbedRepresentative?.focusWindow() ?? false
+                            return (direction.focusOffset > 0 ? tabs.first : tabs.last).flatMap { Window.get(byId: $0) }?.focusWindow() ?? false
                         }
                     }
                     return hitWorkspaceBoundaries(target, io, args, direction)
@@ -72,10 +69,13 @@ struct FocusCommand: Command {
                     return io.err("Can't find window with DFS index \(dfsIndex)")
                 }
             case .tabIndex(let tabIndex):
-                // In a Tabbed workspace the tabs are the workspace's windows, as its bar lists them.
+                // In a Tabbed workspace the tabs are those of the focused tab group's bar.
                 if target.workspace.arrangement == .tabbed {
-                    guard let window = target.workspace.tabbedUnits.getOrNil(atIndex: Int(tabIndex) - 1)?.tabbedRepresentative else {
-                        return io.err("Can't find tab with index \(tabIndex) in this workspace")
+                    target.workspace.syncTabbedGroups()
+                    let group = target.windowOrNil.flatMap { target.workspace.tabbedGroup(containing: $0.windowId) } ?? target.workspace.tabbedFocusedGroup
+                    guard let window = group?.shownWindowIds.getOrNil(atIndex: Int(tabIndex) - 1)
+                        .flatMap({ Window.get(byId: $0) }) else {
+                        return io.err("Can't find tab with index \(tabIndex) in this tab group")
                     }
                     return window.focusWindow()
                 }
@@ -103,6 +103,7 @@ struct FocusCommand: Command {
                 return windows[targetIndex].focusWindow()
             case .tabRelative(let nextPrev):
                 if target.workspace.arrangement == .tabbed {
+                    target.workspace.syncTabbedGroups()
                     return focusRelativeInWorkspaceTabs(target, args.boundariesAction, nextPrev)
                 }
                 return focusRelativeInCurrentTabGroup(target, args.boundariesAction, nextPrev)
@@ -312,16 +313,15 @@ extension TreeNode {
     }
 }
 
-/// `tab-next` and `tab-prev` in a Tabbed workspace, through the windows its bar lists.
+/// `tab-next` and `tab-prev` in a Tabbed workspace, through the focused tab group's tabs.
 @MainActor
 private func focusRelativeInWorkspaceTabs(
     _ target: LiveFocus,
     _ boundariesAction: FocusCmdArgs.WhenBoundariesCrossed,
     _ nextPrev: TabNextPrev,
 ) -> Bool {
-    let tabs = target.workspace.tabbedUnits
-    guard let window = target.windowOrNil, let unit = target.workspace.tabbedUnit(containing: window),
-          let current = tabs.firstIndex(where: { $0 === unit }) else { return false }
+    guard let window = target.windowOrNil, let tabs = target.workspace.tabbedGroup(containing: window.windowId)?.shownWindowIds,
+          let current = tabs.firstIndex(of: window.windowId) else { return false }
     var index = current + nextPrev.focusOffset
     if !tabs.indices.contains(index) {
         switch boundariesAction {
@@ -331,23 +331,5 @@ private func focusRelativeInWorkspaceTabs(
             case .wrapAroundAllMonitors: return dieT("Must be discarded by args parser")
         }
     }
-    return tabs[index].tabbedRepresentative?.focusWindow() ?? false
-}
-
-/// The nearest of `windows` on `direction`'s side of `window`, overlapping it across that axis,
-/// from their last laid-out frames.
-@MainActor
-func spatialNeighbor(of window: Window, among windows: [Window], _ direction: CardinalDirection) -> Window? {
-    guard let from = window.lastAppliedLayoutPhysicalRect else { return nil }
-    let candidates = windows.compactMap { other -> (Window, CGFloat)? in
-        guard other !== window, let to = other.lastAppliedLayoutPhysicalRect else { return nil }
-        let (gap, overlaps): (CGFloat, Bool) = switch direction {
-            case .right: (to.minX - from.maxX, to.minY < from.maxY && to.maxY > from.minY)
-            case .left: (from.minX - to.maxX, to.minY < from.maxY && to.maxY > from.minY)
-            case .down: (to.minY - from.maxY, to.minX < from.maxX && to.maxX > from.minX)
-            case .up: (from.minY - to.maxY, to.minX < from.maxX && to.maxX > from.minX)
-        }
-        return overlaps && gap > -1 ? (other, gap) : nil
-    }
-    return candidates.min(by: { $0.1 < $1.1 })?.0
+    return Window.get(byId: tabs[index])?.focusWindow() ?? false
 }

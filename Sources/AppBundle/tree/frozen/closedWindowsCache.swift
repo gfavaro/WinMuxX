@@ -38,6 +38,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let preservesTopLevelGroups: Bool?
     let masterGroupIndex: Int?
     let masterRatio: CGFloat?
+    let tabbedLayout: FrozenTabbedLayout?
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -52,6 +53,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         case preservesTopLevelGroups
         case masterGroupIndex
         case masterRatio
+        case tabbedLayout
     }
 
     @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
@@ -64,6 +66,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         preservesTopLevelGroups = workspace.preservesTopLevelGroups
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
+        tabbedLayout = workspace.tabbedLayout.map(FrozenTabbedLayout.init)
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -96,6 +99,8 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         preservesTopLevelGroups = try container.decodeIfPresent(Bool.self, forKey: .preservesTopLevelGroups)
         masterGroupIndex = try container.decodeIfPresent(Int.self, forKey: .masterGroupIndex)
         masterRatio = try container.decodeIfPresent(CGFloat.self, forKey: .masterRatio)
+        // Lenient, like the arrangement: an unreadable group layout restores as one group.
+        tabbedLayout = (try? container.decodeIfPresent(FrozenTabbedLayout.self, forKey: .tabbedLayout)) ?? nil
     }
 }
 
@@ -225,6 +230,9 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
         restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST, windowsById: windowsById)
+        workspace.tabbedLayout = frozenWorkspace.tabbedLayout?.restored(windowsById)
+            ?? migratedTabbedLayout(from: frozenWorkspace.rootTilingNode, windowsById,
+                                    allWindows: workspace.rootTilingContainer.allLeafWindowsRecursive.map(\.windowId))
         workspace.transitionArrangement(to: frozenWorkspace.arrangement ??
             (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle))
         if frozenWorkspace.arrangement == nil, workspace.rootTilingContainer.layout == .master {
@@ -275,7 +283,6 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
 
     container.isMasterStack = frozenContainer.isMasterStack ?? false
     container.presentsAsStrip = frozenContainer.presentsAsStrip ?? false
-    container.isTabbedSplit = frozenContainer.isTabbedSplit ?? false
     container.masterRatio = frozenContainer.masterRatio
     container.dwindleOrientation = frozenContainer.dwindleOrientation
     for child in frozenContainer.children {

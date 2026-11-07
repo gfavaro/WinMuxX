@@ -13,7 +13,10 @@ enum WindowDragIntentKind: Equatable {
 @MainActor
 func isWindowDragIntentKindEnabled(_ kind: WindowDragIntentKind) -> Bool {
     switch kind {
-        case .tabStack, .reorderTab:
+        case .tabStack(let targetWindowId):
+            // A Tabbed workspace's bars show whatever the window tabs setting, and so do their groups.
+            return config.windowTabs.enabled || Window.get(byId: targetWindowId)?.nodeWorkspace?.arrangement == .tabbed
+        case .reorderTab:
             return config.windowTabs.enabled
         case .createWorkspace, .sidebarHover, .detachTab, .stackSplit, .swap, .moveToWorkspace, .moveToWorkspaceZone:
             return true

@@ -1,0 +1,396 @@
+import AppKit
+import Common
+import PrivateApi
+
+/// One tab group of a Tabbed workspace: its tabs in bar order and the window it shows.
+/// Groups refer to windows by ID and leave the window tree untouched, so Dwindle and Master
+/// return to exactly the layout they had.
+@MainActor
+final class TabbedGroup {
+    var windowIds: [UInt32]
+    var activeWindowId: UInt32?
+    /// The group's area from the last layout: tab bar and window together.
+    var lastFrame: Rect?
+
+    init(windowIds: [UInt32], activeWindowId: UInt32? = nil) {
+        self.windowIds = windowIds
+        self.activeWindowId = activeWindowId ?? windowIds.first
+    }
+
+    /// The window shown: the chosen tab, or while its window is briefly missing the first shown
+    /// one, without changing the choice, so the chosen tab returns with its window.
+    var activeWindow: Window? {
+        let shown = shownWindowIds
+        let id = activeWindowId.flatMap { shown.contains($0) ? $0 : nil } ?? shown.first
+        return id.flatMap { Window.get(byId: $0) }
+    }
+
+    /// The tabs its bar shows: windows in the workspace's tiled tree, without any kept only while
+    /// WinMuxX has briefly lost track of them.
+    var shownWindowIds: [UInt32] { windowIds.filter { Window.get(byId: $0)?.parent is TilingContainer } }
+}
+
+/// Groups side by side (columns) or stacked (rows), each sharing the area by its weight.
+@MainActor
+indirect enum TabbedLayout {
+    case group(TabbedGroup)
+    case split(Orientation, [TabbedLayout], [CGFloat])
+
+    var groups: [TabbedGroup] {
+        switch self {
+            case .group(let group): [group]
+            case .split(_, let children, _): children.flatMap(\.groups)
+        }
+    }
+
+    /// Without the groups that hold no windows; a split left with one child becomes that child.
+    func pruned() -> TabbedLayout? { pruned(keeping: { !$0.windowIds.isEmpty }) }
+
+    /// Only the groups `keep` accepts, with splits collapsed to match. The groups themselves are shared.
+    func pruned(keeping keep: (TabbedGroup) -> Bool) -> TabbedLayout? {
+        switch self {
+            case .group(let group): return keep(group) ? self : nil
+            case .split(let orientation, let children, let weights):
+                let kept = zip(children, weights).compactMap { child, weight in child.pruned(keeping: keep).map { ($0, weight) } }
+                if kept.isEmpty { return nil }
+                if kept.count == 1 { return kept[0].0 }
+                return .split(orientation, kept.map(\.0), kept.map(\.1))
+        }
+    }
+
+    /// Puts `newGroup` on `side` of `target`, sharing the target's area.
+    func inserting(_ newGroup: TabbedGroup, beside target: TabbedGroup, on side: CardinalDirection) -> TabbedLayout {
+        switch self {
+            case .group(let group):
+                guard group === target else { return self }
+                let pair: [TabbedLayout] = side == .left || side == .up ? [.group(newGroup), self] : [self, .group(newGroup)]
+                return .split(side.orientation, pair, [1, 1])
+            case .split(let orientation, let children, let weights):
+                // A same-direction split gains a sibling instead of nesting another split.
+                if orientation == side.orientation, let index = children.firstIndex(where: { if case .group(let g) = $0 { g === target } else { false } }) {
+                    var children = children, weights = weights
+                    let at = side == .left || side == .up ? index : index + 1
+                    children.insert(.group(newGroup), at: at)
+                    weights.insert(weights[index], at: at)
+                    return .split(orientation, children, weights)
+                }
+                return .split(orientation, children.map { $0.inserting(newGroup, beside: target, on: side) }, weights)
+        }
+    }
+
+    /// Grows `group` by `delta` points along `axis` at the expense of its neighbour before or after
+    /// it, in the nearest split of that direction. Nil when no split of that direction holds it.
+    /// `strictSide` keeps to the neighbour on that side, leaving an outer boundary to the enclosing
+    /// split, as dragging that edge means; otherwise the other side serves when there is none.
+    func resizing(_ group: TabbedGroup, along axis: Orientation, by delta: CGFloat, againstNext: Bool, strictSide: Bool = false,
+                  gap: CGFloat = 0) -> TabbedLayout? {
+        guard case .split(let orientation, let children, let weights) = self,
+              let index = children.firstIndex(where: { $0.groups.contains { $0 === group } }) else { return nil }
+        if let inner = children[index].resizing(group, along: axis, by: delta, againstNext: againstNext, strictSide: strictSide, gap: gap) {
+            var children = children
+            children[index] = inner
+            return .split(orientation, children, weights)
+        }
+        guard orientation == axis, children.count > 1 else { return nil }
+        // Groups hidden while their windows are briefly missing have no size; the divider is between
+        // shown neighbours, and hidden ones keep their share for when they return.
+        let sizes = children.map { $0.extent(along: axis) }
+        let shown = sizes.indices.filter { sizes[$0] > 0 }
+        guard sizes[index] > 0, let position = shown.firstIndex(of: index) else { return nil }
+        let onSide = againstNext ? shown.getOrNil(atIndex: position + 1) : shown.getOrNil(atIndex: position - 1)
+        guard onSide != nil || !strictSide,
+              let neighbor = onSide ?? (againstNext ? shown.getOrNil(atIndex: position - 1) : shown.getOrNil(atIndex: position + 1))
+        else { return nil }
+        // The weights restart from what is on screen, minimum sizes included: each shown child's size
+        // plus its share of the gaps, as the tile allocator divides them. Points then move between the
+        // two children only, so every other child keeps its size.
+        var shares = weights
+        for (order, child) in shown.enumerated() {
+            shares[child] = sizes[child] + (order == 0 || order == shown.count - 1 ? gap / 2 : gap)
+        }
+        let scale = shown.map { shares[$0] }.reduce(0, +) / max(shown.map { weights[$0] }.reduce(0, +), 0.0001)
+        for hidden in sizes.indices where sizes[hidden] <= 0 { shares[hidden] = weights[hidden] * scale }
+        // Neither side goes below what its shown windows need, or the allocator would take the rest
+        // from an uninvolved sibling.
+        let floor = { (child: Int) in max(80, children[child].minimumExtent(horizontal: axis == .h, gap: CGSize(width: gap, height: gap))) }
+        let change = max(min(delta, sizes[neighbor] - floor(neighbor)), floor(index) - sizes[index])
+        shares[index] += change
+        shares[neighbor] -= change
+        return .split(orientation, children, shares)
+    }
+
+    /// The direction of the split nearest `group`, the one `resize smart` acts on.
+    func nearestSplitOrientation(of group: TabbedGroup) -> Orientation? {
+        guard case .split(let orientation, let children, _) = self,
+              let child = children.first(where: { $0.groups.contains { $0 === group } }) else { return nil }
+        return child.nearestSplitOrientation(of: group) ?? orientation
+    }
+
+    /// The size along `axis` that this part of the layout last took on screen.
+    func extent(along axis: Orientation) -> CGFloat {
+        let frames = groups.compactMap(\.lastFrame)
+        guard !frames.isEmpty else { return 0 }
+        return axis == .h
+            ? (frames.map(\.maxX).max() ?? 0) - (frames.map(\.minX).min() ?? 0)
+            : (frames.map(\.maxY).max() ?? 0) - (frames.map(\.minY).min() ?? 0)
+    }
+
+    /// Each group's area within `rect`: columns `gap.width` apart, rows `gap.height` apart. Groups
+    /// share by weight, as tiles do, but never below what their shown window needs while space allows.
+    func frames(in rect: Rect, gap: CGSize) -> [(TabbedGroup, Rect)] {
+        switch self {
+            case .group(let group): return [(group, rect)]
+            case .split(let orientation, let children, let weights):
+                let horizontal = orientation == .h
+                let tiles = TileLayoutGeometry.calculate(TileLayoutInput(
+                    origin: rect.topLeftCorner, size: CGSize(width: rect.width, height: rect.height), horizontal: horizontal,
+                    innerGap: horizontal ? gap.width : gap.height,
+                    weights: weights, minimumExtents: children.map { $0.minimumExtent(horizontal: horizontal, gap: gap) },
+                    master: false, reversed: false))
+                guard tiles.count == children.count else { return [] }
+                return zip(children, tiles).flatMap { child, tile in
+                    child.frames(in: Rect(topLeftX: tile.physical.minX, topLeftY: tile.physical.minY,
+                                          width: tile.physical.width, height: tile.physical.height), gap: gap)
+                }
+        }
+    }
+
+    /// The least room along one axis that the shown windows, with their bars, need.
+    func minimumExtent(horizontal: Bool, gap: CGSize) -> CGFloat {
+        switch self {
+            case .group(let group):
+                let minimum = group.activeWindow?.minimumLayoutSize ?? .zero
+                return horizontal ? minimum.width : minimum.height + resolvedWindowTabBarHeight()
+            case .split(let orientation, let children, _):
+                let extents = children.map { $0.minimumExtent(horizontal: horizontal, gap: gap) }
+                return (orientation == .h) == horizontal
+                    ? extents.reduce(0, +) + (horizontal ? gap.width : gap.height) * CGFloat(max(extents.count - 1, 0))
+                    : extents.max() ?? 0
+        }
+    }
+}
+
+extension Workspace {
+    /// The groups in reading order: left to right, top to bottom within each split.
+    @MainActor var tabbedGroups: [TabbedGroup] { tabbedLayout?.groups ?? [] }
+
+    @MainActor func tabbedGroup(containing windowId: UInt32) -> TabbedGroup? {
+        tabbedGroups.first { $0.windowIds.contains(windowId) }
+    }
+
+    /// The group being worked in: the one holding the most recently focused tiled window.
+    @MainActor var tabbedFocusedGroup: TabbedGroup? {
+        rootTilingContainer.mostRecentWindowRecursive.flatMap { tabbedGroup(containing: $0.windowId) } ?? tabbedGroups.first
+    }
+
+    /// Brings the groups in line with the tiled windows: closed windows leave, new windows join
+    /// the group being worked in, empty groups close, and the focused window becomes its group's
+    /// shown tab.
+    @MainActor func syncTabbedGroups() {
+        let windows = rootTilingContainer.allLeafWindowsRecursive.map(\.windowId)
+        let present = Set(windows)
+        guard var layout = tabbedLayout else {
+            tabbedLayout = windows.isEmpty ? nil : .group(TabbedGroup(windowIds: windows, activeWindowId: rootTilingContainer.mostRecentWindowRecursive?.windowId))
+            return
+        }
+        // A window WinMuxX lost track of for a moment (Accessibility dropped it) keeps its place, so
+        // its group and split come back with it. One that closed, or that WinMuxX still has
+        // elsewhere (another workspace, floating), has left the group.
+        for group in layout.groups {
+            group.windowIds.removeAll { !present.contains($0) && !keepsTabbedPlace($0) }
+            if let active = group.activeWindowId, !group.windowIds.contains(active) { group.activeWindowId = nil }
+        }
+        let assigned = Set(layout.groups.flatMap(\.windowIds))
+        let newcomers = windows.filter { !assigned.contains($0) }
+        if !newcomers.isEmpty {
+            // The group being worked in; after a restore replaced the groups, the one holding the
+            // window last focused here.
+            let anchors = [lastTabbedFocusedWindowId, focus.windowOrNil?.windowId].compactMap { $0 }.filter { !newcomers.contains($0) }
+            let target = lastTabbedGroup.flatMap { last in layout.groups.first { $0 === last } }
+                ?? anchors.lazy.compactMap { id in layout.groups.first { $0.windowIds.contains(id) } }.first
+                ?? layout.groups.first
+            if let target {
+                target.windowIds += newcomers
+                // A window that opened and took focus is shown in the group it joined.
+                if let focused = lastTabbedFocusedWindowId, newcomers.contains(focused) { target.activeWindowId = focused }
+            } else {
+                layout = .group(TabbedGroup(windowIds: newcomers, activeWindowId: lastTabbedFocusedWindowId.flatMap { newcomers.contains($0) ? $0 : nil }))
+            }
+        }
+        tabbedLayout = layout.pruned()
+        for group in tabbedGroups where group.activeWindowId == nil {
+            group.activeWindowId = group.windowIds.first(where: present.contains)
+        }
+    }
+
+    /// The groups to show: those holding at least one window in the tree now.
+    @MainActor var visibleTabbedLayout: TabbedLayout? { tabbedLayout.flatMap(visibleTabbedLayout) }
+
+    /// `layout` without the groups none of whose windows is in the tiled tree now.
+    @MainActor func visibleTabbedLayout(_ layout: TabbedLayout) -> TabbedLayout? {
+        let present = Set(rootTilingContainer.allLeafWindowsRecursive.map(\.windowId))
+        return layout.pruned(keeping: { $0.windowIds.contains(where: present.contains) })
+    }
+
+    /// Whether a window out of the tiled tree keeps its tab: while WinMuxX briefly lost track of it,
+    /// or while macOS holds it minimized, hidden with its app, or in native fullscreen. A window
+    /// that closed, floats, or went to another workspace has left.
+    @MainActor private func keepsTabbedPlace(_ windowId: UInt32) -> Bool {
+        guard let window = Window.get(byId: windowId) else { return windowServerStillHas(windowId) }
+        if window.parent is TilingContainer || window.parent is Workspace { return false }
+        return window.nodeWorkspace == nil || window.nodeWorkspace === self
+    }
+
+    /// Moves a tab to `index` among the tabs its group's bar shows.
+    @MainActor func reorderTabbedTab(_ windowId: UInt32, toIndex index: Int) -> Bool {
+        guard let group = tabbedGroup(containing: windowId) else { return false }
+        let shown = group.shownWindowIds
+        guard let from = shown.firstIndex(of: windowId) else { return false }
+        let target = max(0, min(index, shown.count - 1))
+        if target == from { return true }
+        // Place it beside the tab now at that position, so tabs kept out of view keep theirs.
+        let anchor = shown[target]
+        group.windowIds.removeAll { $0 == windowId }
+        guard let anchorIndex = group.windowIds.firstIndex(of: anchor) else { return false }
+        group.windowIds.insert(windowId, at: target > from ? anchorIndex + 1 : anchorIndex)
+        return true
+    }
+
+    /// Moves a tab into `target`, at the end or at `index`, and shows it there.
+    @MainActor func moveTabbedTab(_ windowId: UInt32, into target: TabbedGroup, at index: Int? = nil) -> Bool {
+        guard let source = tabbedGroup(containing: windowId), tabbedGroups.contains(where: { $0 === target }) else { return false }
+        if source === target { return index.map { reorderTabbedTab(windowId, toIndex: $0) } ?? false }
+        source.windowIds.removeAll { $0 == windowId }
+        if source.activeWindowId == windowId { source.activeWindowId = source.windowIds.first }
+        target.windowIds.insert(windowId, at: min(index ?? target.windowIds.count, target.windowIds.count))
+        target.activeWindowId = windowId
+        if lastTabbedFocusedWindowId == windowId { lastTabbedGroup = target }
+        tabbedLayout = tabbedLayout?.pruned()
+        return true
+    }
+
+    /// Opens a new group on `side` of `target` holding the tab, as dropping it on that edge does.
+    @MainActor func moveTabbedTabToNewGroup(_ windowId: UInt32, beside target: TabbedGroup, on side: CardinalDirection) -> Bool {
+        guard let source = tabbedGroup(containing: windowId), let layout = tabbedLayout,
+              !(source === target && source.windowIds.count == 1) else { return false }
+        source.windowIds.removeAll { $0 == windowId }
+        if source.activeWindowId == windowId { source.activeWindowId = source.windowIds.first }
+        let group = TabbedGroup(windowIds: [windowId])
+        tabbedLayout = layout.inserting(group, beside: target, on: side).pruned()
+        if lastTabbedFocusedWindowId == windowId { lastTabbedGroup = group }
+        return true
+    }
+
+    /// Resizes the tab group holding `window`, as `resize` and dragging a window's edge do in
+    /// other arrangements. Only the groups' shares change; the tree beneath stays as it was.
+    @MainActor func resizeTabbedGroup(of window: Window, along axis: Orientation, by delta: CGFloat, againstNext: Bool = true,
+                                      strictSide: Bool = false) -> Bool {
+        guard let layout = tabbedLayout, let resized = tabbedLayout(layout, resizingGroupOf: window, along: axis, by: delta,
+                                                                    againstNext: againstNext, strictSide: strictSide) else { return false }
+        tabbedLayout = resized
+        return true
+    }
+
+    /// `layout` with the group of `window` resized, leaving the workspace as it is, or nil when
+    /// nothing can give way.
+    @MainActor func tabbedLayout(_ layout: TabbedLayout, resizingGroupOf window: Window, along axis: Orientation,
+                                 by delta: CGFloat, againstNext: Bool, strictSide: Bool) -> TabbedLayout? {
+        let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor).inner
+        let gap = CGFloat(axis == .h ? gaps.horizontal : gaps.vertical)
+        guard let group = tabbedGroup(containing: window.windowId) else { return nil }
+        return layout.resizing(group, along: axis, by: delta, againstNext: againstNext, strictSide: true, gap: gap)
+            ?? (strictSide ? nil : layout.resizing(group, along: axis, by: delta, againstNext: againstNext, gap: gap))
+    }
+
+    /// The group whose last area lies on `direction`'s side of `group`, nearest first.
+    @MainActor func tabbedGroup(beside group: TabbedGroup, _ direction: CardinalDirection) -> TabbedGroup? {
+        guard let from = group.lastFrame else { return nil }
+        return tabbedGroups.compactMap { other -> (TabbedGroup, CGFloat)? in
+            guard other !== group, let to = other.lastFrame else { return nil }
+            let (gap, overlaps): (CGFloat, Bool) = switch direction {
+                case .right: (to.minX - from.maxX, to.minY < from.maxY && to.maxY > from.minY)
+                case .left: (from.minX - to.maxX, to.minY < from.maxY && to.maxY > from.minY)
+                case .down: (to.minY - from.maxY, to.minX < from.maxX && to.maxX > from.minX)
+                case .up: (from.minY - to.maxY, to.minX < from.maxX && to.maxX > from.minX)
+            }
+            return overlaps && gap > -1 ? (other, gap) : nil
+        }.min(by: { $0.1 < $1.1 })?.0
+    }
+}
+
+@MainActor
+private func windowServerStillHas(_ windowId: UInt32) -> Bool {
+    !isUnitTest && winmux_window_exists(windowId)
+}
+
+extension Window {
+    /// Focusing a window of a Tabbed workspace shows it in its group. Only real focus does this:
+    /// restoring a tree rebinds windows in order without anyone choosing them.
+    @MainActor func noteTabbedFocus() {
+        guard let workspace = nodeWorkspace, workspace.arrangement == .tabbed, parent is TilingContainer else { return }
+        workspace.lastTabbedFocusedWindowId = windowId
+        guard let group = workspace.tabbedGroup(containing: windowId) else { return }
+        group.activeWindowId = windowId
+        workspace.lastTabbedGroup = group
+    }
+}
+
+/// The saved form of a Tabbed workspace's groups, by window ID.
+indirect enum FrozenTabbedLayout: Codable, Equatable, Sendable {
+    case group(windowIds: [UInt32], active: UInt32?)
+    case split(orientation: Orientation, children: [FrozenTabbedLayout], weights: [CGFloat])
+
+    @MainActor init(_ layout: TabbedLayout) {
+        switch layout {
+            case .group(let group): self = .group(windowIds: group.windowIds, active: group.activeWindowId)
+            case .split(let orientation, let children, let weights):
+                self = .split(orientation: orientation, children: children.map(FrozenTabbedLayout.init), weights: weights)
+        }
+    }
+
+    /// The live layout, with saved window IDs mapped to the windows restored for them. Windows not
+    /// back yet keep their saved IDs, so one returning later rejoins its group; IDs WindowServer
+    /// no longer has are dropped at the next sync.
+    @MainActor func restored(_ windowsById: [UInt32: Window]) -> TabbedLayout? {
+        switch self {
+            case .group(let ids, let active):
+                return .group(TabbedGroup(windowIds: ids.map { windowsById[$0]?.windowId ?? $0 },
+                                          activeWindowId: active.map { windowsById[$0]?.windowId ?? $0 }))
+            case .split(let orientation, let children, let weights):
+                let kept = zip(children, weights).compactMap { child, weight in child.restored(windowsById).map { ($0, weight) } }
+                return TabbedLayout.split(orientation, kept.map(\.0), kept.map(\.1)).pruned()
+        }
+    }
+}
+
+extension FrozenContainer {
+    /// The windows of each side-by-side tab saved by build 322, outermost first.
+    var legacySideBySideTabs: [[UInt32]] {
+        if isTabbedSplit == true { return [collectWindowIds()] }
+        return children.flatMap { child -> [[UInt32]] in
+            if case .container(let container) = child { return container.legacySideBySideTabs }
+            return []
+        }
+    }
+
+    private func collectWindowIds() -> [UInt32] {
+        children.flatMap { child -> [UInt32] in
+            switch child {
+                case .window(let window): [window.id]
+                case .container(let container): container.collectWindowIds()
+            }
+        }
+    }
+}
+
+/// Groups for state saved before tab groups existed: each side-by-side tab of build 322 becomes
+/// columns of its own windows beside the group holding everything else.
+@MainActor
+func migratedTabbedLayout(from root: FrozenContainer, _ windowsById: [UInt32: Window], allWindows: [UInt32]) -> TabbedLayout? {
+    let sideBySide = root.legacySideBySideTabs.map { $0.compactMap { windowsById[$0]?.windowId } }.filter { $0.count > 1 }
+    guard !sideBySide.isEmpty else { return nil }
+    let grouped = Set(sideBySide.flatMap { $0 })
+    let rest = allWindows.filter { !grouped.contains($0) }
+    let columns = ([rest] + sideBySide.flatMap { $0.map { [$0] } }).filter { !$0.isEmpty }
+    return TabbedLayout.split(.h, columns.map { .group(TabbedGroup(windowIds: $0)) }, columns.map { _ in 1 }).pruned()
+}

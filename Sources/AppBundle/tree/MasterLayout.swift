@@ -7,7 +7,14 @@ extension Workspace {
     @MainActor
     func transitionArrangement(to next: WorkspaceLayoutName, focused: Window? = nil) {
         if next != .dwindle { preserveAtomicRootAsArrangementGroup() }
+        let entering = arrangement != next
         arrangement = next
+        if next == .tabbed {
+            syncTabbedGroups()
+            // Switching to Tabbed starts from the window being worked in. Restoring a workspace
+            // that already was Tabbed keeps each group's saved tab.
+            if entering { rootTilingContainer.mostRecentWindowRecursive?.noteTabbedFocus() }
+        }
         if next == .master, let focused,
            let index = workspaceLayoutUnits.firstIndex(where: { $0 === focused.topLevelWorkspaceGroup }) {
             masterGroupIndex = index

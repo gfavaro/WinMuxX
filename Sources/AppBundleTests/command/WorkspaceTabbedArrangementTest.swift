@@ -100,19 +100,18 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         let (workspace, windows, _) = makeNestedWorkspace()
         _ = windows[0].focusWindow()
         _ = try await run("workspace-layout tabbed")
+        try await workspace.layoutWorkspace()
         let rect = workspaceTilingRect(workspace)
-        let content = workspaceTabbedContentRect(rect)
-        let windowFrame = CGRect(x: content.topLeftX, y: content.topLeftY, width: content.width, height: content.height)
-        let target = try XCTUnwrap(windowBorderTarget(for: windows[0], nativeFrame: windowFrame))
+        let target = try XCTUnwrap(windowBorderTarget(for: windows[0], nativeFrame: .zero))
         XCTAssertEqual(target.frame.minY, rect.topLeftY, "The border starts at the top of the tab bar")
-        XCTAssertEqual(target.frame.maxY, windowFrame.maxY)
-        XCTAssertEqual(target.frame.width, windowFrame.width)
+        XCTAssertEqual(target.frame.height, rect.height)
+        XCTAssertNil(windowBorderTarget(for: windows[1], nativeFrame: .zero), "Hidden tabs draw no border")
         windows[0].isFullscreen = true
-        XCTAssertEqual(windowBorderTarget(for: windows[0], nativeFrame: windowFrame)?.frame, windowFrame,
+        XCTAssertEqual(windowBorderTarget(for: windows[0], nativeFrame: .zero)?.frame, .zero,
             "In fullscreen there is no bar to enclose")
     }
 
-    func testTabCommandsUseTheWorkspaceTabs() async throws {
+    func testTabCommandsUseTheFocusedGroupsTabs() async throws {
         let (_, windows, _) = makeNestedWorkspace()
         _ = windows[0].focusWindow()
         _ = try await run("workspace-layout tabbed")
@@ -126,120 +125,394 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertNotEqual(missing.exitCode, 0)
     }
 
-    func testReorderingTabsKeepsTheTreeShape() async throws {
+    func testReorderingTabsLeavesTheTreeAlone() async throws {
         let (workspace, windows, group) = makeNestedWorkspace()
         _ = windows[0].focusWindow()
         _ = try await run("workspace-layout tabbed")
-        XCTAssertTrue(reorderWorkspaceTab(windows[0], stripId: ObjectIdentifier(workspace), toIndex: 2))
-        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual([windows[1], windows[2], windows[0]], by: ===))
-        XCTAssertEqual(group.children.count, 2, "Slots stay where they were; windows move between them")
-        XCTAssertEqual(group.layout, .tabGroup)
+        workspace.syncTabbedGroups()
+        let tabs = try XCTUnwrap(workspace.tabbedGroups.first)
+        XCTAssertTrue(reorderWorkspaceTab(windows[0], stripId: ObjectIdentifier(tabs), toIndex: 2))
+        XCTAssertEqual(tabs.windowIds, [windows[1], windows[2], windows[0]].map(\.windowId))
+        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual(windows, by: ===),
+            "Only the bar's order changes; Dwindle returns to the same tree")
         _ = try await run("move left")
-        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual([windows[1], windows[0], windows[2]], by: ===),
-            "move left moves the focused tab one place along the bar")
+        XCTAssertEqual(tabs.windowIds, [windows[1], windows[0], windows[2]].map(\.windowId))
         XCTAssertFalse(reorderWorkspaceTab(windows[0], stripId: ObjectIdentifier(group), toIndex: 0), "Another strip's id is not this bar")
     }
 
-    func testShowBesideMakesOneSideBySideTabAndSplitRestoresTabs() async throws {
+    /// Two tab groups side by side: Finder-like left window alone, the nested group's tabs on the right.
+    private func makeTwoGroups() async throws -> (Workspace, [TestWindow], TabbedGroup, TabbedGroup) {
         let (workspace, windows, _) = makeNestedWorkspace()
         _ = windows[0].focusWindow()
         _ = try await run("workspace-layout tabbed")
-        XCTAssertEqual(workspace.tabbedUnits.count, 3)
-        XCTAssertTrue(showTabbedTabBesideCurrent(windows[2]))
-        XCTAssertEqual(workspace.tabbedUnits.count, 2, "The two windows now share one tab")
-        let split = try XCTUnwrap(workspace.tabbedActiveUnit as? TilingContainer)
-        XCTAssertTrue(split.isTabbedSplit)
-        XCTAssertTrue(split.allLeafWindowsRecursive.elementsEqual([windows[0], windows[2]], by: ===))
-
+        workspace.syncTabbedGroups()
+        let first = try XCTUnwrap(workspace.tabbedGroups.first)
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[1].windowId, beside: first, on: .right))
+        XCTAssertTrue(workspace.moveTabbedTab(windows[2].windowId, into: try XCTUnwrap(workspace.tabbedGroup(containing: windows[1].windowId))))
+        _ = windows[0].focusWindow()
         try await workspace.layoutWorkspace()
-        let left = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
-        let right = try XCTUnwrap(windows[2].lastAppliedLayoutPhysicalRect)
-        XCTAssertLessThan(left.topLeftX, right.topLeftX, "Both windows show side by side")
-        XCTAssertEqual(left.topLeftY, workspaceTabbedContentRect(workspaceTilingRect(workspace)).topLeftY)
-        XCTAssertNil(windows[1].lastAppliedLayoutPhysicalRect, "The other tab waits hidden")
-
-        _ = windows[0].focusWindow()
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === windows[2], "Right moves inside the side-by-side tab first")
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === windows[1], "then on to the next tab")
-
-        _ = windows[0].focusWindow()
-        let border = windowBorderTarget(for: windows[0], nativeFrame: .zero)
-        XCTAssertEqual(border?.frame.height, workspaceTilingRect(workspace).height, "One border encloses the bar and both windows")
-        XCTAssertNil(windowBorderTarget(for: windows[2], nativeFrame: .zero), "The other window draws no border of its own")
-
-        XCTAssertTrue(splitTabbedTabIntoTabs(windows[0]))
-        XCTAssertEqual(workspace.tabbedUnits.count, 3, "Each window is a tab again")
-        XCTAssertFalse(split.isTabbedSplit)
+        return (workspace, windows, first, try XCTUnwrap(workspace.tabbedGroup(containing: windows[1].windowId)))
     }
 
-    func testDraggingATabMovesOnlyThatTab() async throws {
-        let (_, windows, group) = makeNestedWorkspace()
+    func testGroupsShowSideBySideEachWithItsOwnTab() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertEqual(workspace.tabbedGroups.count, 2)
+        XCTAssertEqual(left.windowIds, [windows[0].windowId])
+        XCTAssertEqual(right.windowIds, [windows[1], windows[2]].map(\.windowId))
+        let a = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        let b = try XCTUnwrap(right.activeWindow?.lastAppliedLayoutPhysicalRect)
+        XCTAssertLessThan(a.topLeftX, b.topLeftX, "The new group opened on the right")
+        XCTAssertEqual(a.topLeftY, b.topLeftY, "Both sit under their own bars")
+        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual(windows, by: ===), "The tree is untouched")
+    }
+
+    func testFocusMovesBetweenGroupsThenThroughTabs() async throws {
+        let (_, windows, _, right) = try await makeTwoGroups()
+        _ = try await run("focus right")
+        XCTAssertTrue(focus.windowOrNil === right.activeWindow, "Right goes to the group on the right")
+        _ = right.activeWindow?.focusWindow()
+        _ = try await run("focus left")
+        XCTAssertTrue(focus.windowOrNil === windows[0], "Left goes back to the other group")
         _ = windows[1].focusWindow()
-        _ = try await run("workspace-layout tabbed")
-        XCTAssertTrue(windows[1].moveNode === windows[1], "A tab inside a nested group leaves alone, not with its hidden siblings")
-        XCTAssertTrue(showTabbedTabBesideCurrent(windows[0]))
-        XCTAssertTrue(windows[1].moveNode is TilingContainer, "A side-by-side tab leaves as one")
-        XCTAssertTrue(shouldAllowTabStripChromeGroupDrag(windowId: windows[1].windowId), "The handle can start dragging it")
-        XCTAssertFalse(windows[1].moveNode === group)
-        // A split nested inside the side-by-side tab still moves with the whole tab.
-        let split = try XCTUnwrap(windows[1].moveNode as? TilingContainer)
-        let inner = TilingContainer(parent: split, adaptiveWeight: WEIGHT_AUTO, .v, .tiles, index: INDEX_BIND_LAST)
-        windows[0].unbindFromParent()
-        windows[0].bind(to: inner, adaptiveWeight: WEIGHT_AUTO, index: 0)
-        TestWindow.new(id: 29003, parent: inner)
-        XCTAssertTrue(windows[0].moveNode === split)
+        _ = try await run("focus tab-next")
+        XCTAssertTrue(focus.windowOrNil === windows[2], "tab-next stays in the focused group")
     }
 
-    func testFocusInsideASideBySideTabFollowsItsLayout() async throws {
+    func testMovePastAGroupsEdgeSendsTheTabToTheNextGroup() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        _ = windows[0].focusWindow()
+        _ = try await run("move right")
+        XCTAssertEqual(right.windowIds.last, windows[0].windowId, "The tab joined the group on the right")
+        XCTAssertEqual(workspace.tabbedGroups.count, 1, "Its empty group closed")
+        XCTAssertFalse(workspace.tabbedGroups.contains { $0 === left })
+    }
+
+    func testDroppingATabOnAnEdgeOrInTheMiddle() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertEqual(applyTabbedGroupDragIntent(.stackSplit(targetWindowId: windows[0].windowId, position: .below),
+            sourceWindow: windows[2]), true)
+        XCTAssertEqual(workspace.tabbedGroups.count, 3, "A drop on the bottom edge opened a new group below")
+        XCTAssertEqual(workspace.tabbedGroup(containing: windows[2].windowId)?.windowIds, [windows[2].windowId])
+        XCTAssertEqual(applyTabbedGroupDragIntent(.tabStack(targetWindowId: windows[0].windowId), sourceWindow: windows[2]), true)
+        XCTAssertTrue(workspace.tabbedGroup(containing: windows[2].windowId) === left, "A drop in the middle joins that group")
+        XCTAssertEqual(left.activeWindowId, windows[2].windowId)
+        XCTAssertEqual(right.windowIds, [windows[1].windowId])
+        let other = TestWindow.new(id: 29900, parent: Workspace.get(byName: "elsewhere").rootTilingContainer)
+        XCTAssertEqual(applyTabbedGroupDragIntent(.tabStack(targetWindowId: windows[1].windowId), sourceWindow: other), true)
+        XCTAssertTrue(other.nodeWorkspace === workspace, "A window from another workspace comes over")
+        XCTAssertTrue(workspace.tabbedGroup(containing: other.windowId) === right, "into the group it was dropped on")
+        XCTAssertEqual(right.activeWindowId, other.windowId)
+    }
+
+    func testNewWindowsJoinTheGroupBeingWorkedIn() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        _ = windows[1].focusWindow()
+        workspace.syncTabbedGroups()
+        let opened = TestWindow.new(id: 29400, parent: workspace.rootTilingContainer)
+        _ = opened.focusWindow()
+        workspace.syncTabbedGroups()
+        XCTAssertTrue(workspace.tabbedGroup(containing: opened.windowId) === right)
+        XCTAssertEqual(right.activeWindowId, opened.windowId)
+        opened.unbindFromParent()
+        windows[1].unbindFromParent()
+        windows[2].unbindFromParent()
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(workspace.tabbedGroups.count, 1, "A group whose windows all closed disappears")
+    }
+
+    func testAWindowThatLeavesTheWorkspaceLeavesItsGroup() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        windows[2].unbindFromParent()
+        windows[2].bind(to: Workspace.get(byName: "elsewhere").rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(right.windowIds, [windows[1].windowId], "A window moved elsewhere is no longer a tab here")
+        _ = windows[1].focusWindow()
+        _ = try await run("focus --boundaries-action wrap-around-the-workspace tab-next")
+        XCTAssertTrue(focus.windowOrNil === windows[1], "tab-next never reaches a window that left")
+    }
+
+    func testResizingChangesTheGroupsNotTheTree() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        let before = try XCTUnwrap(left.lastFrame).width
+        let ratiosBefore = workspace.rootTilingContainer.allLeafWindowsRecursive.map { $0.parent?.getWeight(.h) }
+        _ = windows[0].focusWindow()
+        let result = try await run("resize width +100")
+        XCTAssertEqual(result.exitCode, 0)
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame).width, before + 100, accuracy: 2, "The left group grew by 100 points")
+        XCTAssertLessThan(try XCTUnwrap(right.lastFrame).width, before, "at the right group's expense")
+        XCTAssertEqual(workspace.rootTilingContainer.allLeafWindowsRecursive.map { $0.parent?.getWeight(.h) }, ratiosBefore,
+            "The tree kept for other arrangements is untouched")
+        let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        applyResizeWithMouse(windows[0], rect: Rect(topLeftX: shown.topLeftX, topLeftY: shown.topLeftY, width: shown.width - 60, height: shown.height))
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame).width, before + 40, accuracy: 2, "Dragging the right edge in shrinks it")
+    }
+
+    func testTheResizePreviewShowsTheProposedGroups() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        let leftBefore = try XCTUnwrap(left.lastFrame), rightBefore = try XCTUnwrap(right.lastFrame)
+        let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        let (_, layout) = try XCTUnwrap(proposedTabbedMouseResize(windows[0], rect: Rect(topLeftX: shown.topLeftX,
+            topLeftY: shown.topLeftY, width: shown.width + 50, height: shown.height)))
+        let items = tabbedResizePreviewItems(in: workspace, layout: layout, excluding: windows[0])
+        XCTAssertEqual(items.map(\.id), [try XCTUnwrap(right.activeWindow).windowId], "Only the other group's shown tab is drawn")
+        XCTAssertEqual(try XCTUnwrap(items.first).frame.width, rightBefore.width - 50, accuracy: 2, "at its proposed size")
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame), leftBefore, "Previewing changes nothing")
+    }
+
+    func testDroppingOnAnotherGroupIgnoresTheTreesTabGroup() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: right, on: .right))
+        try await workspace.layoutWorkspace()
+        XCTAssertTrue(windows[1].parent === windows[2].parent, "Both still share one tab group in the tree")
+        let area = try XCTUnwrap(right.lastFrame)
+        let destination = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[2],
+            mouseLocation: CGPoint(x: area.center.x, y: area.center.y), subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(destination.kind, .tabStack(targetWindowId: windows[1].windowId), "The middle moves the tab into that group")
+        XCTAssertEqual(destination.dropIntentOverlay?.targetFrame, area, "The whole group, its bar included, is the target")
+        let edge = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[2],
+            mouseLocation: CGPoint(x: area.minX + 4, y: area.center.y), subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(edge.kind, .stackSplit(targetWindowId: windows[1].windowId, position: .left))
+        XCTAssertEqual(applyTabbedGroupDragIntent(destination.kind, sourceWindow: windows[2]), true)
+        XCTAssertEqual(right.windowIds, [windows[1], windows[2]].map(\.windowId))
+    }
+
+    func testResizingASingleGroupIsANoOp() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        let result = try await run("resize width +100")
+        XCTAssertEqual(result.exitCode, 0, "Nothing to resize does not fail a command chain")
+        XCTAssertEqual(workspace.tabbedGroups.count, 1)
+    }
+
+    func testARestoredGroupKeepsItsSavedTab() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        right.activeWindowId = windows[1].windowId
+        windows[2].markAsMostRecentChild()
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(right.activeWindowId, windows[1].windowId, "Rebinding in order is not a focus change")
+        _ = windows[2].focusWindow()
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(right.activeWindowId, windows[2].windowId, "Focusing a tab shows it")
+    }
+
+    func testSmartResizeFollowsTheGroupsSplit() async throws {
+        let (workspace, windows, _) = makeNestedWorkspace()
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        let only = try XCTUnwrap(workspace.tabbedGroups.first)
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[1].windowId, beside: only, on: .down))
+        _ = windows[0].focusWindow()
+        try await workspace.layoutWorkspace()
+        let top = try XCTUnwrap(only.lastFrame).height
+        let result = try await run("resize smart +80")
+        XCTAssertEqual(result.exitCode, 0, "Rows resize along their height")
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(only.lastFrame).height, top + 80, accuracy: 2)
+    }
+
+    func testRestoringATabbedWorkspaceKeepsSavedTabs() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        right.activeWindowId = windows[1].windowId
+        windows[2].markAsMostRecentChild()
+        workspace.transitionArrangement(to: .tabbed)
+        XCTAssertEqual(right.activeWindowId, windows[1].windowId, "Restoring an already Tabbed workspace is not a switch")
+    }
+
+    func testDraggingAnOuterEdgeMovesTheOuterDivider() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: right, on: .right))
+        try await workspace.layoutWorkspace()
+        let leftWidth = try XCTUnwrap(left.lastFrame).width
+        let shown = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
+        applyResizeWithMouse(windows[1], rect: Rect(topLeftX: shown.topLeftX - 50, topLeftY: shown.topLeftY, width: shown.width + 50, height: shown.height))
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame).width, leftWidth - 50, accuracy: 2, "Dragging the left edge moves the divider on the left")
+    }
+
+    func testResizingNextToAMinimumSizeMovesTheRequestedPoints() async throws {
+        let (workspace, windows, left, _) = try await makeTwoGroups()
+        windows[0].testMinimumSize = CGSize(width: 1000, height: 100)
+        try await workspace.layoutWorkspace()
+        let before = try XCTUnwrap(left.lastFrame).width
+        XCTAssertTrue(workspace.resizeTabbedGroup(of: windows[0], along: .h, by: 100))
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame).width, before + 100, accuracy: 2)
+    }
+
+    func testResizingLeavesUninvolvedGroupsAlone() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: right, on: .right))
+        try await workspace.layoutWorkspace()
+        let third = try XCTUnwrap(workspace.tabbedGroup(containing: windows[2].windowId))
+        let thirdWidth = try XCTUnwrap(third.lastFrame).width
+        _ = windows[0].focusWindow()
+        XCTAssertTrue(workspace.resizeTabbedGroup(of: windows[0], along: .h, by: 60))
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(third.lastFrame).width, thirdWidth, accuracy: 1, "Only the two groups at the divider change")
+        XCTAssertTrue(workspace.tabbedGroups.contains { $0 === left })
+    }
+
+    func testResizingWorksWhileAnotherGroupIsHidden() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        XCTAssertTrue(workspace.moveTabbedTabToNewGroup(windows[2].windowId, beside: right, on: .right))
+        try await workspace.layoutWorkspace()
+        right.lastFrame = nil
+        let before = try XCTUnwrap(left.lastFrame).width
+        XCTAssertTrue(workspace.resizeTabbedGroup(of: windows[0], along: .h, by: 50), "The hidden middle group does not block resizing")
+        XCTAssertGreaterThan(before, 0)
+    }
+
+    func testResizingStopsAtTheNeighboursMinimumSize() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        try await workspace.layoutWorkspace()
+        let rightWidth = try XCTUnwrap(right.lastFrame).width
+        try XCTUnwrap(right.activeWindow as? TestWindow).testMinimumSize = CGSize(width: rightWidth - 30, height: 100)
+        let before = try XCTUnwrap(left.lastFrame).width
+        XCTAssertTrue(workspace.resizeTabbedGroup(of: windows[0], along: .h, by: 300))
+        try await workspace.layoutWorkspace()
+        XCTAssertEqual(try XCTUnwrap(left.lastFrame).width, before + 30, accuracy: 2, "Only the room the neighbour can spare moves")
+    }
+
+    func testMovingTheFocusedTabMovesWhereNewWindowsGo() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        _ = windows[0].focusWindow()
+        _ = try await run("move right")
+        let opened = TestWindow.new(id: 29700, parent: workspace.rootTilingContainer)
+        workspace.syncTabbedGroups()
+        XCTAssertTrue(workspace.tabbedGroup(containing: opened.windowId) === right, "New windows follow the moved tab")
+    }
+
+    func testAMissingChosenTabKeepsItsChoice() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        right.activeWindowId = windows[2].windowId
+        windows[2].unbindFromParent()
+        right.windowIds.append(windows[2].windowId)
+        XCTAssertTrue(right.activeWindow === windows[1], "While the chosen window is missing another tab shows")
+        XCTAssertEqual(right.activeWindowId, windows[2].windowId, "but the choice is kept")
+        windows[2].bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        XCTAssertTrue(right.activeWindow === windows[2], "and it shows again when its window returns")
+    }
+
+    func testATabInNativeFullscreenKeepsItsPlace() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        windows[2].unbindFromParent()
+        windows[2].bind(to: workspace.macOsNativeFullscreenWindowsContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        workspace.syncTabbedGroups()
+        XCTAssertEqual(right.windowIds, [windows[1], windows[2]].map(\.windowId), "Native fullscreen keeps the tab's place")
+        XCTAssertEqual(right.shownWindowIds, [windows[1].windowId], "though its bar leaves it out meanwhile")
+    }
+
+    func testNewWindowsFindTheFocusedGroupAfterARestore() async throws {
+        let (workspace, windows, _, _) = try await makeTwoGroups()
+        _ = windows[2].focusWindow()
+        let frozen = try XCTUnwrap(workspace.tabbedLayout.map(FrozenTabbedLayout.init))
+        workspace.tabbedLayout = frozen.restored(Dictionary(uniqueKeysWithValues: windows.map { ($0.windowId, $0 as Window) }))
+        let opened = TestWindow.new(id: 29800, parent: workspace.rootTilingContainer)
+        workspace.syncTabbedGroups()
+        XCTAssertTrue(workspace.tabbedGroup(containing: opened.windowId) === workspace.tabbedGroup(containing: windows[2].windowId),
+            "New windows still join the group being worked in")
+    }
+
+    func testGroupsSurviveARestartWithNewWindowIds() async throws {
+        let (workspace, windows, _, _) = try await makeTwoGroups()
+        let frozen = try XCTUnwrap(workspace.tabbedLayout.map(FrozenTabbedLayout.init))
+        let decoded = try JSONDecoder().decode(FrozenTabbedLayout.self, from: JSONEncoder().encode(frozen))
+        let replacements = Dictionary(uniqueKeysWithValues: windows.enumerated().map { index, window in
+            (window.windowId, TestWindow.new(id: UInt32(29500 + index), parent: workspace.rootTilingContainer) as Window)
+        })
+        let restored = try XCTUnwrap(decoded.restored(replacements))
+        XCTAssertEqual(restored.groups.map(\.windowIds), [[29500], [29501, 29502]], "Saved IDs map to the restored windows")
+        let partial = try XCTUnwrap(decoded.restored([windows[0].windowId: replacements[windows[0].windowId]!]))
+        XCTAssertEqual(partial.groups.count, 2, "A group whose windows are not back yet keeps its place")
+        XCTAssertEqual(partial.groups.last?.windowIds, [windows[1], windows[2]].map(\.windowId))
+    }
+
+    func testGroupsMakeRoomForTheirWindowsMinimumSize() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        windows[0].testMinimumSize = CGSize(width: 1200, height: 100)
+        let rect = workspaceTilingRect(workspace)
+        let frames = try XCTUnwrap(workspace.tabbedLayout).frames(in: rect, gap: .zero)
+        let leftFrame = try XCTUnwrap(frames.first { $0.0 === left }?.1)
+        XCTAssertGreaterThanOrEqual(leftFrame.width, min(1200, rect.width), "The left group widens for its window")
+        XCTAssertTrue(frames.contains { $0.0 === right })
+    }
+
+    func testAFloatingWindowDroppedOnAnEdgeOpensAGroupThere() async throws {
+        let (workspace, windows, left, _) = try await makeTwoGroups()
+        let floating = TestWindow.new(id: 29600, parent: workspace)
+        XCTAssertEqual(applyTabbedGroupDragIntent(.stackSplit(targetWindowId: windows[0].windowId, position: .below),
+            sourceWindow: floating), true)
+        XCTAssertTrue(floating.parent is TilingContainer, "The window is tiled now")
+        let group = try XCTUnwrap(workspace.tabbedGroup(containing: floating.windowId))
+        XCTAssertFalse(group === left)
+        XCTAssertEqual(group.windowIds, [floating.windowId], "It opened its own group, not the focused one")
+        XCTAssertEqual(workspace.tabbedGroups.count, 3)
+    }
+
+    func testAWindowDroppedIntoTheFocusedGroupShows() async throws {
+        let (workspace, windows, left, _) = try await makeTwoGroups()
+        let floating = TestWindow.new(id: 29650, parent: workspace)
+        XCTAssertEqual(applyTabbedGroupDragIntent(.tabStack(targetWindowId: windows[0].windowId), sourceWindow: floating), true)
+        XCTAssertTrue(workspace.tabbedGroup(containing: floating.windowId) === left)
+        XCTAssertEqual(left.activeWindowId, floating.windowId, "The dropped window is the tab shown")
+    }
+
+    func testTheShownTabSplitsBesideItsOwnGroup() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        let area = try XCTUnwrap(right.lastFrame)
+        XCTAssertNil(currentWindowSurfaceDestination(sourceWindow: windows[1], mouseLocation: CGPoint(x: area.center.x, y: area.center.y),
+            subject: .window, detachOrigin: .tabStrip), "The middle of its own group changes nothing")
+        let edge = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[1],
+            mouseLocation: CGPoint(x: area.center.x, y: area.maxY - 4), subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(edge.kind, .stackSplit(targetWindowId: windows[1].windowId, position: .below))
+        XCTAssertEqual(applyTabbedGroupDragIntent(edge.kind, sourceWindow: windows[1]), true)
+        XCTAssertEqual(right.windowIds, [windows[2].windowId])
+        XCTAssertEqual(workspace.tabbedGroup(containing: windows[1].windowId)?.windowIds, [windows[1].windowId])
+        XCTAssertEqual(workspace.tabbedGroups.count, 3)
+    }
+
+    func testJoiningAGroupWorksWithWindowTabsOff() {
+        let previous = config.windowTabs.enabled
+        config.windowTabs.enabled = false
+        defer { config.windowTabs.enabled = previous }
         let workspace = focus.workspace
-        let root = workspace.rootTilingContainer
-        root.layout = .tiles
-        let split = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .h, .tiles, index: INDEX_BIND_LAST)
-        split.isTabbedSplit = true
-        let a = TestWindow.new(id: 29200, parent: split)
-        let column = TilingContainer(parent: split, adaptiveWeight: WEIGHT_AUTO, .v, .tiles, index: INDEX_BIND_LAST)
-        let b = TestWindow.new(id: 29201, parent: column)
-        let c = TestWindow.new(id: 29202, parent: column)
-        let d = TestWindow.new(id: 29203, parent: root)
-        _ = a.focusWindow()
-        _ = try await run("workspace-layout tabbed")
-        try await workspace.layoutWorkspace()
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === b || focus.windowOrNil === c, "Right goes to the column on the right")
-        _ = b.focusWindow()
-        _ = try await run("focus down")
-        XCTAssertTrue(focus.windowOrNil === c, "Down stays inside the side-by-side tab")
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === d, "With nothing further right, right goes to the next tab")
+        workspace.arrangement = .tabbed
+        let window = TestWindow.new(id: 29700, parent: workspace.rootTilingContainer)
+        XCTAssertTrue(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: window.windowId)))
+        workspace.arrangement = .dwindle
+        XCTAssertFalse(isWindowDragIntentKindEnabled(.tabStack(targetWindowId: window.windowId)))
     }
 
-    func testCombiningKeepsAnIncomingSideBySideTabIntact() async throws {
+    func testSideBySideTabsFromBuild322BecomeColumns() throws {
         let (workspace, windows, _) = makeNestedWorkspace()
-        let extra = TestWindow.new(id: 29300, parent: workspace.rootTilingContainer)
-        _ = windows[1].focusWindow()
-        _ = try await run("workspace-layout tabbed")
-        XCTAssertTrue(showTabbedTabBesideCurrent(windows[2]))
-        let incoming = try XCTUnwrap(workspace.tabbedUnit(containing: windows[1]) as? TilingContainer)
-        _ = extra.focusWindow()
-        XCTAssertTrue(showTabbedTabBesideCurrent(windows[1]))
-        XCTAssertTrue(incoming.parent === workspace.tabbedActiveUnit, "The incoming tab nests whole")
-        XCTAssertEqual(incoming.children.count, 2)
-        XCTAssertTrue(splitTabbedTabIntoTabs(extra))
-        XCTAssertTrue(workspace.tabbedUnits.contains { $0 === incoming }, "Splitting brings the inner side-by-side tab back")
-    }
-
-    func testSideBySideTabsSurviveARestart() {
-        let (_, windows, _) = makeNestedWorkspace()
-        let root = focus.workspace.rootTilingContainer
-        let split = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .h, .tiles, index: INDEX_BIND_LAST)
-        split.isTabbedSplit = true
+        let split = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, .h, .tiles, index: INDEX_BIND_LAST)
         windows[0].unbindFromParent()
         windows[0].bind(to: split, adaptiveWeight: WEIGHT_AUTO, index: 0)
-        XCTAssertEqual(FrozenContainer(split).isTabbedSplit, true)
-        split.isTabbedSplit = false
-        XCTAssertNil(FrozenContainer(split).isTabbedSplit, "Ordinary splits add nothing to saved state")
+        windows[2].unbindFromParent()
+        windows[2].bind(to: split, adaptiveWeight: WEIGHT_AUTO, index: 1)
+        var frozen = FrozenContainer(workspace.rootTilingContainer)
+        func mark(_ container: inout FrozenContainer) {
+            for index in container.children.indices {
+                guard case .container(var child) = container.children[index] else { continue }
+                if child.children.count == 2, case .window(let first) = child.children[0], first.id == windows[0].windowId {
+                    child.isTabbedSplit = true
+                }
+                mark(&child)
+                container.children[index] = .container(child)
+            }
+        }
+        mark(&frozen)
+        let byId = Dictionary(uniqueKeysWithValues: windows.map { ($0.windowId, $0 as Window) })
+        let layout = try XCTUnwrap(migratedTabbedLayout(from: frozen, byId, allWindows: windows.map(\.windowId)))
+        XCTAssertEqual(layout.groups.map(\.windowIds), [[windows[1].windowId], [windows[0].windowId], [windows[2].windowId]],
+            "The side-by-side pair opens as two columns beside the rest")
     }
 
     func testConfigSelectsTabbedWhileTabGroupKeepsItsRootMeaning() {

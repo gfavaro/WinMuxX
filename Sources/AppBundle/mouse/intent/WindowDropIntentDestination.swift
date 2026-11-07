@@ -21,6 +21,13 @@ func destinationFromWindowDropIntent(
         return result
     }
 
+    // A drop on a Tabbed workspace's window lands in its tab groups, which are kept apart from
+    // the tree, so the tree's own containers have no say.
+    if let workspace = targetWindow.nodeWorkspace, workspace.arrangement == .tabbed {
+        let source = workspace.tabbedGroup(containing: sourceWindow.windowId)
+        return tabbedGroupDropDestination(resolution, source: source, sourceWindow: sourceWindow, targetWindow: targetWindow,
+                                          subject: subject).map(intentOverlayDestination)
+    }
     switch resolution.intent.zone {
         case .tab:
             if let destination = sameTabGroupReturnDestination(
@@ -78,6 +85,42 @@ func destinationFromWindowDropIntent(
             ) else { return nil }
             return intentOverlayDestination(destination)
     }
+}
+
+/// The middle or top of a window moves the tab into its group; an edge opens a new group on that side.
+@MainActor
+private func tabbedGroupDropDestination(
+    _ resolution: WindowDropIntentResolution,
+    source: TabbedGroup?,
+    sourceWindow: Window,
+    targetWindow: Window,
+    subject: WindowDragSubject,
+) -> WindowDragIntentDestination? {
+    guard let workspace = targetWindow.nodeWorkspace,
+          let target = workspace.tabbedGroup(containing: targetWindow.windowId) else { return nil }
+    let kind: WindowDragIntentKind
+    switch resolution.intent.zone {
+        case .tab, .middle:
+            guard target !== source else { return nil }
+            kind = .tabStack(targetWindowId: targetWindow.windowId)
+        case .left, .right, .top, .bottom:
+            // A group's only tab beside itself would change nothing.
+            guard let position = resolution.intent.zone.stackSplitPosition,
+                  target !== source || target.shownWindowIds.count > 1 else { return nil }
+            kind = .stackSplit(targetWindowId: targetWindow.windowId, position: position)
+    }
+    let joins = if case .tabStack = kind { true } else { false }
+    let preview = windowDropIntentActivePreviewRect(for: resolution)
+    return WindowDragIntentDestination(
+        kind: kind,
+        previewRect: preview,
+        interactionRect: resolution.targetFrame,
+        title: joins ? "Move to Tab Group" : "New Tab Group",
+        subtitle: joins ? "Drop to add this tab to that group" : "Drop to open the tab in a new group on this side",
+        previewStyle: joins ? .tabInsert : .stackSplit,
+        previewGeometry: joins ? .tabStrip : .rounded,
+        isGroup: subject == .group,
+    )
 }
 
 @MainActor

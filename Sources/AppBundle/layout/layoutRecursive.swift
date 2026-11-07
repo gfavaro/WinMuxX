@@ -39,13 +39,23 @@ extension Workspace {
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
             rootTilingContainer.lastAppliedLayoutVirtualRect = rect
-            if let active = tabbedActiveUnit {
-                // Every other tab waits hidden, as a tab group's background tabs do; the tree
-                // beneath stays as it was, so returning to Dwindle or Master restores it. A
-                // side-by-side tab lays out its windows in the area as a split.
-                try await rootTilingContainer.hideAllWindowsExcept(active)
-                let content = workspaceTabbedContentRect(rect)
-                try await active.layoutRecursive(content.topLeftCorner, width: content.width, height: content.height,
+            // Each tab group shows its chosen window under its own bar; every other window waits
+            // hidden, as background tabs do. The tree beneath stays as it was, so returning to
+            // Dwindle or Master restores it.
+            syncTabbedGroups()
+            let gaps = context.resolvedGaps.inner
+            let frames = visibleTabbedLayout?.frames(in: rect, gap: CGSize(width: gaps.horizontal, height: gaps.vertical)) ?? []
+            // A group not shown now (its windows briefly missing) is no neighbour to move to.
+            for group in tabbedGroups { group.lastFrame = nil }
+            let shown = Set(frames.compactMap { $0.0.activeWindow?.windowId })
+            for window in rootTilingContainer.allLeafWindowsRecursive where !shown.contains(window.windowId) {
+                try await window.parkHiddenLayoutWindow()
+            }
+            for (group, frame) in frames {
+                group.lastFrame = frame
+                guard let window = group.activeWindow else { continue }
+                let content = workspaceTabbedContentRect(frame)
+                try await window.layoutRecursive(content.topLeftCorner, width: content.width, height: content.height,
                                                  virtual: content, context)
             }
             for window in children.filterIsInstance(of: Window.self) {

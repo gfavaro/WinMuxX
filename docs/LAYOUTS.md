@@ -35,16 +35,21 @@ with tab strips off, since it is how you switch windows there.
 The bar is the original WinMux tab strip: drag a tab along it to reorder, or away to
 drop the window on another window, a sidebar workspace or another display; right-click
 for Move Tab Left and Right. `move left` and `move right` reorder too, and `focus
-tab-next`, `tab-prev` and `--tab-index` follow the bar. Reordering swaps windows between
-their places in the tree, so the splits Dwindle returns to keep their shape. One border
-encloses the bar and the window, and the bar's surface continues behind the window.
+tab-next`, `tab-prev` and `--tab-index` follow the bar. One border encloses the bar and
+the window, and the bar's surface continues behind the window.
 
-To compare two windows, right-click a tab and choose Show Beside Current Tab: that
-window joins the tab shown, side by side, and the bar lists them as one tab. Left and
-right move between them first, then to the next tab. Split Into Tabs on that tab makes
-each window a tab again; in Dwindle or Master they stay side by side. The handle at the
-right of the bar, or dragging the tab out, carries the tab shown, with all its windows,
-to another workspace, display or window.
+To see windows side by side, split the workspace into tab groups: columns and rows,
+each with its own bar showing one of its windows. Right-click a tab and choose Move to
+New Column or Move to New Row, or drag a tab, or the handle at the right of a bar, onto
+the edge of a window shown in the workspace: it opens a new group on that side.
+Dropping it on the middle of a window moves it into that window's group. Floating
+windows and windows dragged from another workspace land the same way. New windows
+open in the focused group, and a group whose last tab leaves closes. `focus` in a
+direction goes to the group on that side, or along the bar when there is none; `move
+left` and `right` reorder along the bar first, then carry the tab into the group beside
+it. `resize` or dragging a window's edge resizes its group against its neighbour. The
+groups are kept apart from the tree, so Dwindle and Master return to the splits they
+had, and they survive a restart.
 
 ## Container modes and tabs
 

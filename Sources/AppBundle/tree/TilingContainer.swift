@@ -10,9 +10,6 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
     /// A tab group shown as a strip: its children sit side by side as columns that scroll
     /// within the group instead of one tab at a time.
     var presentsAsStrip = false
-    /// Windows shown side by side as one tab of a Tabbed workspace. Elsewhere it is an
-    /// ordinary split; clearing it turns its windows back into separate tabs.
-    var isTabbedSplit = false
     /// The columns the strip showed last; focus moves them only as far as needed.
     var stripVisibleColumns: Range<Int> = 0 ..< 0
     var layout: Layout {

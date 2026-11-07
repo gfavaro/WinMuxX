@@ -8,6 +8,27 @@ struct ResizeCommand: Command {
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
 
+        // A Tabbed workspace resizes its tab groups, never the tree it keeps for other arrangements.
+        if target.workspace.arrangement == .tabbed, let window = target.windowOrNil, window.parent is TilingContainer {
+            target.workspace.syncTabbedGroups()
+            let nearest = target.workspace.tabbedGroup(containing: window.windowId)
+                .flatMap { target.workspace.tabbedLayout?.nearestSplitOrientation(of: $0) } ?? .h
+            let axis: Orientation = switch args.dimension.val {
+                case .width: .h
+                case .height: .v
+                case .smart: nearest
+                case .smartOpposite: nearest.opposite
+            }
+            let current = target.workspace.tabbedGroup(containing: window.windowId)?.lastFrame?.getDimension(axis) ?? 0
+            let delta: CGFloat = switch args.units.val {
+                case .set(let value): CGFloat(value) - current
+                case .add(let value): CGFloat(value)
+                case .subtract(let value): -CGFloat(value)
+            }
+            if !target.workspace.resizeTabbedGroup(of: window, along: axis, by: delta) { io.out("resize: nothing to do") }
+            return true
+        }
+
         if let window = target.windowOrNil, let workspace = window.nodeWorkspace,
            singleWindowWidthTarget(in: workspace) === window,
            args.dimension.val == .width || args.dimension.val == .smart {

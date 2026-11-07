@@ -5,9 +5,7 @@ func updateDetachedTabFromTabStrip(_ windowId: UInt32) {
         cancelManipulatedWithMouseState()
         return
     }
-    // A side-by-side tab of a Tabbed workspace is one entry in the bar: it leaves as a whole.
-    let isSideBySideTab = window.nodeWorkspace.map { $0.arrangement == .tabbed && $0.tabbedUnit(containing: window) is TilingContainer } == true
-    startTabStripWindowMove(window: window, subject: isSideBySideTab ? .group : .window, detachOrigin: .tabStrip)
+    startTabStripWindowMove(window: window, subject: .window, detachOrigin: .tabStrip)
 }
 
 @MainActor

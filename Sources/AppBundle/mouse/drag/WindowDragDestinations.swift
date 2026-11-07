@@ -8,6 +8,10 @@ func windowSurfaceDestination(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> WindowDragIntentDestination? {
+    if let workspace = tabbedDragWorkspace(sourceWindow: sourceWindow, targetWorkspace: targetWindow.nodeWorkspace) {
+        return tabbedWindowSurfaceDestination(in: workspace, sourceWindow: sourceWindow, targetWindow: targetWindow,
+                                              mouseLocation: mouseLocation, subject: subject, detachOrigin: detachOrigin)
+    }
     let targetNode = dragIntentTargetNode(
         sourceWindow: sourceWindow,
         targetWindow: targetWindow,
@@ -50,4 +54,35 @@ func windowSurfaceDestination(
         subject: subject,
         detachOrigin: detachOrigin,
     )
+}
+
+/// The Tabbed workspace a drag lands on: its drops are resolved from the tab groups on screen,
+/// never from the tree kept beneath them.
+@MainActor
+func tabbedDragWorkspace(sourceWindow _: Window, targetWorkspace: Workspace?) -> Workspace? {
+    guard let workspace = targetWorkspace, workspace.arrangement == .tabbed else { return nil }
+    return workspace
+}
+
+/// A drop on the area of the tab group showing `targetWindow`, its bar included. The tab shown
+/// may be the one dragged: an edge then opens a new group beside its own.
+@MainActor
+func tabbedWindowSurfaceDestination(
+    in workspace: Workspace,
+    sourceWindow: Window,
+    targetWindow: Window,
+    mouseLocation: CGPoint,
+    subject: WindowDragSubject,
+    detachOrigin: TabDetachOrigin,
+) -> WindowDragIntentDestination? {
+    guard let area = workspace.tabbedGroup(containing: targetWindow.windowId)?.lastFrame, area.contains(mouseLocation),
+          let zone = WindowIntentZoneBuilder.zone(at: mouseLocation, in: area) else { return nil }
+    let resolution = WindowDropIntentResolution(
+        intent: WindowDropIntent(sourceWindowId: sourceWindow.windowId, targetWindowId: targetWindow.windowId, zone: zone),
+        targetFrame: area,
+        targetCornerRadius: nil,
+        zones: WindowIntentZoneBuilder.zones(in: area),
+    )
+    return destinationFromWindowDropIntent(resolution, sourceWindow: sourceWindow, targetWindow: targetWindow,
+                                           mouseLocation: mouseLocation, subject: subject, detachOrigin: detachOrigin)
 }

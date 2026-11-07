@@ -16,21 +16,12 @@ struct WindowBorderTarget: Equatable {
 func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorderTarget? {
     let ordinary = WindowBorderTarget(frame: nativeFrame,
         corners: .init(top: systemWindowCornerRadius(), bottom: systemWindowCornerRadius()))
-    // In a Tabbed workspace the tab bar belongs to the window shown under it: one border
-    // encloses both, from the top of the bar to the bottom of the window.
+    // In a Tabbed workspace each tab group's bar belongs to the window shown under it: one border
+    // encloses both, from the top of the bar to the bottom of the group's area.
     if let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen,
-       let split = workspace.tabbedActiveUnit as? TilingContainer, split.allLeafWindowsRecursive.contains(where: { $0 === window }) {
-        // A side-by-side tab has one border around the bar and all its windows, drawn by its front window.
-        guard split.mostRecentWindowRecursive === window else { return nil }
-        let area = workspaceTilingRect(workspace)
+       let group = workspace.tabbedGroup(containing: window.windowId) {
+        guard group.activeWindow === window, let area = group.lastFrame else { return nil }
         return WindowBorderTarget(frame: CGRect(x: area.topLeftX, y: area.topLeftY, width: area.width, height: area.height),
-            corners: .init(top: windowTabStripCornerRadius, bottom: systemWindowCornerRadius()))
-    }
-    if let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen,
-       workspace.rootTilingContainer.mostRecentWindowRecursive === window {
-        let top = workspaceTilingRect(workspace).topLeftY
-        guard nativeFrame.maxY > top else { return ordinary }
-        return WindowBorderTarget(frame: CGRect(x: nativeFrame.minX, y: top, width: nativeFrame.width, height: nativeFrame.maxY - top),
             corners: .init(top: windowTabStripCornerRadius, bottom: systemWindowCornerRadius()))
     }
     guard let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior else { return ordinary }
