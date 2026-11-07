@@ -32,6 +32,13 @@ focus left and right, switches windows. New windows open as new tabs. Choose it 
 Dwindle places them. Floating windows keep their own position. The bar shows even
 with tab strips off, since it is how you switch windows there.
 
+The bar is the original WinMux tab strip: drag a tab along it to reorder, or away to
+drop the window on another window, a sidebar workspace or another display; right-click
+for Move Tab Left and Right. `move left` and `move right` reorder too, and `focus
+tab-next`, `tab-prev` and `--tab-index` follow the bar. Reordering swaps windows between
+their places in the tree, so the splits Dwindle returns to keep their shape. One border
+encloses the bar and the window, and the bar's surface continues behind the window.
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another, and

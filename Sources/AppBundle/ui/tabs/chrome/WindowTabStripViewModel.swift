@@ -13,6 +13,9 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     var shownWindowIds: Set<UInt32> = []
     /// The header the group reserves above its windows: the strip's height, or none with pills.
     var headerHeight: CGFloat = 0
+    /// The bar of a Tabbed workspace, whose tabs are the workspace's windows rather than a group's
+    /// children: there is no group to drag as a whole or to remove a tab from.
+    var isWorkspaceTabs = false
 
     var groupFrameIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(groupFrame) }

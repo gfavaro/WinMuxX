@@ -12,6 +12,15 @@ struct MoveCommand: Command {
             return io.err(noWindowIsFocused)
         }
         let currentNode = currentWindow.moveNode
+        // In a Tabbed workspace left and right move the tab along the bar, as dragging it does.
+        if target.workspace.arrangement == .tabbed, currentWindow.parent is TilingContainer {
+            let tabs = target.workspace.rootTilingContainer.allLeafWindowsRecursive
+            guard direction.orientation == .h, let index = tabs.firstIndex(where: { $0 === currentWindow }),
+                  tabs.indices.contains(index + direction.focusOffset) else {
+                return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
+            }
+            return reorderWorkspaceTab(currentWindow, stripId: ObjectIdentifier(target.workspace), toIndex: index + direction.focusOffset)
+        }
         // Inside a strip, left and right reorder its columns; at either end the whole strip moves.
         if direction.orientation == .h, let strip = currentWindow.nearestWindowTabGroup, strip.isWindowStrip,
            let column = currentWindow.directChild(in: strip), let index = column.ownIndex,

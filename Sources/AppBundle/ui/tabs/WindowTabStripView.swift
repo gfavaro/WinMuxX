@@ -116,20 +116,22 @@ extension WindowTabStripView {
             )
                 .frame(maxWidth: .infinity)
 
-            Color.clear
-                .frame(width: windowTabStripTrailingGroupDragGutterWidth)
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
-                    focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
-                }
-                .gesture(groupDragGesture(for: groupDragWindowId))
+            if !strip.isWorkspaceTabs {
+                Color.clear
+                    .frame(width: windowTabStripTrailingGroupDragGutterWidth)
+                    .frame(maxHeight: .infinity)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
+                        focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
+                    }
+                    .gesture(groupDragGesture(for: groupDragWindowId))
 
-            WindowTabGroupHandleView(
-                windowId: groupDragWindowId,
-                workspaceName: strip.workspaceName
-            )
+                WindowTabGroupHandleView(
+                    windowId: groupDragWindowId,
+                    workspaceName: strip.workspaceName
+                )
+            }
         }
         .padding(.leading, 2)
         .padding(.trailing, 8)
@@ -156,21 +158,27 @@ extension WindowTabStripView {
         itemHeight: CGFloat,
         groupDragWindowId: UInt32?,
     ) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: windowTabStripTabSpacing) {
-                ForEach(strip.tabs) { tab in
-                    tabItem(tab, context: context, itemHeight: itemHeight)
+        ScrollViewReader { scroller in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: windowTabStripTabSpacing) {
+                    ForEach(strip.tabs) { tab in
+                        tabItem(tab, context: context, itemHeight: itemHeight)
+                            .id(tab.windowId)
+                    }
+                }
+                .padding(.horizontal, windowTabStripContentHorizontalPadding)
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: WindowTabStripScrollContentFramePreferenceKey.self,
+                            value: proxy.frame(in: .named(context.scrollCoordinateSpaceName)),
+                        )
+                    }
                 }
             }
-            .padding(.horizontal, windowTabStripContentHorizontalPadding)
-            .background {
-                GeometryReader { proxy in
-                    Color.clear.preference(
-                        key: WindowTabStripScrollContentFramePreferenceKey.self,
-                        value: proxy.frame(in: .named(context.scrollCoordinateSpaceName)),
-                    )
-                }
-            }
+            // A tab chosen from the keyboard while scrolled out of view comes into view.
+            .onAppear { scrollToActiveTab(scroller) }
+            .onChange(of: strip.activeWindowId) { _ in scrollToActiveTab(scroller) }
         }
         .coordinateSpace(name: context.scrollCoordinateSpaceName)
         .onPreferenceChange(WindowTabStripScrollContentFramePreferenceKey.self) { nextFrame in
@@ -193,7 +201,7 @@ extension WindowTabStripView {
             focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
         }
         .simultaneousGesture(tabScrollBackgroundGroupDragGesture(
-            for: groupDragWindowId,
+            for: strip.isWorkspaceTabs ? nil : groupDragWindowId,
             context: context,
         ))
     }
@@ -451,15 +459,22 @@ extension WindowTabStripView {
                 .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: -1, in: strip.tabs) == nil)
             Button("Move Tab Right") { moveTab(tab, by: 1) }
                 .disabled(windowTabStripMoveTargetIndex(tab.windowId, by: 1, in: strip.tabs) == nil)
-            Divider()
-            Button("Remove Tab From Stack") {
-                removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
+            if !strip.isWorkspaceTabs {
+                Divider()
+                Button("Remove Tab From Stack") {
+                    removeWindowFromTabStrip(tab.windowId, fallbackWorkspace: tab.workspaceName)
+                }
             }
         }
     }
 }
 
 extension WindowTabStripView {
+    func scrollToActiveTab(_ scroller: ScrollViewProxy) {
+        guard draggingTabId == nil, let active = strip.activeWindowId, strip.tabs.contains(where: { $0.windowId == active }) else { return }
+        scroller.scrollTo(active)
+    }
+
     /// Keyboard and VoiceOver alternative to drag reordering.
     func moveTab(_ tab: WindowTabItemViewModel, by offset: Int) {
         guard let target = windowTabStripMoveTargetIndex(tab.windowId, by: offset, in: strip.tabs) else { return }

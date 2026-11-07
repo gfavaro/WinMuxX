@@ -10,7 +10,9 @@ struct WorkspaceTabBarModel: Equatable, Identifiable {
     let frame: CGRect
     let barHeight: CGFloat
     let activeWindowId: UInt32
-    let tabs: [WindowTabItemViewModel]
+    /// The bar itself, drawn by the tab strip view the original WinMux used for tab groups.
+    let strip: WindowTabStripViewModel
+    var tabs: [WindowTabItemViewModel] { strip.tabs }
     var id: String { workspaceName }
 }
 
@@ -39,8 +41,15 @@ func buildWorkspaceTabBarModels() async -> [WorkspaceTabBarModel]? {
         if Task.isCancelled { return nil }
         guard workspace.isVisible, workspace.arrangement == .tabbed, !workspace.presentsManagedFullscreen else { continue }
         let rect = workspaceTilingRect(workspace)
-        models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: rect.toAppKitScreenRect.alignedToBackingPixels(),
-            barHeight: min(resolvedWindowTabBarHeight(), rect.height), activeWindowId: active.windowId, tabs: tabs))
+        let frame = rect.toAppKitScreenRect.alignedToBackingPixels()
+        let barHeight = min(resolvedWindowTabBarHeight(), rect.height)
+        let strip = WindowTabStripViewModel(id: ObjectIdentifier(workspace), workspaceName: workspace.name,
+            frame: CGRect(x: frame.minX, y: frame.maxY - barHeight, width: frame.width, height: barHeight),
+            groupFrame: frame, activeWindowId: active.windowId,
+            activeWindowCornerRadius: windowTabGroupAppCornerRadius(activeWindowId: active.windowId), tabs: tabs,
+            occludingFloatingWindowFrames: [], shownWindowIds: [active.windowId], headerHeight: barHeight, isWorkspaceTabs: true)
+        models.append(WorkspaceTabBarModel(workspaceName: workspace.name, frame: frame, barHeight: barHeight,
+            activeWindowId: active.windowId, strip: strip))
     }
     return models
 }
@@ -51,6 +60,11 @@ final class WorkspaceTabBarController {
     private var panels: [String: WorkspaceTabBarPanel] = [:]
 
     private init() {}
+
+    /// Called with every tab chrome refresh, including when a drag starts or ends.
+    func refreshMousePolicy() {
+        for panel in panels.values { panel.updateMousePolicy() }
+    }
 
     /// Mission Control hides the panels itself; the swipe preview and overview draw above them.
     func update(_ models: [WorkspaceTabBarModel]) {
@@ -69,7 +83,7 @@ final class WorkspaceTabBarController {
 
 @MainActor
 final class WorkspaceTabBarPanel: NSPanelHud {
-    private let hostingView = NSHostingView(rootView: AnyView(EmptyView()))
+    private let hostingView = WorkspaceTabBarHostingView(rootView: AnyView(EmptyView()))
     private var current: WorkspaceTabBarModel?
 
     override init() {
@@ -82,9 +96,10 @@ final class WorkspaceTabBarPanel: NSPanelHud {
     override var canBecomeMain: Bool { false }
 
     func show(_ model: WorkspaceTabBarModel) {
-        if current?.tabs != model.tabs || current?.workspaceName != model.workspaceName || current?.barHeight != model.barHeight {
+        if current?.strip != model.strip || current?.barHeight != model.barHeight {
             hostingView.rootView = AnyView(WorkspaceTabBarView(model: model))
         }
+        updateMousePolicy()
         if current?.frame != model.frame { setWindowTabChromePanelFrame(model.frame, on: self) }
         // Just behind the window shown, reasserted on every refresh like the tab-group panels:
         // raising that window or another one changes the order outside this model.
@@ -93,62 +108,30 @@ final class WorkspaceTabBarPanel: NSPanelHud {
         if !isVisible { order(.below, relativeTo: 0) }
         current = model
     }
+
+    /// As the original strip panel: while a dragged tab is carried away, drops reach what lies beneath.
+    func updateMousePolicy() {
+        ignoresMouseEvents = currentlyManipulatedWithMouseWindowId != nil
+            && shouldIgnoreWindowTabStripMouseEventsDuringDrag(detachOrigin: getCurrentMouseTabDetachOrigin())
+    }
 }
 
-/// Tabs share the bar's width up to a comfortable maximum and scroll when there are many.
+/// A tab responds to the first click, even while another app is active.
+final class WorkspaceTabBarHostingView: NSHostingView<AnyView> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+/// The original tab strip across the top, carrying its own surface; below it the same surface
+/// sits behind the window, so the window's rounded corners show it.
 struct WorkspaceTabBarView: View {
     let model: WorkspaceTabBarModel
-    @State private var hovered: UInt32?
-    private let spacing = windowTabStripTabSpacing
-    private let padding: CGFloat = 6
 
     var body: some View {
         VStack(spacing: 0) {
-            tabs.frame(height: model.barHeight)
-            // The window covers this part; only its rounded corners show the surface.
-            Color.clear.allowsHitTesting(false)
+            WindowTabStripView(strip: model.strip).frame(height: model.barHeight)
+            OverlaySurface().allowsHitTesting(false)
         }
-        .background { OverlaySurface(cornerRadius: windowTabStripCornerRadius) }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Workspace tabs")
     }
-
-    private var tabs: some View {
-        GeometryReader { geometry in
-            let height = geometry.size.height - 2 * padding
-            let width = workspaceTabWidth(barWidth: geometry.size.width - 2 * padding, count: model.tabs.count, spacing: spacing)
-            ScrollViewReader { proxy in ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: spacing) {
-                    ForEach(model.tabs) { tab in
-                        WindowTabItemView(tab: tab, width: width, height: height, isDragSource: false, isHovered: hovered == tab.windowId)
-                            .id(tab.windowId)
-                            .onHover { inside in hovered = inside ? tab.windowId : (hovered == tab.windowId ? nil : hovered) }
-                            .onTapGesture { focusWindowFromTabStripClick(tab.windowId, fallbackWorkspace: tab.workspaceName) }
-                            .accessibilityElement(children: .combine)
-                            .accessibilityAddTraits(tab.isActive ? [.isButton, .isSelected] : .isButton)
-                            .accessibilityAction { focusWindowFromTabStripClick(tab.windowId, fallbackWorkspace: tab.workspaceName) }
-                    }
-                }
-                .padding(padding)
-            }
-            // A tab switched to while scrolled out of view comes into view, so one always shows as active.
-            .onAppear { scrollToActive(proxy) }
-            .onChange(of: model.tabs.first(where: \.isActive)?.windowId) { _ in scrollToActive(proxy) }
-            }
-        }
-    }
-}
-
-extension WorkspaceTabBarView {
-    fileprivate func scrollToActive(_ proxy: ScrollViewProxy) {
-        guard let active = model.tabs.first(where: \.isActive)?.windowId else { return }
-        proxy.scrollTo(active)
-    }
-}
-
-/// Each tab's width when `count` tabs share `barWidth`, within the tab strip's widths.
-func workspaceTabWidth(barWidth: CGFloat, count: Int, spacing: CGFloat) -> CGFloat {
-    guard count > 0 else { return 0 }
-    let shared = (barWidth - spacing * CGFloat(count - 1)) / CGFloat(count)
-    return min(windowTabStripPreferredTabWidth, max(windowTabStripMinimumTabWidth, shared.rounded(.down)))
 }

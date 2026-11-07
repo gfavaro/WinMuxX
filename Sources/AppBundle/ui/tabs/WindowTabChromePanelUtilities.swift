@@ -14,6 +14,7 @@ extension WindowTabStripViewModel {
             occludingFloatingWindowFrames: occludingFloatingWindowFrames,
             shownWindowIds: shownWindowIds,
             headerHeight: headerHeight,
+            isWorkspaceTabs: isWorkspaceTabs,
         )
     }
 }

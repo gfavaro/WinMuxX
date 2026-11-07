@@ -126,6 +126,20 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertNotEqual(missing.exitCode, 0)
     }
 
+    func testReorderingTabsKeepsTheTreeShape() async throws {
+        let (workspace, windows, group) = makeNestedWorkspace()
+        _ = windows[0].focusWindow()
+        _ = try await run("workspace-layout tabbed")
+        XCTAssertTrue(reorderWorkspaceTab(windows[0], stripId: ObjectIdentifier(workspace), toIndex: 2))
+        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual([windows[1], windows[2], windows[0]], by: ===))
+        XCTAssertEqual(group.children.count, 2, "Slots stay where they were; windows move between them")
+        XCTAssertEqual(group.layout, .tabGroup)
+        _ = try await run("move left")
+        XCTAssertTrue(workspace.rootTilingContainer.allLeafWindowsRecursive.elementsEqual([windows[1], windows[0], windows[2]], by: ===),
+            "move left moves the focused tab one place along the bar")
+        XCTAssertFalse(reorderWorkspaceTab(windows[0], stripId: ObjectIdentifier(group), toIndex: 0), "Another strip's id is not this bar")
+    }
+
     func testConfigSelectsTabbedWhileTabGroupKeepsItsRootMeaning() {
         let parsed = parseConfig("""
         [workspace.'1']
@@ -138,10 +152,4 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(parsed.config.workspaceLayouts["2"]?.defaults.rootLayout, .tabGroup)
     }
 
-    func testTabsShareTheBarWithinComfortableWidths() {
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 4, spacing: 4), 240, "Few tabs stop at 240 points")
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 6, spacing: 4), 163)
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 30, spacing: 4), 132, "Many tabs keep 132 points and scroll")
-        XCTAssertEqual(workspaceTabWidth(barWidth: 1000, count: 0, spacing: 4), 0)
-    }
 }
