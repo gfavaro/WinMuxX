@@ -83,6 +83,15 @@ final class SettingsRefinementTest: WorkspaceTestCase {
         XCTAssertNil(settingsSearchSubmitSelection(controls: [], pages: []))
     }
 
+    func testCommandFFocusesSearchButOtherShortcutsDoNot() {
+        XCTAssertTrue(isSettingsFindShortcut(.command, "f"))
+        XCTAssertTrue(isSettingsFindShortcut([.command, .capsLock], "F"))
+        XCTAssertFalse(isSettingsFindShortcut([.command, .shift], "f"))
+        XCTAssertFalse(isSettingsFindShortcut([.command, .option], "f"))
+        XCTAssertFalse(isSettingsFindShortcut(.command, "g"))
+        XCTAssertFalse(isSettingsFindShortcut([], "f"))
+    }
+
     func testControlSearchFindsSpecificDestinations() {
         let borders = settingsControlSearchResults("borders")
         XCTAssertTrue(borders.contains { $0.id == "borders.enabled" && $0.page == .appearance })

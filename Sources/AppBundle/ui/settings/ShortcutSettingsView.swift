@@ -221,8 +221,13 @@ struct ShortcutSettingsView: View {
                     }
                 }
             }
-            .searchable(text: $settingsSearch, placement: .sidebar, prompt: "Find settings")
-            .onSubmit(of: .search) { select(settingsSearchSubmitSelection(controls: controlResults, pages: matchingPages)) }
+            .safeAreaInset(edge: .top) {
+                SettingsSearchField(text: $settingsSearch) {
+                    select(settingsSearchSubmitSelection(controls: controlResults, pages: matchingPages))
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+            }
             .onAppear { showsAdvanced = selectedItem?.isAdvanced == true }
             .onChange(of: storedPage) { _ in
                 if selectedItem?.isAdvanced == true { showsAdvanced = true }

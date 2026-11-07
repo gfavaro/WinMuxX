@@ -193,6 +193,10 @@ showed Tab and arrow keys skipping direct control results and Return in the sear
 field doing nothing. Control results were plain Buttons beside the page links. Every
 sidebar row is now a NavigationLink on one `SettingsSidebarSelection`, so control
 results take part in List selection, and Return opens the first control result or
-else the first page. Choosing a control again issues a fresh scroll request. Still
-pending: native keyboard navigation and Return, focus after jumping, VoiceOver
-announcement, Increase Contrast and Reduce Motion.
+else the first page. Choosing a control again issues a fresh scroll request.
+
+UI-08 native check (build 313, by the user): ⌘F focuses the search field, Return
+opens the first result, and Tab and arrow keys move through control results and
+pages. SwiftUI's `.searchable` field ignored ⌘F and never reported Return, so the
+sidebar now uses an AppKit search field (`SettingsSearchField`). Still pending:
+VoiceOver announcement of the destination, Increase Contrast and Reduce Motion.
