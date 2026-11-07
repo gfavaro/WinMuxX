@@ -18,6 +18,9 @@ final class TabbedGroup {
     weak var foldedInto: TabbedGroup?
     /// Which of this group and those folded into it was used last, and so is shown in its area.
     weak var displayedMember: TabbedGroup?
+    /// How far its bar has scrolled its tabs, as the bar reports: zero, or negative once tabs have
+    /// scrolled out to the left. Drops onto the bar land by where its tabs are now.
+    var barScrollOffset: CGFloat = 0
 
     init(windowIds: [UInt32], activeWindowId: UInt32? = nil) {
         self.windowIds = windowIds
@@ -338,6 +341,37 @@ extension Workspace {
         if lastTabbedFocusedWindowId == windowId { lastTabbedGroup = target }
         tabbedLayout = tabbedLayout?.pruned()
         return true
+    }
+
+    /// Puts a tab at `index` among the other tabs `bar`'s bar shows, as dropping it there does: into
+    /// the group of the tab it lands before, or after the last tab, staying in its own group when it
+    /// lands beside one of its own tabs. Shows it there.
+    @MainActor func insertTabbedTab(_ windowId: UInt32, intoBarOf bar: TabbedGroup, at index: Int) -> Bool {
+        guard let source = tabbedGroup(containing: windowId) else { return false }
+        // Put back where it was, it stays: no group changes hands for a gesture that moved nothing.
+        if source.barGroup === bar, bar.barWindowIds.firstIndex(of: windowId) == index {
+            source.activeWindowId = windowId
+            return true
+        }
+        let tabs = bar.barWindowIds.filter { $0 != windowId }
+        let before = tabs.getOrNil(atIndex: index - 1), after = tabs.getOrNil(atIndex: index)
+        // Before `after`, or else after `before`; its own group's neighbour wins when there are two.
+        let anchor: (id: UInt32, after: Bool)? = if let after, !(before.map { source.windowIds.contains($0) } ?? false)
+            || source.windowIds.contains(after) {
+            (after, false)
+        } else {
+            (before ?? tabs.last).map { ($0, true) }
+        }
+        let group = anchor.flatMap { tabbedGroup(containing: $0.id) } ?? bar
+        var ids = group.windowIds.filter { $0 != windowId }
+        let position = anchor.flatMap { anchor in ids.firstIndex(of: anchor.id).map { anchor.after ? $0 + 1 : $0 } } ?? ids.count
+        if source === group {
+            ids.insert(windowId, at: position)
+            group.windowIds = ids
+            group.activeWindowId = windowId
+            return true
+        }
+        return moveTabbedTab(windowId, into: group, at: position)
     }
 
     /// Opens a new group on `side` of `target` holding the tab, as dropping it on that edge does.

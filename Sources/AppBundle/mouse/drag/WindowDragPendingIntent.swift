@@ -136,6 +136,7 @@ func clearPendingWindowDragIntent() {
     }
     pendingWindowDragIntent = nil
     WindowTabReentryPreviewModel.shared.set(nil)
+    WindowTabReentryPreviewModel.shared.setIncoming(nil)
     lastWindowDragIntentLogSignature = nil
     setPinnedDraggedWindowId(nil)
     if !preservesSidebarDragUI {
@@ -156,6 +157,8 @@ func clearPendingWindowDragIntent() {
 
 @MainActor
 private func updateWindowTabReentryPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) {
+    if updateTabbedBarDropPreview(sourceWindowId: sourceWindowId, destination: destination) { return }
+    WindowTabReentryPreviewModel.shared.setIncoming(nil)
     guard case .reorderTab(let windowId, let targetIndex) = destination.kind,
           windowId == sourceWindowId,
           let sourceWindow = Window.get(byId: sourceWindowId),
@@ -199,12 +202,20 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
     let carriedGroup = pendingWindowDragIntent.sourceSubject == .group ? tabbedGroupCarried(by: sourceWindow) : nil
     defer { if let carriedGroup { bringTabbedGroupAlong(carriedGroup, after: sourceWindow) } }
     switch pendingWindowDragIntent.kind {
+        case .insertTab:
+            return false
         case .reorderTab(let windowId, let targetIndex):
             guard pendingWindowDragIntent.sourceSubject == .window,
                   sourceWindow.windowId == windowId
             else { return false }
             syncClosedWindowsCacheToCurrentWorld()
             suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
+            // A tab dragged out of a Tabbed workspace's bar and back moves along that bar.
+            if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .tabbed,
+               let group = workspace.tabbedGroup(containing: windowId) {
+                guard workspace.insertTabbedTab(windowId, intoBarOf: group.barGroup, at: targetIndex) else { return false }
+                return sourceWindow.focusWindow()
+            }
             return reorderWindowTabInCurrentGroup(sourceWindow, toIndex: targetIndex)
         case .tabStack(let targetWindowId):
             guard pendingWindowDragIntent.sourceSubject == .window else { return false }
@@ -272,7 +283,8 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
 }
 
 /// Dropping a window on a Tabbed workspace's window: on an edge it opens a new tab group on that
-/// side, in the middle or on the tabs it joins that window's group. Nil when the drop does not
+/// side, in the middle it joins that window's group, and on the bar it goes where it was dropped
+/// among the tabs. Nil when the drop does not
 /// land on a Tabbed workspace's tab group.
 @MainActor
 func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Window, subject: WindowDragSubject = .window) -> Bool? {
@@ -281,6 +293,7 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
           sourceWindow !== target || side != nil, workspace.tabbedGroup(containing: targetId) != nil else { return nil }
     syncClosedWindowsCacheToCurrentWorld()
     suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, target.windowId])
+    let insertIndex: Int? = if case .insertTab(_, let index) = kind { index } else { nil }
     var windowIds = [sourceWindow.windowId]
     var importedGroupOrder: [UInt32] = []
     if workspace.tabbedGroup(containing: sourceWindow.windowId) == nil {
@@ -322,6 +335,7 @@ func applyTabbedGroupDragIntent(_ kind: WindowDragIntentKind, sourceWindow: Wind
     // An imported window may already have joined the target's group as a newcomer.
     guard let group = workspace.tabbedGroup(containing: targetId)?.barGroup,
           side.map({ workspace.moveTabbedTabToNewGroup(sourceWindow.windowId, beside: group, on: $0) })
+            ?? insertIndex.map({ workspace.insertTabbedTab(sourceWindow.windowId, intoBarOf: group, at: $0) })
             ?? (workspace.tabbedGroup(containing: sourceWindow.windowId) === group
                 || workspace.moveTabbedTab(sourceWindow.windowId, into: group)),
           let destination = workspace.tabbedGroup(containing: sourceWindow.windowId) else { return false }
@@ -345,7 +359,7 @@ func tabbedGroupDropTarget(_ kind: WindowDragIntentKind) -> (UInt32, CardinalDir
                 case .below: .down
             }
             return (target, side)
-        case .tabStack(let target), .swap(let target): return (target, nil)
+        case .tabStack(let target), .insertTab(let target, _), .swap(let target): return (target, nil)
         default: return nil
     }
 }
@@ -384,4 +398,42 @@ func bringTabbedGroupAlong(_ carried: (workspace: Workspace, windowIds: [UInt32]
     group.windowIds = group.windowIds.filter { !carried.windowIds.contains($0) } + carried.windowIds
     group.activeWindowId = window.windowId
     target.tabbedLayout = target.tabbedLayout?.pruned()
+}
+
+/// Over a Tabbed workspace's bar, as over a tab strip: the dragged tab's own bar makes room where
+/// it would go back, and another bar opens a gap where it would land. False when the drop is
+/// not on such a bar.
+@MainActor
+private func updateTabbedBarDropPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) -> Bool {
+    let preview = WindowTabReentryPreviewModel.shared
+    let mouse = MousePointerTracker.shared.currentSample.point
+    switch destination.kind {
+        case .insertTab(let targetWindowId, let index):
+            guard let workspace = Window.get(byId: targetWindowId)?.nodeWorkspace,
+                  let host = workspace.tabbedGroup(containing: targetWindowId)?.barGroup else { return false }
+            preview.set(nil)
+            preview.setIncoming(WindowTabIncomingDrop(stripId: ObjectIdentifier(host), targetIndex: index,
+                                                      orderBeforeDrop: host.barWindowIds))
+            return true
+        case .reorderTab(let windowId, let targetIndex):
+            guard windowId == sourceWindowId, let workspace = Window.get(byId: windowId)?.nodeWorkspace,
+                  workspace.arrangement == .tabbed, let host = workspace.tabbedGroup(containing: windowId)?.barGroup,
+                  let area = host.lastFrame else { return false }
+            let bar = host.barWindowIds
+            guard let sourceIndex = bar.firstIndex(of: windowId) else { return false }
+            preview.setIncoming(nil)
+            preview.set(WindowTabPendingReorderDrop(
+                stripId: ObjectIdentifier(host),
+                windowId: windowId,
+                sourceIndex: sourceIndex,
+                targetIndex: max(0, min(targetIndex, bar.count - 1)),
+                orderBeforeDrop: bar,
+                sourceVisualOffset: tabReentrySourceVisualOffset(mouseLocation: mouse, tabStripRect: tabbedBarTabsRect(area: area, host: host),
+                                                                 tabCount: bar.count, sourceIndex: sourceIndex,
+                                                                 minimumTabWidth: workspaceTabStripMinimumTabWidth),
+            ))
+            return true
+        default:
+            return false
+    }
 }

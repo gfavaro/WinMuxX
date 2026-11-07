@@ -1,7 +1,7 @@
 @MainActor
 func stickyTargetWindow(for sticky: PendingWindowDragIntent) -> Window? {
     switch sticky.kind {
-        case .tabStack(let targetWindowId), .stackSplit(let targetWindowId, _), .swap(let targetWindowId):
+        case .tabStack(let targetWindowId), .insertTab(let targetWindowId, _), .stackSplit(let targetWindowId, _), .swap(let targetWindowId):
             Window.get(byId: targetWindowId)
         case .reorderTab, .detachTab, .moveToWorkspace, .moveToWorkspaceZone, .createWorkspace, .sidebarHover:
             nil

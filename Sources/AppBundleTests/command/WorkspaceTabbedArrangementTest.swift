@@ -718,6 +718,56 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         _ = left
     }
 
+    func testATabDroppedOnAnotherBarGoesWhereThePointerIs() async throws {
+        let (workspace, windows, left, right) = try await makeTwoGroups()
+        let bar = tabbedBarTabsRect(area: try XCTUnwrap(right.lastFrame))
+        let first = CGPoint(x: bar.minX + 6, y: bar.center.y)
+        let destination = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[0], mouseLocation: first,
+                                                                         subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(destination.kind, .insertTab(targetWindowId: try XCTUnwrap(right.displayedWindow).windowId, index: 0))
+        XCTAssertEqual(applyTabbedGroupDragIntent(destination.kind, sourceWindow: windows[0]), true)
+        XCTAssertEqual(right.windowIds, [windows[0], windows[1], windows[2]].map(\.windowId), "It went before the first tab")
+        XCTAssertFalse(workspace.tabbedGroups.contains { $0 === left }, "Its empty group closed")
+    }
+
+    func testATabBackOverItsOwnBarMovesAlongIt() async throws {
+        let (workspace, windows, _, right) = try await makeTwoGroups()
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        let bar = tabbedBarTabsRect(area: try XCTUnwrap(right.lastFrame))
+        let end = CGPoint(x: bar.maxX - 80, y: bar.center.y)
+        let destination = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[1], mouseLocation: end,
+                                                                         subject: .window, detachOrigin: .tabStrip))
+        XCTAssertEqual(destination.kind, .reorderTab(windowId: windows[1].windowId, targetIndex: 1))
+        XCTAssertTrue(workspace.insertTabbedTab(windows[1].windowId, intoBarOf: right, at: 1))
+        XCTAssertEqual(right.windowIds, [windows[2], windows[1]].map(\.windowId))
+    }
+
+    func testDropsOnAScrolledBarFollowItsTabs() async throws {
+        let (_, windows, _, right) = try await makeTwoGroups()
+        let area = try XCTUnwrap(right.lastFrame)
+        let tabs = tabbedBarTabsRect(area: area)
+        let pointer = CGPoint(x: tabs.minX + 6, y: tabs.center.y)
+        right.barScrollOffset = -120
+        XCTAssertEqual(tabbedBarTabsRect(area: area, host: right).minX, tabs.minX - 120)
+        let destination = try XCTUnwrap(currentWindowSurfaceDestination(sourceWindow: windows[0], mouseLocation: pointer,
+                                                                         subject: .window, detachOrigin: .tabStrip))
+        guard case .insertTab(_, let index) = destination.kind else { return XCTFail("Not a bar drop") }
+        XCTAssertGreaterThan(index, 0, "With the first tab scrolled away, the pointer is past it")
+    }
+
+    func testInsertingIntoAFoldedBarJoinsTheGroupOfTheTabItLandsBefore() async throws {
+        let rect = workspaceTilingRect(focus.workspace)
+        let (workspace, windows, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
+        XCTAssertEqual(groups[1].barWindowIds, [windows[1], windows[2]].map(\.windowId))
+        XCTAssertTrue(workspace.insertTabbedTab(windows[0].windowId, intoBarOf: groups[1], at: 1))
+        XCTAssertEqual(groups[2].windowIds, [windows[0], windows[2]].map(\.windowId))
+        XCTAssertEqual(groups[2].activeWindowId, windows[0].windowId)
+        XCTAssertEqual(groups[1].barWindowIds, [windows[1], windows[0], windows[2]].map(\.windowId))
+        XCTAssertTrue(workspace.insertTabbedTab(windows[1].windowId, intoBarOf: groups[1], at: 0))
+        XCTAssertEqual(groups[1].windowIds, [windows[1].windowId], "Put back where it was, a tab keeps its own group")
+    }
+
     func testJoiningAGroupWorksWithWindowTabsOff() {
         let previous = config.windowTabs.enabled
         config.windowTabs.enabled = false

@@ -10,6 +10,8 @@ let windowTabPreviewCornerRadius: CGFloat = {
     if #available(macOS 26.0, *) { return 16 } else { return 12 }
 }()
 let windowTabStripContentHorizontalPadding: CGFloat = 3
+/// Between the strip's leading edge and its scrolling tabs.
+let windowTabStripLeadingInset: CGFloat = 2
 let windowTabStripReservedHandleWidth: CGFloat = 24
 let windowTabStripTrailingGroupDragGutterWidth: CGFloat = 28
 let windowTabStripCornerRadius: CGFloat = RadiusToken.section

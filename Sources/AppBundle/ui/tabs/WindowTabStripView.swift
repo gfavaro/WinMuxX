@@ -137,7 +137,7 @@ extension WindowTabStripView {
                 workspaceName: strip.workspaceName
             )
         }
-        .padding(.leading, 2)
+        .padding(.leading, windowTabStripLeadingInset)
         .padding(.trailing, 8)
         .padding(.vertical, 2)
         .frame(width: stripWidth, height: stripHeight)
@@ -189,6 +189,8 @@ extension WindowTabStripView {
             if abs(tabScrollContentMinX - nextFrame.minX) > 0.5 {
                 tabScrollContentMinX = nextFrame.minX
             }
+            // Drops onto a Tabbed workspace's bar land by where its tabs are now.
+            if strip.isWorkspaceTabs { recordWorkspaceTabBarScroll(strip.id, contentMinX: nextFrame.minX) }
             if abs(tabScrollContentMaxX - nextFrame.maxX) > 0.5 {
                 tabScrollContentMaxX = nextFrame.maxX
             }
@@ -287,6 +289,10 @@ extension WindowTabStripView {
         for tab: WindowTabItemViewModel,
         context: WindowTabStripLayoutContext,
     ) -> CGFloat {
+        // A tab from elsewhere over this bar: the tabs from where it would land move aside for it.
+        if let incoming = reentryPreviewModel.incoming, incoming.stripId == strip.id, incoming.orderBeforeDrop == context.tabOrder {
+            return (context.tabIndicesById[tab.windowId] ?? 0) >= incoming.targetIndex ? context.effectiveTabWidth : 0
+        }
         if let reentryPreview = reentryPreviewModel.value,
            reentryPreview.stripId == strip.id,
            reentryPreview.orderBeforeDrop == context.tabOrder {
@@ -450,6 +456,7 @@ extension WindowTabStripView {
         )
         .animation(reduceMotion ? nil : .interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reorderTargetIndex(context: context))
         .animation(reduceMotion ? nil : .interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reentryPreviewModel.value?.targetIndex)
+        .animation(reduceMotion ? nil : .interactiveSpring(response: 0.2, dampingFraction: 0.8), value: reentryPreviewModel.incoming?.targetIndex)
         .animation(nil, value: reentryPreviewModel.value?.sourceVisualOffset)
         .highPriorityGesture(tabDragGesture(for: tab, context: context))
         .workspaceSidebarDrag(enabled: true) {

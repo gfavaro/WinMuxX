@@ -67,15 +67,11 @@ func tabReentryTargetIndex(
     tabStripRect: Rect,
     tabCount: Int,
     sourceIndex: Int? = nil,
+    minimumTabWidth: CGFloat = windowTabStripMinimumTabWidth,
 ) -> Int {
     guard tabCount > 1, tabStripRect.width > 0 else { return 0 }
-    let tabWidth = windowTabStripTabWidth(stripWidth: tabStripRect.width, count: tabCount)
-    let effectiveTabWidth = tabWidth + windowTabStripTabSpacing
-    let firstTabMinX = tabStripRect.minX + windowTabStripContentHorizontalPadding
-    let localX = mouseLocation.x - firstTabMinX
-    let hoveredTabIndex = max(0, min(Int(floor(localX / effectiveTabWidth)), tabCount - 1))
-    let hoveredTabCenterX = firstTabMinX + CGFloat(hoveredTabIndex) * effectiveTabWidth + tabWidth / 2
-    let insertionSlot = hoveredTabIndex + (mouseLocation.x >= hoveredTabCenterX ? 1 : 0)
+    let insertionSlot = tabInsertionSlot(mouseLocation: mouseLocation, tabStripRect: tabStripRect, tabCount: tabCount,
+                                         minimumTabWidth: minimumTabWidth)
     guard let sourceIndex else {
         return max(0, min(insertionSlot, tabCount - 1))
     }
@@ -83,14 +79,32 @@ func tabReentryTargetIndex(
     return max(0, min(adjustedTarget, tabCount - 1))
 }
 
+/// The gap between tabs, from 0 before the first to `tabCount` after the last, nearest the pointer.
+func tabInsertionSlot(
+    mouseLocation: CGPoint,
+    tabStripRect: Rect,
+    tabCount: Int,
+    minimumTabWidth: CGFloat = windowTabStripMinimumTabWidth,
+) -> Int {
+    guard tabCount > 0, tabStripRect.width > 0 else { return 0 }
+    let tabWidth = windowTabStripTabWidth(stripWidth: tabStripRect.width, count: tabCount, minimum: minimumTabWidth)
+    let effectiveTabWidth = tabWidth + windowTabStripTabSpacing
+    let firstTabMinX = tabStripRect.minX + windowTabStripContentHorizontalPadding
+    let localX = mouseLocation.x - firstTabMinX
+    let hoveredTabIndex = max(0, min(Int(floor(localX / effectiveTabWidth)), tabCount - 1))
+    let hoveredTabCenterX = firstTabMinX + CGFloat(hoveredTabIndex) * effectiveTabWidth + tabWidth / 2
+    return hoveredTabIndex + (mouseLocation.x >= hoveredTabCenterX ? 1 : 0)
+}
+
 func tabReentrySourceVisualOffset(
     mouseLocation: CGPoint,
     tabStripRect: Rect,
     tabCount: Int,
     sourceIndex: Int,
+    minimumTabWidth: CGFloat = windowTabStripMinimumTabWidth,
 ) -> CGFloat {
     guard tabCount > 1, tabStripRect.width > 0 else { return 0 }
-    let tabWidth = windowTabStripTabWidth(stripWidth: tabStripRect.width, count: tabCount)
+    let tabWidth = windowTabStripTabWidth(stripWidth: tabStripRect.width, count: tabCount, minimum: minimumTabWidth)
     let effectiveTabWidth = tabWidth + windowTabStripTabSpacing
     let sourceCenterX = tabStripRect.minX
         + windowTabStripContentHorizontalPadding

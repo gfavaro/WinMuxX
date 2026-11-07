@@ -75,8 +75,13 @@ func tabbedWindowSurfaceDestination(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> WindowDragIntentDestination? {
-    guard let area = workspace.tabbedGroup(containing: targetWindow.windowId)?.barGroup.lastFrame, area.contains(mouseLocation),
-          let zone = WindowIntentZoneBuilder.zone(at: mouseLocation, in: area) else { return nil }
+    guard let host = workspace.tabbedGroup(containing: targetWindow.windowId)?.barGroup, let area = host.lastFrame,
+          area.contains(mouseLocation) else { return nil }
+    if subject == .window, let bar = tabbedBarDropDestination(host: host, area: area, sourceWindow: sourceWindow,
+                                                               targetWindow: targetWindow, mouseLocation: mouseLocation) {
+        return bar
+    }
+    guard let zone = WindowIntentZoneBuilder.zone(at: mouseLocation, in: area) else { return nil }
     let resolution = WindowDropIntentResolution(
         intent: WindowDropIntent(sourceWindowId: sourceWindow.windowId, targetWindowId: targetWindow.windowId, zone: zone),
         targetFrame: area,
@@ -85,4 +90,62 @@ func tabbedWindowSurfaceDestination(
     )
     return destinationFromWindowDropIntent(resolution, sourceWindow: sourceWindow, targetWindow: targetWindow,
                                            mouseLocation: mouseLocation, subject: subject, detachOrigin: detachOrigin)
+}
+
+/// Notes how far the Tabbed workspace bar `stripId` has scrolled its tabs.
+@MainActor
+func recordWorkspaceTabBarScroll(_ stripId: ObjectIdentifier, contentMinX: CGFloat) {
+    for workspace in Workspace.all where workspace.arrangement == .tabbed {
+        if let group = workspace.tabbedGroups.first(where: { ObjectIdentifier($0) == stripId }) {
+            group.barScrollOffset = contentMinX
+            return
+        }
+    }
+}
+
+/// Where a tab group's tabs sit on screen: the bar across the top of its area, as its strip lays
+/// them out and has scrolled them.
+@MainActor
+func tabbedBarTabsRect(area: Rect, host: TabbedGroup? = nil) -> Rect {
+    let scrolled = host?.barScrollOffset ?? 0
+    return Rect(topLeftX: area.topLeftX + windowTabStripLeadingInset + scrolled, topLeftY: area.topLeftY,
+                width: area.width, height: min(resolvedWindowTabBarHeight(), area.height))
+}
+
+/// Over a Tabbed workspace's bar a tab goes where the pointer is among its tabs: back along its
+/// own bar, or into another bar at that place, as the strip shows by opening a gap there.
+@MainActor
+private func tabbedBarDropDestination(
+    host: TabbedGroup,
+    area: Rect,
+    sourceWindow: Window,
+    targetWindow: Window,
+    mouseLocation: CGPoint,
+) -> WindowDragIntentDestination? {
+    let tabs = tabbedBarTabsRect(area: area, host: host)
+    let interaction = Rect(topLeftX: area.topLeftX, topLeftY: area.topLeftY, width: area.width, height: tabs.height + 8)
+    guard interaction.contains(mouseLocation) else { return nil }
+    let bar = host.barWindowIds
+    let kind: WindowDragIntentKind
+    if let sourceIndex = bar.firstIndex(of: sourceWindow.windowId) {
+        guard bar.count > 1 else { return nil }
+        kind = .reorderTab(windowId: sourceWindow.windowId, targetIndex: tabReentryTargetIndex(
+            mouseLocation: mouseLocation, tabStripRect: tabs, tabCount: bar.count, sourceIndex: sourceIndex,
+            minimumTabWidth: workspaceTabStripMinimumTabWidth))
+    } else {
+        kind = .insertTab(targetWindowId: targetWindow.windowId, index: tabInsertionSlot(
+            mouseLocation: mouseLocation, tabStripRect: tabs, tabCount: bar.count, minimumTabWidth: workspaceTabStripMinimumTabWidth))
+    }
+    let moves = if case .insertTab = kind { true } else { false }
+    return WindowDragIntentDestination(
+        kind: kind,
+        previewRect: tabbedBarTabsRect(area: area),
+        interactionRect: interaction,
+        title: moves ? "Move to Tab Group" : "Move Tab",
+        subtitle: moves ? "Drop to add this tab here" : "Drop to put this tab back here",
+        previewStyle: .tabInsert,
+        previewGeometry: .tabStrip,
+        isGroup: false,
+        dropIntentOverlay: WindowDropIntentOverlayModel(targetFrame: area, activeZone: .tab, cornerRadius: nil),
+    )
 }
