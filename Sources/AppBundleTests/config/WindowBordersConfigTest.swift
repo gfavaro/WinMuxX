@@ -24,14 +24,30 @@ final class WindowBordersConfigTest: XCTestCase {
         let (config, errors) = parseConfig("[borders]\nwidth = 0")
         XCTAssertTrue(errors.isEmpty)
         XCTAssertEqual(config.windowBorders.width, 0)
-        XCTAssertEqual(config.windowBorders.activeColor, "#E1E3E4")
+        XCTAssertEqual(config.windowBorders.activeColor, "accent")
         XCTAssertEqual(config.windowBorders.inactiveColor, "#494D64")
         XCTAssertEqual(config.windowBorders.order, .below)
         XCTAssertTrue(config.windowBorders.enabled)
     }
 
+    func testAccentIsAcceptedForEitherColorAndResolvesOpaque() {
+        let (config, errors) = parseConfig("[borders]\nactive-color = 'Accent'\ninactive-color = 'accent'")
+        XCTAssertTrue(errors.isEmpty, "\(errors)")
+        XCTAssertEqual(config.windowBorders.activeColor, "accent")
+        XCTAssertEqual(config.windowBorders.inactiveColor, "accent")
+        XCTAssertEqual(windowBorderRGBA("accent") & 255, 255)
+    }
+
+    func testHexColorsResolveToRGBA() {
+        XCTAssertEqual(windowBorderRGBA("#E1E3E4"), 0xE1E3_E4FF)
+        XCTAssertEqual(windowBorderRGBA("#E1E3E480"), 0xE1E3_E480)
+        XCTAssertEqual(windowBorderRGBA("#00000000"), 0)
+        XCTAssertEqual(windowBorderRGBA("#XYZXYZ"), 0x0000_00FF)
+    }
+
     func testInvalidBorderSettingsAreRejected() {
-        for setting in ["width = -1", "width = nan", "order = 'front'", "active-color = '#xyzxyz'", "inactive-color = '#12345'", "exclude-apps = [42]"] {
+        for setting in ["width = -1", "width = nan", "order = 'front'", "active-color = '#xyzxyz'", "active-color = 'accentx'",
+                        "inactive-color = '#12345'", "exclude-apps = [42]"] {
             let (_, errors) = parseConfig("[borders]\n\(setting)")
             XCTAssertFalse(errors.isEmpty, setting)
         }

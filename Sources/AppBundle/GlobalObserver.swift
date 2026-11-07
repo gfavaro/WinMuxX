@@ -171,6 +171,7 @@ enum GlobalObserver {
         guard !isInitialized else { return }
         isInitialized = true
         WindowBorderController.shared.startMissionControlMonitoring()
+        WindowBorderController.shared.startColorMonitoring()
         if !winmux_watch_window_closures({ windowId in
             Task { @MainActor in
                 guard let window = MacWindow.allWindowsMap[windowId] else {

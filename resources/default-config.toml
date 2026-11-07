@@ -33,8 +33,8 @@ window-tabs.height = 36
 borders.enabled = true
 # Width in points; fractional values are supported.
 borders.width = 4
-# Colors accept #RRGGBB or #RRGGBBAA.
-borders.active-color = '#e1e3e4'
+# Colors accept 'accent' (the system accent color, visible in light and dark mode), #RRGGBB or #RRGGBBAA.
+borders.active-color = 'accent'
 borders.inactive-color = '#494d64'
 # 'below' draws behind the window; 'above' draws over it.
 borders.order = 'below'

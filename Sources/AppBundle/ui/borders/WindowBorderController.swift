@@ -53,6 +53,21 @@ final class WindowBorderController {
         }
     }
 
+    private var colorObservers: [Any] = []
+
+    /// Redraws `accent` borders when the accent color or the light/dark appearance changes; the
+    /// refresh compares resolved colors, so fixed colors are left alone.
+    func startColorMonitoring() {
+        guard !isUnitTest, colorObservers.isEmpty else { return }
+        colorObservers.append(NotificationCenter.default.addObserver(
+            forName: NSColor.systemColorsDidChangeNotification, object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { WindowBorderController.shared.refresh() }
+        })
+        colorObservers.append(NSApp.observe(\.effectiveAppearance) { _, _ in
+            Task { @MainActor in WindowBorderController.shared.refresh() }
+        })
+    }
+
     func startMissionControlMonitoring() {
         guard !isUnitTest else { return }
         if !winmux_watch_mission_control({ event, windowId in
@@ -472,10 +487,15 @@ final class WindowBorder {
     }
 }
 
+/// The resolved color is part of the value: an accent change redraws on the next refresh.
+@MainActor
 private struct Appearance: Equatable {
     let settings: WindowBordersConfig
     let rgba: UInt32
-    init(settings: WindowBordersConfig, active: Bool) { self.settings = settings; let h = active ? settings.activeColor : settings.inactiveColor; let v = UInt32(h.dropFirst(), radix: 16) ?? 0; let rgb = h.count == 9 ? v >> 8 : v; let alpha = h.count == 9 ? v & 255 : 255; rgba = (rgb << 8) | alpha }
+    init(settings: WindowBordersConfig, active: Bool) {
+        self.settings = settings
+        rgba = windowBorderRGBA(active ? settings.activeColor : settings.inactiveColor)
+    }
 }
 
 /// Current-host Mission Control overlay signature. This is a heuristic, not a
@@ -538,9 +558,9 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
         // The path is rebuilt for every update: compared by identity it always differed, and
         // every piece redrew on each focus or geometry refresh even when nothing changed.
         let geometryChanged = borderView.outerSize != outer.size || borderView.piece != piece || borderView.radius != radius || borderView.path != path
-        if geometryChanged || borderView.settings != settings || borderView.active != active {
-            borderView.settings = settings
-            borderView.active = active
+        let rgba = windowBorderRGBA(active ? settings.activeColor : settings.inactiveColor)
+        if geometryChanged || borderView.rgba != rgba {
+            borderView.rgba = rgba
             borderView.outerSize = outer.size
             borderView.piece = piece
             borderView.radius = radius
@@ -554,21 +574,14 @@ private final class WindowBorderFallbackPanel: NSPanelHud {
 @MainActor
 private final class WindowBorderFallbackView: NSView {
     override var isFlipped: Bool { true }
-    var settings = WindowBordersConfig()
-    var active = false
+    var rgba: UInt32 = 0
     var outerSize = CGSize.zero
     var piece = CGRect.zero
     var radius: CGFloat = 0
     var path: CGPath?
 
     override func draw(_ dirtyRect: NSRect) {
-        let hex = active ? settings.activeColor : settings.inactiveColor
-        let value = UInt32(hex.dropFirst(), radix: 16) ?? 0
-        let rgb = hex.count == 9 ? value >> 8 : value
-        let alpha = hex.count == 9 ? CGFloat(value & 255) / 255 : 1
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        let rgbValue = UInt32(rgb)
-        let rgba = (rgbValue << 8) | UInt32(round(alpha * 255))
         if let path { winmux_border_draw_path(context, piece, path, rgba) }
     }
 }

@@ -376,7 +376,7 @@ window together, using the group’s outer corner shape. Built-in borders are en
 [borders]
     enabled = true
     width = 4                     # Points; fractional values are supported.
-    active-color = '#e1e3e4'       # #RRGGBB or #RRGGBBAA.
+    active-color = 'accent'        # 'accent' (system accent color), #RRGGBB or #RRGGBBAA.
     inactive-color = '#494d64'
     order = 'below'               # 'above' draws the ring over the window.
     exclude-apps = []             # Application bundle IDs.

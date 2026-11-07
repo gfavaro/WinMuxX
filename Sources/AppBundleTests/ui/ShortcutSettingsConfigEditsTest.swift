@@ -35,7 +35,7 @@ final class ShortcutSettingsConfigEditsTest: XCTestCase {
     }
 
     func testColorValidationMatchesConfigParser() {
-        for value in ["#E1E3E4", "#E1E3E480", "#abcdef", "abcdef", "#XYZXYZ", "#123", ""] {
+        for value in ["#E1E3E4", "#E1E3E480", "#abcdef", "abcdef", "#XYZXYZ", "#123", "", "accent", "Accent", "accents"] {
             XCTAssertEqual(settingsHexColorError(value) == nil, normalizedWindowBorderColor(value) != nil, value)
         }
     }

@@ -193,32 +193,43 @@ struct SettingsBorderColor: View {
     }
 
     var body: some View {
+        let followsAccent = normalizedWindowBorderColor(text) == windowBorderAccentColor
         VStack(alignment: .leading, spacing: 4) {
-            ColorPicker(title, selection: Binding(
-                get: {
-                    let normalized = normalizedWindowBorderColor(text) ?? "#000000"
-                    let value = UInt32(normalized.dropFirst(), radix: 16) ?? 0
-                    let hasAlpha = normalized.count == 9
-                    let rgb = hasAlpha ? value >> 8 : value
-                    return Color(red: Double((rgb >> 16) & 255) / 255,
-                                 green: Double((rgb >> 8) & 255) / 255,
-                                 blue: Double(rgb & 255) / 255,
-                                 opacity: hasAlpha ? Double(value & 255) / 255 : 1)
-                },
-                set: { color in
-                    let components = NSColor(color).usingColorSpace(.sRGB) ?? .black
-                    text = String(format: "#%02X%02X%02X%02X",
-                                  Int((components.redComponent * 255).rounded()),
-                                  Int((components.greenComponent * 255).rounded()),
-                                  Int((components.blueComponent * 255).rounded()),
-                                  Int((components.alphaComponent * 255).rounded()))
+            Toggle("\(title): follow accent color", isOn: Binding(
+                get: { followsAccent },
+                set: { follow in
+                    // Turning it off starts the picker from the accent color the border shows now.
+                    text = follow ? windowBorderAccentColor : String(format: "#%08X", windowBorderRGBA(windowBorderAccentColor))
                     ShortcutSettingsModel.shared.activeSettingTitle = title
                     save()
                 }
-            ), supportsOpacity: true)
-            SettingsTextField("Hex value", id: id, text: $text,
-                              help: "Use #RRGGBB or #RRGGBBAA, including optional opacity.",
-                              validate: settingsHexColorError, save: save)
+            ))
+            .accessibilityIdentifier("\(id).accent")
+            SettingsDescription("The system accent color stays visible on light and dark windows.")
+            if !followsAccent {
+                ColorPicker(title, selection: Binding(
+                    get: {
+                        let rgba = windowBorderHexRGBA(normalizedWindowBorderColor(text) ?? "#000000")
+                        return Color(.sRGB, red: Double(rgba >> 24) / 255,
+                                     green: Double((rgba >> 16) & 255) / 255,
+                                     blue: Double((rgba >> 8) & 255) / 255,
+                                     opacity: Double(rgba & 255) / 255)
+                    },
+                    set: { color in
+                        let components = NSColor(color).usingColorSpace(.sRGB) ?? .black
+                        text = String(format: "#%02X%02X%02X%02X",
+                                      Int((components.redComponent * 255).rounded()),
+                                      Int((components.greenComponent * 255).rounded()),
+                                      Int((components.blueComponent * 255).rounded()),
+                                      Int((components.alphaComponent * 255).rounded()))
+                        ShortcutSettingsModel.shared.activeSettingTitle = title
+                        save()
+                    }
+                ), supportsOpacity: true)
+                SettingsTextField("Hex value", id: id, text: $text,
+                                  help: "Use #RRGGBB or #RRGGBBAA, including optional opacity, or 'accent'.",
+                                  validate: settingsHexColorError, save: save)
+            }
         }
     }
 }
@@ -278,7 +289,7 @@ struct SettingsTextField: View {
 
 func settingsHexColorError(_ text: String) -> String? {
     guard normalizedWindowBorderColor(text) != nil else {
-        return "Use # followed by six or eight hexadecimal digits, for example #E1E3E4."
+        return "Use accent, or # followed by six or eight hexadecimal digits, for example #E1E3E4."
     }
     return nil
 }
