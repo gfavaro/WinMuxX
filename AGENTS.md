@@ -5,6 +5,11 @@ substantive changes. [HACKING](HACKING.md) owns architecture and development det
 [Testing](docs/TESTING.md) owns verification requirements. No external memory service
 or personal skill installation is required to contribute.
 
+Always build code cleanly and modularly, with proper architecture and separation of
+concerns. Never bolt a feature on just because it was asked for. If there is no easy
+way to build it naturally, and a refactor would make the whole thing clean, stop
+before writing the feature and say so, recommending the refactor.
+
 Before editing, inspect `git status --short` and preserve unrelated changes. Use
 the user's requested outcome to choose scope; current docs describe the baseline,
 not authority to override an explicit behavior change. If code and docs disagree,
