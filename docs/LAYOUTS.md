@@ -6,7 +6,8 @@ container layout controls how that container displays its children.
 ## Dwindle
 
 Dwindle is the default. Opening a window splits the focused area along its
-longer axis. Closing or moving windows lets the tree rebalance. The
+longer axis. When a half would be smaller than an app's known minimum size, the new
+window opens as a tab in the tile instead. Closing or moving windows lets the tree rebalance. The
 [dwindle diagram](assets/layouts/dwindle.svg) shows successive splits.
 
 ## Master
@@ -20,6 +21,8 @@ stack beside it. Choose it for a workspace with `workspace-layout master`; run
 
 Master keeps one main window on every display, including ultrawide displays. The
 remaining windows form a stack beside it. Two windows share the screen.
+When another stack row would be shorter than an app's known minimum size, a new
+window opens as a tab in the window in use instead, so the stack stops growing.
 
 ## Tabbed
 

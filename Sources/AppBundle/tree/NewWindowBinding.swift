@@ -43,6 +43,10 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newl
         return tabGroupBinding
     }
     if workspace.arrangement == .master {
+        if let newBundleId = newlyOpenedBundleId,
+           let joined = masterTabGroupBindingInsteadOfCrowdingStack(workspace: workspace, newBundleId: newBundleId) {
+            return joined
+        }
         let root = workspace.arrangementGroupParent !== workspace.rootTilingContainer
             ? workspace.arrangementGroupParent : ensureRootSupportsColumns(workspace)
         let focused = focus.windowOrNil?.topLevelWorkspaceGroup
@@ -64,6 +68,12 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newl
     }
     if tilingParent.layout == .tabGroup {
         return bindingDataAfterTabGroup(workspace: workspace, tabGroup: tilingParent)
+    }
+    if workspace.arrangement == .dwindle, tilingParent.layout == .tiles, let newBundleId = newlyOpenedBundleId,
+       let rect = tilingParent.lastAppliedLayoutPhysicalRect,
+       let joined = tabGroupBindingInsteadOfCrowdingRow(tilingParent.children, rect: rect, along: tilingParent.orientation,
+           workspace: workspace, anchorWindow: mruWindow, newBundleId: newBundleId) {
+        return joined
     }
     return BindingData(parent: tilingParent, adaptiveWeight: WEIGHT_AUTO, index: mruWindow.ownIndex.orDie() + 1)
 }
@@ -151,8 +161,42 @@ private func ensureTabGroupAnchorHasWorkspaceRootContainer(
 /// leaves a half smaller than one of these minimum extents along that side.
 func newWindowSplitWouldSqueeze(tile size: CGSize, gap: CGSize, minimumExtents: [CGFloat]) -> Bool {
     let horizontal = size.width >= size.height
-    let half = (horizontal ? size.width - gap.width : size.height - gap.height) / 2
-    return minimumExtents.contains { $0 > half }
+    return newWindowRowWouldSqueeze(extent: horizontal ? size.width : size.height,
+        gap: horizontal ? gap.width : gap.height, tiles: 1, minimumExtents: minimumExtents)
+}
+
+/// Whether sharing `extent` equally among `tiles` tiles and one more, as a Master stack or a row
+/// of tiles does for a new window, leaves a tile smaller than one of these minimum extents.
+func newWindowRowWouldSqueeze(extent: CGFloat, gap: CGFloat, tiles: Int, minimumExtents: [CGFloat]) -> Bool {
+    let share = (extent - gap * CGFloat(tiles)) / CGFloat(tiles + 1)
+    return minimumExtents.contains { $0 > share }
+}
+
+/// A new window joins the tab group of the window in use instead of adding a stack row smaller
+/// than an app's learned minimum size. A lone main window has no stack to crowd yet.
+@MainActor
+private func masterTabGroupBindingInsteadOfCrowdingStack(workspace: Workspace, newBundleId: String?) -> BindingData? {
+    guard let anchorWindow = workspace.mostRecentWindowRecursive, anchorWindow.parent is TilingContainer else { return nil }
+    let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+    // The first frame is the main window; the rest are the stack.
+    let stack = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace), gaps: gaps).dropFirst()
+    guard let first = stack.first?.physical, let last = stack.last?.physical else { return nil }
+    let rect = Rect(topLeftX: first.minX, topLeftY: first.minY, width: last.maxX - first.minX, height: last.maxY - first.minY)
+    return tabGroupBindingInsteadOfCrowdingRow(stack.map(\.node), rect: rect, along: config.master.side.orientation.opposite,
+        workspace: workspace, anchorWindow: anchorWindow, newBundleId: newBundleId)
+}
+
+/// Rows weight their tiles unevenly after resizing; an equal share is close enough to tell a
+/// row with room from a full one.
+@MainActor
+private func tabGroupBindingInsteadOfCrowdingRow(_ tiles: [TreeNode], rect: Rect, along axis: Orientation,
+                                                 workspace: Workspace, anchorWindow: Window, newBundleId: String?) -> BindingData? {
+    let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+    let newMinimum = PersistedAppMinimums.shared.size(for: newBundleId).map { axis == .h ? $0.width : $0.height } ?? 0
+    let minimums = tiles.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) } + [newMinimum]
+    guard newWindowRowWouldSqueeze(extent: rect.getDimension(axis), gap: CGFloat(gaps.inner.get(axis)),
+        tiles: tiles.count, minimumExtents: minimums) else { return nil }
+    return bindingDataJoiningTabGroup(of: anchorWindow)
 }
 
 /// A new window joins the tile's tab group, starting one when needed, instead of splitting a
@@ -170,10 +214,16 @@ private func tabGroupBindingInsteadOfSqueezing(workspace: Workspace, anchorWindo
     let newMinimum = PersistedAppMinimums.shared.size(for: newBundleId).map { horizontal ? $0.width : $0.height } ?? 0
     guard newWindowSplitWouldSqueeze(tile: CGSize(width: splitRect.width, height: splitRect.height), gap: gap,
         minimumExtents: [tileMinimum, newMinimum]) else { return nil }
+    return bindingDataJoiningTabGroup(of: anchorWindow)
+}
+
+/// Joins the window's tab group, starting one around it when needed, and keeps the surrounding
+/// split exactly as it was, as splitting an anchor does.
+@MainActor
+private func bindingDataJoiningTabGroup(of anchorWindow: Window) -> BindingData {
     if let group = anchorWindow.parent as? TilingContainer, group.layout == .tabGroup {
         return BindingData(parent: group, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
     }
-    // Keep the surrounding Dwindle split exactly as it was, as splitting an anchor does.
     let parent = anchorWindow.parent as? TilingContainer
     let ratios = parent?.dwindleSplitRatios
     let siblingRatios = parent?.dwindleChildRatios

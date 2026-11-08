@@ -32,3 +32,53 @@ final class NewWindowSqueezeTabGroupTest: WorkspaceTestCase {
             "A hidden tab's larger minimum decides the group's minimum")
     }
 }
+
+final class NewWindowRowSqueezeTest: XCTestCase {
+    func testAnotherRowFitsWhileEveryShareMeetsItsMinimum() {
+        XCTAssertFalse(newWindowRowWouldSqueeze(extent: 1080, gap: 0, tiles: 2, minimumExtents: [300, 300, 0]),
+            "Three rows of 360 points hold 300-point minimums")
+        XCTAssertTrue(newWindowRowWouldSqueeze(extent: 1080, gap: 0, tiles: 2, minimumExtents: [500, 300, 0]),
+            "A third row of 360 points is shorter than 500")
+        XCTAssertEqual(newWindowRowWouldSqueeze(extent: 1000, gap: 10, tiles: 1, minimumExtents: [495]),
+            newWindowSplitWouldSqueeze(tile: CGSize(width: 1000, height: 600), gap: CGSize(width: 10, height: 10),
+                minimumExtents: [495]), "Halving a tile is a row of one tile gaining another")
+    }
+}
+
+@MainActor
+final class NewWindowMasterStackTest: WorkspaceTestCase {
+    private func masterWorkspace(stackMinimumHeight: CGFloat) -> (Workspace, main: Window, stack: [Window]) {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let main = TestWindow.new(id: 75001, parent: root)
+        let stack = [TestWindow.new(id: 75002, parent: root), TestWindow.new(id: 75003, parent: root)]
+        stack.forEach { $0.testMinimumSize = CGSize(width: 100, height: stackMinimumHeight) }
+        workspace.transitionArrangement(to: .master, focused: main)
+        _ = stack[1].focusWindow()
+        stack[1].markAsMostRecentChild()
+        return (workspace, main, stack)
+    }
+
+    func testAFullStackGivesTheNewWindowATabInTheWindowInUse() {
+        let (workspace, _, stack) = masterWorkspace(stackMinimumHeight: 500)
+        let binding = bindingDataForNewTilingWindow(workspace, window: nil, newlyOpenedBundleId: .some(nil))
+        let group = binding.parent as? TilingContainer
+        XCTAssertEqual(group?.layout, .tabGroup, "A third stack row would be shorter than 500 points")
+        XCTAssertTrue(stack[1].parent === group, "The window in use starts the tab group")
+        XCTAssertEqual(workspace.workspaceLayoutUnits.count, 3, "The stack keeps its two rows")
+    }
+
+    func testAStackWithRoomAddsARow() {
+        let (workspace, _, _) = masterWorkspace(stackMinimumHeight: 300)
+        let binding = bindingDataForNewTilingWindow(workspace, window: nil, newlyOpenedBundleId: .some(nil))
+        XCTAssertTrue(binding.parent === workspace.rootTilingContainer)
+        XCTAssertNotEqual((binding.parent as? TilingContainer)?.layout, .tabGroup)
+    }
+
+    func testAMovedWindowStillAddsARow() {
+        let (workspace, _, _) = masterWorkspace(stackMinimumHeight: 500)
+        let binding = bindingDataForNewTilingWindow(workspace, window: nil)
+        XCTAssertTrue(binding.parent === workspace.rootTilingContainer, "Explicit moves keep their placement")
+    }
+}
