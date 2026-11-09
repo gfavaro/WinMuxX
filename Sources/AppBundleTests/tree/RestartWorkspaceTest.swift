@@ -106,6 +106,14 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertEqual(decoded.pending?.first?.remainingWindowIds, [1])
     }
 
+    func testPowerOffHoldsSavesUntilNavigationShowsItWasCancelled() {
+        XCTAssertFalse(runtime.recovery.savesHeldForPowerOff)
+        persistFrozenWorldBeforePowerOff()
+        XCTAssertTrue(runtime.recovery.savesHeldForPowerOff, "windows closing as apps quit must not overwrite the saved layout")
+        recordUserWorkspaceSelectionForRestoration()
+        XCTAssertFalse(runtime.recovery.savesHeldForPowerOff)
+    }
+
     func testAppLaunchedAfterWorkspaceSelectionKeepsNewPlacementAcrossFurtherNavigation() async throws {
         let oldWorkspace = Workspace.get(byName: "1")
         let old = TestWindow.new(id: 1, parent: oldWorkspace.rootTilingContainer)

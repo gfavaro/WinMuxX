@@ -16,6 +16,9 @@ final class WorkspaceRecoveryState {
     var restartRetryTask: Task<Void, Never>?
     var restartRestorationsInFlight = 0
     var firstUserWorkspaceSelectionDate: Date?
+    /// Set once the layout is saved for logout, restart or shutdown. Apps then close
+    /// their windows before they terminate, which would otherwise overwrite that save.
+    var savesHeldForPowerOff = false
     let restartWriter = RestartStateWriter()
     var restartIdentityQueryForTests: (@MainActor (Window) async -> [(UInt32, RestartWindowIdentity)])?
 
@@ -29,6 +32,7 @@ final class WorkspaceRecoveryState {
         lastRestartIdentityRefresh = .distantPast
         restartWindowAttempts = [:]
         firstUserWorkspaceSelectionDate = nil
+        savesHeldForPowerOff = false
         restartIdentityQueryForTests = nil
         restartRetryTask?.cancel()
         restartRetryTask = nil
@@ -52,6 +56,8 @@ private let persistedFrozenWorldVersion = 2
 @MainActor
 func recordUserWorkspaceSelectionForRestoration(at date: Date = .now) {
     forgetClosedWindowsCacheVisibility()
+    // Navigating again means a logout or shutdown was cancelled.
+    recovery.savesHeldForPowerOff = false
     guard _isStartup != true, isWinMuxRuntimeReady || isUnitTest else { return }
     if recovery.firstUserWorkspaceSelectionDate == nil {
         recovery.firstUserWorkspaceSelectionDate = date
@@ -221,7 +227,7 @@ private func prepareRestartStateDirectory(_ url: URL) throws {
 func persistFrozenWorldForRestartIfPossible() {
     recovery.pendingRestartSave?.cancel()
     recovery.pendingRestartSave = nil
-    guard !isUnitTest, isWinMuxRuntimeReady else { return }
+    guard !isUnitTest, isWinMuxRuntimeReady, !recovery.savesHeldForPowerOff else { return }
     do {
         let url = try persistedFrozenWorldUrl()
         try recovery.restartWriter.flush(makeRestartEnvelope(), to: url)
@@ -267,9 +273,16 @@ func loadRestartEnvelope(from url: URL) -> PersistedFrozenWorldEnvelope? {
     return nil
 }
 
+/// macOS posts this before it asks apps to quit, while every window is still in the layout.
+@MainActor
+func persistFrozenWorldBeforePowerOff() {
+    persistFrozenWorldForRestartIfPossible()
+    recovery.savesHeldForPowerOff = true
+}
+
 @MainActor
 func schedulePersistedFrozenWorldSave() {
-    guard !isUnitTest, isWinMuxRuntimeReady,
+    guard !isUnitTest, isWinMuxRuntimeReady, !recovery.savesHeldForPowerOff,
           TrayMenuModel.shared.isEnabled,
           !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
     // Capture current titles without adding AX round trips to every focus/layout event.
