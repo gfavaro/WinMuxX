@@ -246,11 +246,7 @@ enum Ax {
     )
     static let sizeAttr = WritableAttrImpl<CGSize>(
         key: kAXSizeAttribute,
-        getter: {
-            var raw: CGSize = .zero
-            check(AXValueGetValue($0 as! AXValue, .cgSize, &raw))
-            return raw
-        },
+        getter: { axGeometryValue($0, .cgSize, CGSize.zero) },
         setter: {
             var size = $0
             return AXValueCreate(.cgSize, &size) as CFTypeRef
@@ -258,11 +254,7 @@ enum Ax {
     )
     static let topLeftCornerAttr = WritableAttrImpl<CGPoint>(
         key: kAXPositionAttribute,
-        getter: {
-            var raw: CGPoint = .zero
-            AXValueGetValue($0 as! AXValue, .cgPoint, &raw)
-            return raw
-        },
+        getter: { axGeometryValue($0, .cgPoint, CGPoint.zero) },
         setter: {
             var size = $0
             return AXValueCreate(.cgPoint, &size) as CFTypeRef
@@ -307,7 +299,15 @@ enum Ax {
 
 let kAXWinMuxSynthetic = "WinMux.synthetic"
 
-private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock {
+/// The app chooses what it answers with. A value of another type is no answer: read as geometry
+/// it would report an origin or size the window does not have.
+func axGeometryValue<T: BitwiseCopyable>(_ raw: AnyObject, _ type: AXValueType, _ empty: T) -> T? {
+    guard CFGetTypeID(raw) == AXValueGetTypeID() else { return nil }
+    var value = empty
+    return AXValueGetValue(raw as! AXValue, type, &value) ? value : nil
+}
+
+private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock? {
     if isUnitTest {
         if let str = a as? String, let commaIndex = str.firstIndex(of: ",") {
             let windowId = UInt32.init(String(str.prefix(upTo: commaIndex)).removePrefix("AXUIElement(AxWindowId="))
@@ -323,6 +323,7 @@ private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock {
         }
         die("Can't convert \(a) to AxUiElementMock")
     }
+    guard CFGetTypeID(a) == AXUIElementGetTypeID() else { return nil }
     let element = a as! AXUIElement
     // Messaging timeouts belong to each element, including returned controls.
     AXUIElementSetMessagingTimeout(element, 1.0)
@@ -332,9 +333,7 @@ private func castToAxUiElementMock(_ a: AnyObject) -> AxUiElementMock {
 typealias WindowIdAndAxUiElementMock = (windowId: UInt32, ax: AxUiElementMock)
 
 private func windowOrNil(_ any: Any?) -> WindowIdAndAxUiElementMock? {
-    guard let any else { return nil }
-    if !isUnitTest, CFGetTypeID(any as CFTypeRef) != AXUIElementGetTypeID() { return nil }
-    let potentialWindow = castToAxUiElementMock(any as AnyObject)
+    guard let any, let potentialWindow = castToAxUiElementMock(any as AnyObject) else { return nil }
     // Filter out non-window objects (e.g. Finder's desktop)
     let windowId = potentialWindow.containingWindowId()
     if let windowId, windowId != 0 {

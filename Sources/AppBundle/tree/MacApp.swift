@@ -243,7 +243,7 @@ final class MacApp: AbstractApp {
             AXReadBudget.current?.record(error, pid: nsApp.processIdentifier)
             switch error {
                 case .success:
-                    guard let raw else { return .noFocusedWindow }
+                    guard let raw, CFGetTypeID(raw) == AXUIElementGetTypeID() else { return .noFocusedWindow }
                     let element = raw as! AXUIElement
                     // Fresh elements use the 6s global default; bound follow-up traffic like
                     // every other window element.
@@ -767,10 +767,9 @@ private func diagnosticProbe(_ element: AXUIElement, _ source: String) throws ->
         if status == .cannotComplete { throw DiagnosticReadUnanswered() }
         return status == .success ? value : nil
     }
-    var origin = CGPoint.zero, size = CGSize.zero
-    let hasOrigin = try attribute(kAXPositionAttribute).map { AXValueGetValue($0 as! AXValue, .cgPoint, &origin) } ?? false
-    let hasSize = try attribute(kAXSizeAttribute).map { AXValueGetValue($0 as! AXValue, .cgSize, &size) } ?? false
+    let origin = try attribute(kAXPositionAttribute).flatMap { axGeometryValue($0, .cgPoint, CGPoint.zero) }
+    let size = try attribute(kAXSizeAttribute).flatMap { axGeometryValue($0, .cgSize, CGSize.zero) }
     return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
-        frame: hasOrigin && hasSize ? CGRect(origin: origin, size: size) : nil,
+        frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
         role: try attribute(kAXRoleAttribute) as? String, subrole: try attribute(kAXSubroleAttribute) as? String)
 }
