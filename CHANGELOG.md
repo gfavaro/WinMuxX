@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Return windows to their workspaces after an app quits and relaunches, and match the only window of a relaunched app even when its title changed.
 - Keep the saved window layout across logout, restart and shutdown; apps closing their windows as they quit no longer overwrite it.
 - Add root `accent-color` to replace the macOS accent in borders, tab pills, the hover bar, the overview and mode indicators.
 - Add a task-based learning path and a detailed Dinky fit and execution plan.

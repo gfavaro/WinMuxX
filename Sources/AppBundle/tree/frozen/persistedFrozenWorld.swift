@@ -19,6 +19,9 @@ final class WorkspaceRecoveryState {
     /// Set once the layout is saved for logout, restart or shutdown. Apps then close
     /// their windows before they terminate, which would otherwise overwrite that save.
     var savesHeldForPowerOff = false
+    /// Placements of windows a still-running app closed, by process. Quitting apps close
+    /// their windows before they terminate; termination keeps these as restart snapshots.
+    var closedWindowsOfRunningApps: [Int32: [PendingRestartSnapshot]] = [:]
     let restartWriter = RestartStateWriter()
     var restartIdentityQueryForTests: (@MainActor (Window) async -> [(UInt32, RestartWindowIdentity)])?
 
@@ -33,6 +36,7 @@ final class WorkspaceRecoveryState {
         restartWindowAttempts = [:]
         firstUserWorkspaceSelectionDate = nil
         savesHeldForPowerOff = false
+        closedWindowsOfRunningApps = [:]
         restartIdentityQueryForTests = nil
         restartRetryTask?.cancel()
         restartRetryTask = nil
@@ -469,10 +473,35 @@ func retryPendingRestartWindows() async throws {
 /// Explicitly closing a window in a running app does not keep a stale assignment.
 @MainActor
 func rememberRestartWindowBeforeAppTermination(_ window: Window) {
-    guard window.restartIdentity != nil, let workspace = window.nodeWorkspace else { return }
+    guard let snapshot = closedWindowRestartSnapshot(window) else { return }
+    recovery.restartSnapshots.append(RestartSnapshotState(snapshot: snapshot))
+}
+
+/// The app may be quitting: keep the placement until its process terminates or opens a window.
+@MainActor
+func rememberWindowClosedByRunningApp(_ window: Window, pid: Int32) {
+    guard let snapshot = closedWindowRestartSnapshot(window) else { return }
+    recovery.closedWindowsOfRunningApps[pid, default: []].append(snapshot)
+}
+
+@MainActor
+func rememberClosedWindowsOfTerminatedApp(pid: Int32) {
+    guard let closed = recovery.closedWindowsOfRunningApps.removeValue(forKey: pid) else { return }
+    recovery.restartSnapshots += closed.map { RestartSnapshotState(snapshot: $0) }
+    schedulePersistedFrozenWorldSave()
+}
+
+/// A new window shows the app kept running, so its earlier closures were explicit.
+@MainActor
+func forgetWindowsClosedByRunningApp(pid: Int32) {
+    recovery.closedWindowsOfRunningApps.removeValue(forKey: pid)
+}
+
+@MainActor
+private func closedWindowRestartSnapshot(_ window: Window) -> PendingRestartSnapshot? {
+    guard window.restartIdentity != nil, let workspace = window.nodeWorkspace else { return nil }
     let world = FrozenWorld(workspaces: [FrozenWorkspace(workspace, assignmentFor: window)], monitors: [], windowIds: [window.windowId])
-    recovery.restartSnapshots.append(RestartSnapshotState(snapshot:
-        PendingRestartSnapshot(world: world, remainingWindowIds: [window.windowId])))
+    return PendingRestartSnapshot(world: world, remainingWindowIds: [window.windowId])
 }
 
 @MainActor

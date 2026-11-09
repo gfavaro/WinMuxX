@@ -102,6 +102,7 @@ final class MacWindow: Window {
             if !didRestorePersistedFrozenWorld && !didRestoreClosedWindowsCache {
                 try await tryOnWindowDetected(window)
             }
+            if window.parent is TilingContainer { forgetWindowsClosedByRunningApp(pid: macApp.pid) }
             if !didRestorePersistedFrozenWorld {
                 trackPendingRestartWindow(window)
                 if window.parent is TilingContainer || window.parent is Workspace {
@@ -145,8 +146,13 @@ final class MacWindow: Window {
     func garbageCollect(skipClosedWindowsCache: Bool) {
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
-        if macApp.nsApp.isTerminated, MacWindow.allWindowsMap[windowId] != nil {
-            rememberRestartWindowBeforeAppTermination(self)
+        if MacWindow.allWindowsMap[windowId] != nil {
+            if macApp.nsApp.isTerminated {
+                rememberRestartWindowBeforeAppTermination(self)
+            } else if !skipClosedWindowsCache {
+                // A native closure, not a WinMuxX close command or project deletion.
+                rememberWindowClosedByRunningApp(self, pid: macApp.pid)
+            }
         }
         WindowMotion.shared.forget(windowId)
         WindowBorderController.shared.remove(windowId: windowId)

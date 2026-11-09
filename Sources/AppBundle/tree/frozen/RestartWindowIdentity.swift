@@ -41,6 +41,13 @@ struct RestartWindowIdentity: Codable, Equatable, Sendable {
         if !title.isEmpty && title == other.title { strength += 1 }
         return strength
     }
+
+    func contradicts(_ other: Self) -> Bool {
+        if let documentURL, let otherDocument = other.documentURL, documentURL != otherDocument { return true }
+        if let accessibilityIdentifier, let otherIdentifier = other.accessibilityIdentifier,
+           accessibilityIdentifier != otherIdentifier { return true }
+        return false
+    }
 }
 
 /// Return the candidate's position, not its old macOS ID: IDs can collide between
@@ -58,11 +65,30 @@ func matchRestartWindowIndex(
     }
     if sameProcess.count == 1 { return sameProcess[0] }
     let strengths = saved.map { $0.restartIdentity?.matchStrength(with: identity) ?? 0 }
-    guard let strongest = strengths.max(), strongest > 0 else { return nil }
+    guard let strongest = strengths.max(), strongest > 0 else {
+        return soleRelaunchedWindowIndex(id: id, identity: identity, saved: saved, live: live)
+    }
     let candidates = saved.indices.filter { strengths[$0] == strongest }
     guard candidates.count == 1, let index = candidates.first,
           let selected = saved[index].restartIdentity else { return nil }
     let competingLiveWindows = live.filter { selected.matchStrength(with: $0.1) >= strongest }
     guard competingLiveWindows.count == 1, competingLiveWindows[0].0 == id else { return nil }
+    return index
+}
+
+/// Titles such as a chat or web page change between launches. When a relaunched app
+/// has exactly one saved and one live window, they are the same window.
+private func soleRelaunchedWindowIndex(
+    id: UInt32,
+    identity: RestartWindowIdentity,
+    saved: [FrozenWindow],
+    live: [(UInt32, RestartWindowIdentity)]
+) -> Int? {
+    let sameApp = saved.indices.filter { saved[$0].restartIdentity?.bundleId == identity.bundleId }
+    guard sameApp.count == 1, let index = sameApp.first, let selected = saved[index].restartIdentity,
+          identity.launchDate != nil, selected.launchDate != identity.launchDate,
+          !selected.contradicts(identity) else { return nil }
+    let liveWindows = live.filter { $0.1.bundleId == identity.bundleId }
+    guard liveWindows.count == 1, liveWindows[0].0 == id else { return nil }
     return index
 }

@@ -35,6 +35,7 @@ enum GlobalObserver {
                 windowLifecycleChanges.notify()
                 MacApp.registrationRetries.cancel(pid: terminatedPid)
                 WindowDetectionOperations.shared.cancel(pid: terminatedPid)
+                rememberClosedWindowsOfTerminatedApp(pid: terminatedPid)
             }
             if !TrayMenuModel.shared.isEnabled { return }
             if notifName == NSWorkspace.didActivateApplicationNotification.rawValue {

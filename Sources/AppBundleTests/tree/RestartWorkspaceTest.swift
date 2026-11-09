@@ -574,6 +574,38 @@ final class RestartWorkspaceTest: XCTestCase {
         }
     }
 
+    func testSoleWindowOfRelaunchedAppMatchesDespiteChangedTitle() {
+        let workspace = Workspace.get(byName: "2")
+        let chat = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        chat.restartIdentity = identity("Chat | Alice")
+        let reopened = identity("Chat | Bob", pid: 20, launch: 20)
+        XCTAssertEqual(matchRestartWindow(id: 99, identity: reopened,
+            saved: [FrozenWindow(chat)], live: [(99, reopened)]), 1)
+        XCTAssertNil(matchRestartWindow(id: 99, identity: reopened,
+            saved: [FrozenWindow(chat)], live: [(99, reopened), (100, identity("Chat | Carol", pid: 20, launch: 20))]),
+            "a second live window makes the match a guess")
+        let other = TestWindow.new(id: 2, parent: workspace.rootTilingContainer)
+        other.restartIdentity = identity("Chat | Dave")
+        XCTAssertNil(matchRestartWindow(id: 99, identity: reopened,
+            saved: [FrozenWindow(chat), FrozenWindow(other)], live: [(99, reopened)]))
+    }
+
+    func testWindowsClosedByQuittingAppAreRememberedOnlyWhenItTerminates() {
+        let workspace = Workspace.get(byName: "3")
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.restartIdentity = identity("Notes")
+        rememberWindowClosedByRunningApp(window, pid: 10)
+        XCTAssertTrue(runtime.recovery.restartSnapshots.isEmpty, "a running app may have closed it explicitly")
+        rememberClosedWindowsOfTerminatedApp(pid: 10)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.map(\.snapshot.remainingWindowIds), [[1]])
+        XCTAssertEqual(runtime.recovery.restartSnapshots.first?.snapshot.world.workspaces.map(\.name), ["3"])
+
+        rememberWindowClosedByRunningApp(window, pid: 11)
+        forgetWindowsClosedByRunningApp(pid: 11)
+        rememberClosedWindowsOfTerminatedApp(pid: 11)
+        XCTAssertEqual(runtime.recovery.restartSnapshots.count, 1, "a new window showed the app kept running")
+    }
+
     func testIdentifierCanRestoreWithoutTitleButGenericIdentifiersRemainAmbiguous() {
         let workspace = Workspace.get(byName: "3")
         let original = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
