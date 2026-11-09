@@ -40,6 +40,8 @@ var defaultConfigUrl: URL {
 
 struct Config: ConvenienceCopyable {
     var appearance: AppAppearance = .system
+    /// `#RRGGBB` from root `accent-color`; nil follows the system accent (see `winMuxAccentColor`).
+    var accentColor: String?
     var configVersion: Int = 1
     var afterStartupCommand: [any Command] = []
     var enableNormalizationFlattenContainers: Bool = true

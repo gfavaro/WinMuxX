@@ -43,12 +43,11 @@ func normalizedWindowBorderColor(_ raw: String) -> String? {
     return raw.uppercased()
 }
 
-/// A border color as 0xRRGGBBAA. `accent` resolves the system accent color in the current
-/// appearance; graphite draws blue, as elsewhere, so focus stays distinct from gray borders.
+/// A border color as 0xRRGGBBAA. `accent` resolves `winMuxAccentColor` in the current appearance.
 @MainActor
 func windowBorderRGBA(_ color: String) -> UInt32 {
     guard color == windowBorderAccentColor else { return windowBorderHexRGBA(color) }
-    let accent: NSColor = NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor
+    let accent = winMuxAccentColor
     var resolved: NSColor?
     // NSApp is nil before the application starts, as in unit tests.
     (NSApp?.effectiveAppearance ?? NSAppearance.currentDrawing()).performAsCurrentDrawingAppearance { resolved = accent.usingColorSpace(.sRGB) }

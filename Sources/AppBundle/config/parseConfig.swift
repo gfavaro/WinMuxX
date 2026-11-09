@@ -54,6 +54,11 @@ private let configParser: [String: any ParserProtocol<Config>] = [
             AppAppearance(rawValue: $0).orFailure(.semantic(backtrace, "Possible values: system, light, dark"))
         }
     },
+    "accent-color": Parser(\.accentColor) { raw, backtrace in
+        parseString(raw, backtrace).flatMap {
+            normalizedWorkspaceSidebarColorHex($0).map { .success($0) } ?? .failure(.semantic(backtrace, "Use #RRGGBB"))
+        }
+    },
     "config-version": Parser(\.configVersion, parseConfigVersion),
 
     "after-startup-command": Parser(\.afterStartupCommand) { parseCommandOrCommands($0).toParsedToml($1) },

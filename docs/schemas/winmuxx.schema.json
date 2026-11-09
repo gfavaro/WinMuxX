@@ -7,6 +7,7 @@
   "properties": {
     "config-version": {"type": "integer", "minimum": 1, "maximum": 2},
     "appearance": {"enum": ["system", "light", "dark"]},
+    "accent-color": {"type": "string", "pattern": "^#?[0-9A-Fa-f]{6}$"},
     "after-startup-command": {"$ref": "#/$defs/commands"},
     "on-display-changed": {"$ref": "#/$defs/commands"},
     "on-focus-changed": {"$ref": "#/$defs/commands"},

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add root `accent-color` to replace the macOS accent in borders, tab pills, the hover bar, the overview and mode indicators.
 - Add a task-based learning path and a detailed Dinky fit and execution plan.
 - Add illustrated layout, command and configuration recipe guides.
 - Preserve dangling configuration symlinks during bootstrap and round-trip quoted Unicode CLI arguments.

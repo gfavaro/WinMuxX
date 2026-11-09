@@ -135,6 +135,17 @@ its wallpaper to meet the menu bar. Explicit themes override that adaptation.
 Custom solid surface colors retain a contrasting foreground. Reduce Transparency
 and Increase Contrast continue to apply in every theme.
 
+Focus and selection use the macOS accent color, or blue with the Graphite accent.
+To use another color, set the root-level `accent-color`:
+
+```toml
+accent-color = '#7AA2F7' # #RRGGBB; omit it to follow macOS
+```
+
+It colors borders set to `'accent'`, tab pills, the hover bar, the workspace
+overview's selection and mode indicators without their own `indicator-color`.
+A theme tool can write it to match WinMuxX to the rest of the desktop.
+
 ## Dimming inactive windows
 
 ```toml
@@ -150,7 +161,7 @@ and blurs everything but the focused window until you turn it off.
 ## Hover bar
 
 Rest the pointer on a tiled window's top edge, away from its corners, and a bar in your
-accent color (blue with the Graphite accent) appears where the pointer is, offering
+accent color (`accent-color`, or blue with the Graphite accent) appears where the pointer is, offering
 **Main** (Master layout: swap it into the main pane), **Focus** (`fullscreen`) and
 **Float** (`layout floating tiling`) for that window. It appears only after a short
 rest, and only for the window actually on top there. Its behavior is fixed.

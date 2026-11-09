@@ -67,7 +67,7 @@ struct WorkspaceOverviewView: View {
                 VStack(spacing: 6) {
                     desktop(card)
                         .aspectRatio(card.desktopSize.width / max(1, card.desktopSize.height), contentMode: .fit)
-                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(model.selectedCard?.id == card.id ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: model.selectedCard?.id == card.id ? 3 : (increasedContrast ? 2 : 1)))
+                        .overlay(RoundedRectangle(cornerRadius: 7).stroke(model.selectedCard?.id == card.id ? Color(nsColor: winMuxAccentColor) : Color(nsColor: .separatorColor), lineWidth: model.selectedCard?.id == card.id ? 3 : (increasedContrast ? 2 : 1)))
                         .frame(maxWidth: .infinity, maxHeight: cardHeight, alignment: .top)
                     Button(card.title) { model.activate?(card.id, nil) }.buttonStyle(.plain)
                         .lineLimit(1).truncationMode(.middle)
@@ -118,7 +118,7 @@ struct WorkspaceOverviewView: View {
                             }
                             .frame(width: max(1, rect.width * geometry.size.width), height: max(1, rect.height * geometry.size.height))
                             .background(model.images[card.id] == nil ? Color.gray.opacity(0.25) : .clear)
-                            .overlay(Rectangle().stroke(model.selectedWindow == window.id && model.selectedCard?.id == card.id ? Color.accentColor : Color(nsColor: .separatorColor), lineWidth: model.selectedWindow == window.id ? 3 : (increasedContrast ? 2 : 1)))
+                            .overlay(Rectangle().stroke(model.selectedWindow == window.id && model.selectedCard?.id == card.id ? Color(nsColor: winMuxAccentColor) : Color(nsColor: .separatorColor), lineWidth: model.selectedWindow == window.id ? 3 : (increasedContrast ? 2 : 1)))
                             .contentShape(Rectangle())
                         }.buttonStyle(.plain)
                             .accessibilityLabel("\(window.appName): \(window.title), workspace \(card.title)")

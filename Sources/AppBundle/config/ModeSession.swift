@@ -98,13 +98,14 @@ struct ModePresentation: Equatable, Sendable {
         }
     }
 
+    @MainActor
     func color(dark: Bool, increasedContrast: Bool) -> NSColor {
         let base: NSColor
         if let hex = configuredColor, let value = UInt32(hex.dropFirst(), radix: 16) {
             base = NSColor(srgbRed: CGFloat((value >> 16) & 255) / 255,
                            green: CGFloat((value >> 8) & 255) / 255,
                            blue: CGFloat(value & 255) / 255, alpha: 1)
-        } else { base = .controlAccentColor }
+        } else { base = winMuxAccentColor }
         let rgb = base.usingColorSpace(.sRGB) ?? base
         func linear(_ c: CGFloat) -> CGFloat { c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4) }
         func luminance(_ c: NSColor) -> CGFloat {

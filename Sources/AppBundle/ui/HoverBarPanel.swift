@@ -136,10 +136,7 @@ final class HoverBarPanel: NSPanelHud {
         invalidateShadow()
     }
 
-    /// Graphite has no hue, so the accent would not show; blue stands in, as for the pills.
-    static var accentColor: NSColor {
-        NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor
-    }
+    static var accentColor: NSColor { winMuxAccentColor }
 
     private static func roundedMask(radius: CGFloat) -> NSImage {
         let edge = radius * 2 + 1

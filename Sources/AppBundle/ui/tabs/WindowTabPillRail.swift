@@ -45,11 +45,8 @@ struct WindowTabPillRail: View {
     }
 
     private func fill(for tab: WindowTabItemViewModel) -> Color {
-        // SwiftUI's accentColor greys out in a panel that never becomes active; Graphite has no
-        // hue, so blue stands in, as in the hover bar.
-        if tab.isActive {
-            return Color(nsColor: NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor)
-        }
+        // SwiftUI's accentColor greys out in a panel that never becomes active.
+        if tab.isActive { return Color(nsColor: winMuxAccentColor) }
         return Color(nsColor: .systemGray).opacity(shownWindowIds.contains(tab.windowId) ? 0.95 : 0.7)
     }
 }

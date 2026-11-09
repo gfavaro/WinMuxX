@@ -2,10 +2,9 @@ import AppKit
 import SwiftUI
 
 /// A border color from Settings text: `accent`, `#RRGGBB` or `#RRGGBBAA`, as `[borders]` accepts.
+@MainActor
 func settingsPreviewColor(hex: String) -> Color? {
-    if hex.lowercased() == windowBorderAccentColor {
-        return Color(nsColor: NSColor.currentControlTint == .graphiteControlTint ? .systemBlue : .controlAccentColor)
-    }
+    if hex.lowercased() == windowBorderAccentColor { return Color(nsColor: winMuxAccentColor) }
     let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
     guard digits.count == 6 || digits.count == 8, let value = UInt32(digits, radix: 16) else { return nil }
     let rgb = digits.count == 8 ? value >> 8 : value
@@ -88,7 +87,7 @@ struct SettingsTabGroupPreview: View {
                     HStack(spacing: windowTabPillSpacing) {
                         ForEach(0..<3) { index in
                             Capsule()
-                                .fill(index == 0 ? Color(nsColor: .controlAccentColor) : Color(nsColor: .systemGray).opacity(0.7))
+                                .fill(index == 0 ? Color(nsColor: winMuxAccentColor) : Color(nsColor: .systemGray).opacity(0.7))
                                 .frame(width: windowTabPillWidth(isActive: index == 0, isShown: false), height: windowTabPillHeight)
                         }
                     }

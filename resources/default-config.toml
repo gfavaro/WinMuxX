@@ -16,6 +16,9 @@ config-version = 2
 
 # Theme for WinMuxX UI: system follows macOS, or choose light / dark.
 appearance = 'system'
+# Accent for focus and selection: 'accent' borders, tab pills, hover bar, workspace overview
+# and mode indicators. Omit it to follow the macOS accent color.
+# accent-color = '#5E9EFF'
 start-at-login = false
 # Reset workspace placement at launch; explicit assignments still apply.
 start-workspaces-on-main-monitor = false
@@ -33,7 +36,7 @@ window-tabs.height = 36
 borders.enabled = true
 # Width in points; fractional values are supported.
 borders.width = 4
-# Colors accept 'accent' (the system accent color, visible in light and dark mode), #RRGGBB or #RRGGBBAA.
+# Colors accept 'accent' (accent-color, or the system accent color), #RRGGBB or #RRGGBBAA.
 borders.active-color = 'accent'
 borders.inactive-color = '#00000000'   # transparent: only the focused window has a border
 # 'below' draws behind the window; 'above' draws over it.
