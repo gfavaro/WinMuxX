@@ -4,7 +4,6 @@ import Foundation
 
 @MainActor public func initAppBundle() {
     Task {
-        // Nothing retries startup: a failure here leaves WinMuxX running but never ready.
         do { try await startAppBundle() }
         catch { NSLog("WinMuxX startup failed: %@", String(describing: error)) }
     }
@@ -51,17 +50,35 @@ import Foundation
     let didLoadPersistedFrozenWorld = loadPersistedFrozenWorldForStartupIfPresent()
     Workspace.reconcileWorkspaceState() // init workspaces
     _ = Workspace.all.first?.focusWorkspace()
-    try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
-    try await runLightSession(.startup, .forceRun) {
-        applyStartupWorkspacePlacement(restoredWorld: didLoadPersistedFrozenWorld)
-        applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
-        _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
-    }
-    isWinMuxRuntimeReady = true
-    scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
+    await runStartupSessions(restoredWorld: didLoadPersistedFrozenWorld)
     reloadConfigIfSavedDuringStartup()
     schedulePersistedFrozenWorldSave()
     showSetupCheckIfNeeded()
+}
+
+/// Discovers the open windows, applies the startup layout, then lets native events through.
+/// An app that does not answer Accessibility while it launches fails a session. Startup still
+/// finishes: until it does every native event is ignored, and nothing would run it again. The
+/// refresh scheduled at the end discovers the windows again, and the saved placement of a
+/// window not seen yet stays pending.
+@MainActor
+func runStartupSessions(restoredWorld: Bool) async {
+    do {
+        try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
+    } catch {
+        NSLog("WinMuxX startup window discovery failed: %@", error.localizedDescription)
+    }
+    do {
+        try await runLightSession(.startup, .forceRun) {
+            applyStartupWorkspacePlacement(restoredWorld: restoredWorld)
+            applyStartupWindowLayout(restoredWorld: restoredWorld)
+            _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
+        }
+    } catch {
+        NSLog("WinMuxX startup layout failed: %@", error.localizedDescription)
+    }
+    isWinMuxRuntimeReady = true
+    scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
 }
 
 /// Startup placement is separate from display ownership during normal switching.

@@ -16,6 +16,10 @@ Focused-window requests retain their 250 ms timeout; general requests retain 1 s
 An unanswered focus or fullscreen/minimize read is unknown, not evidence that a
 window vanished or changed state.
 
+An unanswered read that fails window discovery or layout during startup is logged
+and startup still finishes. The refresh that follows discovers the windows again,
+and the saved placement of a window not seen yet stays pending.
+
 Normalization validates observations before acting, respects explicit workspace
 moves made during a read, and preserves focus ordering during native bookkeeping.
 Window detection owns its committed rule task: cancelling a background refresh does
