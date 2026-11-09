@@ -3,6 +3,10 @@ name: CI
 on:
   workflow_dispatch:
   pull_request:
+  # Work is committed straight to main, so this is the only run on the pinned toolchain.
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**', 'site/**']
 
 permissions:
   contents: read
@@ -60,7 +64,8 @@ jobs:
           retention-days: 14
 
       - name: Build personal app
-        if: github.repository == 'gfavaro/WinMuxX'
+        # Pushes to main are tested only; apps come from pull requests, on demand and release tags.
+        if: github.repository == 'gfavaro/WinMuxX' && github.event_name != 'push'
         env:
           BUILD_NUMBER: ${{ github.run_number }}
           CODESIGN_IDENTITY: '-'
