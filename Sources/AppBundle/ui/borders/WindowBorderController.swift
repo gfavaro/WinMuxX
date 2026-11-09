@@ -518,9 +518,7 @@ private let windowManagerPath = "/System/Library/CoreServices/WindowManager.app/
 /// The only bundle these checks ask about, answered from the process's executable path:
 /// a system call rather than a synchronous LaunchServices request per process.
 func windowManagerBundleIdentifier(_ pid: pid_t) -> String? {
-    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-    guard proc_pidpath(pid, &path, UInt32(path.count)) > 0 else { return nil }
-    return String(cString: path) == windowManagerPath ? "com.apple.WindowManager" : nil
+    executablePath(ofProcess: pid) == windowManagerPath ? "com.apple.WindowManager" : nil
 }
 
 // Public AppKit fallback when the private WindowServer renderer is unavailable.

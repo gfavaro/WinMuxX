@@ -25,7 +25,7 @@ func updateMoveFromTabStrip(_ windowId: UInt32) {
 func finishMoveFromTabStrip() {
     guard shouldHandleWindowTabStripGroupDragEnd() else { return }
     Task { @MainActor in
-        try? await resetManipulatedWithMouseIfPossible()
+        await resetManipulatedWithMouseIfPossible()
     }
 }
 

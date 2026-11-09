@@ -226,7 +226,7 @@ final class SwitcherPalettePanel: NSPanelHud {
         dismiss()
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
-            try await runLightSession(.menuBarButton, token) { bringWindowForward(windowId) }
+            _ = try? await runLightSession(.menuBarButton, token) { bringWindowForward(windowId) }
         }
     }
 

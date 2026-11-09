@@ -38,8 +38,8 @@ final class RegularApplications {
     private func start() {
         // AppKit changes both properties on the main thread only.
         running = NSWorkspace.shared.observe(\.runningApplications, options: [.initial, .new, .old]) { _, change in
-            nonisolated(unsafe) let added = change.newValue ?? []
-            nonisolated(unsafe) let removed = change.oldValue ?? []
+            let added = change.newValue ?? []
+            let removed = change.oldValue ?? []
             MainActor.assumeIsolated {
                 for app in removed { RegularApplications.shared.forget(app) }
                 for app in added { RegularApplications.shared.watch(app) }
@@ -51,7 +51,6 @@ final class RegularApplications {
         let pid = app.processIdentifier
         guard policies[pid] == nil else { return }
         policies[pid] = app.observe(\.activationPolicy) { app, _ in
-            nonisolated(unsafe) let app = app
             MainActor.assumeIsolated { RegularApplications.shared.update(app) }
         }
         // Read after the observation is stored: an initial callback would arrive before it.

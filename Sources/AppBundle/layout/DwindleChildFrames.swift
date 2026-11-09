@@ -11,7 +11,7 @@ extension TilingContainer {
         let settings = DwindleMinimumSettings(orientationHorizontal: dwindleOrientation.map { $0 == .h },
             explicitShares: explicitDwindleShares, ratios: ratios)
         let node = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: orientation == .h,
-            children: snapshots, dwindle: settings, tabChrome: .zero, stackedPadding: 0)
+            children: snapshots, dwindle: settings, tabChrome: .zero)
         let extent = node.extent(horizontal: axis == .h,
             in: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height),
             gap: CGSize(width: CGFloat(gaps.inner.horizontal.toDouble()), height: CGFloat(gaps.inner.vertical.toDouble())))
@@ -60,7 +60,7 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
             : nil
         return .container(layout: container.layout, horizontal: container.orientation == .h,
             children: children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
-            tabChrome: chrome, stackedPadding: tabGroupPadding)
+            tabChrome: chrome)
     default: return .window(.zero)
     }
 }

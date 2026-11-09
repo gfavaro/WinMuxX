@@ -50,7 +50,7 @@ enum GlobalObserver {
         let notifName = notification.name.rawValue
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
-            try await runLightSession(.globalObserver(notifName), token) {
+            _ = try? await runLightSession(.globalObserver(notifName), token) {
                 if config.automaticallyUnhideMacosHiddenApps {
                     if let w = prevFocus?.windowOrNil,
                        w.macAppUnsafe.nsApp.isHidden,
@@ -218,13 +218,13 @@ enum GlobalObserver {
             Task { @MainActor in
                 finishWorkspaceSidebarDragAfterGlobalMouseUp()
                 guard let token: RunSessionGuard = .isServerEnabled else { return }
-                try await resetManipulatedWithMouseIfPossible()
+                await resetManipulatedWithMouseIfPossible()
                 // Drag-end releases the sidebar expansion locks without any pointer movement;
                 // hover must be re-evaluated for a stationary cursor.
                 WorkspaceSidebarPanel.scheduleHoverRecheckForVisiblePanels()
                 let mouseLocation = mouseLocation
                 if let workspace = desktopWorkspaceToFocus(at: mouseLocation) {
-                    _ = try await runLightSession(.globalObserverLeftMouseUp, token) {
+                    _ = try? await runLightSession(.globalObserverLeftMouseUp, token) {
                         workspace.focusWorkspace()
                     }
                 } else {

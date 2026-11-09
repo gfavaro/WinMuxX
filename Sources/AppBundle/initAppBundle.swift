@@ -4,58 +4,64 @@ import Foundation
 
 @MainActor public func initAppBundle() {
     Task {
-        initTerminationHandler()
-        isCli = false
-        AssistiveTechnology.startObserving()
-        initServerArgs()
-        var bootstrappedConfigUrl: URL? = nil
-        do {
-            bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
-            let editable = bootstrappedConfigUrl ?? preferredEditableConfigUrl()
-            if FileManager.default.fileExists(atPath: editable.path) {
-                try migrateLegacyConfiguration(at: editable)
-            }
-        } catch {
-            MessageModel.shared.message = Message(
-                description: "Config Bootstrap Error",
-                body: error.localizedDescription,
-            )
-        }
-        if try await !reloadConfig(forceConfigUrl: bootstrappedConfigUrl) {
-            var out = ""
-            check(
-                try await reloadConfig(forceConfigUrl: defaultConfigUrl, stdout: &out),
-                """
-                Can't load default config. Your installation is probably corrupted.
-                Please don't modify '\(defaultConfigUrl)'
-
-                \(out)
-                """,
-            )
-        }
-        if isDebug { await toggleReleaseServerIfDebug(.off) }
-        MonitorConfigurationObserver.shared.prepareForStartup()
-
-        checkAccessibilityPermissions()
-        requestScreenRecordingPermissionsIfNeeded()
-        startUnixSocketServer()
-        GlobalObserver.initObserver()
-        MonitorConfigurationObserver.shared.startObserving()
-        let didLoadPersistedFrozenWorld = loadPersistedFrozenWorldForStartupIfPresent()
-        Workspace.reconcileWorkspaceState() // init workspaces
-        _ = Workspace.all.first?.focusWorkspace()
-        try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
-        try await runLightSession(.startup, .forceRun) {
-            applyStartupWorkspacePlacement(restoredWorld: didLoadPersistedFrozenWorld)
-            applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
-            _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
-        }
-        isWinMuxRuntimeReady = true
-        scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
-        reloadConfigIfSavedDuringStartup()
-        schedulePersistedFrozenWorldSave()
-        showSetupCheckIfNeeded()
+        // Nothing retries startup: a failure here leaves WinMuxX running but never ready.
+        do { try await startAppBundle() }
+        catch { NSLog("WinMuxX startup failed: %@", String(describing: error)) }
     }
+}
+
+@MainActor private func startAppBundle() async throws {
+    initTerminationHandler()
+    isCli = false
+    AssistiveTechnology.startObserving()
+    initServerArgs()
+    var bootstrappedConfigUrl: URL? = nil
+    do {
+        bootstrappedConfigUrl = try ensureBootstrapConfigExistsIfNeeded()
+        let editable = bootstrappedConfigUrl ?? preferredEditableConfigUrl()
+        if FileManager.default.fileExists(atPath: editable.path) {
+            try migrateLegacyConfiguration(at: editable)
+        }
+    } catch {
+        MessageModel.shared.message = Message(
+            description: "Config Bootstrap Error",
+            body: error.localizedDescription,
+        )
+    }
+    if try await !reloadConfig(forceConfigUrl: bootstrappedConfigUrl) {
+        var out = ""
+        check(
+            try await reloadConfig(forceConfigUrl: defaultConfigUrl, stdout: &out),
+            """
+            Can't load default config. Your installation is probably corrupted.
+            Please don't modify '\(defaultConfigUrl)'
+
+            \(out)
+            """,
+        )
+    }
+    if isDebug { await toggleReleaseServerIfDebug(.off) }
+    MonitorConfigurationObserver.shared.prepareForStartup()
+
+    checkAccessibilityPermissions()
+    requestScreenRecordingPermissionsIfNeeded()
+    startUnixSocketServer()
+    GlobalObserver.initObserver()
+    MonitorConfigurationObserver.shared.startObserving()
+    let didLoadPersistedFrozenWorld = loadPersistedFrozenWorldForStartupIfPresent()
+    Workspace.reconcileWorkspaceState() // init workspaces
+    _ = Workspace.all.first?.focusWorkspace()
+    try await runRefreshSessionBlocking(.startup, layoutWorkspaces: false)
+    try await runLightSession(.startup, .forceRun) {
+        applyStartupWorkspacePlacement(restoredWorld: didLoadPersistedFrozenWorld)
+        applyStartupWindowLayout(restoredWorld: didLoadPersistedFrozenWorld)
+        _ = try await config.afterStartupCommand.runCmdSeq(hookEnvironment(event: "startup"), .emptyStdin)
+    }
+    isWinMuxRuntimeReady = true
+    scheduleRefreshSession(.workspaceRestoration) // Catch events deferred during startup.
+    reloadConfigIfSavedDuringStartup()
+    schedulePersistedFrozenWorldSave()
+    showSetupCheckIfNeeded()
 }
 
 /// Startup placement is separate from display ownership during normal switching.

@@ -4,12 +4,12 @@ import CoreGraphics
 indirect enum LayoutMinimumSnapshot {
     case window(CGSize)
     case container(layout: Layout, horizontal: Bool, children: [LayoutMinimumSnapshot],
-                   dwindle: DwindleMinimumSettings?, tabChrome: CGSize, stackedPadding: CGFloat)
+                   dwindle: DwindleMinimumSettings?, tabChrome: CGSize)
 
     func extent(horizontal: Bool, in rect: CGRect, gap: CGSize) -> CGFloat {
         switch self {
         case .window(let size): return horizontal ? size.width : size.height
-        case .container(let layout, let orientationHorizontal, let children, let dwindle, let chrome, let padding):
+        case .container(let layout, let orientationHorizontal, let children, let dwindle, let chrome):
             guard !children.isEmpty else { return 0 }
             if layout == .dwindle, let dwindle {
                 return Self.dwindleExtent(children: children, settings: dwindle, axisHorizontal: horizontal, rect: rect, gap: gap)
@@ -46,7 +46,7 @@ indirect enum LayoutMinimumSnapshot {
         let firstMinimum = first.extent(horizontal: axisHorizontal, in: firstRect, gap: gap)
         let tail = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: settings.orientationHorizontal ?? splitHorizontal,
             children: Array(children.dropFirst()), dwindle: settings.droppingFirstRatio,
-            tabChrome: .zero, stackedPadding: 0).extent(horizontal: axisHorizontal, in: tailRect, gap: gap)
+            tabChrome: .zero).extent(horizontal: axisHorizontal, in: tailRect, gap: gap)
         return splitHorizontal == axisHorizontal ? firstMinimum + splitGap + tail : max(firstMinimum, tail)
     }
 }
@@ -116,7 +116,7 @@ enum DwindleLayoutGeometry {
                         children: Array(input.children.dropFirst(index + 1)),
                         dwindle: DwindleMinimumSettings(orientationHorizontal: input.orientationHorizontal,
                             explicitShares: nil, ratios: Array(input.ratios.dropFirst(index + 1))),
-                        tabChrome: .zero, stackedPadding: 0).extent(horizontal: horizontal, in: tailRect, gap: gapSize)
+                        tabChrome: .zero).extent(horizontal: horizontal, in: tailRect, gap: gapSize)
                     let minimum = child.extent(horizontal: horizontal, in: childRect, gap: gapSize)
                     let available = max(length - splitGap, 0)
                     let requested = available * ratio

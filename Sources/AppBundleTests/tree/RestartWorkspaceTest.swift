@@ -297,7 +297,7 @@ final class RestartWorkspaceTest: XCTestCase {
             current.restartIdentity = identity("Second")
             let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: current)
             XCTAssertTrue(restored)
-            try await $_isStartup.withValue(false) {
+            $_isStartup.withValue(false) {
                 syncClosedWindowsCacheToCurrentWorld()
             }
             try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: [2])

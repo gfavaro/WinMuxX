@@ -9,8 +9,8 @@ import XCTest
 final class SettingsRefinementRenderingTest: WorkspaceTestCase {
 
     func testRuleEditorActionsFitCompactAndWideLayouts() throws {
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        defer { NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")) }
+        setEnhancedUserInterfaceForTests(true)
+        defer { setEnhancedUserInterfaceForTests(false) }
         for size in [CGSize(width: 500, height: 360), CGSize(width: 500, height: 650), CGSize(width: 900, height: 650)] {
             let width = size.width
             var document = "[[on-window-detected]]\nif.app-id = 'com.example.long-application-name'\nrun = ['exec-and-forget echo custom', 'layout floating']\n"
@@ -51,8 +51,8 @@ final class SettingsRefinementRenderingTest: WorkspaceTestCase {
     }
 
     func testModeOptionsRenderFromConfigWithoutSavingOnLoad() throws {
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        defer { NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")) }
+        setEnhancedUserInterfaceForTests(true)
+        defer { setEnhancedUserInterfaceForTests(false) }
         config = parseConfig("""
         [mode.main.binding]
         [mode.navigation]
@@ -88,8 +88,8 @@ final class SettingsRefinementRenderingTest: WorkspaceTestCase {
     }
 
     func testEverySearchDescriptorExistsOnItsDestinationPage() throws {
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        defer { NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface")) }
+        setEnhancedUserInterfaceForTests(true)
+        defer { setEnhancedUserInterfaceForTests(false) }
         var writes = 0
         let model = ShortcutSettingsModel(configAccess: .init(edit: { _ in
             writes += 1

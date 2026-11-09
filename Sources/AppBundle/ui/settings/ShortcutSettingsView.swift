@@ -61,8 +61,11 @@ public func openShortcutSettingsWindow(_ openWindow: OpenWindowAction) {
 @MainActor
 private let releaseSettingsPagesOnClose: Void = {
     _ = NotificationCenter.default.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
-        guard (note.object as? NSWindow)?.identifier?.rawValue == shortcutSettingsWindowId else { return }
-        MainActor.assumeIsolated { ShortcutSettingsModel.shared.isWindowShown = false }
+        let window = note.object as? NSWindow
+        MainActor.assumeIsolated {
+            guard window?.identifier?.rawValue == shortcutSettingsWindowId else { return }
+            ShortcutSettingsModel.shared.isWindowShown = false
+        }
     }
 }()
 

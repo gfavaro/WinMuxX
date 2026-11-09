@@ -35,6 +35,7 @@ final class WinMuxRuntime {
     }
 
     /// Inherits the owner at creation, rather than looking up the process fixture after a delay.
+    @discardableResult
     func task(_ operation: @escaping @MainActor () async -> Void) -> Task<Void, Never> {
         withValue { Task { @MainActor in await operation() } }
     }

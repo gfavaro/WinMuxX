@@ -171,7 +171,7 @@ extension HotKey {
     let expected = session.generation
     guard let token = session.begin(expected: expected) else { return }
     Task {
-        try await owner.withValue {
+        _ = try? await owner.withValue {
             defer { session.finish(token) }
             guard session.generation == token.generation else { return }
             if let activeMode {

@@ -231,8 +231,6 @@ import XCTest
             - windowTabStripReservedGroupHandleWidth()
             - windowTabStripTrailingGroupDragGutterWidth
             - 18
-        let expectedTabsWidth = expectedViewportWidth
-            - (windowTabStripContentPadding() * 2)
 
         XCTAssertEqual(windowTabStripScrollViewportWidth(stripWidth: stripWidth), expectedViewportWidth)
         XCTAssertEqual(windowTabStripTabWidth(stripWidth: stripWidth, count: 1), 240)

@@ -85,7 +85,7 @@ extension WindowMouseInteractionDriver {
         isMouseUpResetScheduled = true
         DisplayRefreshDriver.shared.remove(owner: self)
         Task { @MainActor in
-            try? await resetManipulatedWithMouseIfPossible()
+            await resetManipulatedWithMouseIfPossible()
             isMouseUpResetScheduled = false
         }
     }

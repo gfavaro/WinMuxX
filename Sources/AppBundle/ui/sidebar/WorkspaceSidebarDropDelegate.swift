@@ -49,7 +49,7 @@ struct WorkspaceSidebarDropDelegate: DropDelegate {
             startedInSidebar: getCurrentMouseDragStartedInSidebar()
         ) {
             Task { @MainActor in
-                try? await resetManipulatedWithMouseIfPossible()
+                await resetManipulatedWithMouseIfPossible()
             }
             return true
         }

@@ -6,15 +6,14 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarOverrideTest: XCTestCase {
-    override func setUp() {
-        super.setUp()
-        // SwiftUI lazily creates its accessibility nodes only when requested.
-        NSApplication.shared.accessibilitySetValue(true, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
+    override func setUp() async throws {
+        try await super.setUp()
+        setEnhancedUserInterfaceForTests(true)
     }
 
-    override func tearDown() {
-        NSApplication.shared.accessibilitySetValue(false, forAttribute: NSAccessibility.Attribute(rawValue: "AXEnhancedUserInterface"))
-        super.tearDown()
+    override func tearDown() async throws {
+        setEnhancedUserInterfaceForTests(false)
+        try await super.tearDown()
     }
 
     private func render<Content: View>(_ view: Content, size: CGSize) -> (NSWindow, NSHostingView<Content>) {

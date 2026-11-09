@@ -363,7 +363,7 @@ func restoreFrozenFloatingSize(_ window: Window, _ frozen: FrozenWindow, on work
     let fitted = CGSize(width: min(saved.width, available.width), height: min(saved.height, available.height))
     window.lastFloatingSize = fitted
     if let macWindow = window as? MacWindow {
-        try? await macWindow.setAxFrameBlocking(nil, fitted)
+        _ = try? await macWindow.setAxFrameBlocking(nil, fitted)
     } else {
         window.setAxFrame(nil, fitted)
     }

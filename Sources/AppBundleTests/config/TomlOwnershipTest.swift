@@ -4,7 +4,7 @@ import XCTest
 final class TomlOwnershipTest: XCTestCase {
     func testNestedValueRetainsDocumentUntilLastViewIsReleased() throws {
         var root: TOMLTable? = try TOMLTable(string: "[nested]\ntext = 'alive'")
-        weak var owner = root!.storage
+        weak let owner = root!.storage
         var child: TOMLValue? = root!["nested"]?["text"]
         root = nil
         XCTAssertNotNil(owner)
@@ -15,7 +15,7 @@ final class TomlOwnershipTest: XCTestCase {
 
     func testNestedArrayAndTableViewsShareDocumentOwner() throws {
         var root: TOMLTable? = try TOMLTable(string: "items = [{ name = 'nested' }]")
-        weak var owner = root!.storage
+        weak let owner = root!.storage
         var array = root!["items"]!.array
         var table = array![0].table
         XCTAssertTrue(array!.storage === root!.storage)
@@ -30,7 +30,7 @@ final class TomlOwnershipTest: XCTestCase {
 
     func testLiteralAndEncodedTemporariesOwnTheirNativeRoots() throws {
         var value: TOMLValue? = ["nested": ["name": "literal"]]
-        weak var owner = value!.storage
+        weak let owner = value!.storage
         XCTAssertEqual(value?["nested"]?["name"]?.string, "literal")
         value = nil
         XCTAssertNil(owner)
@@ -38,7 +38,7 @@ final class TomlOwnershipTest: XCTestCase {
         struct Fixture: Codable, Equatable { let name: String; let values: [Int] }
         let fixture = Fixture(name: "encoded", values: [1, 2, 3])
         var encoded: TOMLTable? = try TOMLTable(fixture)
-        weak var encodedOwner = encoded!.storage
+        weak let encodedOwner = encoded!.storage
         XCTAssertEqual(try TOMLDecoder().decode(Fixture.self, from: encoded!), fixture)
         encoded = nil
         XCTAssertNil(encodedOwner)
@@ -46,9 +46,9 @@ final class TomlOwnershipTest: XCTestCase {
 
     func testRemovedValuesOwnIndependentCopies() throws {
         var root: TOMLTable? = try TOMLTable(string: "[nested]\nname = 'removed'")
-        weak var rootOwner = root!.storage
+        weak let rootOwner = root!.storage
         var removed = root!.remove(at: "nested")?.tomlValue
-        weak var removedOwner = removed!.storage
+        weak let removedOwner = removed!.storage
         XCTAssertFalse(removed!.storage === root!.storage)
         root = nil
         XCTAssertNil(rootOwner)
@@ -58,7 +58,7 @@ final class TomlOwnershipTest: XCTestCase {
 
         var array: TOMLArray? = ["first", "second"]
         var element = array!.remove(at: 0).tomlValue
-        weak var arrayOwner = array!.storage
+        weak let arrayOwner = array!.storage
         array = nil
         XCTAssertNil(arrayOwner)
         XCTAssertEqual(element.string, "first")
@@ -67,7 +67,7 @@ final class TomlOwnershipTest: XCTestCase {
 
     func testValuesRetainDocumentButKeysAreIndependentSwiftStrings() throws {
         var root: TOMLTable? = try TOMLTable(string: "name = 'value'\ncount = 3")
-        weak var owner = root!.storage
+        weak let owner = root!.storage
         let keys = root!.keys
         var values = root!.values
         root = nil
@@ -84,7 +84,7 @@ final class TomlOwnershipTest: XCTestCase {
     func testRepeatedParseAndReleaseDoesNotRetainNativeOwner() throws {
         for _ in 0..<500 {
             var root: TOMLTable? = try TOMLTable(string: "items = [{ name = 'fixture', flags = [true, false] }]")
-            weak var owner = root!.storage
+            weak let owner = root!.storage
             XCTAssertEqual(root!["items"]?[0]?["name"]?.string, "fixture")
             XCTAssertEqual(root!["items"]?[0]?["flags"]?[1]?.bool, false)
             _ = root!.convert()

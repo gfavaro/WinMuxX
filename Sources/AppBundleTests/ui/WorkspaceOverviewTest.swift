@@ -235,7 +235,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         deps.makePanel = { _, _ in panel }
         let controller = WorkspaceOverviewController(dependencies: deps)
         _ = controller.show(); await drain(controller)
-        weak var model = controller.models.first
+        weak let model = controller.models.first
         controller.dismiss()
         XCTAssertNotNil(model)
         panel.complete()
@@ -277,8 +277,6 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertEqual(frame?.width, 0.5)
         XCTAssertNil(normalizedWorkspacePreviewFrame(CGRect(x: CGFloat.nan, y: 0, width: 20, height: 20), origin: .zero, desktopSize: CGSize(width: 100, height: 100)))
         XCTAssertNil(normalizedWorkspacePreviewFrame(.zero, origin: .zero, desktopSize: .zero))
-        let back = window(1, frame: CGRect(x: -0.1, y: 0, width: 0.8, height: 0.8))
-        let front = window(2, frame: CGRect(x: 0.2, y: 0.2, width: 0.8, height: 0.8))
     }
 
     func testPaginationAndKeyboardNavigation() {
@@ -410,7 +408,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         let controller = WorkspaceOverviewController(dependencies: deps)
         for _ in 0..<1000 {
             XCTAssertTrue(controller.show())
-            weak var model = controller.models.first
+            weak let model = controller.models.first
             await drain(controller)
             controller.dismiss()
             XCTAssertNil(panel); XCTAssertNil(model)

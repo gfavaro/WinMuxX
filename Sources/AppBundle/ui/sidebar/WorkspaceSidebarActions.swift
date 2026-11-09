@@ -537,7 +537,7 @@ func finishSidebarWindowDrag(pointer: CGPoint? = nil) {
         return
     }
     Task { @MainActor in
-        try? await resetManipulatedWithMouseIfPossible()
+        await resetManipulatedWithMouseIfPossible()
     }
     clearWorkspaceSidebarDropPreview()
     WindowDragCursorProxyPanel.shared.hide()

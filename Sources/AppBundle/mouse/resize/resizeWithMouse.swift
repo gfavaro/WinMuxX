@@ -27,7 +27,9 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
             return
         }
         if isContinuingManagedDragSessionForResizedEvent(windowId) { return }
-        guard try await isManipulatedWithMouse(window) else {
+        // An unanswered read says neither that this is a drag nor that the app resized itself.
+        guard let manipulated = try? await isManipulatedWithMouse(window) else { return }
+        guard manipulated else {
             FrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
             return
         }
@@ -40,7 +42,7 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
 }
 
 @MainActor
-func resetManipulatedWithMouseIfPossible() async throws {
+func resetManipulatedWithMouseIfPossible() async {
     await WindowMouseInteractionDriver.shared.flushBeforeMouseUp()
     let didApplyPendingDragIntent = applyPendingWindowDragIntentIfPossible()
     clearPendingWindowDragIntent()

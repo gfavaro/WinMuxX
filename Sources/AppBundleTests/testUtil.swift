@@ -26,6 +26,14 @@ let projectRoot: URL = {
     return url
 }()
 
+/// SwiftUI creates its accessibility nodes only once assistive technology asks for them. The
+/// NSAccessibility protocol has no property for this attribute, so it is set by selector.
+@MainActor
+func setEnhancedUserInterfaceForTests(_ enabled: Bool) {
+    NSApplication.shared.perform(NSSelectorFromString("accessibilitySetValue:forAttribute:"),
+                                 with: enabled as NSNumber, with: "AXEnhancedUserInterface" as NSString)
+}
+
 @MainActor
 func setUpWorkspacesForTests() {
     layoutForNextDetectedWindow = nil

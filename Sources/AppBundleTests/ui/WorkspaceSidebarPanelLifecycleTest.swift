@@ -49,7 +49,7 @@ final class WorkspaceSidebarPanelLifecycleTest: WorkspaceTestCase {
         let secondId = workspaceSidebarMonitorScopeId(for: second)
         WorkspaceSidebarPanel.refreshAll(on: [first, second])
         let active = try XCTUnwrap(WorkspaceSidebarPanel.panel(for: firstId))
-        weak var obsolete = WorkspaceSidebarPanel.panel(for: secondId)
+        weak let obsolete = WorkspaceSidebarPanel.panel(for: secondId)
         XCTAssertNotNil(obsolete)
 
         autoreleasepool { WorkspaceSidebarPanel.refreshAll(on: [first]) }

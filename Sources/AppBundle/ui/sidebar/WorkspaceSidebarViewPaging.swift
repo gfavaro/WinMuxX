@@ -174,7 +174,7 @@ extension WorkspaceSidebarView {
             withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
                 projectSwipeTranslation = fullPageOffset
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: finish)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { finish() }
         }
     }
 

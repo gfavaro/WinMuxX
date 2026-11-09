@@ -251,7 +251,7 @@ extension Workspace {
     let owner = runtime
     let context = hookEnvironment(event: "focused-monitor-changed").withFocus(focus)
     Task {
-        try await owner.withValue {
+        _ = try? await owner.withValue {
             try await runLightSession(.onFocusedMonitorChanged, token) {
                 _ = try await config.onFocusedMonitorChanged.runCmdSeq(context, .emptyStdin)
             }
@@ -269,7 +269,7 @@ extension Workspace {
     let owner = runtime
     let context = hookEnvironment(event: "focus-changed").withFocus(focus)
     Task {
-        try await owner.withValue {
+        _ = try? await owner.withValue {
             try await runLightSession(.onFocusChanged, token) {
                 _ = try await config.onFocusChanged.runCmdSeq(context, .emptyStdin)
             }

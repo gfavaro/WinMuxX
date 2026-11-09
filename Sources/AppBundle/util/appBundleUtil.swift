@@ -17,13 +17,19 @@ private let lockScreenExecutablePath = "/System/Library/CoreServices/loginwindow
 func isLockScreenApp(_ app: NSRunningApplication?) -> Bool {
     guard let app else { return false }
     if let known = objc_getAssociatedObject(app, &lockScreenAnswerKey) as? Bool { return known }
-    var path = [CChar](repeating: 0, count: Int(MAXPATHLEN))
-    guard proc_pidpath(app.processIdentifier, &path, UInt32(path.count)) > 0 else { return false }
-    let answer = String(cString: path) == lockScreenExecutablePath
+    guard let path = executablePath(ofProcess: app.processIdentifier) else { return false }
+    let answer = path == lockScreenExecutablePath
     objc_setAssociatedObject(app, &lockScreenAnswerKey, answer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     return answer
 }
 nonisolated(unsafe) private var lockScreenAnswerKey: UInt8 = 0
+
+/// A system call, where asking the app object is a synchronous LaunchServices request.
+func executablePath(ofProcess pid: pid_t) -> String? {
+    var path = [UInt8](repeating: 0, count: Int(MAXPATHLEN))
+    let length = proc_pidpath(pid, &path, UInt32(path.count))
+    return length > 0 ? String(decoding: path.prefix(Int(length)), as: UTF8.self) : nil
+}
 
 @MainActor
 private let terminationCoordinator = WindowTerminationCoordinator()

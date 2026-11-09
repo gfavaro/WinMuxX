@@ -2,6 +2,7 @@
 import AppKit
 import Common
 import XCTest
+import os
 
 private actor ControlledSwipeRenderer {
     private var continuations: [WorkspaceId: CheckedContinuation<WorkspaceSwipeSnapshotResult, any Error>] = [:]
@@ -256,13 +257,13 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         let preview = WorkspaceSwipePreview(snapshots: snapshots)
         defer { preview.invalidate() }
         let picture = try image()
-        var valid = true
+        let valid = OSAllocatedUnfairLock(initialState: true)
         preview.begin(request: request(), front: picture, rect: rect, slidesLeft: true) {
             delivered.fulfill()
-            return valid
+            return valid.withLock { $0 }
         }
         await fulfillment(of: [started], timeout: 2)
-        valid = false
+        valid.withLock { $0 = false }
         await gate.finish(WorkspaceId("target"), image: picture)
         await fulfillment(of: [delivered], timeout: 2)
         XCTAssertFalse(preview.isActive)

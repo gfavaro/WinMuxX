@@ -265,7 +265,7 @@ extension WindowTabStripView {
         } else if hasCommittedToDetach {
             hasCommittedToDetach = false
             Task { @MainActor in
-                try? await resetManipulatedWithMouseIfPossible()
+                await resetManipulatedWithMouseIfPossible()
             }
         } else if let srcIdx = draggingIndex(context: context),
                   let tgtIdx = reorderTargetIndex(context: context),
