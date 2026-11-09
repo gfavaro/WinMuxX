@@ -47,8 +47,8 @@ The repository Secrets `WINMUXX_SIGNING_P12` (base64-encoded PKCS#12 containing
 the certificate and private key), `WINMUXX_SIGNING_PASSWORD`, and
 `WINMUXX_SIGNING_IDENTITY` (certificate SHA-1 fingerprint) must be configured.
 The release workflow imports it into a temporary keychain and deletes the keychain
-after the build. CI runs on pull requests and on demand, not on pushes to `main`;
-its builds stay ad hoc and do not receive the signing key.
+after the build. CI runs `make check` on pushes to `main`, and also builds an ad hoc
+app on pull requests and on demand; it never receives the signing key.
 Signing does not notarize the app; switching from an ad hoc build may require
 granting permissions once more.
 
