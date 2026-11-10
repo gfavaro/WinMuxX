@@ -46,11 +46,18 @@ final class SessionWindowTitleTest: WorkspaceTestCase {
         XCTAssertEqual(title, "Old")
         XCTAssertEqual(window.titleGetCount, 1, "stale entry must not be refreshed inline")
 
-        // The queued background refresh eventually updates the cache.
-        for _ in 0 ..< 1000 {
-            if cachedWindowTitle(for: window) == "New" { break }
-            await Task.yield()
+        // Await the actual batch, including its cache write, with a bounded failure.
+        let refresh = backgroundTitleRefreshTask
+        let completed = expectation(description: "Background title refresh completed")
+        let observer = Task { @MainActor in
+            await refresh?.value
+            completed.fulfill()
         }
+        defer {
+            observer.cancel()
+            resetCachedWindowTitles()
+        }
+        await fulfillment(of: [completed], timeout: 2)
         XCTAssertEqual(cachedWindowTitle(for: window), "New")
         XCTAssertEqual(window.titleGetCount, 2)
     }
@@ -65,7 +72,7 @@ final class SessionWindowTitleTest: WorkspaceTestCase {
         let title = await getSessionWindowTitle(window, now: now.addingTimeInterval(1))
         XCTAssertEqual(title, "Fresh")
 
-        for _ in 0 ..< 50 { await Task.yield() }
+        XCTAssertNil(backgroundTitleRefreshTask, "fresh entries must not schedule a refresh")
         XCTAssertEqual(window.titleGetCount, 1, "fresh entries must not be re-fetched")
     }
 

@@ -14,8 +14,9 @@ private var cachedWindowTitles: [UInt32: CachedWindowTitle] = [:]
 @MainActor
 private var pendingTitleRefreshWindowIds: Set<UInt32> = []
 
+// The cache owns scheduling and cancellation; observers may await the current batch.
 @MainActor
-private var backgroundTitleRefreshTask: Task<Void, Never>? = nil
+private(set) var backgroundTitleRefreshTask: Task<Void, Never>? = nil
 
 @MainActor
 func resetCachedWindowTitles() {
