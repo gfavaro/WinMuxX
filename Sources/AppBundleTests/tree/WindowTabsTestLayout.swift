@@ -5,48 +5,19 @@ import CoreGraphics
 import XCTest
 
 @MainActor extension WindowTabsTest {
-    func testMovedObsIgnoresSidebarManagedDragSession() {
-        XCTAssertTrue(shouldIgnoreMovedObsForManagedWindowDragSession(
-            observedWindowId: 10,
-            currentWindowId: 10,
-            kind: .move,
-            subject: .window,
-            detachOrigin: .window,
-            startedInSidebar: true,
-        ))
-    }
-
-    func testMovedObsIgnoresTabStripDetachDragSession() {
-        XCTAssertTrue(shouldIgnoreMovedObsForManagedWindowDragSession(
-            observedWindowId: 10,
-            currentWindowId: 10,
-            kind: .move,
-            subject: .window,
-            detachOrigin: .tabStrip,
-            startedInSidebar: false,
-        ))
-    }
-
-    func testMovedObsIgnoresManagedGroupBodyDragSession() {
-        XCTAssertTrue(shouldIgnoreMovedObsForManagedWindowDragSession(
-            observedWindowId: 10,
-            currentWindowId: 10,
-            kind: .move,
-            subject: .group,
-            detachOrigin: .window,
-            startedInSidebar: false,
-        ))
-    }
-
-    func testMovedObsKeepsNormalBodyDragSessionActive() {
-        XCTAssertFalse(shouldIgnoreMovedObsForManagedWindowDragSession(
-            observedWindowId: 10,
-            currentWindowId: 10,
-            kind: .move,
-            subject: .window,
-            detachOrigin: .window,
-            startedInSidebar: false,
-        ))
+    func testMovedObservationRoutingForDragOriginsAndSubjects() {
+        let cases: [(String, WindowDragSubject, TabDetachOrigin, Bool, Bool)] = [
+            ("sidebar", .window, .window, true, true),
+            ("detached tab", .window, .tabStrip, false, true),
+            ("group body", .group, .window, false, true),
+            ("window body", .window, .window, false, false),
+        ]
+        for (label, subject, origin, sidebar, ignored) in cases {
+            XCTAssertEqual(shouldIgnoreMovedObsForManagedWindowDragSession(
+                observedWindowId: 10, currentWindowId: 10, kind: .move,
+                subject: subject, detachOrigin: origin, startedInSidebar: sidebar
+            ), ignored, label)
+        }
     }
 
     @MainActor

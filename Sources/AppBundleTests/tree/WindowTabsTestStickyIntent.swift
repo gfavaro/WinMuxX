@@ -103,11 +103,8 @@ import XCTest
         XCTAssertTrue(targetWorkspace.rootTilingContainer.children.last === source)
     }
 
-    func testStickyWindowDragIntentDisabledForDetachPreview() {
+    func testStickyWindowDragIntentEligibilityByPreviewStyle() {
         XCTAssertFalse(shouldUseStickyWindowDragIntent(previewStyle: .detach))
-    }
-
-    func testStickyWindowDragIntentEnabledForTabInsertAndSwapPreviews() {
         XCTAssertTrue(shouldUseStickyWindowDragIntent(previewStyle: .tabInsert))
         XCTAssertTrue(shouldUseStickyWindowDragIntent(previewStyle: .stackSplit))
         XCTAssertTrue(shouldUseStickyWindowDragIntent(previewStyle: .swap))

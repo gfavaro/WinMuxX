@@ -20,8 +20,7 @@ import XCTest
 // expected: mru(window3, window4) is focused
 
 @MainActor
-final class FocusCommandTest: XCTestCase {
-    override func setUp() async throws { setUpWorkspacesForTests() }
+final class FocusCommandTest: WorkspaceTestCase {
 
     func testParse() {
         XCTAssertTrue(parseCommand("focus --boundaries left").errorOrNil?.contains("Possible values") == true)
@@ -87,17 +86,6 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 3)
     }
 
-    func testFocusAlongTheContainerOrientation() async throws {
-        Workspace.get(byName: name).rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
-        }
-
-        assertEquals(focus.windowOrNil?.windowId, 1)
-        try await FocusCommand.new(direction: .right).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 2)
-    }
-
     func testDwindleFocusUsesGeometricNeighborsOnBothAxes() async throws {
         config.defaultRootContainerLayout = .dwindle
         config.defaultRootContainerOrientation = .auto
@@ -135,29 +123,23 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
-    func testFocusNoWrapping() async throws {
-        Workspace.get(byName: name).rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
+    func testDirectionalFocusMovesStopsAndWraps() async throws {
+        for (direction, wraps, expected): (CardinalDirection, Bool, UInt32) in [
+            (.right, false, 2), (.left, false, 1), (.left, true, 2),
+        ] {
+            setUpWorkspacesForTests()
+            let root = Workspace.get(byName: name).rootTilingContainer
+            XCTAssertTrue(TestWindow.new(id: 1, parent: root).focusWindow())
+            _ = TestWindow.new(id: 2, parent: root)
+            XCTAssertEqual(focus.windowOrNil?.windowId, 1)
+            var args = FocusCmdArgs(rawArgs: [], targetArg: .direction(direction))
+            if wraps {
+                args.rawBoundaries = .workspace
+                args.rawBoundariesAction = .wrapAroundTheWorkspace
+            }
+            try await FocusCommand(args: args).run(.defaultEnv, .emptyStdin)
+            XCTAssertEqual(focus.windowOrNil?.windowId, expected, "direction: \(direction), wraps: \(wraps)")
         }
-
-        assertEquals(focus.windowOrNil?.windowId, 1)
-        try await FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 1)
-    }
-
-    func testFocusWrapping() async throws {
-        Workspace.get(byName: name).rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
-        }
-
-        assertEquals(focus.windowOrNil?.windowId, 1)
-        var args = FocusCmdArgs(rawArgs: [], targetArg: .direction(.left))
-        args.rawBoundaries = .workspace
-        args.rawBoundariesAction = .wrapAroundTheWorkspace
-        try await FocusCommand(args: args).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
     func testFocusFindMruLeaf() async throws {
@@ -194,28 +176,18 @@ final class FocusCommandTest: XCTestCase {
         assertEquals(focus.windowOrNil?.windowId, 2)
     }
 
-    func testFocusOutsideOfTheContainer() async throws {
-        Workspace.get(byName: name).rootTilingContainer.apply {
-            TestWindow.new(id: 1, parent: $0)
-            TilingContainer.newVTiles(parent: $0, adaptiveWeight: 1).apply {
-                assertEquals(TestWindow.new(id: 2, parent: $0).focusWindow(), true)
-            }
+    func testFocusLeavesNestedContainerInEitherOrientation() async throws {
+        for vertical in [true, false] {
+            setUpWorkspacesForTests()
+            let root = Workspace.get(byName: name).rootTilingContainer
+            _ = TestWindow.new(id: 1, parent: root)
+            let nested = vertical
+                ? TilingContainer.newVTiles(parent: root, adaptiveWeight: 1)
+                : TilingContainer.newHTiles(parent: root, adaptiveWeight: 1)
+            XCTAssertTrue(TestWindow.new(id: 2, parent: nested).focusWindow())
+            try await FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
+            XCTAssertEqual(focus.windowOrNil?.windowId, 1, "vertical nested container: \(vertical)")
         }
-
-        try await FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 1)
-    }
-
-    func testFocusOutsideOfTheContainer2() async throws {
-        Workspace.get(byName: name).rootTilingContainer.apply {
-            TestWindow.new(id: 1, parent: $0)
-            TilingContainer.newHTiles(parent: $0, adaptiveWeight: 1).apply {
-                assertEquals(TestWindow.new(id: 2, parent: $0).focusWindow(), true)
-            }
-        }
-
-        try await FocusCommand.new(direction: .left).run(.defaultEnv, .emptyStdin)
-        assertEquals(focus.windowOrNil?.windowId, 1)
     }
 
     func testFocusDfsRelative() async throws {

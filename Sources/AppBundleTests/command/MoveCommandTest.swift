@@ -3,8 +3,7 @@ import Common
 import XCTest
 
 @MainActor
-final class MoveCommandTest: XCTestCase {
-    override func setUp() async throws { setUpWorkspacesForTests() }
+final class MoveCommandTest: WorkspaceTestCase {
 
     func testMove_swapWindows() async throws {
         let root = Workspace.get(byName: name).rootTilingContainer.apply {
@@ -224,40 +223,22 @@ final class MoveCommandTest: XCTestCase {
         assertEquals(result.exitCode, 0)
     }
 
-    func testStop_onRootNode() async throws {
-        let workspace = Workspace.get(byName: name)
-        workspace.rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
-            TestWindow.new(id: 3, parent: $0)
+    func testRootBoundaryPreservesLayoutForStopAndFail() async throws {
+        for (command, expectedExit): (String, Int32) in [
+            ("move --boundaries-action stop left", 0),
+            ("move --boundaries-action stop up", 0),
+            ("move --boundaries-action fail left", 1),
+        ] {
+            setUpWorkspacesForTests()
+            let workspace = Workspace.get(byName: name)
+            let root = workspace.rootTilingContainer
+            XCTAssertTrue(TestWindow.new(id: 1, parent: root).focusWindow())
+            _ = TestWindow.new(id: 2, parent: root)
+            _ = TestWindow.new(id: 3, parent: root)
+            let result = try await parseCommand(command).cmdOrDie.run(.defaultEnv, .emptyStdin)
+            XCTAssertEqual(workspace.layoutDescription, .workspace([.h_tiles([.window(1), .window(2), .window(3)])]), command)
+            XCTAssertEqual(result.exitCode, expectedExit, command)
         }
-
-        let result = try await parseCommand("move --boundaries-action stop left").cmdOrDie.run(.defaultEnv, .emptyStdin)
-        assertEquals(
-            workspace.layoutDescription,
-            .workspace([
-                .h_tiles([.window(1), .window(2), .window(3)]),
-            ]),
-        )
-        assertEquals(result.exitCode, 0)
-    }
-
-    func testStop_onRootNode_withOppositeOrientation() async throws {
-        let workspace = Workspace.get(byName: name)
-        workspace.rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
-            TestWindow.new(id: 3, parent: $0)
-        }
-
-        let result = try await parseCommand("move --boundaries-action stop up").cmdOrDie.run(.defaultEnv, .emptyStdin)
-        assertEquals(
-            workspace.layoutDescription,
-            .workspace([
-                .h_tiles([.window(1), .window(2), .window(3)]),
-            ]),
-        )
-        assertEquals(result.exitCode, 0)
     }
 
     func testStop_onRootNode_whenNoBoundary() async throws {
@@ -296,24 +277,6 @@ final class MoveCommandTest: XCTestCase {
             ]),
         )
         assertEquals(result.exitCode, 0)
-    }
-
-    func testFail() async throws {
-        let workspace = Workspace.get(byName: name)
-        workspace.rootTilingContainer.apply {
-            assertEquals(TestWindow.new(id: 1, parent: $0).focusWindow(), true)
-            TestWindow.new(id: 2, parent: $0)
-            TestWindow.new(id: 3, parent: $0)
-        }
-
-        let result = try await parseCommand("move --boundaries-action fail left").cmdOrDie.run(.defaultEnv, .emptyStdin)
-        assertEquals(
-            workspace.layoutDescription,
-            .workspace([
-                .h_tiles([.window(1), .window(2), .window(3)]),
-            ]),
-        )
-        assertEquals(result.exitCode, 1)
     }
 
     func testMoveOut() async throws {
