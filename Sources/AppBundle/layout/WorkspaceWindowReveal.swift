@@ -52,6 +52,12 @@ struct WorkspaceWindowRevealState {
         phase = .parked
     }
 
+    mutating func resumeVisible() {
+        // Recovery invalidates in-flight work without reusing earlier tokens.
+        generation &+= 1
+        phase = .visible
+    }
+
     mutating func begin() -> UInt64 {
         generation &+= 1
         phase = .restoring

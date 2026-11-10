@@ -329,7 +329,7 @@ final class MacWindow: Window {
         }) else { return }
         prevUnhiddenProportionalPositionInsideWorkspaceRect = nil
         hiddenInCorner = nil
-        workspaceReveal = WorkspaceWindowRevealState()
+        workspaceReveal.resumeVisible()
         recordAuthoritativeActualRect(Rect(topLeftX: frame.minX, topLeftY: frame.minY, width: frame.width, height: frame.height))
         lastAppliedLayoutPhysicalRect = nil
         lastAppliedLayoutVirtualRect = nil
@@ -399,6 +399,9 @@ final class MacWindow: Window {
             let actual = try await macApp.getAxRect(windowId)
             WorkspaceMotionDiagnostics.record("Restore readback elapsed", milliseconds: (CACurrentMediaTime() - readStarted) * 1000)
             try checkCancellation()
+            // A newer reveal or park owns the layout cache now. Even failure cleanup
+            // from this response must not invalidate its completed placement.
+            guard workspaceReveal.generation == token else { return false }
             let matches = actual.map { abs($0.topLeftX - target.minX) <= 2 && abs($0.topLeftY - target.minY) <= 2 } ?? false
             let current = nodeWorkspace === workspace && (workspace.isVisible || !TrayMenuModel.shared.isEnabled)
             guard workspaceReveal.finish(token, succeeded: matches && current) else {
@@ -412,8 +415,10 @@ final class MacWindow: Window {
             WorkspaceTransitionDiagnostics.record("restore-end", window: self, generation: token, requested: target)
             return true
         } catch {
-            _ = workspaceReveal.finish(token, succeeded: false)
-            lastAppliedLayoutPhysicalRect = nil
+            if workspaceReveal.generation == token {
+                _ = workspaceReveal.finish(token, succeeded: false)
+                lastAppliedLayoutPhysicalRect = nil
+            }
             WorkspaceTransitionDiagnostics.record("restore-cancelled-or-failed", window: self, generation: token, requested: target)
             throw error
         }

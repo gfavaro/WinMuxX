@@ -22,6 +22,7 @@ final class ScriptedWindowApplication: WindowApplication {
     var acceptsWrites = true
     var hasElement = true
     var beforeWrite: (() -> Void)?
+    var beforeRectResponse: (@MainActor () async throws -> Void)?
     var writes: [(point: CGPoint?, size: CGSize?, positionFirst: Bool)] = []
     var reads = 0
 
@@ -52,8 +53,12 @@ final class ScriptedWindowApplication: WindowApplication {
     }
     func getAxRect(_ windowId: UInt32) async throws -> Rect? {
         reads += 1
-        if let readFailure { throw AXReadFailure(code: readFailure) }
-        return hasElement ? rect : nil
+        // An in-flight AX response belongs to this read, even if another write completes.
+        let response = hasElement ? rect : nil
+        let failure = readFailure
+        try await beforeRectResponse?()
+        if let failure { throw AXReadFailure(code: failure) }
+        return response
     }
     func getAxRectForLayoutConfirmation(_ windowId: UInt32) async throws -> Rect? { try await getAxRect(windowId) }
     func getAxWindowsCount() async throws -> Int? { hasElement ? 1 : 0 }

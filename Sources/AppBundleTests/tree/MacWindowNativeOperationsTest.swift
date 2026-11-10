@@ -128,6 +128,63 @@ final class MacWindowNativeOperationsTest: WorkspaceTestCase {
         XCTAssertEqual(app.writes.last?.positionFirst, true)
     }
 
+    func testSupersededRevealReadbackCannotClearANewerLayout() async throws {
+        for (fails, recovers) in [(false, false), (true, false), (false, true), (true, true)] {
+            let window = try await register()
+            defer { window.garbageCollect(skipClosedWindowsCache: true) }
+            try await window.hideInCorner(.bottomRightCorner)
+            let started = expectation(description: "Old reveal readback suspended")
+            let completed = expectation(description: "Old reveal completed")
+            let gate = NativeRectResponseGate(started: started)
+            app.beforeRectResponse = {
+                await gate.wait()
+                if fails { throw AXReadFailure(code: .cannotComplete) }
+            }
+            var result: Result<Bool, any Error>?
+            let oldReveal = Task { @MainActor in
+                defer { completed.fulfill() }
+                do {
+                    result = .success(try await window.restoreFromCorner(
+                        to: CGRect(x: 100, y: 100, width: 400, height: 300)))
+                } catch { result = .failure(error) }
+            }
+            defer {
+                app.beforeRectResponse = nil
+                oldReveal.cancel()
+                gate.release()
+            }
+            await fulfillment(of: [started], timeout: 2)
+            app.beforeRectResponse = nil
+
+            if recovers {
+                let visible = CGRect(origin: app.rect.topLeftCorner, size: app.rect.size)
+                runtime.windowServer = WindowServerQueries(exists: { _ in true }, frame: { _ in visible })
+                window.resumeFromVisibleNativeGeometry()
+                XCTAssertFalse(window.isHiddenInCorner)
+                try await window.hideInCorner(.bottomRightCorner)
+                runtime.windowServer = WindowServerQueries(exists: { _ in true }, frame: { _ in nil })
+            }
+            // A later layout reveals the same window while the old response is in flight.
+            try await focus.workspace.layoutWorkspace()
+            let latest = try XCTUnwrap(window.lastAppliedLayoutPhysicalRect)
+            XCTAssertFalse(window.isHiddenInCorner)
+            let writes = app.writes.count
+            gate.release()
+            await fulfillment(of: [completed], timeout: 2)
+
+            if fails {
+                guard case .failure(let error) = result else { return XCTFail("Expected the old AX failure") }
+                XCTAssertEqual((error as? AXReadFailure)?.code, .cannotComplete)
+            } else {
+                guard case .success(let restored) = result else { return XCTFail("Expected the superseded reveal to return") }
+                XCTAssertFalse(restored)
+            }
+            XCTAssertEqual(window.lastAppliedLayoutPhysicalRect, latest, "Old failure: \(fails), recovery: \(recovers)")
+            XCTAssertFalse(window.isHiddenInCorner, "Old failure: \(fails), recovery: \(recovers)")
+            XCTAssertEqual(app.writes.count, writes, "An old readback must not write another frame")
+        }
+    }
+
     func testUnansweredRevealReadbackStaysPendingUntilRetry() async throws {
         let window = try await register()
         try await window.hideInCorner(.bottomRightCorner)
@@ -142,5 +199,28 @@ final class MacWindowNativeOperationsTest: WorkspaceTestCase {
         app.readFailure = nil
         let restored = try await window.restoreFromCorner(to: CGRect(x: 100, y: 100, width: 400, height: 300))
         XCTAssertTrue(restored)
+    }
+}
+
+@MainActor
+private final class NativeRectResponseGate {
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var released = false
+    let started: XCTestExpectation
+
+    init(started: XCTestExpectation) { self.started = started }
+
+    func wait() async {
+        guard !released else { return }
+        await withCheckedContinuation {
+            continuation = $0
+            started.fulfill()
+        }
+    }
+
+    func release() {
+        released = true
+        continuation?.resume()
+        continuation = nil
     }
 }
