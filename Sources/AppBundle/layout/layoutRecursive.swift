@@ -31,7 +31,7 @@ extension Workspace {
             try await hideAllWindowsExcept(fullscreenWindow)
             fullscreenWindow.lastAppliedLayoutVirtualRect = rect
             fullscreenWindow.lastAppliedLayoutPhysicalRect = nil
-            try await fullscreenWindow.layoutFullscreen(context)
+            try await skippingUnansweredApp { try await fullscreenWindow.layoutFullscreen(context) }
             return
         }
         if arrangement == .tabbed {
@@ -64,7 +64,7 @@ extension Workspace {
             for window in children.filterIsInstance(of: Window.self) {
                 window.lastAppliedLayoutPhysicalRect = nil
                 window.lastAppliedLayoutVirtualRect = nil
-                try await window.layoutFloatingWindow(context)
+                try await skippingUnansweredApp { try await window.layoutFloatingWindow(context) }
             }
             return
         }
@@ -77,7 +77,7 @@ extension Workspace {
             for window in children.filterIsInstance(of: Window.self) {
                 window.lastAppliedLayoutPhysicalRect = nil
                 window.lastAppliedLayoutVirtualRect = nil
-                try await window.layoutFloatingWindow(context)
+                try await skippingUnansweredApp { try await window.layoutFloatingWindow(context) }
             }
             return
         }
@@ -117,7 +117,7 @@ extension TreeNode {
                 for window in workspace.children.filterIsInstance(of: Window.self) {
                     window.lastAppliedLayoutPhysicalRect = nil
                     window.lastAppliedLayoutVirtualRect = nil
-                    try await window.layoutFloatingWindow(context)
+                    try await skippingUnansweredApp { try await window.layoutFloatingWindow(context) }
                 }
             case .window(let window):
                 window.preserveRestoredWorkspacePreview = false
@@ -127,7 +127,7 @@ extension TreeNode {
                     let isFullscreenTab = window.nearestWindowTabGroup?.hasFullscreenTab == true
                     if window.isFullscreen && !isFullscreenTab && window == context.workspace.rootTilingContainer.mostRecentWindowRecursive {
                         lastAppliedLayoutPhysicalRect = nil
-                        try await window.layoutFullscreen(context)
+                        try await skippingUnansweredApp { try await window.layoutFullscreen(context) }
                     } else {
                         lastAppliedLayoutPhysicalRect = physicalRect
                         if !isFullscreenTab {
@@ -135,7 +135,11 @@ extension TreeNode {
                         }
                         let leftAlone = !window.isHiddenInCorner && frameRecoveryLeavesAlone(window, tile: physicalRect)
                         if !leftAlone, window.isHiddenInCorner || !canReuseLastAppliedWindowFrame(previousPhysicalRect: previousPhysicalRect, nextPhysicalRect: physicalRect) {
-                            try await WindowMotion.shared.apply(window, target: CGRect(origin: point, size: CGSize(width: width, height: height)))
+                            let target = CGRect(origin: point, size: CGSize(width: width, height: height))
+                            if try await !skippingUnansweredApp({ try await WindowMotion.shared.apply(window, target: target) }) {
+                                // Not written: the next layout must not take this tile as applied.
+                                lastAppliedLayoutPhysicalRect = nil
+                            }
                         }
                     }
                 }
@@ -430,7 +434,7 @@ extension Window {
         lastAppliedLayoutPhysicalRect = nil
         lastAppliedLayoutVirtualRect = nil
         if let macWindow = self as? MacWindow {
-            try await macWindow.hideInCorner(.bottomRightCorner)
+            try await skippingUnansweredApp { try await macWindow.hideInCorner(.bottomRightCorner) }
         }
     }
 }

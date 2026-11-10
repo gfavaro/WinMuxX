@@ -58,7 +58,9 @@ final class TestWindow: Window, CustomStringConvertible {
         return _rect?.size
     }
 
+    @MainActor var rectReader: (@MainActor () async throws -> Rect?)?
     @MainActor override func getAxRect() async throws -> Rect? { // todo change to not Optional
+        if let rectReader { return try await rectReader() }
         recordAuthoritativeActualRect(_rect)
         return _rect
     }

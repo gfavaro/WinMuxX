@@ -171,7 +171,7 @@ extension HotKey {
     let expected = session.generation
     guard let token = session.begin(expected: expected) else { return }
     Task {
-        _ = try? await owner.withValue {
+        await owner.withValue {
             defer { session.finish(token) }
             guard session.generation == token.generation else { return }
             if let activeMode {
@@ -179,14 +179,18 @@ extension HotKey {
                     mode: activeMode,
                     binding: binding,
                 ))
-                try await runCommandSession(
-                    .hotkeyBinding,
-                    .checkServerIsEnabledOrDie(),
-                    isQuery: commands.allSatisfy { $0.isQuery || $0.isPresentation },
-                    shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
-                ) { () throws in
-                    let result = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
-                    showShortcutFailure(binding, result)
+                do {
+                    try await runCommandSession(
+                        .hotkeyBinding,
+                        .checkServerIsEnabledOrDie(),
+                        isQuery: commands.allSatisfy { $0.isQuery || $0.isPresentation },
+                        shouldSchedulePostRefresh: !commands.canSkipPostCommandRefresh
+                    ) { () throws in
+                        let result = try await commands.runCmdSeq(.defaultEnv, .emptyStdin)
+                        showShortcutFailure(binding, result)
+                    }
+                } catch {
+                    recordSessionFailure(error, .hotkeyBinding)
                 }
             }
         }

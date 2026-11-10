@@ -1,6 +1,7 @@
 import AppKit
 import PrivateApi
 import Common
+import os
 
 @MainActor
 private var activeRefreshTask: Task<(), any Error>? { runtime.refresh.activeRefreshTask }
@@ -211,6 +212,9 @@ func scheduleRefreshSession(
         } catch is CancellationError {
             runtime.events.record(.cancelled, source: .refresh, generation: generation)
             return
+        } catch {
+            recordSessionFailure(error, request.event)
+            throw error
         }
     }
     runtime.refresh.active = ActiveRefresh(task: task, event: request.event)
@@ -262,6 +266,27 @@ func runLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
     return try await AXReadBudget.$current.withValue(AXReadBudget()) {
         try await performLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
     }
+}
+
+/// A light session nobody waits for, as a click or a notification starts. Its failure has no
+/// caller to report to and the next refresh repairs what it left, so it is only recorded.
+@MainActor
+func runUnattendedLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSessionGuard,
+                                  shouldSchedulePostRefresh: Bool = true,
+                                  body: @MainActor () async throws -> T) async {
+    do {
+        _ = try await runLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
+    } catch {
+        recordSessionFailure(error, event)
+    }
+}
+
+private let sessionLog = Logger(subsystem: winMuxAppId, category: "session")
+
+/// Cancellation is how a newer session takes over, not a failure.
+func recordSessionFailure(_ error: any Error, _ event: RefreshSessionEvent) {
+    if error is CancellationError { return }
+    sessionLog.error("\(event.description, privacy: .public) session failed: \(error.localizedDescription, privacy: .public)")
 }
 
 @MainActor
@@ -523,8 +548,10 @@ private func refresh() async throws {
     try await withThrowingTaskGroup(of: Void.self) { group in
         for (app, windowIds) in mapping {
             group.addTask { @Sendable @MainActor in
-                for windowId in windowIds {
-                    try await MacWindow.getOrRegister(windowId: windowId, macApp: app)
+                try await skippingUnansweredApp {
+                    for windowId in windowIds {
+                        try await MacWindow.getOrRegister(windowId: windowId, macApp: app)
+                    }
                 }
             }
         }
@@ -547,7 +574,7 @@ private func refresh() async throws {
             try await group.waitForAll()
         }
     }
-    try await retryPendingRestartWindows()
+    try await skippingUnansweredApp { try await retryPendingRestartWindows() }
     try await finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: aliveWindowIds)
 
     // Garbage collect workspaces after apps, because workspaces contain apps.
@@ -630,7 +657,7 @@ private func layoutWorkspaces() async throws {
             // hideInCorner confirm native placement, including safe OS clamping,
             // instead of forcing the same rejected position on every refresh.
             if !macWindow.isHiddenInCorner { parked += 1 }
-            try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows)
+            try await skippingUnansweredApp { try await macWindow.hideInCorner(corner, force: shouldReassertHiddenWindows) }
         }
     }
     if parked > 0 { WorkspaceMotionDiagnostics.record("Park outgoing windows", milliseconds: (CACurrentMediaTime() - parkingStarted) * 1000) }
@@ -649,7 +676,7 @@ private func layoutWorkspaces() async throws {
                 continue
             }
             if macWindow.isHiddenInCorner { revealed += 1 }
-            try await macWindow.unhideFromCorner()
+            try await skippingUnansweredApp { try await macWindow.unhideFromCorner() }
         }
         try await workspace.layoutWorkspace()
         try checkCancellation()

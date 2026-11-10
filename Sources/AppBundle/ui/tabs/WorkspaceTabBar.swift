@@ -175,7 +175,7 @@ func runWorkspaceTabGroupControl(_ control: WorkspaceTabGroupControl, windowId: 
     guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(control.command),
           case .cmd(let raise) = parseCommand(["focus", "--window-id", String(windowId)]) else { return }
     Task { @MainActor in
-        _ = try? await runLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
+        await runUnattendedLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
             let result = try await [raise, parsed].runCmdSeq(.defaultEnv, .emptyStdin)
             showShortcutFailure("Tab bar", result)
         }

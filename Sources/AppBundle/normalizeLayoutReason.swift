@@ -14,12 +14,14 @@ private func validateStillPopups() async throws {
     for node in macosPopupWindowsContainer.children {
         guard let popup = node as? MacWindow else { continue }
         let windowLevel = getWindowLevel(for: popup.windowId)
-        if try await popup.isWindowHeuristic(windowLevel), popup.parent is MacosPopupWindowsContainer {
-            try await WindowDetectionOperations.shared.run(popup) {
-                guard popup.parent is MacosPopupWindowsContainer else { return }
-                try await popup.relayoutWindow(on: focus.workspace)
-                WindowDetectionOperations.shared.resolvedPopup(popup)
-                try await tryOnWindowDetected(popup)
+        try await skippingUnansweredApp {
+            if try await popup.isWindowHeuristic(windowLevel), popup.parent is MacosPopupWindowsContainer {
+                try await WindowDetectionOperations.shared.run(popup) {
+                    guard popup.parent is MacosPopupWindowsContainer else { return }
+                    try await popup.relayoutWindow(on: focus.workspace)
+                    WindowDetectionOperations.shared.resolvedPopup(popup)
+                    try await tryOnWindowDetected(popup)
+                }
             }
         }
     }

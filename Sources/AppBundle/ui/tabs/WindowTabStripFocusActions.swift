@@ -73,7 +73,7 @@ func focusWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
 func selectWorkspaceFromTabStrip(_ name: String) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task { @MainActor in
-        _ = try? await runLightSession(.menuBarButton, token) { try await selectWorkspaceFromUi(name) }
+        await runUnattendedLightSession(.menuBarButton, token) { try await selectWorkspaceFromUi(name) }
     }
 }
 

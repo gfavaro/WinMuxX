@@ -3,7 +3,7 @@ import Common
 func removeWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task {
-        _ = try? await runLightSession(.menuBarButton, token) {
+        await runUnattendedLightSession(.menuBarButton, token) {
             guard let window = Window.get(byId: windowId) else {
                 _ = try await selectWorkspaceFromUi(fallbackWorkspace)
                 return
@@ -18,7 +18,7 @@ func removeWindowFromTabStrip(_ windowId: UInt32, fallbackWorkspace: String) {
 func reorderTabInStrip(_ windowId: UInt32, stripId: ObjectIdentifier, toIndex targetIndex: Int) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task {
-        _ = try? await runLightSession(.menuBarButton, token) {
+        await runUnattendedLightSession(.menuBarButton, token) {
             guard let window = Window.get(byId: windowId),
                   reorderTabGroupChild(showing: window, stripId: stripId, toIndex: targetIndex)
                     || reorderWorkspaceTab(window, stripId: stripId, toIndex: targetIndex)
@@ -80,7 +80,7 @@ func mergeAllTabGroupsFromTabStrip(_ windowId: UInt32) {
 private func editTabbedGroupsFromTabStrip(_ windowId: UInt32, _ edit: @escaping @MainActor (Workspace, TabbedGroup) -> Bool) {
     guard let token: RunSessionGuard = .isServerEnabled else { return }
     Task {
-        _ = try? await runLightSession(.menuBarButton, token) {
+        await runUnattendedLightSession(.menuBarButton, token) {
             guard let window = Window.get(byId: windowId), let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed,
                   let group = workspace.tabbedGroup(containing: windowId), edit(workspace, group) else { return }
             _ = window.focusWindow()

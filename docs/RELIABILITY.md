@@ -16,6 +16,12 @@ Focused-window requests retain their 250 ms timeout; general requests retain 1 s
 An unanswered focus or fullscreen/minimize read is unknown, not evidence that a
 window vanished or changed state.
 
+The app that did not answer loses its own step of that refresh: registering its new
+windows, or parking, revealing or placing one of its windows. The refresh continues
+for every other app, and the next one tries the skipped step again. A tile that
+was not written is not remembered as applied. A session that fails for another
+reason is recorded in the `session` log category.
+
 An unanswered read that fails window discovery or layout during startup is logged
 and startup still finishes. The refresh that follows discovers the windows again,
 and the saved placement of a window not seen yet stays pending.

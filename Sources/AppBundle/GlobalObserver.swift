@@ -50,7 +50,7 @@ enum GlobalObserver {
         let notifName = notification.name.rawValue
         Task { @MainActor in
             guard let token: RunSessionGuard = .isServerEnabled else { return }
-            _ = try? await runLightSession(.globalObserver(notifName), token) {
+            await runUnattendedLightSession(.globalObserver(notifName), token) {
                 if config.automaticallyUnhideMacosHiddenApps {
                     if let w = prevFocus?.windowOrNil,
                        w.macAppUnsafe.nsApp.isHidden,
@@ -224,7 +224,7 @@ enum GlobalObserver {
                 WorkspaceSidebarPanel.scheduleHoverRecheckForVisiblePanels()
                 let mouseLocation = mouseLocation
                 if let workspace = desktopWorkspaceToFocus(at: mouseLocation) {
-                    _ = try? await runLightSession(.globalObserverLeftMouseUp, token) {
+                    await runUnattendedLightSession(.globalObserverLeftMouseUp, token) {
                         workspace.focusWorkspace()
                     }
                 } else {

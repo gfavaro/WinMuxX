@@ -134,7 +134,7 @@ final class WindowHoverBar {
             guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command),
                   case .cmd(let raise) = parseCommand(["focus", "--window-id", String(id)]) else { return }
             Task { @MainActor in
-                _ = try? await runLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
+                await runUnattendedLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
                     let result = try await [raise, parsed].runCmdSeq(.defaultEnv, .emptyStdin)
                     showShortcutFailure("Hover bar", result)
                 }
