@@ -125,8 +125,11 @@ The old upstream `make install` target is intentionally disabled.
 
 ## CI and releases
 
-CI runs on PRs and on demand; pushes to `main` do not build. Pushing a `gf-v*`
-tag runs the release workflow, which builds, signs and publishes the app ZIP.
+CI runs `make check` on code pushes to `main`, PRs and on demand. PRs and
+on-demand runs also build an ad hoc app. CI and releases use the `xcode-27`
+runner so the SDK includes the macOS 27 APIs used by the app; the Swift compiler
+remains pinned by `.swift-version`. Pushing a `gf-v*` tag runs the release
+workflow, which builds, signs and publishes the app ZIP.
 Signing import has a two-minute timeout. Hosted runners install certificate trust
 in the admin domain with passwordless, noninteractive `sudo -n`; user-domain trust
 can display a prompt and stall headless jobs. The release workflow calls
