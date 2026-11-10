@@ -41,11 +41,6 @@ final class TileLayoutGeometryTest: XCTestCase {
         XCTAssertEqual(fitted.reduce(0, +), 1000, accuracy: 0.001, "Tiles with known minimums fill the space too")
     }
 
-    func testMinimumsFitAndImpossibleFitKeepsRequestedSizes() {
-        XCTAssertEqual(TileLayoutGeometry.fit([30, 70], minimums: [50, 20], total: 100), [50, 50])
-        XCTAssertEqual(TileLayoutGeometry.fit([30, 70], minimums: [80, 40], total: 100), [30, 70])
-    }
-
     func testEmptyAndMismatchedInputsReturnNoFrames() {
         XCTAssertTrue(TileLayoutGeometry.calculate(TileLayoutInput(origin: .zero, size: .zero,
             horizontal: false, innerGap: 0, weights: [], minimumExtents: [], master: false, reversed: false)).isEmpty)

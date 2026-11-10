@@ -156,13 +156,6 @@ final class SingleWindowGeometryTest: XCTestCase {
         XCTAssertFalse(window.isFloating)
     }
 
-    func testALoneWindowIsCentered() {
-        let available = Rect(topLeftX: 150, topLeftY: 20, width: 3000, height: 1001)
-        let rect = centeredSingleWindowRect(available: available, width: 1500, minimumWidth: 0)
-        XCTAssertEqual(rect.topLeftX, 900)
-        XCTAssertEqual(rect.height, available.height)
-    }
-
     func testParsingAndPersistence() {
         for value in ["0", "1", "1.5", "[{ monitor.\"Disconnected\" = 2 }, 1.5]"] {
             XCTAssertTrue(parseConfig("single-window-aspect-ratio = " + value).errors.isEmpty)

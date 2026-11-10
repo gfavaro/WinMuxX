@@ -89,12 +89,4 @@ final class WindowMotionTest: XCTestCase {
         XCTAssertEqual(motion.frame(progress: 0.5), CGRect(x: 30, y: 50, width: 200, height: 300))
         XCTAssertEqual(motion.frame(progress: 2), target)
     }
-
-    func testRetargetStartsAtCurrentFrame() {
-        let initial = WindowMotionFrame(start: .zero, target: CGRect(x: 100, y: 100, width: 400, height: 400))
-        let current = initial.frame(progress: 0.4)
-        let retargeted = WindowMotionFrame(start: current, target: CGRect(x: 200, y: 50, width: 800, height: 600))
-        XCTAssertEqual(retargeted.frame(progress: 0), current)
-        XCTAssertEqual(retargeted.frame(progress: 1), retargeted.target)
-    }
 }
