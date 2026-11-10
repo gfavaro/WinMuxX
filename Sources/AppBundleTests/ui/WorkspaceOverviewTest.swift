@@ -269,7 +269,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         }
     }
 
-    func testGeometryRetainsNegativeOriginsAndClipsHitTesting() {
+    func testGeometryRetainsNegativeOriginsAndRejectsInvalidFrames() {
         let frame = normalizedWorkspacePreviewFrame(CGRect(x: -1820, y: -300, width: 960, height: 540),
             origin: CGPoint(x: -1920, y: -400), desktopSize: CGSize(width: 1920, height: 1080))
         XCTAssertEqual(frame?.minX ?? -1, 100.0 / 1920, accuracy: 0.00001)
