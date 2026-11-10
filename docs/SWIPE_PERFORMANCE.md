@@ -120,3 +120,11 @@ Logs: `/private/tmp/winmux-swipe-surface-before.log`,
 `/private/tmp/winmux-swipe-physical77.log`,
 `/private/tmp/winmux-swipe-perf-targeted.log`,
 `/private/tmp/winmux-swipe-perf-check.log`.
+
+
+The `doctor` workspace-swipe line includes `tapTimeouts`, the number of times
+macOS disabled the Dock swipe event tap for taking too long since launch. Each
+timeout abandons the in-progress swipe before re-enabling the tap. Measure about
+30 physical swipes and compare this counter with the existing stage timings
+before changing the tap's thread ownership. A zero count alone does not establish
+smooth preview rendering.

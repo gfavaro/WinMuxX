@@ -128,12 +128,11 @@ final class WindowMotion: NSObject {
         }
         // AX geometry events invalidate the cache after every layout. Read native
         // bounds once at departure, rather than skipping motion when that cache is cold.
-        var nativeStart = CGRect.zero
-        let hasNativeStart = !isUnitTest && winmux_window_frame(id, &nativeStart)
+        let nativeStart = runtime.windowServer.frame(id)
         // Travel directly from the actual window position to the tile. An ongoing
         // glide keeps its latest frame when retargeted, without a synthetic waypoint.
         let start = windowMotionDeparture(inFlight: frames[id],
-                                          nativeFrame: hasNativeStart ? nativeStart : nil,
+                                          nativeFrame: nativeStart,
                                           cachedFrame: cachedStart)
         if !snap, let start, landed.matches(id, asked: target, actual: start) {
             cancel(id)

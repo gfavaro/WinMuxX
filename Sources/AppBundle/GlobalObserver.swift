@@ -53,7 +53,7 @@ enum GlobalObserver {
             await runUnattendedLightSession(.globalObserver(notifName), token) {
                 if config.automaticallyUnhideMacosHiddenApps {
                     if let w = prevFocus?.windowOrNil,
-                       w.macAppUnsafe.nsApp.isHidden,
+                       w.macAppUnsafe.isHidden,
                        // "Hide others" (cmd-alt-h) -> don't force focus
                        // "Hide app" (cmd-h) -> force focus
                        MacApp.allAppsMap.values.count(where: { $0.nsApp.isHidden }) == 1

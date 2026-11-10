@@ -32,7 +32,7 @@ func workspaceOverviewIncludesWindow(_ window: Window) -> Bool {
     let activeTab = window.nearestWindowTabGroup.map { !$0.usesWindowTabBehavior || $0.tabActiveWindow === window } ?? true
     return workspaceOverviewIncludesWindow(standard: standard,
         minimized: window.lastKnownNativeMinimized == true,
-        hiddenApp: (window.app as? MacApp)?.nsApp.isHidden == true,
+        hiddenApp: (window.app as? any WindowApplication)?.isHidden == true,
         fullscreen: window.lastKnownNativeFullscreen == true,
         popup: window.parent is MacosPopupWindowsContainer,
         ownWindow: window.app.pid == myPid, activeTab: activeTab)
@@ -58,7 +58,7 @@ func buildWorkspaceOverviewCards(project: WorkspaceProjectId, monitors: [Monitor
             }
             let frame = workspace.isVisible ? liveFrame ?? window.workspacePreviewFrame
                 : window.workspacePreviewFrame ?? liveFrame
-            if icons[window.app.pid] == nil { icons[window.app.pid] = (window.app as? MacApp)?.nsApp.icon }
+            if icons[window.app.pid] == nil { icons[window.app.pid] = (window.app as? any WindowApplication)?.nativeApplication?.icon }
             return WorkspaceOverviewWindow(id: window.windowId, identity: ObjectIdentifier(window), pid: window.app.pid,
                 title: cachedWindowTitle(for: window) ?? window.app.name ?? "Window",
                 appName: window.app.name ?? "Application", icon: icons[window.app.pid], frame: frame)

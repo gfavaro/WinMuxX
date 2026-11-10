@@ -60,7 +60,7 @@ func buildDiagnosticsReport() async -> String {
     io.out("")
 
     let dock = DockWorkspaceSwipeSource.shared
-    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "off") overview=\(dock.readsVertical ? "macos-swipe" : "off") macOS=\(dock.status)")
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) horizontal=\(dock.readsHorizontal ? "macos-swipe" : "off") overview=\(dock.readsVertical ? "macos-swipe" : "off") macOS=\(dock.status) tapTimeouts=\(dock.tapTimeouts)")
     for (axis, swipe) in [("left/right", dock.horizontalSummary), ("up/down", dock.verticalSummary)] {
         io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
                       axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
@@ -142,7 +142,7 @@ func buildDiagnosticsReport() async -> String {
         if case .unknown = reachability { unresponsivePids.insert(pid) }
         guard reachability != .reachable else { continue }
         findings.append(WindowReachabilityFinding(windowId: window.windowId,
-            appName: window.macApp.nsApp.localizedName ?? window.app.rawAppBundleId ?? String(pid),
+            appName: window.macApp.name ?? window.app.rawAppBundleId ?? String(pid),
             workspace: window.nodeWorkspace?.name, windowServerFrame: windowServerFrame(window.windowId),
             reachability: reachability, liveAppRegistered: MacApp.allAppsMap[pid].map { !$0.isRetired } ?? false))
         if !probedPids.contains(pid) { probedPids.append(pid) }
@@ -152,8 +152,8 @@ func buildDiagnosticsReport() async -> String {
     for pid in probedPids {
         // Probe the live registration: a retired object has no AX thread to ask.
         let app = MacApp.allAppsMap[pid] ?? MacWindow.allWindows.first { $0.app.pid == pid }?.macApp
-        details.append(AppReachabilityDetail(appName: app?.nsApp.localizedName ?? String(pid),
-            axWindows: unresponsivePids.contains(pid) ? nil : ((try? await app?.probeAxWindows()) ?? []),
+        details.append(AppReachabilityDetail(appName: app?.name ?? String(pid),
+            axWindows: unresponsivePids.contains(pid) ? nil : ((try? await app?.probeAxWindows(limit: 12)) ?? []),
             windowServerWindows: serverWindows.filter { $0.pid == pid }.map(\.summary)))
     }
     for line in windowReachabilityReport(trackedCount: tracked.count, findings: findings, details: details) { io.out(line) }

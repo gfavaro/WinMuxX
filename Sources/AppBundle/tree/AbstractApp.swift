@@ -27,5 +27,5 @@ extension AbstractApp {
 }
 
 extension Window {
-    var macAppUnsafe: MacApp { app as! MacApp }
+    var macAppUnsafe: any WindowApplication { app as! any WindowApplication }
 }

@@ -22,7 +22,7 @@ struct HiddenWorkspaceWindowRecoveryDependencies {
                   currentlyManipulatedWithMouseWindowId != id,
                   let window = MacWindow.allWindowsMap[id] else { return false }
             return window.isHiddenInCorner && window.layoutReason == .standard &&
-                window.hasCompletedNativeParking && window.nodeWorkspace?.isVisible == false && !window.macApp.nsApp.isHidden &&
+                window.hasCompletedNativeParking && window.nodeWorkspace?.isVisible == false && !window.macApp.isHidden &&
                 window.lastKnownNativeFullscreen != true && window.lastKnownNativeMinimized != true
         }, isNativelyParked: { MacWindow.allWindowsMap[$0]?.hasConfirmedNativeParkingPosition() == true },
         confirmNativeState: { id in
@@ -32,7 +32,7 @@ struct HiddenWorkspaceWindowRecoveryDependencies {
                   window.nativeStateObservationToken() == token, MacWindow.allWindowsMap[id] === window else { return false }
             window.recordObservedNativeState(fullscreen: state.fullscreen, minimized: state.minimized, token: token)
             return canRecoverHiddenWorkspaceWindow(completedParking: window.hasCompletedNativeParking,
-                inactive: window.nodeWorkspace?.isVisible == false, appHidden: window.macApp.nsApp.isHidden,
+                inactive: window.nodeWorkspace?.isVisible == false, appHidden: window.macApp.isHidden,
                 nativeFullscreen: state.fullscreen, nativeMinimized: state.minimized)
         },
         invalidate: { MacWindow.allWindowsMap[$0]?.invalidateLastKnownNativeState() }, requestRefresh: { ids in

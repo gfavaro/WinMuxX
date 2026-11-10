@@ -7,7 +7,7 @@ import AppKit
 
 @MainActor
 func placeholderAppIcon(forWindowId id: UInt32) -> CGImage? {
-    guard let app = MacWindow.allWindowsMap[id]?.macApp.nsApp else { return nil }
+    guard let app = MacWindow.allWindowsMap[id]?.macApp.nativeApplication else { return nil }
     let pid = app.processIdentifier
     if let icon = placeholderIconsByPid[pid] { return icon }
     var rect = CGRect(x: 0, y: 0, width: 128, height: 128)

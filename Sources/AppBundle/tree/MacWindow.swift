@@ -4,7 +4,7 @@ import PrivateApi
 import os
 
 final class MacWindow: Window {
-    let macApp: MacApp
+    let macApp: any WindowApplication
     @MainActor override var minimumLayoutSize: CGSize { learnedMinimum.size }
 
     @MainActor private(set) var learnedMinimum = LearnedWindowMinimum()
@@ -43,7 +43,7 @@ final class MacWindow: Window {
     private var reparkBudget = FrameRecoveryBudget()
 
     @MainActor
-    private init(_ id: UInt32, _ actor: MacApp, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
+    private init(_ id: UInt32, _ actor: any WindowApplication, lastFloatingSize: CGSize?, parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
         self.macApp = actor
         if !isUnitTest, let size = PersistedAppMinimums.shared.size(for: actor.rawAppBundleId) {
             learnedMinimum = LearnedWindowMinimum(size: size)
@@ -56,10 +56,10 @@ final class MacWindow: Window {
 
     @MainActor
     @discardableResult
-    static func getOrRegister(windowId: UInt32, macApp: MacApp) async throws -> MacWindow? {
+    static func getOrRegister(windowId: UInt32, macApp: any WindowApplication) async throws -> MacWindow? {
         // Focus/main-window AX attributes can continue reporting a closed id.
         // Never let the fast focus path recreate its layout node.
-        if !isUnitTest && !winmux_window_exists(windowId) {
+        if !runtime.windowServer.exists(windowId) {
             allWindowsMap[windowId]?.garbageCollect(skipClosedWindowsCache: false)
             // WindowServer confirms it is gone: closed, not missing.
             invalidateClosedWindowsCacheForNativeClosure(windowId)
@@ -94,7 +94,7 @@ final class MacWindow: Window {
             window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
             if window.restartIdentity == nil, let bundleId = macApp.rawAppBundleId {
                 window.restartIdentity = RestartWindowIdentity(bundleId: bundleId, pid: macApp.pid,
-                    launchDate: macApp.nsApp.launchDate, title: "")
+                    launchDate: macApp.launchDate, title: "")
             }
             try await debugWindowsIfRecording(window)
             let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
@@ -147,7 +147,7 @@ final class MacWindow: Window {
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
         if MacWindow.allWindowsMap[windowId] != nil {
-            if macApp.nsApp.isTerminated {
+            if macApp.isTerminated {
                 rememberRestartWindowBeforeAppTermination(self)
             } else if !skipClosedWindowsCache {
                 // A native closure, not a WinMuxX close command or project deletion.
@@ -165,7 +165,7 @@ final class MacWindow: Window {
         resetLearnedMinimum()
         if !skipClosedWindowsCache { cacheClosedWindowIfNeeded() }
         // A quit app's windows are closed, not missing; relaunch placement is the restart snapshot's job.
-        if macApp.nsApp.isTerminated { invalidateClosedWindowsCacheForNativeClosure(windowId) }
+        if macApp.isTerminated { invalidateClosedWindowsCacheForNativeClosure(windowId) }
         // Read before unbinding, which drops this window out of `focus`. A refresh session's
         // snapshot predates macOS' own post-close focus change, so it wins when there is one.
         let focusedWindowIdBeforeClosure = refreshSessionFocusSnapshot?.focus.windowId ?? focus.windowOrNil?.windowId
@@ -217,7 +217,7 @@ final class MacWindow: Window {
     override func nativeFocus() {
         guard !isHiddenInCorner else { return }
         WorkspaceTransitionDiagnostics.record("focus", window: self, generation: workspaceReveal.generation)
-        macApp.nativeFocus(windowId)
+        macApp.nativeFocus(windowId, forceRaise: false)
     }
 
     @MainActor
@@ -272,8 +272,7 @@ final class MacWindow: Window {
         var parkedFrame: CGRect?
         if !force, isHiddenInCorner, hiddenInCorner?.corner == corner,
            hiddenInCorner?.monitorVisibleRect == nodeMonitor.visibleRect {
-            var actual = CGRect.zero
-            if winmux_window_frame(windowId, &actual) { parkedFrame = actual }
+            parkedFrame = runtime.windowServer.frame(windowId)
         }
         var effectiveCorner = corner
         var windowSize = parkedFrame?.size ?? .zero
@@ -290,7 +289,7 @@ final class MacWindow: Window {
         // are otherwise queued, allowing outgoing windows to overlap the destination.
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         workspaceReveal.park()
-        if !isUnitTest { WindowBorderController.shared.remove(windowId: windowId) }
+        WindowBorderController.shared.remove(windowId: windowId)
         let parkingGeneration = workspaceReveal.generation
         WorkspaceTransitionDiagnostics.record("park-begin", window: self, generation: parkingGeneration,
             requested: CGRect(origin: p, size: CGSize(width: lastKnownActualRect?.width ?? 0, height: lastKnownActualRect?.height ?? 0)))
@@ -309,8 +308,7 @@ final class MacWindow: Window {
     @MainActor var hasCompletedNativeParking: Bool { hiddenInCorner != nil }
 
     @MainActor func nativeFrameForRecovery() -> CGRect? {
-        var frame = CGRect.zero
-        return winmux_window_frame(windowId, &frame) ? frame : nil
+        runtime.windowServer.frame(windowId)
     }
 
     @MainActor func fallbackFrameForRecovery() -> CGRect? {
@@ -341,8 +339,7 @@ final class MacWindow: Window {
     func hasConfirmedNativeParkingPosition() -> Bool {
         guard isHiddenInCorner, let hiddenInCorner, let nodeMonitor,
               hiddenInCorner.monitorVisibleRect == nodeMonitor.visibleRect else { return false }
-        var actual = CGRect.zero
-        guard winmux_window_frame(windowId, &actual) else { return false }
+        guard let actual = runtime.windowServer.frame(windowId) else { return false }
         let requested = workspaceParkingPoint(corner: hiddenInCorner.corner,
             visibleRect: CGRect(origin: nodeMonitor.visibleRect.topLeftCorner, size: nodeMonitor.visibleRect.size),
             windowSize: actual.size, zeroOffset: macApp.appId == .zoom)
@@ -386,7 +383,7 @@ final class MacWindow: Window {
     func restoreFromCorner(to target: CGRect, resize: Bool = true) async throws -> Bool {
         guard isHiddenInCorner, let workspace = nodeWorkspace else { return false }
         let token = workspaceReveal.begin()
-        if !isUnitTest { WindowBorderController.shared.remove(windowId: windowId) }
+        WindowBorderController.shared.remove(windowId: windowId)
         // Once a reveal starts, the old parking coordinates no longer describe
         // the native window. A later outgoing transition must park it again.
         hiddenInCorner = nil

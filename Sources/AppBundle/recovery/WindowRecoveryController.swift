@@ -50,7 +50,7 @@ final class WindowRecoveryController {
     }
 
     func identity(for window: MacWindow) -> RecoveryWindowIdentity? {
-        guard let launchDate = window.macApp.nsApp.launchDate else { return nil }
+        guard let launchDate = window.macApp.launchDate else { return nil }
         return RecoveryWindowIdentity(windowId: window.windowId, pid: window.macApp.pid,
                                       bundleId: window.macApp.rawAppBundleId, applicationLaunchDate: launchDate)
     }

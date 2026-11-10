@@ -312,7 +312,7 @@ func makeSwitcherPaletteItem(
         id: window.windowId,
         title: title,
         appName: appName,
-        icon: (window as? MacWindow)?.macApp.nsApp.icon,
+        icon: (window as? MacWindow)?.macApp.nativeApplication?.icon,
         workspaceName: workspaceName,
         isFocused: window.windowId == focusedWindowId,
         workspaceTitle: workspaceTitle,

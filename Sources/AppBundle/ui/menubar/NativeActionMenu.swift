@@ -127,7 +127,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         capturedRuleTarget = focus.windowOrNil.flatMap { window -> QuickFloatingRuleTarget? in
             guard let app = window as? MacWindow, let bundleId = app.macApp.rawAppBundleId else { return nil }
             return QuickFloatingRuleTarget(window: app, focus: focus, bundleId: bundleId,
-                pid: app.macApp.pid, launchDate: app.macApp.nsApp.launchDate, workspaceId: focus.workspace.id)
+                pid: app.macApp.pid, launchDate: app.macApp.launchDate, workspaceId: focus.workspace.id)
         }
         menu.addItem(NSMenuItem(title: "WinMuxX · \(workspaceDisplayName(focus.workspace.name))", action: nil, keyEquivalent: ""))
         if activeMode != mainModeId {
@@ -566,9 +566,9 @@ private struct QuickFloatingRuleTarget {
             node = current.parent
         }
         guard MacWindow.allWindowsMap[window.windowId] === window,
-              window.macApp.pid == pid, window.macApp.nsApp.launchDate == launchDate,
+              window.macApp.pid == pid, window.macApp.launchDate == launchDate,
               window.macApp.rawAppBundleId == bundleId, currentWorkspace?.id == workspaceId,
-              !window.macApp.nsApp.isTerminated else { return false }
+              !window.macApp.isTerminated else { return false }
         return true
     }
 }

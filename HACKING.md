@@ -94,6 +94,17 @@ menu item when it is an action. Add the key to `docs/schemas/winmuxx.schema.json
 which writes each key the way Settings does and parses the result back. Deprecated
 keys, hooks and `config-version` stay config-only.
 
+Native windows depend on `WindowApplication` for Accessibility operations and process
+facts. `MacApp` implements it with its existing app-owned AX thread;
+`ScriptedWindowApplication` in the test target supplies answers without a process.
+`MacWindowNativeOperationsTest` runs registration, parking and reveal through the
+real window class. Presentation metadata can use the optional `nativeApplication`;
+window management should use the interface's process facts instead.
+`WinMuxRuntime.windowServer` owns immutable existence/frame query closures. Capture
+that value before dispatching to an AX thread. Legacy test fixtures install empty
+queries; native-window tests supply their own geometry and existence answers.
+These tests do not certify third-party AX behavior or physical window placement.
+
 `runtime/WinMuxRuntime.swift` is the composition point for configuration, workspace /
 project / viewport registry, focus history and native focus holds, monitor caches,
 hotkeys and recovery snapshots/tasks. Production uses one process-lifetime owner.

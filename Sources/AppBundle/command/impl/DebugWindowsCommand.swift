@@ -95,7 +95,7 @@ private func dumpWindowDebugInfo(_ window: Window) async throws -> String {
     guard let window = window as? MacWindow else {
         return "Window \(window.windowId) isn't a macOS-backed window"
     }
-    let appInfoDic = window.macApp.nsApp.bundleURL.flatMap { Bundle.init(url: $0) }?.infoDictionary ?? [:]
+    let appInfoDic = window.macApp.nativeApplication?.bundleURL.flatMap { Bundle.init(url: $0) }?.infoDictionary ?? [:]
 
     var result: [String: Json] = try await window.dumpAxInfo()
 
@@ -111,9 +111,9 @@ private func dumpWindowDebugInfo(_ window: Window) async throws -> String {
     result["WinMux.App.pid"] = .int(Int(window.app.pid))
     result["WinMux.App.versionShort"] = .stringOrNull(appInfoDic["CFBundleShortVersionString"] as? String)
     result["WinMux.App.version"] = .stringOrNull(appInfoDic["CFBundleVersion"] as? String)
-    result["WinMux.App.nsApp.activationPolicy"] = .string(window.macApp.nsApp.activationPolicy.prettyDescription)
-    result["WinMux.App.nsApp.execPath"] = .stringOrNull(window.macApp.nsApp.executableURL?.description)
-    result["WinMux.App.nsApp.appBundlePath"] = .stringOrNull(window.macApp.nsApp.bundleURL?.description)
+    result["WinMux.App.nsApp.activationPolicy"] = .string(window.macApp.nativeApplication?.activationPolicy.prettyDescription ?? "unavailable")
+    result["WinMux.App.nsApp.execPath"] = .stringOrNull(window.macApp.nativeApplication?.executableURL?.description)
+    result["WinMux.App.nsApp.appBundlePath"] = .stringOrNull(window.macApp.nativeApplication?.bundleURL?.description)
     result["WinMux.AXApp"] = .dict(try await window.macApp.dumpAppAxInfo())
 
     let isDialog = try await window.isDialogHeuristic(windowLevel)

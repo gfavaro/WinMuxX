@@ -519,11 +519,11 @@ func refreshModel() {
         windowIds.withUnsafeBufferPointer {
             winmux_watch_windows($0.baseAddress, Int32($0.count))
         }
-        for window in MacWindow.allWindows where !winmux_window_exists(window.windowId) {
-            window.garbageCollect(skipClosedWindowsCache: false)
-            // WindowServer confirms it is gone, as when the native close notification was missed.
-            invalidateClosedWindowsCacheForNativeClosure(window.windowId)
-        }
+    }
+    for window in MacWindow.allWindows where !runtime.windowServer.exists(window.windowId) {
+        window.garbageCollect(skipClosedWindowsCache: false)
+        // WindowServer confirms it is gone, as when the native close notification was missed.
+        invalidateClosedWindowsCacheForNativeClosure(window.windowId)
     }
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()

@@ -520,7 +520,7 @@ extension Workspace {
 
 @MainActor
 private func windowServerStillHas(_ windowId: UInt32) -> Bool {
-    !isUnitTest && winmux_window_exists(windowId)
+    runtime.windowServer.exists(windowId)
 }
 
 extension Window {

@@ -51,7 +51,7 @@ private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) asy
         guard window.parent != nil,
               window.nodeWorkspace === workspace || window.parent is MacosMinimizedWindowsContainer else { continue }
         var observation = states[index]
-        var hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+        var hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? any WindowApplication)?.isHidden == true
         let willMutate = observation.map { value in
             let unconventional = value.full || value.mini || hidden
             if case .standard = window.layoutReason { return unconventional }
@@ -63,7 +63,7 @@ private func _normalizeLayoutReason(workspace: Workspace, windows: [Window]) asy
             guard let fresh = try await window.readNativeState(), token == window.nativeStateObservationToken(),
                   window.parent === parent else { continue }
             try checkCancellation()
-            hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+            hidden = !config.automaticallyUnhideMacosHiddenApps && (window.app as? any WindowApplication)?.isHidden == true
             observation = (token, fresh.fullscreen, fresh.minimized)
             window.recordObservedNativeState(fullscreen: fresh.fullscreen, minimized: fresh.minimized, token: token)
         }

@@ -333,6 +333,9 @@ final class DockWorkspaceSwipeSource {
     private var envelopeTap: (port: CFMachPort, source: CFRunLoopSource)?
     private var envelopeEnabled = false
     private var wakeObservers: [NSObjectProtocol] = []
+    /// Times macOS switched a tap off because WinMuxX took too long to answer an event, since
+    /// launch. Each one drops the swipe in progress.
+    private(set) var tapTimeouts = 0
 
     var horizontalSummary: DockSwipeSummary { horizontal.summary }
     var verticalSummary: DockSwipeSummary { vertical.summary }
@@ -414,6 +417,7 @@ final class DockWorkspaceSwipeSource {
     fileprivate func handle(_ proxy: CGEventTapProxy, _ type: CGEventType, _ event: CGEvent) -> Bool {
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             // Events missed while disabled cannot be finished; start clean.
+            if type == .tapDisabledByTimeout { tapTimeouts += 1 }
             abandon()
             if let dockTap { CGEvent.tapEnable(tap: dockTap.port, enable: true) }
             setEnvelope(false)

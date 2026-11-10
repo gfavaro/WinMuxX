@@ -598,7 +598,8 @@ final class MacApp: AbstractApp {
             return []
         }
         guard let thread else { return [] }
-        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp, destroyedWindows] (job) -> ([UInt32], [UInt32]) in
+        let windowServer = runtime.windowServer
+        let (alive, dead) = try await thread.runInLoop { [nsApp, windows, axApp, destroyedWindows, windowServer] (job) -> ([UInt32], [UInt32]) in
             var alive: [UInt32: AxWindow] = windows.threadGuarded
             var dead = [UInt32: AxWindow]()
             // Second line of defence against lock screen. See the first line of defence: closedWindowsCache
@@ -606,7 +607,7 @@ final class MacApp: AbstractApp {
             if frontmostAppBundleId != lockScreenAppBundleId {
                 (alive, dead) = try alive.partition {
                     try job.checkCancellation()
-                    if !isUnitTest && !winmux_window_exists($0.key) { return false }
+                    if !windowServer.exists($0.key) { return false }
                     let (windowId, error) = $0.value.ax.containingWindowIdWithError()
                     if windowId != nil { return true }
                     // .cannotComplete means the app didn't answer (CPU-starved or briefly
@@ -621,7 +622,7 @@ final class MacApp: AbstractApp {
             let discovered = axApp.threadGuarded.discoverAxWindows()
             for (id, window) in discovered ?? [] {
                 try job.checkCancellation()
-                if !isUnitTest && !winmux_window_exists(id) { continue }
+                if !windowServer.exists(id) { continue }
                 if let destroyed = destroyedWindows.threadGuarded[id] {
                     if isDestroyedWindowElement(destroyed, window.cast) { continue }
                     destroyedWindows.threadGuarded.removeValue(forKey: id)

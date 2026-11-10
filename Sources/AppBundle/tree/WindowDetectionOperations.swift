@@ -9,7 +9,7 @@ final class DetectionCommit {
     func check() throws {
         try checkCancellation()
         guard isCurrent(window),
-              (window.app as? MacApp)?.nsApp.isTerminated != true else { throw CancellationError() }
+              (window.app as? any WindowApplication)?.isTerminated != true else { throw CancellationError() }
     }
 }
 

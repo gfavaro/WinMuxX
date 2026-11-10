@@ -2,7 +2,7 @@ import AppKit
 import Common
 
 @MainActor
-func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: MacApp, _ workspace: Workspace, window: Window?,
+func unbindAndGetBindingDataForNewWindow(_ windowId: UInt32, _ macApp: any WindowApplication, _ workspace: Workspace, window: Window?,
                                           newlyOpened: Bool = false) async throws -> BindingData {
     let parent = window?.parent
     let windowLevel = getWindowLevel(for: windowId)

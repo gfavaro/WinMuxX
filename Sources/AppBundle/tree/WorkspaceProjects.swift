@@ -291,7 +291,7 @@ private func closeWindowsForProjectDeletion(_ windows: [Window]) async -> [Windo
     for (_, appWindows) in windowsByPid {
         guard let app = appWindows.first?.macApp else { continue }
         let axWindowCount = (try? await app.getAxWindowsCount()) ?? MacWindow.allWindows.count { $0.macApp === app }
-        if axWindowCount == appWindows.count, app.nsApp.terminate() {
+        if axWindowCount == appWindows.count, app.terminate() {
             let didTerminate = await waitForAppTermination(app)
             if didTerminate {
                 for window in appWindows {
@@ -322,10 +322,10 @@ private func closeWindowsForProjectDeletion(_ windows: [Window]) async -> [Windo
 }
 
 @MainActor
-private func waitForAppTermination(_ app: MacApp, timeout: TimeInterval = 2.0) async -> Bool {
+private func waitForAppTermination(_ app: any WindowApplication, timeout: TimeInterval = 2.0) async -> Bool {
     let deadline = ContinuousClock.now + .seconds(timeout)
     while ContinuousClock.now < deadline {
-        if app.nsApp.isTerminated {
+        if app.isTerminated {
             return true
         }
         if (try? await app.getAxWindowsCount()) == 0 {

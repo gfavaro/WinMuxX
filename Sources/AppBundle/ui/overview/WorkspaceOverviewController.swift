@@ -156,7 +156,7 @@ final class WorkspaceOverviewController {
             WorkspaceSwipeController.shared.cancelVisualInteraction()
             SwitcherPalettePanel.shared.dismiss()
             previousApp = NSWorkspace.shared.frontmostApplication
-            if previousApp?.processIdentifier == myPid { previousApp = (focus.windowOrNil?.app as? MacApp)?.nsApp }
+            if previousApp?.processIdentifier == myPid { previousApp = (focus.windowOrNil?.app as? any WindowApplication)?.nativeApplication }
         }
         let cards = dependencies.cards(project!)
         for display in displays {

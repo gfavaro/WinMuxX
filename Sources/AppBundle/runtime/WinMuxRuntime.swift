@@ -15,6 +15,7 @@ final class WinMuxRuntime {
     let recovery = WorkspaceRecoveryState()
     let refresh = RefreshCoordinator()
     let events = RuntimeEventRecorder()
+    var windowServer = WindowServerQueries.live
     let workMetrics = RuntimeWorkMetrics.shared
 
     init(config: Config = defaultConfig, configURL: URL = defaultConfigUrl) {
@@ -53,6 +54,7 @@ final class WinMuxRuntime {
         process.displays.displayChangeTask?.cancel()
         process.configuration.reloadScheduler?.cancelPending()
         process = WinMuxRuntime()
+        process.windowServer = .empty
     }
 }
 

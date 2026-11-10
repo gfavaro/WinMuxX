@@ -380,7 +380,7 @@ func restoreFrozenUnconventionalWindow(
     let isMacosFullscreen = try await window.isMacosFullscreen
     let isMacosMinimized = try await (!isMacosFullscreen).andAsync { @MainActor @Sendable in try await window.isMacosMinimized }
     let isMacosWindowOfHiddenApp = !isMacosFullscreen && !isMacosMinimized &&
-        !config.automaticallyUnhideMacosHiddenApps && (window.app as? MacApp)?.nsApp.isHidden == true
+        !config.automaticallyUnhideMacosHiddenApps && (window.app as? any WindowApplication)?.isHidden == true
 
     switch true {
         case isMacosFullscreen:
