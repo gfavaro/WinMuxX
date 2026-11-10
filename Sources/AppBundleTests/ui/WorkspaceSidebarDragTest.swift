@@ -707,18 +707,14 @@ final class WorkspaceSidebarDragTest: XCTestCase {
         )
     }
 
-    func testWorkspaceSidebarHoverCueWidthStaysCollapsed() {
-        XCTAssertEqual(
-            workspaceSidebarHoverCueWidth(collapsedWidth: 28, expandedWidth: 160),
-            CGFloat(28),
-        )
-    }
-
-    func testWorkspaceSidebarHoverCueWidthDoesNotProtrudeTowardExpandedWidth() {
-        XCTAssertEqual(
-            workspaceSidebarHoverCueWidth(collapsedWidth: 28, expandedWidth: 34),
-            CGFloat(28),
-        )
+    func testWorkspaceSidebarHoverCueFitsCollapsedAndExpandedWidths() {
+        for (expandedWidth, expected): (CGFloat, CGFloat) in [(160, 28), (34, 28), (28, 28), (20, 20)] {
+            XCTAssertEqual(
+                workspaceSidebarHoverCueWidth(collapsedWidth: 28, expandedWidth: expandedWidth),
+                expected,
+                "expanded width: \(expandedWidth)"
+            )
+        }
     }
 
     func testWorkspaceSidebarStatusBottomPaddingMatchesLeadingEdgePadding() {

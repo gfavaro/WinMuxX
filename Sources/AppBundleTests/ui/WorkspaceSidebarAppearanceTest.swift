@@ -356,14 +356,17 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
     }
 
     func testSemanticTextAndCustomPalette() {
-        let system = WorkspaceSidebarPalette(appearance: .system)
         let label = Color(nsColor: .labelColor)
-        XCTAssertEqual(system.foreground, label)
-        XCTAssertEqual(system.text(opacity: 0.9), label.opacity(0.9))
-        XCTAssertEqual(system.text(opacity: 0.4), label.opacity(0.4))
-        XCTAssertEqual(system.text(opacity: 0), .clear)
-        let highContrast = WorkspaceSidebarPalette(appearance: .system, increasedContrast: true)
-        XCTAssertEqual(highContrast.text(opacity: 0.4), label.opacity(1))
+        for scheme in [ColorScheme.light, .dark] {
+            let system = WorkspaceSidebarPalette(appearance: .system, colorScheme: scheme)
+            XCTAssertEqual(system.foreground, label)
+            for opacity in [0.9, 0.4, 0.38] {
+                XCTAssertEqual(system.text(opacity: opacity), label.opacity(opacity))
+            }
+            XCTAssertEqual(system.text(opacity: 0), .clear)
+            let highContrast = WorkspaceSidebarPalette(appearance: .system, increasedContrast: true, colorScheme: scheme)
+            XCTAssertEqual(highContrast.text(opacity: 0.4), label.opacity(1))
+        }
         let custom = WorkspaceSidebarPalette(appearance: .custom)
         XCTAssertEqual(custom.foreground, .white)
         XCTAssertEqual(custom.text(opacity: 0.4), .white.opacity(0.4))

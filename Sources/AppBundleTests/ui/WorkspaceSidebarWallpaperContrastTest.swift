@@ -6,11 +6,6 @@ import SwiftUI
 import XCTest
 
 final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
-    func testSystemPaletteUsesSemanticForegroundInsteadOfWallpaperHeuristics() {
-        let palette = WorkspaceSidebarPalette(appearance: .system, colorScheme: .light)
-        XCTAssertEqual(palette.foreground, Color(nsColor: .labelColor))
-        XCTAssertEqual(palette.text(opacity: 0.38), Color(nsColor: .labelColor).opacity(0.38))
-    }
     func testDisplaySpaceAndWakeChangesAreCoalesced() {
         let applicationCenter = NotificationCenter()
         let workspaceCenter = NotificationCenter()
@@ -67,12 +62,6 @@ final class WorkspaceSidebarWallpaperContrastTest: XCTestCase {
         XCTAssertEqual(request(clipping: false).imageRect(imageSize: image, canvas: canvas), CGRect(x: 0, y: 25, width: 100, height: 50))
         XCTAssertEqual(request(scaling: .scaleNone).imageRect(imageSize: image, canvas: canvas), CGRect(x: -50, y: 0, width: 200, height: 100))
         XCTAssertEqual(request(scaling: .scaleAxesIndependently).imageRect(imageSize: image, canvas: canvas), CGRect(x: 0, y: 0, width: 100, height: 100))
-    }
-
-    func testSystemPaletteKeepsRequestedSecondaryOpacity() {
-        let palette = WorkspaceSidebarPalette(appearance: .system, colorScheme: .dark)
-        XCTAssertEqual(palette.text(opacity: 0.38), Color(nsColor: .labelColor).opacity(0.38))
-        XCTAssertEqual(palette.text(opacity: 0), .clear)
     }
 
     func testSystemSidebarAdaptsContrastAtBothWidths() {

@@ -4,19 +4,18 @@ import XCTest
 /// getSessionWindowTitle is the title accessor for per-session UI model builders: a known
 /// window answers from the cache immediately (even past TTL — the stale entry is refreshed in
 /// the background), while a first-sight window is fetched inline so its first paint is correct.
-final class SessionWindowTitleTest: XCTestCase {
+final class SessionWindowTitleTest: WorkspaceTestCase {
     @MainActor
     func testBlankRefreshPreservesKnownTitleAndBlankFirstSightReturnsNil() async {
-        setUpWorkspacesForTests()
         let start = Date(timeIntervalSince1970: 0)
-        let known = StubSessionTitleWindow(id: 64, title: "Document")
+        let known = StubTitleWindow(id: 64, title: "Document")
         let initial = await getCachedWindowTitle(known, now: start)
         XCTAssertEqual(initial, "Document")
         known.stubTitle = "  \n "
         let refreshed = await getCachedWindowTitle(known, now: start.addingTimeInterval(100))
         XCTAssertEqual(refreshed, "Document")
         XCTAssertEqual(known.titleGetCount, 2)
-        let unknown = StubSessionTitleWindow(id: 65, title: "  ")
+        let unknown = StubTitleWindow(id: 65, title: "  ")
         let first = await getCachedWindowTitle(unknown, now: start)
         XCTAssertNil(first)
         XCTAssertEqual(unknown.titleGetCount, 1)
@@ -24,9 +23,8 @@ final class SessionWindowTitleTest: XCTestCase {
 
     @MainActor
     func testFirstSightFetchesInline() async {
-        setUpWorkspacesForTests()
         resetCachedWindowTitles()
-        let window = StubSessionTitleWindow(id: 61, title: "Inline")
+        let window = StubTitleWindow(id: 61, title: "Inline")
 
         let title = await getSessionWindowTitle(window)
 
@@ -36,9 +34,8 @@ final class SessionWindowTitleTest: XCTestCase {
 
     @MainActor
     func testStaleEntryAnswersImmediatelyWithoutInlineFetch() async {
-        setUpWorkspacesForTests()
         resetCachedWindowTitles()
-        let window = StubSessionTitleWindow(id: 62, title: "Old")
+        let window = StubTitleWindow(id: 62, title: "Old")
         _ = await getCachedWindowTitle(window, now: Date(timeIntervalSince1970: 0))
         XCTAssertEqual(window.titleGetCount, 1)
 
@@ -60,9 +57,8 @@ final class SessionWindowTitleTest: XCTestCase {
 
     @MainActor
     func testFreshEntryDoesNotScheduleBackgroundRefresh() async {
-        setUpWorkspacesForTests()
         resetCachedWindowTitles()
-        let window = StubSessionTitleWindow(id: 63, title: "Fresh")
+        let window = StubTitleWindow(id: 63, title: "Fresh")
         let now = Date()
         _ = await getCachedWindowTitle(window, now: now)
 
@@ -75,40 +71,15 @@ final class SessionWindowTitleTest: XCTestCase {
 
     @MainActor
     func testReusedWindowIdDoesNotReusePriorOwnerTitle() async {
-        setUpWorkspacesForTests()
         resetCachedWindowTitles()
-        let old = StubSessionTitleWindow(id: 66, title: "Old window")
+        let old = StubTitleWindow(id: 66, title: "Old window")
         _ = await getCachedWindowTitle(old)
         old.unbindFromParent()
-        let replacement = StubSessionTitleWindow(id: 66, title: "Replacement")
+        let replacement = StubTitleWindow(id: 66, title: "Replacement")
 
         let title = await getSessionWindowTitle(replacement)
 
         XCTAssertEqual(title, "Replacement")
         XCTAssertEqual(replacement.titleGetCount, 1)
     }
-}
-
-private final class StubSessionTitleWindow: Window {
-    var stubTitle: String
-    var titleGetCount: Int = 0
-
-    @MainActor
-    init(id: UInt32, title: String) {
-        stubTitle = title
-        super.init(id: id, TestApp.shared, lastFloatingSize: nil, parent: Workspace.get(byName: "session-title-test"), adaptiveWeight: 1, index: INDEX_BIND_LAST)
-    }
-
-    override func closeAxWindow() {}
-
-    @MainActor
-    override var title: String {
-        get async {
-            titleGetCount += 1
-            return stubTitle
-        }
-    }
-
-    @MainActor override var isMacosFullscreen: Bool { get async throws { false } }
-    @MainActor override var isMacosMinimized: Bool { get async throws { false } }
 }
