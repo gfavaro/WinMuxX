@@ -106,15 +106,20 @@ final class MacWindow: Window {
 
         try await WindowDetectionOperations.shared.run(window) {
             window.restartIdentity = try? await macApp.getRestartWindowIdentity(windowId)
+            try WindowDetectionOperations.current?.check()
             if window.restartIdentity == nil, let bundleId = macApp.rawAppBundleId {
                 window.restartIdentity = RestartWindowIdentity(bundleId: bundleId, pid: macApp.pid,
                     launchDate: macApp.launchDate, title: "")
             }
             try await debugWindowsIfRecording(window)
+            try WindowDetectionOperations.current?.check()
             let didRestorePersistedFrozenWorld = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: window)
+            try WindowDetectionOperations.current?.check()
             let didRestoreClosedWindowsCache = didRestorePersistedFrozenWorld ? false : try await restoreClosedWindowsCacheIfNeeded(newlyDetectedWindow: window)
+            try WindowDetectionOperations.current?.check()
             if !didRestorePersistedFrozenWorld && !didRestoreClosedWindowsCache {
                 try await tryOnWindowDetected(window)
+                try WindowDetectionOperations.current?.check()
             }
             if window.parent is TilingContainer { forgetWindowsClosedByRunningApp(pid: macApp.pid) }
             if !didRestorePersistedFrozenWorld {
@@ -124,6 +129,8 @@ final class MacWindow: Window {
                 }
             }
         }
+        // A cancelled detection must not schedule popup work for a recycled ID.
+        guard allWindowsMap[windowId] === window else { return nil }
         if window.parent is MacosPopupWindowsContainer { WindowDetectionOperations.shared.schedulePopupChecks(window) }
         return window
     }
