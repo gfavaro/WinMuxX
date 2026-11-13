@@ -119,6 +119,17 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertTrue(recorder.events.isEmpty)
     }
 
+    func testAXDeadlineIsCountedWithoutPIDOrWindowMetadata() {
+        let recorder = RuntimeEventRecorder(eventLimit: 1)
+        recorder.start()
+        recorder.record(.axRefreshDeadline, source: .nativeState, generation: 9,
+                        reason: "per-app-deadline")
+        recorder.record(.refreshCompleted, source: .refresh, generation: 9)
+        XCTAssertEqual(recorder.eventCounts["axRefreshDeadline"], 1)
+        XCTAssertEqual(recorder.events.count, 1, "Old trace entries may be evicted")
+        XCTAssertEqual(recorder.dropped, 1)
+    }
+
     func testFailedScheduledRefreshProducesPrivacySafeTraceEvent() async throws {
         enum ExpectedFailure: Error { case failed }
         let recorder = runtime.events
