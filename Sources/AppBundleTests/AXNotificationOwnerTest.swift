@@ -21,4 +21,19 @@ final class AXNotificationOwnerTest: XCTestCase {
         XCTAssertFalse(isSameAXNotificationOwner(emittingApp: app, managedApp: nil))
         XCTAssertFalse(isSameAXNotificationOwner(emittingApp: nil, managedApp: nil))
     }
+    func testDestroyedEntryRequiresCurrentOwnerOrConfirmedNativeClosure() {
+        let current = NSObject()
+        let previous = NSObject()
+        XCTAssertTrue(shouldRetireAXWindowEntry(emittingApp: current, managedApp: current,
+                                                windowStillExists: true))
+        XCTAssertFalse(shouldRetireAXWindowEntry(emittingApp: previous, managedApp: current,
+                                                 windowStillExists: true))
+        XCTAssertFalse(shouldRetireAXWindowEntry(emittingApp: current, managedApp: nil,
+                                                 windowStillExists: true),
+                       "A live but untracked ID might have been reused by a new window")
+        XCTAssertTrue(shouldRetireAXWindowEntry(emittingApp: current, managedApp: nil,
+                                                windowStillExists: false))
+        XCTAssertFalse(shouldRetireAXWindowEntry(emittingApp: nil, managedApp: nil,
+                                                 windowStillExists: false))
+    }
 }
