@@ -6,7 +6,7 @@ import os
 /// The lock permits recording directly on an application's AX thread.
 final class RuntimeWorkMetrics: @unchecked Sendable {
     static let shared = RuntimeWorkMetrics()
-    enum Operation: String, Codable, CaseIterable { case axRead, axWrite, axAction, runLoopQueueWait }
+    enum Operation: String, Codable, CaseIterable { case axRead, axWrite, axAction, runLoopQueueWait, refreshSession }
     struct Snapshot: Codable, Equatable {
         let operations: [String: Int]
         let failures: Int
