@@ -211,6 +211,28 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertNotEqual(generation, metrics.generationIfRecording())
     }
 
+    func testCancelledScheduledRefreshDoesNotDistortLatencySamples() async throws {
+        let metrics = RuntimeWorkMetrics.shared
+        metrics.stop()
+        _ = metrics.start()
+        defer { metrics.stop(); setScheduledRefreshOverrideForTests(nil) }
+
+        let started = expectation(description: "Scheduled refresh entered")
+        setScheduledRefreshOverrideForTests { _, _ in
+            started.fulfill()
+            try await Task.sleep(for: .seconds(30))
+        }
+        scheduleRefreshSession(.globalObserver("cancelled-latency-fixture"))
+        let work = runtime.refresh.activeRefreshTask
+        XCTAssertNotNil(work)
+        await fulfillment(of: [started], timeout: 2)
+        work?.cancel()
+        // The scheduling path absorbs cancellation as routine supersession.
+        try await work?.value
+        XCTAssertNil(metrics.snapshot().operations["refreshSession"])
+        XCTAssertNil(metrics.snapshot().latencyPercentilesMilliseconds["refreshSession"])
+    }
+
     func testWorkMetricsAreOptInBoundedAndDiscardOldCollectionCompletions() {
         let metrics = RuntimeWorkMetrics(sampleLimit: 2)
         metrics.record(.axRead, failed: false, duration: 0.01, generation: 0)
