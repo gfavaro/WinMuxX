@@ -1,3 +1,59 @@
+## Phase 4 — Performance measurement protocol (2026-11-13)
+
+This phase deliberately does **not** claim faster CPU use, fewer wakeups or lower
+battery drain without on-device baseline and repeat measurements.
+
+### Opt-in latency measurements
+
+Start a bounded recording, exercise the same workload, then export and stop:
+
+```sh
+winmuxx debug-windows --events-start
+# Repeat: workspace switching, app switching, opening/closing windows, monitor handoff
+winmuxx debug-windows --events-export
+winmuxx debug-windows --events-stop
+```
+
+The exported JSON `workMetrics` adds `latencyPercentilesMilliseconds` for the
+*retained* samples of each operation: `axRead`, `axWrite`, `axAction`,
+`runLoopQueueWait`, and `refreshSession` (scheduled sessions only). The
+fixed-size buffer keeps 256 samples per operation by default; p50/p95/p99
+are nearest-rank percentiles of those retained samples, **not** historical
+percentiles over all calls. Compare `operations` (total calls),
+`droppedSamples`, `failures`, and `eventCounts` too. A run with many
+discarded samples can bias the percentiles toward recent activity.
+
+`refreshSession` measures wall-clock time from scheduled task entry through
+completion or error, including waits. Cancelled sessions do not contribute
+latency samples; their counts appear as `cancelled` trace events. These
+measurements do not indicate CPU time or how long AX calls occupy a thread.
+
+For repeatable comparisons, use the same app/window set and monitor topology.
+Capture at least three separate recordings per scenario on the *same build*
+before changing behavior, then repeat on the candidate build. Compare both
+p50 and tail latency, event counts, and dropped samples.
+
+### CPU, memory and wakeups on macOS
+
+Use Activity Monitor (CPU and Memory) for idle and active observations and
+Instruments (Time Profiler, System Trace, and Allocations where appropriate)
+to attribute CPU work, wakeups and allocations. Record the process/build,
+macOS version, display topology, power state, workload and duration in each
+run. Avoid comparing a freshly launched process with a warmed-up process.
+
+Keep the tracing opt-in and off during the final idle/power measurement:
+recording itself has overhead, including locks, timestamps and JSON export.
+Do not change AX polling frequency, coalescing, or timer cadence unless a
+repeated trace identifies an actual bottleneck and the before/after
+measurements show a meaningful gain without regressions.
+
+### Implementation notes
+
+The bounded latency collector now uses a circular buffer with O(1) overwrite
+instead of moving up to 255 elements on every wrap. It excludes non-finite
+durations from samples to keep JSON export valid. No change was made to
+continuous AX enumeration or refresh frequency.
+
 ## Diagnostic trace interpretation (2026-11-13)
 
 WinMuxX already provides opt-in, finite runtime tracing through the CLI:
