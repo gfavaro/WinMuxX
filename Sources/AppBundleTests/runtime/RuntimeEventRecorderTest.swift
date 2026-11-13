@@ -138,8 +138,12 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         TrayMenuModel.shared.isEnabled = true
         setScheduledRefreshOverrideForTests { _, _ in throw ExpectedFailure.failed }
         scheduleRefreshSession(.globalObserver("fixture"))
+        // Keep the task handle: a fast failure can clear activeRefreshTask before
+        // waitForScheduledRefreshForTests observes it.
+        let scheduled = runtime.refresh.activeRefreshTask
+        XCTAssertNotNil(scheduled)
         do {
-            try await waitForScheduledRefreshForTests()
+            try await scheduled?.value
             XCTFail("A failing scheduled refresh must propagate its error")
         } catch is ExpectedFailure {
             // The failure is logged and retained in the opt-in trace.
