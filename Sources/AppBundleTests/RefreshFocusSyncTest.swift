@@ -6,12 +6,24 @@ import XCTest
 final class RefreshFocusSyncTest: XCTestCase {
     func testActivationRaisesOnlyMatchingWindowOnAnotherWorkspace() {
         let activation = RefreshActivationContext(generation: 1, workspaceName: "1", pid: 7)
-        XCTAssertTrue(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 7))
-        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "1", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 7))
-        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 43, frontmostPid: 7, targetPid: 7))
-        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: nil, logicalWindowId: nil, frontmostPid: 7, targetPid: 7))
-        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 8, targetPid: 7))
-        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 8))
+        XCTAssertTrue(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 0))
+        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "1", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 0))
+        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 43, frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 0))
+        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: nil, logicalWindowId: nil, frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 0))
+        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 8, targetPid: 7, currentSelectionGeneration: 0))
+        XCTAssertFalse(activation.shouldRaise(currentWorkspace: "2", nativeWindowId: 42, logicalWindowId: 42, frontmostPid: 7, targetPid: 8, currentSelectionGeneration: 0))
+    }
+
+    func testExplicitWorkspaceSelectionSupersedesPendingActivationRaise() {
+        let activation = RefreshActivationContext(
+            generation: 12, workspaceName: "origin", pid: 7, selectionGeneration: 4)
+        XCTAssertTrue(activation.shouldRaise(
+            currentWorkspace: "destination", nativeWindowId: 42, logicalWindowId: 42,
+            frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 4))
+        XCTAssertFalse(activation.shouldRaise(
+            currentWorkspace: "destination", nativeWindowId: 42, logicalWindowId: 42,
+            frontmostPid: 7, targetPid: 7, currentSelectionGeneration: 5),
+            "An explicit workspace selection supersedes an older activation even if AX focus still matches")
     }
 
     @MainActor
