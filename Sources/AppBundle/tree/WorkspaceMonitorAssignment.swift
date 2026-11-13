@@ -164,6 +164,13 @@ func checkWorkspaceHierarchyInvariants(requireActiveMonitorViewports: Bool = fal
     }
 }
 
+/// Coordinate-based fallback is safe only when it does not contradict known display identity.
+/// A missing UUID keeps legacy/unsupported displays eligible for geometric matching.
+func canReuseMonitorViewport(recordedDisplayUUID: String?, targetDisplayUUID: String?) -> Bool {
+    guard let recordedDisplayUUID, let targetDisplayUUID else { return true }
+    return recordedDisplayUUID == targetDisplayUUID
+}
+
 /// A display that disappears stops showing its workspace at once, so that workspace is an
 /// ordinary hidden one while the topology settles; its viewport is stashed by display UUID
 /// for reconnection. Fallbacks for new displays still wait for the settled pass.
@@ -219,7 +226,9 @@ func rearrangeWorkspacesOnMonitors() {
         oldVisibleMonitors.remove(oldMonitor)
         newMonitorToOldMonitorMapping[newMonitor] = oldMonitor
     }
-    for newMonitor in newMonitors where newMonitorToOldMonitorMapping[newMonitor] == nil && oldVisibleMonitors.contains(newMonitor) {
+    for newMonitor in newMonitors where newMonitorToOldMonitorMapping[newMonitor] == nil && oldVisibleMonitors.contains(newMonitor) &&
+        canReuseMonitorViewport(recordedDisplayUUID: oldViewportsById[newMonitor]?.displayUUID,
+                                targetDisplayUUID: displayUUIDById[newMonitor] ?? nil) {
         check(oldVisibleMonitors.remove(newMonitor) != nil)
         newMonitorToOldMonitorMapping[newMonitor] = newMonitor
     }
@@ -232,7 +241,11 @@ func rearrangeWorkspacesOnMonitors() {
     }
     for newMonitor in newMonitors {
         if newMonitorToOldMonitorMapping[newMonitor] != nil || reconnectedViewports[newMonitor] != nil { continue }
-        if let oldMonitor = oldVisibleMonitors.minBy({ ($0.topLeftCorner - newMonitor.topLeftCorner).vectorLength }) {
+        let compatibleOldMonitors = oldVisibleMonitors.filter {
+            canReuseMonitorViewport(recordedDisplayUUID: oldViewportsById[$0]?.displayUUID,
+                                    targetDisplayUUID: displayUUIDById[newMonitor] ?? nil)
+        }
+        if let oldMonitor = compatibleOldMonitors.minBy({ ($0.topLeftCorner - newMonitor.topLeftCorner).vectorLength }) {
             check(oldVisibleMonitors.remove(oldMonitor) != nil)
             newMonitorToOldMonitorMapping[newMonitor] = oldMonitor
         }
@@ -250,7 +263,11 @@ func rearrangeWorkspacesOnMonitors() {
         let newScreen = newMonitor.topLeftCorner
         let mappedOldMonitor = newMonitorToOldMonitorMapping[newMonitor]
         let reconnected = reconnectedViewports[newMonitor]
-        let preservedViewport = mappedOldMonitor.flatMap { oldViewportsById[$0] } ?? reconnected ?? oldViewportsById[newMonitor]
+        let coordinateFallback = oldViewportsById[newMonitor].flatMap { viewport in
+            canReuseMonitorViewport(recordedDisplayUUID: viewport.displayUUID,
+                                    targetDisplayUUID: displayUUIDById[newMonitor] ?? nil) ? viewport : nil
+        }
+        let preservedViewport = mappedOldMonitor.flatMap { oldViewportsById[$0] } ?? reconnected ?? coordinateFallback
         if var preservedViewport {
             preservedViewport = MonitorViewport(
                 id: newMonitor,
