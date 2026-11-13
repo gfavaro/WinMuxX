@@ -592,6 +592,15 @@ func isSameAXNotificationOwner(emittingApp: AnyObject?, managedApp: AnyObject?) 
     return emittingApp === managedApp
 }
 
+/// An untracked ID may belong to a newly opened window. Only retire that AX entry
+/// without a managed owner if WindowServer confirms the ID is no longer present.
+func shouldRetireAXWindowEntry(emittingApp: AnyObject?, managedApp: AnyObject?,
+                              windowStillExists: Bool) -> Bool {
+    guard let emittingApp else { return false }
+    if let managedApp { return emittingApp === managedApp }
+    return !windowStillExists
+}
+
 func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: UnsafeMutableRawPointer?) {
     let notif = notif as String
     let destroyedWindowId = notif == kAXUIElementDestroyedNotification as String
@@ -619,7 +628,8 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
             let managed = Window.get(byId: destroyedWindowId) as? MacWindow
             // A delayed notification from an old app must not remove a window
             // whose WindowServer ID has been reused by another app or process.
-            if managed == nil || isSameAXNotificationOwner(emittingApp: app, managedApp: managed?.macApp as? MacApp) {
+            if shouldRetireAXWindowEntry(emittingApp: app, managedApp: managed?.macApp as? MacApp,
+                                         windowStillExists: runtime.windowServer.exists(destroyedWindowId)) {
                 if managed != nil { WindowBorderController.shared.remove(windowId: destroyedWindowId) }
                 managed?.garbageCollect(skipClosedWindowsCache: false)
                 try? await app.unregisterDestroyedWindow(destroyedWindowId)
