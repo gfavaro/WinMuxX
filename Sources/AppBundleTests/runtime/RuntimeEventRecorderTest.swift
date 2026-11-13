@@ -119,6 +119,26 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertTrue(recorder.events.isEmpty)
     }
 
+    func testFailedScheduledRefreshProducesPrivacySafeTraceEvent() async throws {
+        enum ExpectedFailure: Error { case failed }
+        let recorder = runtime.events
+        recorder.start()
+        defer { recorder.stop(); setScheduledRefreshOverrideForTests(nil) }
+        TrayMenuModel.shared.isEnabled = true
+        setScheduledRefreshOverrideForTests { _, _ in throw ExpectedFailure.failed }
+        scheduleRefreshSession(.globalObserver("fixture"))
+        do {
+            try await waitForScheduledRefreshForTests()
+            XCTFail("A failing scheduled refresh must propagate its error")
+        } catch is ExpectedFailure {
+            // The failure is logged and retained in the opt-in trace.
+        }
+        let failures = recorder.events.filter { $0.kind == .refreshFailed }
+        XCTAssertEqual(failures.count, 1)
+        XCTAssertEqual(failures.first?.reason, "scheduled-refresh")
+        XCTAssertEqual(recorder.eventCounts["refreshFailed"], 1)
+    }
+
     func testWorkMetricsAreOptInBoundedAndDiscardOldCollectionCompletions() {
         let metrics = RuntimeWorkMetrics(sampleLimit: 2)
         metrics.record(.axRead, failed: false, duration: 0.01, generation: 0)
