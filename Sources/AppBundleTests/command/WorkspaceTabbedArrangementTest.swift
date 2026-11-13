@@ -31,7 +31,9 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         let rect = workspaceTilingRect(workspace)
         let shown = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
         XCTAssertEqual(shown.topLeftY, workspaceTabbedContentRect(rect).topLeftY, "The window sits under the tab bar")
-        XCTAssertEqual(shown.width, rect.width)
+        let inset = windowTabGroupShellHorizontalInset()
+        XCTAssertEqual(shown.topLeftX, rect.topLeftX + inset, "The window sits inside the shell, as in a tab group")
+        XCTAssertEqual(shown.width, rect.width - 2 * inset)
         XCTAssertNil(windows[0].lastAppliedLayoutPhysicalRect, "Other windows wait hidden as tabs")
         XCTAssertNil(windows[2].lastAppliedLayoutPhysicalRect)
     }
@@ -371,7 +373,8 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         let (workspace, windows, left, right) = try await makeTwoGroups()
         try await workspace.layoutWorkspace()
         let rightWidth = try XCTUnwrap(right.lastFrame).width
-        try XCTUnwrap(right.activeWindow as? TestWindow).testMinimumSize = CGSize(width: rightWidth - 30, height: 100)
+        try XCTUnwrap(right.activeWindow as? TestWindow).testMinimumSize = CGSize(
+            width: rightWidth - 30 - windowTabGroupChromeSize(headerHeight: 0).width, height: 100)
         let before = try XCTUnwrap(left.lastFrame).width
         XCTAssertTrue(workspace.resizeTabbedGroup(of: windows[0], along: .h, by: 300))
         try await workspace.layoutWorkspace()

@@ -14,6 +14,24 @@ func windowTabGroupFrameRect(forActiveWindowContentRect contentRect: Rect) -> Re
     )
 }
 
+/// Where the window sits in a tab group's shell: under the header, inset on the sides and bottom
+/// so its rounded corners sit inside the shell's instead of against its edge.
+func windowTabGroupContentRect(inGroupFrame frame: Rect, headerHeight: CGFloat) -> Rect {
+    let chrome = windowTabGroupChromeSize(headerHeight: headerHeight)
+    return Rect(
+        topLeftX: frame.topLeftX + windowTabGroupShellHorizontalInset(),
+        topLeftY: frame.topLeftY + headerHeight + windowTabGroupShellTopInset(),
+        width: max(frame.width - chrome.width, 0),
+        height: max(frame.height - chrome.height, 0),
+    )
+}
+
+/// The room a tab group's shell takes around its window: the header and the shell's insets.
+func windowTabGroupChromeSize(headerHeight: CGFloat) -> CGSize {
+    CGSize(width: windowTabGroupShellHorizontalInset() * 2,
+           height: headerHeight + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset())
+}
+
 @MainActor
 func windowTabBarRect(forGroupFrameRect groupFrameRect: Rect) -> Rect {
     Rect(

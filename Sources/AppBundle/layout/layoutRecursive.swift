@@ -91,8 +91,7 @@ extension Workspace {
 /// The area under a Tabbed workspace's tab bar.
 @MainActor
 func workspaceTabbedContentRect(_ rect: Rect) -> Rect {
-    let bar = min(resolvedWindowTabBarHeight(), rect.height)
-    return Rect(topLeftX: rect.topLeftX, topLeftY: rect.topLeftY + bar, width: rect.width, height: rect.height - bar)
+    windowTabGroupContentRect(inGroupFrame: rect, headerHeight: min(resolvedWindowTabBarHeight(), rect.height))
 }
 
 @MainActor
@@ -378,9 +377,8 @@ extension TreeNode {
                 guard !minimums.isEmpty else { return 0 }
                 if container.layout == .tabGroup {
                     let chrome = container.showsWindowTabs
-                        ? (axis == .h ? 2 * windowTabGroupShellHorizontalInset()
-                            : resolvedWindowTabReservedHeight() + windowTabGroupShellTopInset() + windowTabGroupShellBottomInset()) : 0
-                    return (minimums.max() ?? 0) + chrome
+                        ? windowTabGroupChromeSize(headerHeight: resolvedWindowTabReservedHeight()) : .zero
+                    return (minimums.max() ?? 0) + (axis == .h ? chrome.width : chrome.height)
                 }
                 return container.orientation == axis
                     ? minimums.reduce(0, +) + CGFloat(gaps.inner.get(axis).toDouble()) * CGFloat(minimums.count - 1)

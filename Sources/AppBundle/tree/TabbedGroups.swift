@@ -212,7 +212,8 @@ indirect enum TabbedLayout {
                 // A folded group's windows count in the bar that shows them.
                 if group.foldedInto != nil { return 0 }
                 let minimum = group.minimumWindowSize
-                return horizontal ? minimum.width : minimum.height + resolvedWindowTabBarHeight()
+                let chrome = windowTabGroupChromeSize(headerHeight: resolvedWindowTabBarHeight())
+                return horizontal ? minimum.width + chrome.width : minimum.height + chrome.height
             case .split(let orientation, let children, _):
                 let extents = children.filter { $0.groups.contains { $0.foldedInto == nil } }
                     .map { $0.minimumExtent(horizontal: horizontal, gap: gap) }

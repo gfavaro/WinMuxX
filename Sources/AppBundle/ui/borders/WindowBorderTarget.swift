@@ -22,7 +22,7 @@ func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorder
        let group = workspace.tabbedGroup(containing: window.windowId)?.barGroup {
         guard group.displayedWindow === window, let area = group.lastFrame else { return nil }
         return WindowBorderTarget(frame: CGRect(x: area.topLeftX, y: area.topLeftY, width: area.width, height: area.height),
-            corners: .init(top: windowTabStripCornerRadius, bottom: systemWindowCornerRadius()))
+            corners: .init(top: windowTabStripCornerRadius, bottom: windowTabGroupShellBottomRadius(activeWindowId: window.windowId)))
     }
     guard let group = window.nearestWindowTabGroup, group.usesWindowTabBehavior else { return ordinary }
     // Only the representative owns the group's outline, including during a tab switch
@@ -43,7 +43,6 @@ func windowBorderTarget(for window: Window, nativeFrame: CGRect) -> WindowBorder
         // the representative leaf. Its layout frame is already the whole group.
         groupRect = groupFrame
     } else { return ordinary }
-    let appRadius = windowTabGroupAppCornerRadius(activeWindowId: window.windowId)
     return WindowBorderTarget(frame: CGRect(origin: groupRect.topLeftCorner, size: groupRect.size),
-        corners: .init(top: windowTabStripCornerRadius, bottom: appRadius + windowTabGroupShellBottomInset()))
+        corners: .init(top: windowTabStripCornerRadius, bottom: windowTabGroupShellBottomRadius(activeWindowId: window.windowId)))
 }

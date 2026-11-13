@@ -40,6 +40,11 @@ func windowTabGroupAppCornerRadius(activeWindowId: UInt32?) -> CGFloat {
     return min(max(radius, 6), windowTabGroupFrameMaxInnerCornerRadius)
 }
 
+/// The shell's bottom corners follow the window's, offset by the inset between them.
+@MainActor
+func windowTabGroupShellBottomRadius(activeWindowId: UInt32?) -> CGFloat {
+    windowTabGroupAppCornerRadius(activeWindowId: activeWindowId) + windowTabGroupShellBottomInset()
+}
 
 func windowTabGroupTopInnerCornerRadius(_ appCornerRadius: CGFloat) -> CGFloat {
     min(
