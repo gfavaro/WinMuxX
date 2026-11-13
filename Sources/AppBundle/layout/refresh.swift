@@ -41,8 +41,11 @@ struct RefreshActivationContext: Equatable, Sendable {
     var selectionGeneration: UInt64 = 0
 
     func shouldRaise(currentWorkspace: String, nativeWindowId: UInt32?, logicalWindowId: UInt32?,
-                     frontmostPid: Int32?, targetPid: Int32?) -> Bool {
-        workspaceName != currentWorkspace && nativeWindowId != nil && nativeWindowId == logicalWindowId &&
+                     frontmostPid: Int32?, targetPid: Int32?,
+                     currentSelectionGeneration: UInt64) -> Bool {
+        // A later explicit workspace selection must win over an older Cmd-Tab raise.
+        selectionGeneration == currentSelectionGeneration &&
+            workspaceName != currentWorkspace && nativeWindowId != nil && nativeWindowId == logicalWindowId &&
             frontmostPid == pid && targetPid == pid
     }
 }
@@ -367,7 +370,8 @@ private func performRefreshSession(
                                    currentWorkspace: focus.workspace.name,
                                    nativeWindowId: nativeFocused?.windowId, logicalWindowId: logicalFocused?.windowId,
                                    frontmostPid: NSWorkspace.shared.frontmostApplication?.processIdentifier,
-                                   targetPid: window.macApp.pid
+                                   targetPid: window.macApp.pid,
+                                   currentSelectionGeneration: runtime.refresh.workspaceSelectionGeneration
                                ) == true {
                                 window.macApp.nativeFocus(window.windowId, forceRaise: true)
                             }
