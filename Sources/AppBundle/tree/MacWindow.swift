@@ -3,6 +3,12 @@ import Common
 import PrivateApi
 import os
 
+/// A native window may disappear while Accessibility and binding discovery suspend.
+/// Recheck immediately before inserting a new managed node.
+func canCommitWindowRegistration(windowStillExists: Bool, appTerminated: Bool) -> Bool {
+    windowStillExists && !appTerminated
+}
+
 final class MacWindow: Window {
     let macApp: any WindowApplication
     @MainActor override var minimumLayoutSize: CGSize { learnedMinimum.size }
@@ -73,6 +79,9 @@ final class MacWindow: Window {
         }
         let creationWorkspace = isStartup ? nil : focus.workspace
         let rect = try await macApp.getAxRect(windowId)
+        try checkCancellation()
+        guard canCommitWindowRegistration(windowStillExists: runtime.windowServer.exists(windowId),
+                                          appTerminated: macApp.isTerminated) else { return nil }
         let data = try await unbindAndGetBindingDataForNewWindow(
             windowId,
             macApp,
@@ -83,6 +92,11 @@ final class MacWindow: Window {
             newlyOpened: !isStartup,
         )
 
+        // The AX/binding awaits can outlive this native window. Never insert its
+        // stale layout node or stage a recovery frame after confirmed closure.
+        try checkCancellation()
+        guard canCommitWindowRegistration(windowStillExists: runtime.windowServer.exists(windowId),
+                                          appTerminated: macApp.isTerminated) else { return nil }
         // atomic synchronous section
         if let existing = allWindowsMap[windowId] { return existing }
         let window = MacWindow(windowId, macApp, lastFloatingSize: rect?.size, parent: data.parent, adaptiveWeight: data.adaptiveWeight, index: data.index)
