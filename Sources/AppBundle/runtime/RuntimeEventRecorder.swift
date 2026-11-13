@@ -7,7 +7,7 @@ import Common
 @MainActor
 final class RuntimeEventRecorder {
     enum Kind: String, Codable {
-        case refreshRequested, refreshCoalesced, refreshCompleted, refreshFailed, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten
+        case refreshRequested, refreshCoalesced, refreshCompleted, refreshFailed, axRefreshDeadline, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten
         /// An app activation was recorded; reason "pid:N", workspace = the one it was made from.
         case activationRecorded
         /// Native focus WinMux acted on; reason is a fixed code for the decision and the refresh event.
