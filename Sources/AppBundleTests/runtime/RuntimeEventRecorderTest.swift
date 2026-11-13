@@ -187,6 +187,30 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertEqual(metrics.snapshot().latencyPercentilesMilliseconds["axWrite"]?["p99"] ?? -1, 20, accuracy: 0.0001)
     }
 
+    func testScheduledRefreshRecordsOptInLatencyAndSkipsCancelledSamples() async throws {
+        let metrics = RuntimeWorkMetrics.shared
+        metrics.stop()
+        let generation = metrics.start()
+        defer { metrics.stop(); setScheduledRefreshOverrideForTests(nil) }
+
+        setScheduledRefreshOverrideForTests { _, _ in }
+        scheduleRefreshSession(.globalObserver("latency-fixture"))
+        let work = runtime.refresh.activeRefreshTask
+        XCTAssertNotNil(work)
+        try await work?.value
+
+        let snapshot = metrics.snapshot()
+        XCTAssertEqual(snapshot.operations["refreshSession"], 1)
+        XCTAssertEqual(snapshot.latencyPercentilesMilliseconds["refreshSession"]?["p50"] != nil, true)
+        XCTAssertEqual(snapshot.failures, 0)
+
+        // Samples from an older recording cannot leak into a new collection.
+        metrics.stop()
+        _ = metrics.start()
+        XCTAssertNil(metrics.snapshot().operations["refreshSession"])
+        XCTAssertNotEqual(generation, metrics.generationIfRecording())
+    }
+
     func testWorkMetricsAreOptInBoundedAndDiscardOldCollectionCompletions() {
         let metrics = RuntimeWorkMetrics(sampleLimit: 2)
         metrics.record(.axRead, failed: false, duration: 0.01, generation: 0)
