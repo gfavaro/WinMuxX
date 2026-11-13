@@ -7,7 +7,7 @@ import Common
 @MainActor
 final class RuntimeEventRecorder {
     enum Kind: String, Codable {
-        case refreshRequested, refreshCoalesced, refreshCompleted, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten
+        case refreshRequested, refreshCoalesced, refreshCompleted, refreshFailed, cancelled, staleObservation, workspaceActivated, nativeFrameObserved, nativeFrameWritten
         /// An app activation was recorded; reason "pid:N", workspace = the one it was made from.
         case activationRecorded
         /// Native focus WinMux acted on; reason is a fixed code for the decision and the refresh event.
@@ -33,6 +33,8 @@ final class RuntimeEventRecorder {
     private(set) var isRecording = false
     private(set) var dropped = 0
     private(set) var payloadBytes = 0
+    /// Cumulative counts survive ring-buffer eviction; fixed kind names bound memory.
+    private(set) var eventCounts: [String: Int] = [:]
     private var records: [(event: Event, bytes: Int)?] = []
     private var head = 0
     private var count = 0
@@ -45,10 +47,11 @@ final class RuntimeEventRecorder {
     var events: [Event] { (0..<count).compactMap { records[(head + $0) % records.count]?.event } }
     func start() { reset(); isRecording = true }
     func stop() { isRecording = false; reset() }
-    func reset() { records.removeAll(keepingCapacity: false); head = 0; count = 0; payloadBytes = 0; dropped = 0 }
+    func reset() { records.removeAll(keepingCapacity: false); head = 0; count = 0; payloadBytes = 0; dropped = 0; eventCounts.removeAll() }
     /// `reason` takes fixed codes only, never native text.
     func record(_ kind: Kind, source: Source, generation: UInt64, windowID: UInt32? = nil, workspaceID: WorkspaceId? = nil, viewport: MonitorViewportId? = nil, intendedFrame: Rect? = nil, observedFrame: Rect? = nil, reason: String? = nil) {
         guard isRecording else { return }
+        eventCounts[kind.rawValue, default: 0] += 1
         let event = Event(monotonicNanoseconds: DispatchTime.now().uptimeNanoseconds, kind: kind,
                           source: source, generation: generation, windowID: windowID, workspaceID: workspaceID?.rawValue,
                           viewport: viewport?.description,
@@ -78,12 +81,13 @@ final class RuntimeEventRecorder {
             let configSHA256: String?
             let topology: [String]
             let dropped: Int
+            let eventCounts: [String: Int]
             let events: [Event]
             let workMetrics: RuntimeWorkMetrics.Snapshot
         }
         let fingerprint = (try? Data(contentsOf: configURL)).map { SHA256.hash(data: $0).map { String(format: "%02x", $0) }.joined() }
         let envelope = Envelope(build: gitHash, session: session.uuidString, configSHA256: fingerprint,
-                                topology: topology, dropped: dropped, events: events,
+                                topology: topology, dropped: dropped, eventCounts: eventCounts, events: events,
                                 workMetrics: RuntimeWorkMetrics.shared.snapshot())
         try writePrivateData(JSONEncoder().encode(envelope), to: url)
     }
