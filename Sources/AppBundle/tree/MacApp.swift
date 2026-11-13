@@ -537,6 +537,9 @@ final class MacApp: AbstractApp {
                 // Propagate if the whole refresh session was cancelled; otherwise the deadline
                 // fired — report the model's current windows for this app as alive.
                 try checkCancellation()
+                runtime.events.record(.axRefreshDeadline, source: .nativeState,
+                                      generation: runtime.refresh.activeScheduledRefreshGeneration,
+                                      reason: "per-app-deadline")
                 return MacWindow.allWindows.filter { window in
                     guard let owner = window.macApp as? MacApp else { return false }
                     return shouldPreserveWindowOnAXTimeout(
