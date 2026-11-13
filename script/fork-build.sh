@@ -47,7 +47,14 @@ test -d "$fork_bin"
 # macOS normally uses case-insensitive volumes: winmuxx would overwrite WinMuxX.
 fork_cli="$fork_app/Contents/MacOS/winmuxx-cli"
 ditto "$fork_bin/winmuxx" "$fork_cli"
+# SwiftPM records the toolchain's library path, which exists only on the building Mac
+# (https://github.com/swiftlang/swift-package-manager/issues/10760).
+/usr/bin/xcrun objdump --macho --rpaths --no-leading-headers "$fork_cli" | { grep -E '^/(Users|Applications)/' || true; } | sort -u |
+  while IFS= read -r fork_rpath; do install_name_tool -delete_rpath "$fork_rpath" "$fork_cli"; done
 for fork_binary in "$fork_app/Contents/MacOS/WinMuxX" "$fork_cli"; do
+  if /usr/bin/xcrun objdump --macho --rpaths --no-leading-headers "$fork_binary" | grep -E '^/(Users|Applications)/'; then
+    echo "$fork_binary keeps a path that exists only on this Mac" >&2; exit 1
+  fi
   grep -q --fixed-strings "$fork_git_hash" "$fork_binary" || { echo "$fork_binary lacks build info for $fork_git_hash" >&2; exit 1; }
 done
 mkdir -p "$fork_app/Contents/Helpers"
