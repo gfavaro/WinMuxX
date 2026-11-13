@@ -52,6 +52,22 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertFalse(recorder.isRecording)
     }
 
+    func testEventKindCountsSurviveEvictionAndReset() {
+        let recorder = RuntimeEventRecorder(eventLimit: 2)
+        recorder.record(.refreshFailed, source: .refresh, generation: 0)
+        XCTAssertTrue(recorder.eventCounts.isEmpty, "Disabled tracing does not collect counters")
+        recorder.start()
+        recorder.record(.refreshRequested, source: .refresh, generation: 1)
+        recorder.record(.refreshRequested, source: .refresh, generation: 2)
+        recorder.record(.refreshFailed, source: .refresh, generation: 3, reason: "scheduled-refresh")
+        XCTAssertEqual(recorder.events.count, 2)
+        XCTAssertEqual(recorder.dropped, 1)
+        XCTAssertEqual(recorder.eventCounts["refreshRequested"], 2)
+        XCTAssertEqual(recorder.eventCounts["refreshFailed"], 1)
+        recorder.stop()
+        XCTAssertTrue(recorder.eventCounts.isEmpty)
+    }
+
     func testByteBoundAndOversizedPayload() {
         let recorder = RuntimeEventRecorder(byteLimit: 320)
         recorder.start()
@@ -96,6 +112,7 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertTrue(text.contains("configSHA256"))
         XCTAssertTrue(text.contains("\"schema\":2"))
         XCTAssertTrue(text.contains("workMetrics"))
+        XCTAssertTrue(text.contains("eventCounts"))
         let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
         XCTAssertEqual((attributes[.posixPermissions] as? NSNumber)?.intValue, 0o600)
         recorder.stop()
