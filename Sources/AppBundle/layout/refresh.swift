@@ -216,6 +216,9 @@ func scheduleRefreshSession(
             runtime.events.record(.cancelled, source: .refresh, generation: generation)
             return
         } catch {
+            // Record a fixed code, never localized error text, in the opt-in trace.
+            runtime.events.record(.refreshFailed, source: .refresh, generation: generation,
+                                  reason: "scheduled-refresh")
             recordSessionFailure(error, request.event)
             throw error
         }
@@ -280,6 +283,10 @@ func runUnattendedLightSession<T>(_ event: RefreshSessionEvent, _ token: RunSess
     do {
         _ = try await runLightSession(event, token, shouldSchedulePostRefresh: shouldSchedulePostRefresh, body: body)
     } catch {
+        if !(error is CancellationError) {
+            runtime.events.record(.refreshFailed, source: .refresh,
+                                  generation: activeScheduledRefreshGeneration, reason: "light-session")
+        }
         recordSessionFailure(error, event)
     }
 }
