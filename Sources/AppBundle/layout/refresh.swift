@@ -192,6 +192,16 @@ func scheduleRefreshSession(
     let generation = activeScheduledRefreshGeneration
     let override = scheduledRefreshOverrideForTests
     let task = runtime.throwingTask {
+        // Capture only during explicit diagnostic collection; no steady-state clock work.
+        let workMetrics = RuntimeWorkMetrics.shared
+        let metricsGeneration = workMetrics.generationIfRecording()
+        let started = metricsGeneration.map { _ in DispatchTime.now().uptimeNanoseconds }
+        func recordDuration(failed: Bool) {
+            guard let metricsGeneration, let started else { return }
+            workMetrics.record(.refreshSession, failed: failed,
+                               duration: Double(DispatchTime.now().uptimeNanoseconds - started) / 1_000_000_000,
+                               generation: metricsGeneration)
+        }
         defer {
             // Generation mismatch means someone took over (light session, test setup); they are
             // responsible for the next refresh, so don't drain the pending request from here.
@@ -211,11 +221,13 @@ func scheduleRefreshSession(
             } else {
                 try await runRefreshSessionBlocking(request.event, optimisticallyPreLayoutWorkspaces: request.optimisticallyPreLayoutWorkspaces)
             }
+            recordDuration(failed: false)
             runtime.events.record(.refreshCompleted, source: .refresh, generation: generation)
         } catch is CancellationError {
             runtime.events.record(.cancelled, source: .refresh, generation: generation)
             return
         } catch {
+            recordDuration(failed: true)
             // Record a fixed code, never localized error text, in the opt-in trace.
             runtime.events.record(.refreshFailed, source: .refresh, generation: generation,
                                   reason: "scheduled-refresh")
