@@ -42,6 +42,12 @@ final class WindowDetectionOperations {
             if Self.current != nil { return }
             return try await current.task.value
         }
+        // The WindowServer can reuse an ID before the previous detection finishes.
+        // Supersede the old job before installing the new owner; its continuation
+        // must not apply restoration or popup updates to the replacement.
+        if let previous = operations[window.windowId], previous.window !== window {
+            previous.task.cancel()
+        }
         let id = UUID()
         let commit = DetectionCommit(window, isCurrent: isCurrent)
         let task = Task { @MainActor in
