@@ -28,18 +28,28 @@ make xcodeproj VERSION="$fork_version" BUILD_NUMBER="$fork_build_number" CODESIG
 mkdir -p .release
 fork_stage="$(mktemp -d "$PWD/.release/fork-build.XXXXXX")"
 trap 'echo "Build intermediates retained at: $fork_stage"' EXIT
+# Linked into both binaries and read by Sources/Common/buildInfo.swift.
+fork_build_info="$fork_stage/build-info.txt"
+fork_git_hash="$(git rev-parse HEAD)"
+printf '%s\n%s\n%s\n' "$fork_version" "$fork_git_hash" "$(git rev-parse --short HEAD)" > "$fork_build_info"
 xcodebuild -project WinMux.xcodeproj -scheme WinMux -configuration Release \
   -derivedDataPath "$PWD/.release/fork-derived" CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= SWIFT_EXEC="$fork_swift_compiler" build > "$fork_stage/xcodebuild.log" 2>&1 || {
+  CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= SWIFT_EXEC="$fork_swift_compiler" \
+  WINMUX_BUILD_INFO_LDFLAGS="-sectcreate __TEXT __winmux_build $fork_build_info" build > "$fork_stage/xcodebuild.log" 2>&1 || {
     tail -80 "$fork_stage/xcodebuild.log" >&2; exit 1;
   }
 fork_app="$PWD/.release/fork-derived/Build/Products/Release/WinMuxX.app"
 test -d "$fork_app"
-swift build -c release --product winmuxx
-fork_bin="$(swift build -c release --show-bin-path | tail -n 1)"
+fork_build_info_flags=(-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __winmux_build -Xlinker "$fork_build_info")
+swift build -c release --product winmuxx "${fork_build_info_flags[@]}"
+fork_bin="$(swift build -c release --show-bin-path "${fork_build_info_flags[@]}" | tail -n 1)"
 test -d "$fork_bin"
 # macOS normally uses case-insensitive volumes: winmuxx would overwrite WinMuxX.
-ditto "$fork_bin/winmuxx" "$fork_app/Contents/MacOS/winmuxx-cli"
+fork_cli="$fork_app/Contents/MacOS/winmuxx-cli"
+ditto "$fork_bin/winmuxx" "$fork_cli"
+for fork_binary in "$fork_app/Contents/MacOS/WinMuxX" "$fork_cli"; do
+  grep -q --fixed-strings "$fork_git_hash" "$fork_binary" || { echo "$fork_binary lacks build info for $fork_git_hash" >&2; exit 1; }
+done
 mkdir -p "$fork_app/Contents/Helpers"
 ln -sfn ../MacOS/winmuxx-cli "$fork_app/Contents/Helpers/winmuxx"
 codesign --force --deep --sign "$fork_signing_identity" "$fork_app"

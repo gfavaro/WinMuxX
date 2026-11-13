@@ -44,6 +44,8 @@ targets:
         CODE_SIGN_STYLE: Automatic
         CODE_SIGN_IDENTITY: ${XCODEGEN_WINMUX_CODE_SIGN_IDENTITY}
         DEVELOPMENT_TEAM: ${XCODEGEN_WINMUX_DEVELOPMENT_TEAM}
+        # script/fork-build.sh sets it to link the version and commit into the app (buildInfo.swift).
+        OTHER_LDFLAGS: $(inherited) $(WINMUX_BUILD_INFO_LDFLAGS)
       configs:
         Debug:
           PRODUCT_NAME: WinMuxX-Debug
