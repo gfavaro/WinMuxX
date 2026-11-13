@@ -9,6 +9,12 @@ func canCommitWindowRegistration(windowStillExists: Bool, appTerminated: Bool) -
     windowStillExists && !appTerminated
 }
 
+/// WindowServer IDs are not permanent identities. A delayed cleanup may only
+/// mutate the registry entry that still points at the same window object.
+func isCurrentWindowRegistration(_ registered: AnyObject?, candidate: AnyObject) -> Bool {
+    registered === candidate
+}
+
 final class MacWindow: Window {
     let macApp: any WindowApplication
     @MainActor override var minimumLayoutSize: CGSize { learnedMinimum.size }
@@ -165,6 +171,9 @@ final class MacWindow: Window {
     //                        If you are unsure, it's better to pass `false`
     @MainActor
     func garbageCollect(skipClosedWindowsCache: Bool) {
+        // The same WindowServer ID may already belong to a newly registered window.
+        // Do not cancel its jobs, erase its recovery state, or remove its border.
+        guard isCurrentWindowRegistration(MacWindow.allWindowsMap[windowId], candidate: self) else { return }
         WindowDetectionOperations.shared.cancel(self)
         forgetPendingRestartWindow(windowId)
         if MacWindow.allWindowsMap[windowId] != nil {
