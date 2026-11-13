@@ -1,3 +1,39 @@
+## Diagnostic trace interpretation (2026-11-13)
+
+WinMuxX already provides opt-in, finite runtime tracing through the CLI:
+
+```sh
+winmuxx debug-windows --events-start
+# Reproduce the window/display problem, then:
+winmuxx debug-windows --events-export
+winmuxx debug-windows --events-stop
+```
+
+The export path is printed by `--events-export`; exported JSON is private (mode 0600).
+This diagnostic path neither enables background polling nor changes refresh scheduling.
+The event ring is bounded by event count and serialized bytes; AX operation samples are
+also bounded and collected only when explicitly enabled.
+
+The JSON retains `schema: 2` and adds an optional `eventCounts` object with cumulative
+counts by fixed event kind. Counts include events evicted by the ring and events too large
+to retain. `dropped` remains the number of events not retained. Interpret `events` as
+the recent timeline, not the complete history; compare it against `eventCounts` to
+detect bursts without losing count when records overflow.
+
+Relevant new event kinds:
+
+- `refreshFailed`: the scheduled refresh or unattended light session failed.
+  `reason` is one of the fixed codes `scheduled-refresh` or `light-session`;
+  the error text is **not** copied into the trace. Check the ordinary session log
+  for details when needed.
+- `axRefreshDeadline`: a per-app AX enumeration exceeded the cooperative 1.5-second
+  deadline and used the existing live-process fallback. This event contains no PID,
+  window ID, title, executable path or native error text. It is not proof that the
+  app crashed, or that one native AX call finished within the deadline.
+
+Recording is disabled by default; stopping clears the in-memory trace and metrics.
+Physical testing is still required for slow/unresponsive apps and monitor hotplugging.
+
 # Runtime efficiency
 
 The runtime manages native application windows through Accessibility and private
