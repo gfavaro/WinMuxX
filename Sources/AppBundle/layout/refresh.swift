@@ -585,6 +585,13 @@ private func refresh() async throws {
     Workspace.reconcileWorkspaceState()
 }
 
+/// AX callbacks can outlive the registration that created them, including after PID reuse.
+/// Only a callback from the currently registered app may mutate a managed window.
+func isSameAXNotificationOwner(emittingApp: AnyObject?, managedApp: AnyObject?) -> Bool {
+    guard let emittingApp, let managedApp else { return false }
+    return emittingApp === managedApp
+}
+
 func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: UnsafeMutableRawPointer?) {
     let notif = notif as String
     let destroyedWindowId = notif == kAXUIElementDestroyedNotification as String
@@ -607,16 +614,23 @@ func refreshObs(_: AXObserver, _ ax: AXUIElement, notif: CFString, _ context: Un
         isMinimizeStateNotif && invalidateNativeStateWindowId == nil ? axTaskLocalAppThreadToken?.pid : nil
     Task { @MainActor in
         if destroyedWindowId != nil { windowLifecycleChanges.notify() }
-        if let destroyedWindowId {
-            WindowBorderController.shared.remove(windowId: destroyedWindowId)
-            (Window.get(byId: destroyedWindowId) as? MacWindow)?.garbageCollect(skipClosedWindowsCache: false)
-            if let emittingAppPid, let app = MacApp.allAppsMap[emittingAppPid] {
+        if let destroyedWindowId, let emittingAppPid,
+           let app = MacApp.allAppsMap[emittingAppPid] {
+            let managed = Window.get(byId: destroyedWindowId) as? MacWindow
+            // A delayed notification from an old app must not remove a window
+            // whose WindowServer ID has been reused by another app or process.
+            if managed == nil || isSameAXNotificationOwner(emittingApp: app, managedApp: managed?.macApp as? MacApp) {
+                if managed != nil { WindowBorderController.shared.remove(windowId: destroyedWindowId) }
+                managed?.garbageCollect(skipClosedWindowsCache: false)
                 try? await app.unregisterDestroyedWindow(destroyedWindowId)
             }
         }
-        if let invalidateNativeStateWindowId {
-            Window.get(byId: invalidateNativeStateWindowId)?.invalidateLastKnownNativeState()
-        } else if let invalidateNativeStateAppPid {
+        if let invalidateNativeStateWindowId,
+           let managed = Window.get(byId: invalidateNativeStateWindowId) as? MacWindow,
+           let emittingAppPid, let app = MacApp.allAppsMap[emittingAppPid],
+           isSameAXNotificationOwner(emittingApp: app, managedApp: managed.macApp as? MacApp) {
+            managed.invalidateLastKnownNativeState()
+        } else if invalidateNativeStateWindowId == nil, let invalidateNativeStateAppPid {
             for window in MacWindow.allWindows where window.macApp.pid == invalidateNativeStateAppPid {
                 window.invalidateLastKnownNativeState()
             }
