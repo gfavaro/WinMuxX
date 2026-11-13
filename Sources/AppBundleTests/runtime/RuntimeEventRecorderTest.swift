@@ -154,6 +154,39 @@ final class RuntimeEventRecorderTest: WorkspaceTestCase {
         XCTAssertEqual(recorder.eventCounts["refreshFailed"], 1)
     }
 
+    func testLatencyPercentilesAndChronologicalRingWrap() {
+        let metrics = RuntimeWorkMetrics(sampleLimit: 4)
+        let generation = metrics.start()
+        for milliseconds in [10.0, 20, 30, 40, 50, 60] {
+            metrics.record(.axRead, failed: false, duration: milliseconds / 1000, generation: generation)
+        }
+        let snapshot = metrics.snapshot()
+        XCTAssertEqual(snapshot.operations["axRead"], 6)
+        XCTAssertEqual(snapshot.droppedSamples, 2)
+        let retained = snapshot.durationsMilliseconds["axRead"] ?? []
+        XCTAssertEqual(retained.count, 4)
+        for (observed, expected) in zip(retained, [30.0, 40, 50, 60]) {
+            XCTAssertEqual(observed, expected, accuracy: 0.0001)
+        }
+        XCTAssertEqual(snapshot.latencyPercentilesMilliseconds["axRead"]?["p50"] ?? -1, 40, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.latencyPercentilesMilliseconds["axRead"]?["p95"] ?? -1, 60, accuracy: 0.0001)
+        XCTAssertEqual(snapshot.latencyPercentilesMilliseconds["axRead"]?["p99"] ?? -1, 60, accuracy: 0.0001)
+        metrics.stop()
+        XCTAssertTrue(metrics.snapshot().latencyPercentilesMilliseconds.isEmpty)
+    }
+
+    func testLatencyPercentilesHandleEmptyAndNonFiniteSamples() {
+        XCTAssertNil(RuntimeWorkMetrics.percentile(50, samples: []))
+        XCTAssertNil(RuntimeWorkMetrics.percentile(101, samples: [1]))
+        let metrics = RuntimeWorkMetrics(sampleLimit: 2)
+        let generation = metrics.start()
+        metrics.record(.axWrite, failed: false, duration: .nan, generation: generation)
+        metrics.record(.axWrite, failed: false, duration: .infinity, generation: generation)
+        XCTAssertNil(metrics.snapshot().latencyPercentilesMilliseconds["axWrite"])
+        metrics.record(.axWrite, failed: true, duration: 0.02, generation: generation)
+        XCTAssertEqual(metrics.snapshot().latencyPercentilesMilliseconds["axWrite"]?["p99"] ?? -1, 20, accuracy: 0.0001)
+    }
+
     func testWorkMetricsAreOptInBoundedAndDiscardOldCollectionCompletions() {
         let metrics = RuntimeWorkMetrics(sampleLimit: 2)
         metrics.record(.axRead, failed: false, duration: 0.01, generation: 0)
