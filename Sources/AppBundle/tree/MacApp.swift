@@ -500,6 +500,12 @@ final class MacApp: AbstractApp {
         }
     }
 
+    /// On an AX deadline, keep only windows belonging to the same live process.
+    /// A PID reused by a newly launched app must not preserve the old app's nodes.
+    static func shouldPreserveWindowOnAXTimeout(sameProcess: Bool, appRetired: Bool, appTerminated: Bool) -> Bool {
+        sameProcess && !appRetired && !appTerminated
+    }
+
     /// Cooperative cancellation deadline for one app's window refresh. A CPU-starved
     /// app answers each AX message only at the messaging timeout, so its enumeration can take
     /// (windows × timeout); every other app's layout would wait behind it. Cancellation skips
@@ -531,7 +537,13 @@ final class MacApp: AbstractApp {
                 // Propagate if the whole refresh session was cancelled; otherwise the deadline
                 // fired — report the model's current windows for this app as alive.
                 try checkCancellation()
-                return MacWindow.allWindows.filter { $0.macApp.pid == pid }.map(\.windowId)
+                return MacWindow.allWindows.filter { window in
+                    guard let owner = window.macApp as? MacApp else { return false }
+                    return shouldPreserveWindowOnAXTimeout(
+                        sameProcess: isSameRunningProcess(owner.nsApp, nsApp),
+                        appRetired: owner.isRetired,
+                        appTerminated: owner.nsApp.isTerminated)
+                }.map(\.windowId)
             }
         } onCancel: {
             work.cancel()
