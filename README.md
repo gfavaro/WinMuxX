@@ -120,5 +120,4 @@ The [documentation index](docs/README.md) lists everything else.
 
 WinMuxX is based on [ZimengXiong/WinMux](https://github.com/ZimengXiong/WinMux).
 Configuration and command support also build on
-[AeroSpace](https://github.com/nikitabobko/AeroSpace) and
-[Dinky](https://github.com/mikker/Dinky).
+[AeroSpace](https://github.com/nikitabobko/AeroSpace).
