@@ -253,7 +253,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     let customSurface = NSView()
     let clearSurface = NSView()
     let opaqueSurface = NSView()
-    let glassSurface: NSView?
+    let glassSurface: NSView
     let glassContent = NSView()
     private var hostedContent: NSView?
     private var configuration = WorkspaceSidebarConfiguration.empty
@@ -270,17 +270,13 @@ final class WorkspaceSidebarMaterialContainer: NSView {
 
     init(frame frameRect: NSRect, reduceTransparency: @escaping () -> Bool) {
         self.reduceTransparency = reduceTransparency
-        if #available(macOS 26, *) {
-            let glass = NSGlassEffectView()
-            glass.style = .regular
-            glass.cornerRadius = 0
-            glass.tintColor = nil
-            glass.contentView = glassContent
-            glass.wantsLayer = true
-            glassSurface = glass
-        } else {
-            glassSurface = nil
-        }
+        let glass = NSGlassEffectView()
+        glass.style = .regular
+        glass.cornerRadius = 0
+        glass.tintColor = nil
+        glass.contentView = glassContent
+        glass.wantsLayer = true
+        glassSurface = glass
         super.init(frame: frameRect)
         effect.blendingMode = .behindWindow
         effect.state = .active
@@ -294,7 +290,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         addSubview(customSurface)
         addSubview(clearSurface)
         addSubview(opaqueSurface)
-        if let glassSurface { addSubview(glassSurface) }
+        addSubview(glassSurface)
         configure(configuration: configuration, visibleWidth: 0)
     }
 
@@ -324,7 +320,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         } else {
             switch background {
             case .clear: surface = clearSurface
-            case .glass, .frosted: surface = glassSurface ?? effect
+            case .glass, .frosted: surface = glassSurface
             case .opaque: surface = opaqueSurface
             }
         }
@@ -336,7 +332,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         customSurface.isHidden = surface !== customSurface || visibleWidth <= 0
         clearSurface.isHidden = surface !== clearSurface || visibleWidth <= 0
         opaqueSurface.isHidden = surface !== opaqueSurface || visibleWidth <= 0
-        glassSurface?.isHidden = surface !== glassSurface || visibleWidth <= 0
+        glassSurface.isHidden = surface !== glassSurface || visibleWidth <= 0
         if system, expanded {
             let systemScheme: ColorScheme = contentColorScheme ??
                 (NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? .dark : .light)
@@ -361,7 +357,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
             expanded: expanded
         ) {
         case .clear: return clearSurface
-        case .glass, .frosted: return glassSurface ?? effect
+        case .glass, .frosted: return glassSurface
         case .opaque: return opaqueSurface
         }
     }

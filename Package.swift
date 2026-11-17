@@ -5,9 +5,8 @@ import PackageDescription
 
 let package = Package(
     name: "WinMuxPackage",
-    // Runtime support for parameterized protocol types is only available in macOS 13.0.0 or newer
-    // And it specifies deploymentTarget for CLI
-    platforms: [.macOS(.v13)],
+    // WinMuxX supports macOS 26 (Tahoe) and newer; this is also the CLI's deployment target.
+    platforms: [.macOS(.v26)],
     // Products define the executables and libraries a package produces, making them visible to other packages.
     products: [
         .executable(name: "winmuxx", targets: ["Cli"]),

@@ -31,13 +31,13 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         container.configure(configuration: configuration, visibleWidth: 44)
         XCTAssertTrue(container.activeSurface === container.clearSurface)
         container.configure(configuration: configuration, visibleWidth: 280)
-        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
+        XCTAssertTrue(container.activeSurface === container.glassSurface)
 
         configuration.menuBarBackground = true
         container.configure(configuration: configuration, visibleWidth: 44)
-        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
+        XCTAssertTrue(container.activeSurface === container.glassSurface)
         container.configure(configuration: configuration, visibleWidth: 280)
-        XCTAssertTrue(container.activeSurface === (container.glassSurface ?? container.effect))
+        XCTAssertTrue(container.activeSurface === container.glassSurface)
     }
 
     func testEachSidebarCanApplyItsOwnWallpaperContrast() {
@@ -212,16 +212,6 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertEqual(after.expandedWidth, before.expandedWidth)
     }
 
-    func testNativeMaterialAndInactivePanelBehavior() {
-        let view = NSVisualEffectView()
-        WorkspaceSidebarVisualEffect().configure(view)
-        XCTAssertEqual(view.material, .sidebar)
-        XCTAssertEqual(view.blendingMode, .behindWindow)
-        XCTAssertEqual(view.state, .active)
-        XCTAssertFalse(view.isEmphasized)
-        XCTAssertNil(view.appearance)
-    }
-
     func testMaterialOnlyCoversVisibleRailOnBothSidesAndPreservesContentCoordinates() {
         let container = WorkspaceSidebarMaterialContainer(frame: .init(x: 0, y: 0, width: 560, height: 200), reduceTransparency: { false })
         let content = NSView()
@@ -298,28 +288,6 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertEqual(after.background, .transparent)
         XCTAssertEqual(after.chromeStyle, before.chromeStyle)
         XCTAssertEqual(after.appearance, before.appearance)
-    }
-
-    func testMenuBarApproximationUsesNativeSidebarMaterial() {
-        let view = NSVisualEffectView()
-        WorkspaceSidebarVisualEffect(background: .menuBar).configure(view)
-        XCTAssertEqual(view.material, .sidebar)
-        XCTAssertEqual(view.blendingMode, .behindWindow)
-        XCTAssertEqual(view.state, .active)
-        WorkspaceSidebarVisualEffect(background: .sidebar).configure(view)
-        XCTAssertEqual(view.material, .sidebar)
-    }
-
-    func testExpandedTransparentSurfaceRetainsBlurAndReducedOpacity() {
-        let view = NSVisualEffectView()
-        WorkspaceSidebarVisualEffect(frosted: true).configure(view)
-        XCTAssertEqual(view.material, .hudWindow)
-        XCTAssertEqual(view.blendingMode, .behindWindow)
-        XCTAssertEqual(view.state, .active)
-        XCTAssertEqual(view.alphaValue, 0.93, accuracy: 0.001)
-        WorkspaceSidebarVisualEffect().configure(view)
-        XCTAssertEqual(view.alphaValue, 1)
-        XCTAssertEqual(view.material, .sidebar)
     }
 
     func testBackgroundEditPreservesCustomAppearanceAndBindings() {

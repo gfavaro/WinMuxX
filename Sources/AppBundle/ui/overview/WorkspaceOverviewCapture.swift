@@ -29,12 +29,10 @@ extension WorkspaceSwipeSnapshotRenderer {
     func prepareOverview(_ session: UUID) async -> [UInt32: Int] {
         let ranks = windowRanks()
         guard !Task.isCancelled, CGPreflightScreenCaptureAccess() else { return ranks }
-        if #available(macOS 14, *) {
-            let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
-            guard !Task.isCancelled else { return ranks }
-            overviewCaptureSession = session
-            overviewCaptureWindows = Dictionary((content?.windows ?? []).map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
-        }
+        let content = try? await SCShareableContent.excludingDesktopWindows(true, onScreenWindowsOnly: false)
+        guard !Task.isCancelled else { return ranks }
+        overviewCaptureSession = session
+        overviewCaptureWindows = Dictionary((content?.windows ?? []).map { ($0.windowID, $0) }, uniquingKeysWith: { first, _ in first })
         return ranks
     }
 
@@ -45,14 +43,13 @@ extension WorkspaceSwipeSnapshotRenderer {
     }
 
     func renderOverview(_ request: WorkspaceSwipeSnapshotRequest) async throws -> CGImage {
-        if #available(macOS 14, *), request.allowCapture {
-            return try await captureGate.run { try await self.renderModernOverview(request) }
+        if request.allowCapture {
+            return try await captureGate.run { try await self.renderCapturedOverview(request) }
         }
         return try await render(request).image
     }
 
-    @available(macOS 14, *)
-    private func renderModernOverview(_ request: WorkspaceSwipeSnapshotRequest) async throws -> CGImage {
+    private func renderCapturedOverview(_ request: WorkspaceSwipeSnapshotRequest) async throws -> CGImage {
         try Task.checkCancellation()
         let width = request.key.width, height = request.key.height
         guard width.isFinite, height.isFinite, width > 0, height > 0 else { throw CocoaError(.coderInvalidValue) }
@@ -72,20 +69,10 @@ extension WorkspaceSwipeSnapshotRenderer {
             context.setFillColor(CGColor(gray: 0.23, alpha: 1))
             context.fill(item.frame)
             guard let window = windows[item.id] else { continue }
-            let configuration = SCStreamConfiguration()
             let windowScale = min(scale, request.maximumPixelSize.width / max(1, item.frame.width),
                                   request.maximumPixelSize.height / max(1, item.frame.height))
-            configuration.width = max(1, Int(item.frame.width * windowScale))
-            configuration.height = max(1, Int(item.frame.height * windowScale))
-            configuration.showsCursor = false
-            configuration.scalesToFit = true
-            configuration.ignoreShadowsSingleWindow = true
-            configuration.captureResolution = .nominal
-            if #available(macOS 14.2, *) { configuration.includeChildWindows = false }
-            let filter = SCContentFilter(desktopIndependentWindow: window)
-            // No fallback to CGWindowListCreateImage on modern systems: its compatibility
-            // proxy leaked CGRect dictionaries in the measured macOS 27.2 workload.
-            let image = try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
+            let image = try? await WindowImageCapture.image(of: window, size: CGSize(width: item.frame.width * windowScale,
+                                                                                    height: item.frame.height * windowScale))
             try Task.checkCancellation()
             if let image { context.draw(image, in: item.frame) }
         }

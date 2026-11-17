@@ -185,16 +185,14 @@ actor WorkspaceSwipeSnapshotRenderer {
     }
 
     func render(_ request: WorkspaceSwipeSnapshotRequest) async throws -> WorkspaceSwipeSnapshotResult {
-        try await captureGate.run { try await self.renderLegacy(request) }
+        try await captureGate.run { try await self.renderSnapshot(request) }
     }
 
-    private func renderLegacy(_ request: WorkspaceSwipeSnapshotRequest) throws -> WorkspaceSwipeSnapshotResult {
+    private func renderSnapshot(_ request: WorkspaceSwipeSnapshotRequest) async throws -> WorkspaceSwipeSnapshotResult {
         try Task.checkCancellation()
         let start = CACurrentMediaTime()
         if let rect = request.screenRect {
-            guard let image = CGWindowListCreateImage(rect, .optionOnScreenOnly, kCGNullWindowID, [.nominalResolution]) else {
-                throw CocoaError(.fileReadUnknown)
-            }
+            guard let image = try await WindowImageCapture.image(of: rect) else { throw CocoaError(.fileReadUnknown) }
             try Task.checkCancellation()
             return WorkspaceSwipeSnapshotResult(image: image, renderMs: (CACurrentMediaTime() - start) * 1000)
         }
@@ -225,19 +223,18 @@ actor WorkspaceSwipeSnapshotRenderer {
             }
             windows.sort { (rank[$0.id] ?? 0) > (rank[$1.id] ?? 0) }
         }
+        let capturable = request.allowCapture ? (try? await WindowImageCapture.windows()) ?? [:] : [:]
         for window in windows {
             try Task.checkCancellation()
-            autoreleasepool {
-                // A missing capture still has truthful geometry; no extra AX read or retry.
-                guard request.allowCapture else {
-                    drawWindowPlaceholder(window.frame, icon: window.icon, in: context)
-                    return
-                }
-                context.setFillColor(CGColor(gray: 0.23, alpha: 1))
-                context.fill(window.frame)
-                if let image = CGWindowListCreateImage(.null, .optionIncludingWindow, window.id, [.boundsIgnoreFraming, .nominalResolution]) {
-                    context.draw(image, in: window.frame)
-                }
+            // A missing capture still has truthful geometry; no extra AX read or retry.
+            guard request.allowCapture else {
+                drawWindowPlaceholder(window.frame, icon: window.icon, in: context)
+                continue
+            }
+            context.setFillColor(CGColor(gray: 0.23, alpha: 1))
+            context.fill(window.frame)
+            if let source = capturable[window.id], let image = try? await WindowImageCapture.image(of: source) {
+                context.draw(image, in: window.frame)
             }
         }
         try Task.checkCancellation()

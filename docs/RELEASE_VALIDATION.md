@@ -149,10 +149,9 @@ Allocation stacks in build 84 led from the overview's renderer through
 64 allocations / 5,632 bytes after five cycles. Panel/hosting/render-only probes
 did not reproduce these allocations.
 
-On macOS 14+, the overview now uses ScreenCaptureKit single-frame screenshots.
-Failed captures retain placeholders without falling back to the legacy API.
-Other existing capture consumers and the macOS 13 fallback still use the older
-API. Zero detected leaks in the measured builds 85/86 workloads does not certify every
+The overview and every other capture use ScreenCaptureKit single-frame
+screenshots; the legacy API went with the macOS 26 minimum. Failed captures
+retain placeholders. Zero detected leaks in the measured builds 85/86 workloads does not certify every
 application path. The older build 83 six-allocation / 432-byte report was not
 individually attributed.
 
@@ -171,7 +170,7 @@ observation. The early footprint rise and later activity were not a controlled
 idle workload.
 
 Before broader release, validate physical gestures, multi-display ownership and
-hotplug, sleep/wake, rapid native Mission Control interruption, macOS 13 capture,
+hotplug, sleep/wake, rapid native Mission Control interruption,
 and matched app/WindowServer energy traces. Passing synthetic tests does not
 replace those desktop checks. Native overview implementation and resource policy
 are documented in [Workspace overview](WORKSPACE_OVERVIEW.md).

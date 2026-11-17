@@ -192,16 +192,9 @@ enum WorkspaceSidebarSystemBackground {
 
 /// The expanded sidebar and the Background toggle share one translucent backing.
 struct WorkspaceSidebarGlassSurface: View {
-    var body: some View {
-        if #available(macOS 26, *) {
-            WorkspaceSidebarNativeGlass()
-        } else {
-            WorkspaceSidebarVisualEffect(background: .menuBar)
-        }
-    }
+    var body: some View { WorkspaceSidebarNativeGlass() }
 }
 
-@available(macOS 26, *)
 private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -221,33 +214,6 @@ private struct WorkspaceSidebarNativeGlass: NSViewRepresentable {
         view.cornerRadius = 0
         view.tintColor = nil
         view.appearance = NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua)
-    }
-}
-
-struct WorkspaceSidebarVisualEffect: NSViewRepresentable {
-    var background: WorkspaceSidebarBackground = .sidebar
-    var frosted = false
-    @Environment(\.colorScheme) var colorScheme
-    func makeNSView(context: Context) -> NSVisualEffectView {
-        let view = NSVisualEffectView()
-        configure(view)
-        return view
-    }
-
-    func updateNSView(_ view: NSVisualEffectView, context: Context) {
-        configure(view)
-    }
-
-    func configure(_ view: NSVisualEffectView) {
-        view.material = frosted ? .hudWindow : .sidebar
-        // Keep the expanded transparent sidebar visibly translucent rather than the
-        // near-opaque header material, while retaining the native behind-window blur.
-        view.alphaValue = frosted ? 0.93 : 1
-        view.blendingMode = .behindWindow
-        // The sidebar stays visible when another application's window has focus.
-        view.state = .active
-        view.isEmphasized = false
-        view.appearance = frosted ? NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua) : nil
     }
 }
 

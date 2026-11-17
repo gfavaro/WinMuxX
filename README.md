@@ -141,9 +141,8 @@ width, including `1.0`, takes priority over the old setting. See
 ### Native sidebar appearance
 
 Settings → Appearance controls the shared visual style; Settings → Sidebar controls
-placement, sizing and content. Choose Liquid Glass for native glass
-on macOS 26 and later, or Solid color for an opaque preset/custom color. Earlier
-macOS versions use a native material fallback. Reduce Transparency forces an
+placement, sizing and content. Choose Liquid Glass for native glass,
+or Solid color for an opaque preset/custom color. Reduce Transparency forces an
 opaque system background in Liquid Glass. Expanded Liquid Glass always uses a
 frosted background; Show background controls the compact rail.
 

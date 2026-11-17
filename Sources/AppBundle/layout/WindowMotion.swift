@@ -267,34 +267,22 @@ func windowMotionNativeTarget(_ frame: CGRect) -> CGRect {
 /// A single refresh clock for all moving windows; invalidated immediately at rest.
 @MainActor
 private final class WindowMotionClock: NSObject {
-    private var source: AnyObject?
-    private var fallback: Timer?
+    private var link: CADisplayLink?
     private let frame: (Double, Double) -> Void
 
     init(screen: NSScreen, frame: @escaping (Double, Double) -> Void) {
         self.frame = frame
         super.init()
-        if #available(macOS 14, *) {
-            let link = screen.displayLink(target: self, selector: #selector(displayFrame))
-            source = link
-            link.add(to: .main, forMode: .common)
-        } else {
-            let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
-                MainActor.assumeIsolated { self?.frame(CACurrentMediaTime(), 1.0 / 60) }
-            }
-            fallback = timer
-            RunLoop.main.add(timer, forMode: .common)
-        }
+        let link = screen.displayLink(target: self, selector: #selector(displayFrame))
+        link.add(to: .main, forMode: .common)
+        self.link = link
     }
 
-    @available(macOS 14, *)
     @objc private func displayFrame(_ link: CADisplayLink) { frame(link.timestamp, link.duration) }
 
     func invalidate() {
-        if #available(macOS 14, *) { (source as? CADisplayLink)?.invalidate() }
-        source = nil
-        fallback?.invalidate()
-        fallback = nil
+        link?.invalidate()
+        link = nil
     }
 }
 

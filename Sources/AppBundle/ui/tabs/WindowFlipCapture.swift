@@ -1,4 +1,5 @@
 import AppKit
+import ScreenCaptureKit
 
 struct WindowFlipImages: Sendable {
     let front: CGImage
@@ -63,33 +64,34 @@ final class WindowFlipPreparation {
 /// Runs in the shared capture queue, so a flip never captures alongside a swipe or the overview.
 func captureWindowFlipImages(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) async throws -> WindowFlipImages {
     try await WorkspaceSwipeSnapshotRenderer.shared.captureGate.run {
-        try windowFlipImages(front: front, back: back, rect: rect, padding: padding)
+        try await windowFlipImages(front: front, back: back, rect: rect, padding: padding)
     }
 }
 
-private func windowFlipImages(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) throws -> WindowFlipImages {
+private func windowFlipImages(front: UInt32, back: UInt32, rect: CGRect, padding: CGFloat) async throws -> WindowFlipImages {
+    let windows = try await WindowImageCapture.windows()
     try Task.checkCancellation()
-    let first = try image(rect: .null, options: .optionIncludingWindow, id: front, trim: true)
+    let first = try await windowImage(windows[front])
     try Task.checkCancellation()
-    let second = try image(rect: .null, options: .optionIncludingWindow, id: back, trim: true)
+    let second = try await windowImage(windows[back])
     try Task.checkCancellation()
-    let background = try image(rect: rect.insetBy(dx: -padding, dy: -padding),
-        options: .optionOnScreenBelowWindow, id: front, trim: false)
+    // What lies behind the two windows: the screen without them or WinMuxX's own panels.
+    guard let background = try await WindowImageCapture.image(of: rect.insetBy(dx: -padding, dy: -padding),
+                                                              excluding: [front, back], excludingOwnPanels: true)
+    else { throw CocoaError(.fileReadUnknown) }
     try Task.checkCancellation()
-    return WindowFlipImages(front: first, back: second, background: background)
+    return WindowFlipImages(front: first, back: second, background: try boundedWindowFlipImage(background))
 }
 
-private func image(rect: CGRect, options: CGWindowListOption, id: UInt32, trim: Bool) throws -> CGImage {
-    try autoreleasepool {
-        guard var image = CGWindowListCreateImage(rect, options, id, [.boundsIgnoreFraming, .nominalResolution]) else {
-            throw CocoaError(.fileReadUnknown)
-        }
-        if trim, image.width > 2, image.height > 2,
-           let cropped = image.cropping(to: CGRect(x: 1, y: 1, width: image.width - 2, height: image.height - 2)) {
-            image = cropped
-        }
-        return try boundedWindowFlipImage(image)
+private func windowImage(_ window: SCWindow?) async throws -> CGImage {
+    guard let window else { throw CocoaError(.fileReadUnknown) }
+    var image = try await WindowImageCapture.image(of: window)
+    // One pixel off each edge, as the flip has always taken it.
+    if image.width > 2, image.height > 2,
+       let cropped = image.cropping(to: CGRect(x: 1, y: 1, width: image.width - 2, height: image.height - 2)) {
+        image = cropped
     }
+    return try boundedWindowFlipImage(image)
 }
 
 /// Three retained images total at most roughly 24 MiB of RGBA pixels.

@@ -1,30 +1,31 @@
 import AppKit
+import ScreenCaptureKit
 import SwiftUI
 @testable import AppBundle
 
 /// Exports a deterministic marketing composition that embeds WinMux's production SwiftUI views.
 /// The renderer does not capture the screen or read pixels from application windows.
 @MainActor
-func renderWinMuxMarketingImage(to outputURL: URL) throws {
-    try renderMarketingView(WinMuxMarketingCanvas(), to: outputURL)
+func renderWinMuxMarketingImage(to outputURL: URL) async throws {
+    try await renderMarketingView(WinMuxMarketingCanvas(), to: outputURL)
 }
 
 /// Exports a focused proof containing one real Safari surface and two WinMux tabs.
 @MainActor
-func renderWinMuxSafariProofImage(to outputURL: URL) throws {
-    try renderMarketingView(WinMuxSafariProofCanvas(), to: outputURL)
+func renderWinMuxSafariProofImage(to outputURL: URL) async throws {
+    try await renderMarketingView(WinMuxSafariProofCanvas(), to: outputURL)
 }
 
 /// Exports a collage of native Helium, Ghostty, and Finder window surfaces.
 @MainActor
-func renderWinMuxAppsProofImage(to outputURL: URL) throws {
-    try renderMarketingView(WinMuxAppsProofCanvas(), to: outputURL)
+func renderWinMuxAppsProofImage(to outputURL: URL) async throws {
+    try await renderMarketingView(WinMuxAppsProofCanvas(), to: outputURL)
 }
 
 /// Exports a tiled Safari and Plasticity workspace using their measured split ratio.
 @MainActor
-func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
-    try renderMarketingView(
+func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) async throws {
+    try await renderMarketingView(
         WinMuxSafariPlasticityProofCanvas(),
         to: outputURL,
         size: CGSize(width: 1_600, height: 928),
@@ -33,7 +34,7 @@ func renderWinMuxSafariPlasticityProofImage(to outputURL: URL) throws {
 }
 
 @MainActor
-func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
+func renderWinMuxSidebarAppearanceProofs(to directory: URL) async throws {
     let application = NSApplication.shared
     application.setActivationPolicy(.accessory)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -107,7 +108,7 @@ func renderWinMuxSidebarAppearanceProofs(to directory: URL) throws {
         }
         backdrop.orderFrontRegardless()
         defer { backdrop.orderOut(nil) }
-        try renderMarketingView(
+        try await renderMarketingView(
             WorkspaceSidebarView(snapshot: snapshot)
                 .environment(\.workspaceSidebarWallpaperSample, wallpaperSample)
                 .environment(\.colorScheme, resolvedScheme)
@@ -140,7 +141,7 @@ private func renderMarketingView<Content: View>(
     increasedContrast: Bool = false,
     isOpaque: Bool = true,
     backdrop: NSWindow? = nil
-) throws {
+) async throws {
     let renderSize = CGSize(width: size.width * renderScale, height: size.height * renderScale)
     let content = rootView
         .frame(width: size.width, height: size.height)
@@ -195,15 +196,15 @@ private func renderMarketingView<Content: View>(
     window.orderFrontRegardless()
     hostingView.layoutSubtreeIfNeeded()
     hostingView.displayIfNeeded()
-    RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+    CATransaction.flush()
+    try await Task.sleep(for: .milliseconds(800))
 
     // The backdrop is part of the picture: without it, translucent materials export
     // as nearly transparent pixels. Both windows are the renderer's own.
-    let windowNumbers = [window, backdrop].compactMap { $0.map { CGWindowID($0.windowNumber) } }
-    var windowPointers = windowNumbers.map { UnsafeRawPointer(bitPattern: UInt($0)) }
-    guard let windowArray = CFArrayCreate(nil, &windowPointers, windowPointers.count, nil),
-          let image = CGImage(windowListFromArrayScreenBounds: .null, windowArray: windowArray,
-                              imageOption: [.boundsIgnoreFraming, .bestResolution]) else {
+    let image: CGImage
+    do {
+        image = try await captureOwnWindows([window] + (backdrop.map { [$0] } ?? []))
+    } catch {
         window.orderOut(nil)
         throw WinMuxMarketingRenderError.renderFailed
     }
@@ -1047,4 +1048,27 @@ private enum MarketingFixtures {
             occludingFloatingWindowFrames: []
         )
     }
+}
+
+/// The renderer's own windows, composited as they show, at the display's full resolution.
+@MainActor
+private func captureOwnWindows(_ windows: [NSWindow]) async throws -> CGImage {
+    let numbers = Set(windows.map { CGWindowID($0.windowNumber) })
+    let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
+    let included = content.windows.filter { numbers.contains($0.windowID) }
+    // ScreenCaptureKit frames use a top-left origin; AppKit's start at the bottom of the main screen.
+    let mainHeight = NSScreen.screens.first?.frame.height ?? 0
+    let union = windows.map(\.frame).reduce(CGRect.null) { $0.union($1) }
+    let frame = CGRect(x: union.minX, y: mainHeight - union.maxY, width: union.width, height: union.height)
+    guard let display = content.displays.first(where: { $0.frame.contains(CGPoint(x: frame.midX, y: frame.midY)) })
+    else { throw WinMuxMarketingRenderError.renderFailed }
+    let scale = windows.first?.backingScaleFactor ?? 2
+    let configuration = SCStreamConfiguration()
+    configuration.sourceRect = frame.offsetBy(dx: -display.frame.minX, dy: -display.frame.minY)
+    configuration.width = Int((frame.width * scale).rounded())
+    configuration.height = Int((frame.height * scale).rounded())
+    configuration.captureResolution = .best
+    configuration.showsCursor = false
+    return try await SCScreenshotManager.captureImage(contentFilter: SCContentFilter(display: display, including: included),
+                                                      configuration: configuration)
 }

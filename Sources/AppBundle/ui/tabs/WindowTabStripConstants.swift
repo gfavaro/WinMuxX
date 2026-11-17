@@ -6,9 +6,7 @@ import SwiftUI
 
 // Fallback when the system window corner radius can't be probed from AppKit (see
 // systemWindowCornerRadius). 16 is the measured unified radius on macOS 27.
-let windowTabPreviewCornerRadius: CGFloat = {
-    if #available(macOS 26.0, *) { return 16 } else { return 12 }
-}()
+let windowTabPreviewCornerRadius: CGFloat = 16
 let windowTabStripContentHorizontalPadding: CGFloat = 3
 /// Between the strip's leading edge and its scrolling tabs.
 let windowTabStripLeadingInset: CGFloat = 2
@@ -29,9 +27,7 @@ let windowTabRestingTextOpacity: Double = 0.6
 // macOS 27), otherwise the chrome frame's inner cutout clamps below the real window corners
 // and visibly mismatches them. The actual radius comes from per-window measurement; this only
 // bounds absurd estimates.
-let windowTabGroupFrameMaxInnerCornerRadius: CGFloat = {
-    if #available(macOS 26.0, *) { return 36 } else { return 22 }
-}()
+let windowTabGroupFrameMaxInnerCornerRadius: CGFloat = 36
 let windowTabGroupFrameMaxTopInnerCornerRadius: CGFloat = 40
 let windowTabPillAnimation: Animation = MotionToken.pill
 

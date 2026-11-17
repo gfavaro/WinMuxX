@@ -98,17 +98,17 @@ and 64 allocations / 5,632 bytes afterward. Small panel/hosting/render probes di
 not reproduce those allocations. These are separate from controller retain cycles.
 
 The overview now uses [ScreenCaptureKit single-frame screenshots](https://developer.apple.com/documentation/screencapturekit/scscreenshotmanager/captureimage(contentfilter:configuration:completionhandler:))
-on macOS 14 and later. It queries shareable window descriptors once per opening,
+It queries shareable window descriptors once per opening,
 includes parked windows, requests thumbnail-sized output, and clears descriptors
 on dismissal. Failed modern captures use placeholders, not the leaking legacy
-fallback. macOS 13 retains the existing capture implementation. Other existing
-features that call the legacy API are outside this overview change.
+fallback. With the macOS 26 minimum, swipe snapshots, the window flip and the
+marketing tools capture through ScreenCaptureKit too.
 
 Native build 85 reported zero detected leaks after five overview cycles, and again
 after twenty additional cycles with all workspace previews populated, using
 `MallocStackLogging` and `leaks --fullStacks`. This is a bounded workload result,
-not a whole-application or long-term leak guarantee. The legacy capture path on
-macOS 13 and physical multi-display/trackpad behavior still need native validation.
+not a whole-application or long-term leak guarantee. Physical multi-display and
+trackpad behavior still need native validation.
 
 Build 86 native validation preserved all seven saved frames across a normal app
 restart and displayed populated inactive cards before visiting those workspaces.

@@ -296,7 +296,7 @@ model lifecycle stress test, fixture isolation fix, two-hour passive observation
 and remaining native/energy access limits. The build 83 long observation was
 interrupted by an app update after 97.23 minutes; it was not a completed two-hour
 result. The checklist also records the overview capture leak attribution and the
-ScreenCaptureKit replacement on macOS 14+.
+ScreenCaptureKit replacement, now used for every capture.
 
 
 ## 2026-10-18: native corner-clamp retry

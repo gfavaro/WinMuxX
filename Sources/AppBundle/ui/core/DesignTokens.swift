@@ -152,22 +152,16 @@ struct GlassSurface<S: Shape>: View {
         case .solid:
             shape.fill(solidColor)
         case .liquidGlass:
-            if #available(macOS 26.0, *) {
-                Color.clear.glassEffect(.regular.interactive(false), in: shape)
-            } else {
-                shape.fill(.ultraThinMaterial)
-                    .environment(\.colorScheme, .dark)
-            }
+            Color.clear.glassEffect(.regular.interactive(false), in: shape)
         }
     }
 
-    /// The outer edge. On macOS 26 it's a ring of real Liquid Glass masked to just the
-    /// border band, so the edge refracts — light bends along the rounded corner like the
-    /// native material — over a faint hairline that keeps the outline defined. Older systems
-    /// get the plain hairline.
+    /// The outer edge: a ring of real Liquid Glass masked to just the border band, so the edge
+    /// refracts — light bends along the rounded corner like the native material — over a faint
+    /// hairline that keeps the outline defined. Solid chrome gets the plain hairline.
     @ViewBuilder
     private var borderEdge: some View {
-        if #available(macOS 26.0, *), style == .liquidGlass {
+        if style == .liquidGlass {
             Color.clear
                 .glassEffect(.regular, in: shape)
                 .mask(shape.stroke(lineWidth: GlassToken.refractiveBorderWidth))

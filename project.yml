@@ -15,7 +15,7 @@ targets:
   WinMux:
     type: application
     platform: macOS
-    deploymentTarget: "13.0"
+    deploymentTarget: "26.0"
     info:
       path: resources/WinMux-Info.plist
       properties:

@@ -85,7 +85,7 @@ extension WorkspaceSidebarView {
             }
             .offset(x: -CGFloat(displayIndex) * pageWidth + dragOffset)
             .onAppear { projectPagerWidth = pageWidth }
-            .onChange(of: pageWidth) { projectPagerWidth = $0 }
+            .onChange(of: pageWidth) { _, newValue in projectPagerWidth = newValue }
         }
         .clipped()
     }
@@ -165,17 +165,10 @@ extension WorkspaceSidebarView {
             actions.send(.selectProject(projectId))
             resetProjectSwipeWithoutAnimation()
         }
-        if #available(macOS 14, *) {
-            // Switch when the page has slid out, not after a duration that only matches it.
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12), completionCriteria: .logicallyComplete) {
-                projectSwipeTranslation = fullPageOffset
-            } completion: { finish() }
-        } else {
-            withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12)) {
-                projectSwipeTranslation = fullPageOffset
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) { finish() }
-        }
+        // Switch when the page has slid out, not after a duration that only matches it.
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.12), completionCriteria: .logicallyComplete) {
+            projectSwipeTranslation = fullPageOffset
+        } completion: { finish() }
     }
 
 

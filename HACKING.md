@@ -22,7 +22,7 @@ app builds pass the selected compiler to Xcode through `SWIFT_EXEC`, so the app
 and CLI use the same compiler. `Package.swift` still requires tools version 6.2.
 See [dependencies](docs/DEPENDENCIES.md) for retained packages and audit decisions.
 The app
-supports macOS 13+, with native Liquid Glass enabled on macOS 26+.
+requires macOS 26 (Tahoe) or newer and uses native Liquid Glass throughout.
 
 ```sh
 swift build                  # Fast compilation with the active toolchain

@@ -52,7 +52,7 @@ re-render:
 swift build --product winmux-window-capture
 "$(swift build --show-bin-path)/winmux-window-capture" \
   resources/marketing/captures/safari-current-retina.png com.apple.Safari \
-  [title-filter] [--url <url>] [--settle-ms 1500] [--core-graphics]
+  [title-filter] [--url <url>] [--settle-ms 1500]
 ```
 
 It needs Screen Recording permission for the terminal and captures one window of
