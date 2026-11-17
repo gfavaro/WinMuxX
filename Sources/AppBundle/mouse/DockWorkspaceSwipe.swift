@@ -249,10 +249,14 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
 final class DockWorkspaceSwipeSource {
     static let shared = DockWorkspaceSwipeSource()
     private(set) var status = "Disabled"
-    /// macOS's three-finger up/down swipe switches workspaces; left/right stays with macOS.
+    /// macOS's three-finger up/down swipe switches workspaces.
     private(set) var readsVertical = false
+    /// macOS's three-finger left/right swipe pans a Scrolling strip; elsewhere it stays with macOS.
+    private(set) var readsHorizontal = false
     private var vertical = DockSwipeTracker()
+    private var horizontal = DockSwipeTracker()
     private let workspaces = DockWorkspaceSwipeReceiver()
+    private let strip = DockScrollingSwipeReceiver()
     private var held: [CGEvent] = []
     private var dockTap: (port: CFMachPort, source: CFRunLoopSource)?
     private var envelopeTap: (port: CFMachPort, source: CFRunLoopSource)?
@@ -263,12 +267,15 @@ final class DockWorkspaceSwipeSource {
     private(set) var tapTimeouts = 0
 
     var verticalSummary: DockSwipeSummary { vertical.summary }
+    var horizontalSummary: DockSwipeSummary { horizontal.summary }
 
     func syncConfiguration() {
         stop()
         guard !isUnitTest else { return }
         guard workspaceSwipeGestureEnabled else { return }
-        guard macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2 else {
+        let wantsVertical = macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2
+        let wantsHorizontal = macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2
+        guard wantsVertical || wantsHorizontal else {
             status = "Set macOS Mission Control to a three-finger swipe up to use workspace swipes"
             return
         }
@@ -281,8 +288,10 @@ final class DockWorkspaceSwipeSource {
         dockTap = dock
         envelopeTap = envelope
         CGEvent.tapEnable(tap: envelope.port, enable: false)
-        readsVertical = true
-        status = "Reading macOS three-finger swipes up/down"
+        readsVertical = wantsVertical
+        readsHorizontal = wantsHorizontal
+        status = "Reading macOS three-finger swipes " + [wantsVertical ? "up/down" : nil, wantsHorizontal ? "left/right in Scrolling workspaces" : nil]
+            .compactMap(\.self).joined(separator: " and ")
         for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
             wakeObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
                 MainActor.assumeIsolated { DockWorkspaceSwipeSource.shared.reviveIfNeeded() }
@@ -297,6 +306,7 @@ final class DockWorkspaceSwipeSource {
         envelopeTap = nil
         envelopeEnabled = false
         readsVertical = false
+        readsHorizontal = false
         wakeObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         wakeObservers.removeAll()
         status = "Disabled"
@@ -304,6 +314,7 @@ final class DockWorkspaceSwipeSource {
 
     private func abandon() {
         vertical.abandon(workspaces)
+        horizontal.abandon(strip)
         held.removeAll()
     }
 
@@ -343,16 +354,16 @@ final class DockWorkspaceSwipeSource {
             return false
         }
         defer {
-            setEnvelope(vertical.ownsGesture || vertical.isUndecided)
+            setEnvelope(vertical.ownsGesture || vertical.isUndecided || horizontal.ownsGesture || horizontal.isUndecided)
         }
         let subtype = event.getIntegerValueField(Self.field(Self.eventTypeField))
         if subtype == Self.gesture {
             // Held in order with the swipe, so a swipe handed back reaches the Dock whole.
-            if vertical.isUndecided {
+            if vertical.isUndecided || horizontal.isUndecided {
                 if let copy = event.copy() { held.append(copy) }
                 return true
             }
-            return vertical.ownsGesture
+            return vertical.ownsGesture || horizontal.ownsGesture
         }
         // Physical swipes come from the HID system; another app's synthetic ones are not ours.
         guard subtype == Self.dockControl,
@@ -363,9 +374,17 @@ final class DockWorkspaceSwipeSource {
         let time = Double(event.timestamp) / 1_000_000_000
         // A late event means WinMuxX's main thread was busy: the preview stalls, then jumps.
         WorkspaceMotionDiagnostics.record("macOS swipe event to WinMuxX", milliseconds: (CACurrentMediaTime() - time) * 1000)
-        guard readsVertical, event.getIntegerValueField(Self.field(Self.swipeMotion)) == Self.motionVertical else { return false }
-        let verdict = vertical.receive(phase: phase, progress: progress,
-                                       endVelocity: event.getDoubleValueField(Self.field(Self.velocityY)), timestamp: time, to: workspaces)
+        let verdict: DockSwipeTracker.Verdict
+        switch event.getIntegerValueField(Self.field(Self.swipeMotion)) {
+            case Self.motionVertical where readsVertical:
+                verdict = vertical.receive(phase: phase, progress: progress,
+                                           endVelocity: event.getDoubleValueField(Self.field(Self.velocityY)), timestamp: time, to: workspaces)
+            case Self.motionHorizontal where readsHorizontal:
+                verdict = horizontal.receive(phase: phase, progress: progress,
+                                             endVelocity: event.getDoubleValueField(Self.field(Self.velocityX)), timestamp: time, to: strip)
+            default:
+                return false
+        }
         switch verdict {
             case .pass:
                 held.removeAll()
@@ -398,7 +417,7 @@ final class DockWorkspaceSwipeSource {
     private static let eventTypeField = 55, hidType = 110, swipeMotion = 123, progress = 124
     private static let velocityX = 129, velocityY = 130, phase = 132
     private static let gesture: Int64 = 29, dockControl: Int64 = 30, dockSwipe: Int64 = 23
-    private static let motionVertical: Int64 = 2
+    private static let motionHorizontal: Int64 = 1, motionVertical: Int64 = 2
     private static func field(_ raw: Int) -> CGEventField { CGEventField(rawValue: UInt32(raw))! }
 }
 

@@ -225,7 +225,8 @@ on-mode-changed = []
     alt-cmd-shift-9 = 'move-node-to-project 9'
 
 # Three-finger swipes up/down move to the workspace below/above, as in the sidebar.
-# Needs macOS Mission Control on three fingers; left/right stays with macOS.
+# Needs macOS Mission Control on three fingers. In a Scrolling workspace left/right
+# scrolls the strip; elsewhere it stays with macOS.
 [workspace-swipe]
 enabled = false
 

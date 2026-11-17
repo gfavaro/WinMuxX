@@ -60,10 +60,11 @@ func buildDiagnosticsReport() async -> String {
     io.out("")
 
     let dock = DockWorkspaceSwipeSource.shared
-    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) vertical=\(dock.readsVertical ? "macos-swipe" : "off") macOS=\(dock.status) tapTimeouts=\(dock.tapTimeouts)")
-    let swipe = dock.verticalSummary
-    io.out(String(format: "Last macOS up/down swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
-                  swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
+    io.out("Workspace swipes: enabled=\(config.workspaceSwipe.enabled) vertical=\(dock.readsVertical ? "macos-swipe" : "off") scrolling=\(dock.readsHorizontal ? "macos-swipe" : "off") macOS=\(dock.status) tapTimeouts=\(dock.tapTimeouts)")
+    for (axis, swipe) in [("up/down", dock.verticalSummary), ("left/right", dock.horizontalSummary)] {
+        io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
+                      axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
+    }
     let preview = WorkspaceSwipePreview.shared
     if let timing = preview.timings.last {
         let submission = timing.submissionMs.map { String(format: "%.1fms", $0) } ?? "not submitted"

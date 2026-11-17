@@ -713,8 +713,10 @@ so starting, resting thumbs and palms, flicks and taking a swipe back behave exa
 as in macOS. WinMuxX keeps the swipe from the Dock;
 past the first or last workspace the swipe does nothing. Over a native full-screen
 app, while Mission Control is open or while WinMuxX is not taking swipes, macOS gets
-the swipe as usual. Mission Control stays on its keyboard shortcut, and three-finger
-left/right still switches macOS Spaces. While a
+the swipe as usual. Mission Control stays on its keyboard shortcut. In a Scrolling
+workspace, three-finger left/right scrolls its strip: the columns follow your fingers,
+and on release focus goes to the column nearest the middle (with Swipe between
+full-screen apps on three fingers). Elsewhere left/right still switches macOS Spaces. While a
 window drag or the workspace overview is in progress, the swipe does nothing, so
 macOS does not open Mission Control underneath. macOS's own release speed decides a flick: a
 quick flick switches after a little travel, and flicking back cancels even past

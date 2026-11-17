@@ -136,7 +136,9 @@ names skip it, and reconciliation moves one showing elsewhere to its display.
 `WorkspaceGestureCoordinator` wires the gestures to their configuration.
 `DockWorkspaceSwipeSource` reads macOS's three-finger up/down Dock swipe events when
 macOS assigns Mission Control to three fingers: workspaces stack like the sidebar, so up
-and down move to the workspace below or above. Left/right stays with macOS. WinMuxX does
+and down move to the workspace below or above. Left/right goes to
+`DockScrollingSwipeReceiver` when the workspace under the pointer uses Scrolling, and
+otherwise stays with macOS. WinMuxX does
 not read raw touches; scrolling workspaces and their raw-touch pan moved to SpaceMuxX.
 `DockSwipeTracker` decides which swipes WinMuxX keeps from the Dock and replays the rest;
 vertical progress follows Natural scrolling, so its sign alone says which way the content

@@ -92,6 +92,9 @@ scroll the strip half a display without moving focus or back to it, and
 `scrolling-focus` and `scrolling-move` take `1` to `9`, `first` or `last` (9 is the last
 column). Settings → Shortcuts lists them under Scrolling, and Settings → Windows →
 Scrolling workspaces edits the table below.
+With workspace swipes on and Swipe between full-screen apps on three fingers, three-finger
+left/right scrolls the strip with your fingers and focuses the column nearest the middle
+when you lift them.
 Columns off the display wait at its edge, showing `scrolling.edge-preview` points, or behind
 it where another display sits beside it. Column widths and the strip's position survive a
 restart.

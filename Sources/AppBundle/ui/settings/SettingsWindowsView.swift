@@ -81,7 +81,7 @@ struct ShortcutBehaviorSettingsView: View {
 
             }
             SettingsSection("Workspace swipes") {
-                SettingsToggle(.workspaceSwipes, isOn: $workspaceSwipes, help: "Three-finger swipes up and down move to the workspace below or above, in sidebar order, on the display under the pointer. Stops at either end.") {
+                SettingsToggle(.workspaceSwipes, isOn: $workspaceSwipes, help: "Three-finger swipes up and down move to the workspace below or above, in sidebar order, on the display under the pointer. Stops at either end. In a Scrolling workspace, left and right scroll its strip.") {
                     persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
                 Text(DockWorkspaceSwipeSource.shared.status)

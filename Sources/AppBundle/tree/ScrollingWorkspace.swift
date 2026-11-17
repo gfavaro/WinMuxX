@@ -371,3 +371,29 @@ extension Workspace {
         lastScrollingFocusWindowId = window.windowId
     }
 }
+
+/// The column whose centre is nearest the viewport's; on a tie, the one further in `direction`.
+func nearestScrollingColumn(in metrics: ScrollingWorkspaceMetrics, offset: CGFloat, direction: CGFloat) -> ScrollingColumnMetric? {
+    let center = offset + metrics.areaWidth / 2
+    return metrics.columns.min { lhs, rhs in
+        let a = abs(lhs.start + lhs.width / 2 - center)
+        let b = abs(rhs.start + rhs.width / 2 - center)
+        if abs(a - b) < 0.5, direction != 0 { return direction > 0 ? lhs.start > rhs.start : lhs.start < rhs.start }
+        return a < b
+    }
+}
+
+/// A completed swipe gets one adjacent-column fallback if an oversized column remains nearest
+/// after the finger-following pan. Never skip a column, reverse direction, or force a move at
+/// either end of the strip.
+func settledDockSwipeColumn(in metrics: ScrollingWorkspaceMetrics, offset: CGFloat,
+                            direction: CGFloat, startingColumnID: ObjectIdentifier?,
+                            advanceIfStuck: Bool) -> ScrollingColumnMetric? {
+    let nearest = nearestScrollingColumn(in: metrics, offset: offset, direction: direction)
+    guard advanceIfStuck, let startingColumnID, direction != 0,
+          let current = metrics.columns.firstIndex(where: { ObjectIdentifier($0.node) == startingColumnID }),
+          let nearest, ObjectIdentifier(nearest.node) == startingColumnID else { return nearest }
+    let next = current + (direction > 0 ? 1 : -1)
+    guard metrics.columns.indices.contains(next) else { return nearest }
+    return metrics.columns[next]
+}

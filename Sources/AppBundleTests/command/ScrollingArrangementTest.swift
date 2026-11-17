@@ -127,4 +127,19 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
             XCTAssertNotEqual(result.exitCode, 0, command)
         }
     }
+
+    func testASwipeSettlesOnTheNearestColumnAndAlwaysAdvancesAtLeastOne() async throws {
+        let (workspace, windows) = try await strip(4)
+        windows[0].scrollingColumnWidth = 1 // the first column fills the display, so it is nearest at the start
+        let metrics = workspace.scrollingMetrics
+        let second = metrics.columns[1], first = metrics.columns[0]
+        let nearSecond = second.start + second.width / 2 - metrics.areaWidth / 2
+        XCTAssertTrue(nearestScrollingColumn(in: metrics, offset: nearSecond, direction: 1)?.node === second.node)
+        let stuck = settledDockSwipeColumn(in: metrics, offset: 0, direction: 1,
+                                           startingColumnID: ObjectIdentifier(first.node), advanceIfStuck: true)
+        XCTAssertTrue(stuck?.node === second.node, "A committed swipe that has not left the first column still advances")
+        let atEnd = settledDockSwipeColumn(in: metrics, offset: 0, direction: -1,
+                                           startingColumnID: ObjectIdentifier(first.node), advanceIfStuck: true)
+        XCTAssertTrue(atEnd?.node === first.node, "Nothing past the first column")
+    }
 }
