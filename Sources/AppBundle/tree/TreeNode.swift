@@ -24,7 +24,7 @@ open class TreeNode: Equatable, WinMuxAny {
     /// The share of the display this node takes as a Scrolling column; nil uses `scrolling.column-width`.
     var scrollingColumnWidth: CGFloat? = nil
     final var unboundStacktrace: String? = nil
-    var isBound: Bool { parent != nil } // todo drop, once https://github.com/nikitabobko/WinMux/issues/1215 is fixed
+    var isBound: Bool { parent != nil } // todo drop, once https://github.com/nikitabobko/AeroSpace/issues/1215 is fixed
 
     @MainActor
     init(parent: NonLeafTreeNodeObject, adaptiveWeight: CGFloat, index: Int) {
@@ -98,7 +98,7 @@ open class TreeNode: Equatable, WinMuxAny {
         unboundStacktrace = nil
         // todo consider disabling automatic mru propogation
         // 1. "floating windows" in FocusCommand break the MRU because of that :(
-        // 2. Misbehaved apps that abuse real window as popups https://github.com/nikitabobko/WinMux/issues/106 (the
+        // 2. Misbehaved apps that abuse real window as popups https://github.com/nikitabobko/AeroSpace/issues/106 (the
         //    last appeared window, is not necessarily the one that has the focus)
         markAsMostRecentChild()
         if anyLeafWindowRecursive != nil {

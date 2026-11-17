@@ -24,7 +24,7 @@ public func dieT<T>(
     let message =
         """
         Please report to:
-            https://github.com/nikitabobko/WinMux/discussions/categories/potential-bugs
+            https://github.com/gfavaro/WinMuxX/issues
             Please describe what you did to trigger this error
 
         Message: \(_message)

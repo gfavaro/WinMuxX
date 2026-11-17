@@ -76,7 +76,7 @@ struct ResizeCommand: Command {
                 io.out("resize: nothing to do")
                 return true
             }
-            return io.err("resize command doesn't support floating windows yet https://github.com/nikitabobko/WinMux/issues/9")
+            return io.err("resize command doesn't support floating windows yet")
         }
         if case .dwindle(let split) = selected {
             if !split.resize(args.units.val) { io.out("resize: nothing to do") }

@@ -34,7 +34,7 @@ final class MacApp: AbstractApp {
     /*conforms*/ var execPath: String? { nsApp.executableURL?.path }
     /*conforms*/ var bundlePath: String? { nsApp.bundleURL?.path }
 
-    // todo think if it's possible to integrate this global mutable state to https://github.com/nikitabobko/WinMux/issues/1215
+    // todo think if it's possible to integrate this global mutable state to https://github.com/nikitabobko/AeroSpace/issues/1215
     //      and make deinitialization automatic in deinit
     @MainActor static var allAppsMap: [pid_t: MacApp] = [:]
     @MainActor static let registrationRetries = AppRegistrationRetries()
@@ -277,7 +277,7 @@ final class MacApp: AbstractApp {
         MacApp.focusJob?.cancel()
         // Performance optimization. If possible avoid doing AX requests
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
-        // Beware of the macOS bug: https://github.com/nikitabobko/WinMux/issues/101
+        // Beware of the macOS bug: https://github.com/nikitabobko/AeroSpace/issues/101
         let useActivationOnly = !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
             shouldUseActivationOnlyForNativeFocus(
                 targetWindowId: windowId,

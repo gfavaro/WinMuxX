@@ -74,10 +74,10 @@ struct Main {
                 exit(
                     1,
                     err: """
-                        ERROR: Implicit stdin is detected (stdin is not TTY). Implicit stdin was forbidden in WinMux v0.20.0.
+                        ERROR: Implicit stdin is detected (stdin is not TTY). Implicit stdin is not accepted, as in AeroSpace 0.20.0 and later.
                         1. Please supply '--stdin' flag to make stdin explicit and preserve the inherited behavior
                         2. You can also use '--no-stdin' flag to behave as if no stdin was supplied
-                        Breaking change issue: https://github.com/nikitabobko/WinMux/issues/1683
+                        AeroSpace's breaking change: https://github.com/nikitabobko/AeroSpace/issues/1683
                         """,
                 )
             }

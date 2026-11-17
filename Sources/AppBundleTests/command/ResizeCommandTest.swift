@@ -109,7 +109,7 @@ final class ResizeCommandTest: XCTestCase {
         assertEquals(result.exitCode, 1)
         assertEquals(
             result.stderr,
-            ["resize command doesn't support floating windows yet https://github.com/nikitabobko/WinMux/issues/9"],
+            ["resize command doesn't support floating windows yet"],
         )
     }
 }

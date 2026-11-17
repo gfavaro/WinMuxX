@@ -74,7 +74,7 @@ struct Config: ConvenienceCopyable {
     var scrolling = ScrollingConfig()
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var persistentWorkspaces: OrderedSet<String> = []
-    var execOnWorkspaceChange: [String] = [] // todo deprecate
+    var execOnWorkspaceChange: [String] = [] // Kept for AeroSpace configs.
     var modifierSides = ModifierSides()
     var keyMapping = KeyMapping()
     var execConfig: ExecConfig = ExecConfig()
