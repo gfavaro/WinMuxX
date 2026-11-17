@@ -126,11 +126,11 @@ final class WorkspaceScrollingMinimap: NSObject {
             self.view = view
         }
         view.frame = CGRect(origin: .zero, size: frame.size)
-        let expectedEpoch = workspace.scrollingSessionEpoch
+        let expectedEpoch = workspace.scrollingState.sessionEpoch
         let expectedTopology = workspace.scrollingTopologySignature
         view.selected = { [weak self, weak workspace] id in
             guard let self, let workspace, self.workspace === workspace,
-                  workspace.scrollingSessionEpoch == expectedEpoch,
+                  workspace.scrollingState.sessionEpoch == expectedEpoch,
                   workspace.scrollingTopologySignature == expectedTopology,
                   workspace.isVisible else { return }
             self.selectGroup(id)
@@ -162,9 +162,9 @@ final class WorkspaceScrollingMinimap: NSObject {
         }
         let models = groups.map(tile)
         var pinned = pinnedColumn.map(tile)
-        pinned?.pinned = workspace.scrollingPinSide
+        pinned?.pinned = workspace.scrollingState.pinSide
         view.update(workspaceName: workspaceDisplayName(workspace.name), models: models, pinned: pinned, icons: icons,
-                    metrics: workspace.scrollingMetrics, offset: workspace.scrollingOffset,
+                    metrics: workspace.scrollingMetrics, offset: workspace.scrollingState.offset,
                     focused: focus.windowOrNil.flatMap { $0.nodeWorkspace === workspace ? workspace.scrollingColumn(of: $0).map(ObjectIdentifier.init) : nil })
         refreshTitles(representatives, in: workspace)
     }

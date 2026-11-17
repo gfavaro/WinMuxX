@@ -68,7 +68,7 @@ func buildDiagnosticsReport() async -> String {
     let scrolling = focus.workspace
     if scrolling.arrangement == .scrolling {
         let shares = scrolling.scrollingColumns.map { $0.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default" }
-        io.out("Scrolling: offset=\(Int(scrolling.scrollingOffset)) columns=[\(shares.joined(separator: ", "))] pinned=\(scrolling.pinnedScrollingColumn != nil)")
+        io.out("Scrolling: offset=\(Int(scrolling.scrollingState.offset)) columns=[\(shares.joined(separator: ", "))] pinned=\(scrolling.pinnedScrollingColumn != nil)")
         // Each column's windows, top to bottom, so a stack shows as one entry.
         let windows = scrolling.scrollingColumns.map { $0.allLeafWindowsRecursive.map { String($0.windowId) }.joined(separator: "/") }
         io.out("Scrolling columns: \(windows.joined(separator: " | "))")

@@ -47,7 +47,7 @@ struct ScrollingMoveCommand: Command {
         guard let from = units.firstIndex(where: { $0 === column }), let to = units.firstIndex(where: { $0 === destination }),
               from != to else { return true }
         workspace.placeScrollingColumn(column, beside: destination, after: to > from)
-        workspace.lastScrollingFocusWindowId = nil
+        workspace.scrollingState.lastFocusWindowId = nil
         return true
     }
 }
@@ -74,19 +74,19 @@ struct ScrollingPanCommand: Command {
         guard workspace.arrangement == .scrolling else { return io.err(notScrolling) }
         let metrics = workspace.scrollingMetrics
         guard !metrics.columns.isEmpty else { return io.err("The Scrolling strip has no columns") }
-        let original = metrics.clampedOffset(workspace.scrollingOffset)
+        let original = metrics.clampedOffset(workspace.scrollingState.offset)
         switch args.direction.val {
-            case .left: workspace.scrollingOffset = metrics.clampedOffset(original - metrics.areaWidth / 2)
-            case .right: workspace.scrollingOffset = metrics.clampedOffset(original + metrics.areaWidth / 2)
+            case .left: workspace.scrollingState.offset = metrics.clampedOffset(original - metrics.areaWidth / 2)
+            case .right: workspace.scrollingState.offset = metrics.clampedOffset(original + metrics.areaWidth / 2)
             case .focus:
                 guard let window = target.windowOrNil,
                       let column = metrics.columns.first(where: { $0.node === workspace.scrollingColumn(of: window) }) else {
                     return io.err(noWindowIsFocused)
                 }
-                workspace.scrollingOffset = metrics.revealedOffset(for: column, current: original)
+                workspace.scrollingState.offset = metrics.revealedOffset(for: column, current: original)
         }
         // Panning keeps focus where it is: the next layout must not scroll back to it.
-        if let window = target.windowOrNil { workspace.lastScrollingFocusWindowId = window.windowId }
+        if let window = target.windowOrNil { workspace.scrollingState.lastFocusWindowId = window.windowId }
         WorkspaceScrollingMinimap.shared.show(workspace)
         workspace.captureScrollingViewportAnchor(using: workspace.scrollingMetrics)
         return true
@@ -115,7 +115,7 @@ struct ScrollingWidthCommand: Command {
         }
         column.scrollingColumnWidth = CGFloat(next)
         // The resized column is scrolled into view again.
-        workspace.lastScrollingFocusWindowId = nil
+        workspace.scrollingState.lastFocusWindowId = nil
         return true
     }
 }
@@ -149,14 +149,14 @@ struct ScrollingPinCommand: Command {
         guard workspace.arrangement == .scrolling else { return io.err(notScrolling) }
         guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
         guard let column = workspace.scrollingColumn(of: window) else { return io.err("Only a tiled column can be pinned") }
-        if workspace.pinnedScrollingColumn === column, workspace.scrollingPinSide == args.side.val {
-            workspace.scrollingPinnedNode = nil
+        if workspace.pinnedScrollingColumn === column, workspace.scrollingState.pinSide == args.side.val {
+            workspace.scrollingState.pinnedNode = nil
         } else {
             guard workspace.scrollingColumns.count > 1 else { return io.err("Pinning needs another column to scroll beside it") }
-            workspace.scrollingPinnedNode = column
-            workspace.scrollingPinSide = args.side.val
+            workspace.scrollingState.pinnedNode = column
+            workspace.scrollingState.pinSide = args.side.val
         }
-        workspace.lastScrollingFocusWindowId = nil
+        workspace.scrollingState.lastFocusWindowId = nil
         return true
     }
 }

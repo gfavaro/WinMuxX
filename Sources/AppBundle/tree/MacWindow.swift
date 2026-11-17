@@ -465,8 +465,8 @@ final class MacWindow: Window {
     /// One step of a strip pan: no glide, readback or minimum-size learning.
     @MainActor
     func setScrollingGestureFrame(_ frame: CGRect) {
-        guard let workspace = nodeWorkspace, workspace.scrollingGestureMotionActive,
-              let session = workspace.scrollingGestureSessionID else { return }
+        guard let workspace = nodeWorkspace, workspace.scrollingState.gestureMotionActive,
+              let session = workspace.scrollingState.gestureSessionID else { return }
         suspendMinimumObservationForMotion()
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
@@ -475,7 +475,7 @@ final class MacWindow: Window {
 
     @MainActor
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
-        if nodeWorkspace?.scrollingGestureMotionActive == true, let topLeft, let size {
+        if nodeWorkspace?.scrollingState.gestureMotionActive == true, let topLeft, let size {
             setScrollingGestureFrame(CGRect(origin: topLeft, size: size))
             return
         }
@@ -530,7 +530,7 @@ final class MacWindow: Window {
     private func canObserveMinimum(_ generation: UInt64) -> Bool {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
-            !isFullscreen && !isConcealedByScrolling && nodeWorkspace?.scrollingGestureMotionActive != true &&
+            !isFullscreen && !isConcealedByScrolling && nodeWorkspace?.scrollingState.gestureMotionActive != true &&
             !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
             !WindowMotion.shared.screensChanging &&
             !WindowRecoveryController.shared.isRecovering &&

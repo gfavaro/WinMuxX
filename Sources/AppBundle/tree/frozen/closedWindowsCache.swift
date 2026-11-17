@@ -69,7 +69,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
         tabbedLayout = workspace.tabbedLayout.map(FrozenTabbedLayout.init)
-        scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingOffset : nil
+        scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingState.offset : nil
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -211,7 +211,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         workspace.arrangement = frozenWorkspace.arrangement ?? (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle)
         workspace.preservesTopLevelGroups = (frozenWorkspace.preservesTopLevelGroups ?? false) || workspace.arrangement != .dwindle
         workspace.masterRatio = frozenWorkspace.masterRatio
-        if let offset = frozenWorkspace.scrollingOffset, offset.isFinite { workspace.scrollingOffset = offset }
+        if let offset = frozenWorkspace.scrollingOffset, offset.isFinite { workspace.scrollingState.offset = offset }
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex

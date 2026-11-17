@@ -140,12 +140,12 @@ func scrollingResizePreviewItems(_ window: Window, rect: Rect) -> (Workspace, [W
           window.parent is TilingContainer, let column = workspace.scrollingColumn(of: window),
           let previous = window.lastAppliedLayoutPhysicalRect else { return nil }
     // Laid out as the release will lay it out, then put back as it was.
-    let savedWidth = column.scrollingColumnWidth, savedView = workspace.scrollingViewState
+    let savedWidth = column.scrollingColumnWidth, savedState = workspace.scrollingState
     workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect)
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
     let frames = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace), gaps: gaps)
     column.scrollingColumnWidth = savedWidth
-    workspace.scrollingViewState = savedView
+    workspace.scrollingState = savedState
     let items = frames.filter { $0.node !== column }.flatMap { frame -> [WindowResizePreviewItem] in
         let shift = frame.physical.minX - (frame.node.lastAppliedLayoutPhysicalRect?.minX ?? frame.physical.minX)
         if let group = frame.node as? TilingContainer, group.layout == .tabGroup {

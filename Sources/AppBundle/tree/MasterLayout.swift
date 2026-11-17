@@ -7,8 +7,8 @@ extension Workspace {
     @MainActor
     func transitionArrangement(to next: WorkspaceLayoutName, focused: Window? = nil) {
         // A strip pan in progress ends with its strip.
-        scrollingGestureMotionActive = false
-        scrollingGestureSessionID = nil
+        scrollingState.gestureMotionActive = false
+        scrollingState.gestureSessionID = nil
         // A root tab group is kept whole, as one group of the arrangement.
         if next != .dwindle { ensureRootSupportsColumns(self) }
         let entering = arrangement != next

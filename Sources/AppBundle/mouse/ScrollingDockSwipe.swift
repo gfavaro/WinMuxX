@@ -36,10 +36,10 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
         self.progress = 0
         direction = 0
         let metrics = workspace.scrollingMetrics
-        startingColumn = nearestScrollingColumn(in: metrics, offset: workspace.scrollingOffset, direction: 0)
+        startingColumn = nearestScrollingColumn(in: metrics, offset: workspace.scrollingState.offset, direction: 0)
             .map { ObjectIdentifier($0.node) }
-        workspace.scrollingGestureSessionID = UUID()
-        workspace.scrollingGestureMotionActive = true
+        workspace.scrollingState.gestureSessionID = UUID()
+        workspace.scrollingState.gestureMotionActive = true
         dockSwipeChanged(progress, timestamp: timestamp)
         return .started
     }
@@ -51,12 +51,12 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
         self.progress = next
         guard abs(delta) > 0.00001 else { return }
         let metrics = workspace.scrollingMetrics
-        let offset = metrics.clampedOffset(workspace.scrollingOffset + delta * metrics.areaWidth)
-        guard abs(offset - workspace.scrollingOffset) > 0.0001 else { return }
-        direction = offset > workspace.scrollingOffset ? 1 : -1
-        workspace.scrollingOffset = offset
+        let offset = metrics.clampedOffset(workspace.scrollingState.offset + delta * metrics.areaWidth)
+        guard abs(offset - workspace.scrollingState.offset) > 0.0001 else { return }
+        direction = offset > workspace.scrollingState.offset ? 1 : -1
+        workspace.scrollingState.offset = offset
         // The strip moves without focus, so the layout must not scroll it back to the focus.
-        workspace.lastScrollingFocusWindowId = focus.windowOrNil?.windowId
+        workspace.scrollingState.lastFocusWindowId = focus.windowOrNil?.windowId
         WorkspaceScrollingMinimap.shared.show(workspace, duringGesture: true)
         scheduleRefreshSession(.globalObserver("scrollingSwipe"))
     }
@@ -64,19 +64,19 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
     func dockSwipeEnded(commit: Bool, progress: Double, velocity: Double, timestamp: Double) {
         defer { workspace = nil; startingColumn = nil }
         // The settle after the fingers lift glides as any layout does.
-        workspace?.scrollingGestureMotionActive = false
-        workspace?.scrollingGestureSessionID = nil
+        workspace?.scrollingState.gestureMotionActive = false
+        workspace?.scrollingState.gestureSessionID = nil
         WorkspaceScrollingMinimap.shared.endGesture()
         guard commit, let workspace, workspace.isVisible, workspace.arrangement == .scrolling else {
             scheduleRefreshSession(.globalObserver("scrollingSwipeCancelled"))
             return
         }
         let metrics = workspace.scrollingMetrics
-        guard let column = settledDockSwipeColumn(in: metrics, offset: workspace.scrollingOffset, direction: direction,
+        guard let column = settledDockSwipeColumn(in: metrics, offset: workspace.scrollingState.offset, direction: direction,
                                                   startingColumnID: startingColumn, advanceIfStuck: true),
               let window = column.node.mostRecentWindowRecursive else { return }
         // Focusing the column scrolls the strip to show it whole.
-        workspace.lastScrollingFocusWindowId = nil
+        workspace.scrollingState.lastFocusWindowId = nil
         _ = window.focusWindow()
         scheduleRefreshSession(.globalObserver("scrollingSwipeEnded"))
     }

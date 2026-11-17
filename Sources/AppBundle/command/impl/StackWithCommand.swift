@@ -34,7 +34,7 @@ struct StackWithCommand: Command {
                 return io.err("No windows in the specified direction")
             }
             createOrAppendWindowTabStack(sourceWindow: currentWindow, onto: neighbor)
-            workspace.lastScrollingFocusWindowId = nil
+            workspace.scrollingState.lastFocusWindowId = nil
             return true
         }
 

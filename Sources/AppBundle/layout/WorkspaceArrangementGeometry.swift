@@ -19,7 +19,7 @@ extension Workspace {
             case .dwindle, .tabbed: return []
             case .scrolling:
                 let geometry = scrollingGeometry(in: rect, gaps: gaps)
-                scrollingOffset = geometry.clampedOffset
+                scrollingState.offset = geometry.clampedOffset
                 // A pinned column sits at its edge, above the strip.
                 let pinned = scrollingPinSplit(in: rect, gaps: gaps).flatMap { split in
                     pinnedScrollingColumn.map { WorkspaceGroupFrame(node: $0, physical: split.pinned, virtual: split.pinned,

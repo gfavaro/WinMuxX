@@ -327,7 +327,7 @@ extension Workspace {
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         }
         window.scrollingColumnWidth = nil
-        lastScrollingFocusWindowId = nil
+        scrollingState.lastFocusWindowId = nil
         normalizeContainers()
     }
 
@@ -335,7 +335,7 @@ extension Workspace {
     @MainActor
     var pinnedScrollingColumn: TreeNode? {
         let columns = scrollingColumns
-        guard let node = scrollingPinnedNode, columns.count > 1, columns.contains(where: { $0 === node }) else { return nil }
+        guard let node = scrollingState.pinnedNode, columns.count > 1, columns.contains(where: { $0 === node }) else { return nil }
         return node
     }
 
@@ -355,7 +355,7 @@ extension Workspace {
         let minimum = pinned.minimumLayoutExtent(along: .h, gaps: gaps)
         let width = min(max((rect.width * share).rounded(), minimum), rect.width * 0.8).rounded()
         let stripWidth = max(1, rect.width - width - gap)
-        return scrollingPinSide == .left
+        return scrollingState.pinSide == .left
             ? (Rect(topLeftX: rect.minX, topLeftY: rect.minY, width: width, height: rect.height),
                Rect(topLeftX: rect.minX + width + gap, topLeftY: rect.minY, width: stripWidth, height: rect.height))
             : (Rect(topLeftX: rect.maxX - width, topLeftY: rect.minY, width: width, height: rect.height),
@@ -369,7 +369,7 @@ extension Workspace {
         guard let from = units.firstIndex(where: { ObjectIdentifier($0) == id }), units.indices.contains(index),
               from != index else { return }
         placeScrollingColumn(units[from], beside: units[index], after: index > from)
-        lastScrollingFocusWindowId = nil
+        scrollingState.lastFocusWindowId = nil
         scheduleRefreshSession(.globalObserver("scrollingMove"))
     }
 
@@ -404,16 +404,16 @@ extension Workspace {
         let overlapsVertically: (Rect) -> Bool = { $0.minY < monitorRect.maxY && $0.maxY > monitorRect.minY }
         // A display beside this one is a wall: a column parked there would show on it. So is
         // a pinned column: the strip shows no previews on its side.
-        let leftWall = pin != nil && scrollingPinSide == .left ||
+        let leftWall = pin != nil && scrollingState.pinSide == .left ||
             otherDisplays.contains { abs($0.rect.maxX - monitorRect.minX) < 1 && overlapsVertically($0.rect) }
-        let rightWall = pin != nil && scrollingPinSide == .right ||
+        let rightWall = pin != nil && scrollingState.pinSide == .right ||
             otherDisplays.contains { abs($0.rect.minX - monitorRect.maxX) < 1 && overlapsVertically($0.rect) }
         let units = scrollingStripUnits
-        let focused = lastScrollingFocusWindowId.flatMap(Window.get(byId:))
+        let focused = scrollingState.lastFocusWindowId.flatMap(Window.get(byId:))
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
         let focusedIndex = focused.flatMap(scrollingColumn(of:)).flatMap { column in units.firstIndex(where: { $0 === column }) }
         return calculateScrollingWorkspaceGeometry(.init(
-            bounds: bounds, parkingBounds: parking, offset: scrollingOffset,
+            bounds: bounds, parkingBounds: parking, offset: scrollingState.offset,
             columns: units.map { node in
                 .init(preferredWidth: node.scrollingColumnWidth ?? config.scrolling.columnWidth,
                       minimumWidth: node.minimumLayoutExtent(along: .h, gaps: gaps))
@@ -446,16 +446,16 @@ extension Workspace {
         rebaseScrollingViewportIfNeeded(using: scrollingMetrics)
         let metrics = scrollingMetrics
         if let focused = focus.windowOrNil, focused.nodeWorkspace === self,
-           lastScrollingFocusWindowId != focused.windowId,
+           scrollingState.lastFocusWindowId != focused.windowId,
            let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: focused) })
         {
-            let previous = lastScrollingFocusWindowId.flatMap(Window.get(byId:)).flatMap { window in
+            let previous = scrollingState.lastFocusWindowId.flatMap(Window.get(byId:)).flatMap { window in
                 metrics.columns.first(where: { $0.node === scrollingColumn(of: window) })
             }
-            scrollingOffset = metrics.focusedOffset(for: column, current: scrollingOffset, previous: previous)
-            lastScrollingFocusWindowId = focused.windowId
+            scrollingState.offset = metrics.focusedOffset(for: column, current: scrollingState.offset, previous: previous)
+            scrollingState.lastFocusWindowId = focused.windowId
         }
-        scrollingOffset = metrics.clampedOffset(scrollingOffset)
+        scrollingState.offset = metrics.clampedOffset(scrollingState.offset)
     }
 
     @MainActor
@@ -464,16 +464,16 @@ extension Workspace {
         guard metrics.areaWidth > 0 else { return }
         let anchor = preferredWindow
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
-            ?? lastScrollingFocusWindowId.flatMap(Window.get(byId:))
-            ?? scrollingAnchorWindowId.flatMap(Window.get(byId:))
+            ?? scrollingState.lastFocusWindowId.flatMap(Window.get(byId:))
+            ?? scrollingState.anchorWindowId.flatMap(Window.get(byId:))
             ?? mostRecentWorkspaceFocusableWindowRecursive
         guard let anchor, anchor.nodeWorkspace === self,
               let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: anchor) }) else { return }
-        scrollingAnchorWindowId = anchor.windowId
+        scrollingState.anchorWindowId = anchor.windowId
         let center = column.start + column.width / 2
-        scrollingAnchorViewportPosition = (center - scrollingOffset) / metrics.areaWidth
-        scrollingAnchorAreaWidth = metrics.areaWidth
-        scrollingAnchorLogicalCenter = center
+        scrollingState.anchorViewportPosition = (center - scrollingState.offset) / metrics.areaWidth
+        scrollingState.anchorAreaWidth = metrics.areaWidth
+        scrollingState.anchorLogicalCenter = center
     }
 
     /// Keeps the anchor window's column where it was in the viewport after columns change
@@ -481,27 +481,27 @@ extension Workspace {
     @MainActor
     func rebaseScrollingViewportIfNeeded(using metrics: ScrollingWorkspaceMetrics) {
         guard metrics.areaWidth > 0 else { return }
-        guard let oldWidth = scrollingAnchorAreaWidth, let oldCenter = scrollingAnchorLogicalCenter else {
+        guard let oldWidth = scrollingState.anchorAreaWidth, let oldCenter = scrollingState.anchorLogicalCenter else {
             captureScrollingViewportAnchor(using: metrics)
             return
         }
-        let anchor = scrollingAnchorWindowId.flatMap(Window.get(byId:))
-            ?? lastScrollingFocusWindowId.flatMap(Window.get(byId:))
+        let anchor = scrollingState.anchorWindowId.flatMap(Window.get(byId:))
+            ?? scrollingState.lastFocusWindowId.flatMap(Window.get(byId:))
             ?? mostRecentWorkspaceFocusableWindowRecursive
         guard let anchor, anchor.nodeWorkspace === self,
-              let position = scrollingAnchorViewportPosition, position.isFinite,
+              let position = scrollingState.anchorViewportPosition, position.isFinite,
               let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: anchor) }) else {
             // A removed anchor is never allowed to impose an old offset on
             // a different window. Establish the new reference after layout.
-            scrollingAnchorAreaWidth = nil
-            scrollingAnchorLogicalCenter = nil
+            scrollingState.anchorAreaWidth = nil
+            scrollingState.anchorLogicalCenter = nil
             return
         }
         let center = column.start + column.width / 2
         guard abs(oldWidth - metrics.areaWidth) > 0.5 || abs(oldCenter - center) > 0.5 else { return }
-        scrollingOffset = metrics.clampedOffset(center - position * metrics.areaWidth)
-        scrollingAnchorAreaWidth = metrics.areaWidth
-        scrollingAnchorLogicalCenter = center
+        scrollingState.offset = metrics.clampedOffset(center - position * metrics.areaWidth)
+        scrollingState.anchorAreaWidth = metrics.areaWidth
+        scrollingState.anchorLogicalCenter = center
     }
 
     /// The column `group` is, with its current window width and the most it can take.
@@ -529,7 +529,7 @@ extension Workspace {
         guard abs(actual - range.width) >= 0.5 else { return false }
         group.scrollingColumnWidth = min(max((actual + range.insets) / max(range.area, 1), 0.1), 1)
         // The resized column is scrolled into view again.
-        lastScrollingFocusWindowId = nil
+        scrollingState.lastFocusWindowId = nil
         return true
     }
 
@@ -542,45 +542,17 @@ extension Workspace {
         guard let group = scrollingColumn(of: window), abs(rect.width - previous.width) > 1,
               let before = scrollingMetrics.columns.first(where: { $0.node === group }),
               let range = scrollingColumnWidthRange(of: group) else { return nil }
-        let offset = scrollingOffset
+        let offset = scrollingState.offset
         guard setScrollingColumnWidth(of: group, to: range.width + rect.width - previous.width),
               let after = scrollingMetrics.columns.first(where: { $0.node === group }) else { return nil }
         let leftEdgeDragged = abs(rect.minX - previous.minX) > 1
-        scrollingOffset = leftEdgeDragged
+        scrollingState.offset = leftEdgeDragged
             ? after.start + after.width - (before.start + before.width - offset)
             : after.start - (before.start - offset)
         // The strip stays where the mouse left it: neither focus nor the anchor scrolls it back.
-        lastScrollingFocusWindowId = window.windowId
+        scrollingState.lastFocusWindowId = window.windowId
         captureScrollingViewportAnchor(preferredWindow: window)
         return group
-    }
-
-    /// Where the strip is looking and what keeps it there: saved before a preview lays the strip
-    /// out as it would be, and put back after, so nothing of the preview reaches the real layout.
-    struct ScrollingViewState {
-        fileprivate let offset: CGFloat
-        fileprivate let lastFocusWindowId: UInt32?
-        fileprivate let anchorWindowId: UInt32?
-        fileprivate let anchorViewportPosition: CGFloat?
-        fileprivate let anchorAreaWidth: CGFloat?
-        fileprivate let anchorLogicalCenter: CGFloat?
-    }
-
-    @MainActor
-    var scrollingViewState: ScrollingViewState {
-        get {
-            ScrollingViewState(offset: scrollingOffset, lastFocusWindowId: lastScrollingFocusWindowId,
-                               anchorWindowId: scrollingAnchorWindowId, anchorViewportPosition: scrollingAnchorViewportPosition,
-                               anchorAreaWidth: scrollingAnchorAreaWidth, anchorLogicalCenter: scrollingAnchorLogicalCenter)
-        }
-        set {
-            scrollingOffset = newValue.offset
-            lastScrollingFocusWindowId = newValue.lastFocusWindowId
-            scrollingAnchorWindowId = newValue.anchorWindowId
-            scrollingAnchorViewportPosition = newValue.anchorViewportPosition
-            scrollingAnchorAreaWidth = newValue.anchorAreaWidth
-            scrollingAnchorLogicalCenter = newValue.anchorLogicalCenter
-        }
     }
 
     @MainActor
@@ -588,8 +560,8 @@ extension Workspace {
         guard let window = focus.windowOrNil, window.nodeWorkspace === self else { return }
         let metrics = scrollingMetrics
         guard let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: window) }) else { return }
-        scrollingOffset = metrics.centeredOffset(for: column)
-        lastScrollingFocusWindowId = window.windowId
+        scrollingState.offset = metrics.centeredOffset(for: column)
+        scrollingState.lastFocusWindowId = window.windowId
     }
 }
 

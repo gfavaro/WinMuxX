@@ -148,11 +148,11 @@ final class ScrollingMinimapTest: WorkspaceTestCase {
         let groups = root.children
         let metrics = workspace.scrollingMetrics
         let column = try XCTUnwrap(metrics.columns.first(where: { $0.node === selected }))
-        let expected = metrics.revealedOffset(for: column, current: workspace.scrollingOffset)
+        let expected = metrics.revealedOffset(for: column, current: workspace.scrollingState.offset)
         XCTAssertTrue(focusScrollingMinimapGroup(id, in: workspace))
         try await workspace.layoutWorkspace()
         XCTAssertTrue(focus.windowOrNil === selected)
-        XCTAssertEqual(workspace.scrollingOffset, expected, accuracy: 1)
+        XCTAssertEqual(workspace.scrollingState.offset, expected, accuracy: 1)
         XCTAssertEqual(root.children, groups)
         selected.unbindFromParent()
         XCTAssertFalse(focusScrollingMinimapGroup(id, in: workspace))
@@ -189,7 +189,7 @@ final class ScrollingMinimapTest: WorkspaceTestCase {
         view.dismissRequested = { dismissed = true }
         func update() {
             view.update(workspaceName: workspace.name, models: models, icons: [:], metrics: workspace.scrollingMetrics,
-                        offset: workspace.scrollingOffset, focused: ObjectIdentifier(windows[0]))
+                        offset: workspace.scrollingState.offset, focused: ObjectIdentifier(windows[0]))
         }
         func key(_ code: UInt16) throws -> NSEvent {
             try XCTUnwrap(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 1,

@@ -186,7 +186,7 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
     // In a Scrolling workspace the strip then shows the column the window landed in, whole.
     defer {
         if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .scrolling {
-            workspace.lastScrollingFocusWindowId = nil
+            workspace.scrollingState.lastFocusWindowId = nil
         }
     }
     let sourceNode = dragSubjectNode(for: sourceWindow, subject: pendingWindowDragIntent.sourceSubject)

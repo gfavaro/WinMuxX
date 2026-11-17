@@ -27,7 +27,7 @@ final class ScrollingPinIndicator {
             lines[other] = nil
         }
         guard workspace.isVisible, let split = workspace.scrollingPinSplit(in: rect, gaps: gaps) else { hide(workspace); return }
-        let line = Self.lineRect(pinned: split.pinned, side: workspace.scrollingPinSide, gap: CGFloat(gaps.inner.horizontal))
+        let line = Self.lineRect(pinned: split.pinned, side: workspace.scrollingState.pinSide, gap: CGFloat(gaps.inner.horizontal))
         let panel = lines[id] ?? ScrollingPinLinePanel()
         lines[id] = panel
         panel.setFrame(CGRect(x: line.minX, y: mainMonitor.height - line.maxY, width: line.width, height: line.height), display: true)

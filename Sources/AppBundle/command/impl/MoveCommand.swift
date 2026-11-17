@@ -132,7 +132,7 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
         workspace.placeScrollingColumn(window, beside: column, after: direction.isPositive)
         window.scrollingColumnWidth = width
     }
-    workspace.lastScrollingFocusWindowId = nil
+    workspace.scrollingState.lastFocusWindowId = nil
     scheduleRefreshSession(.globalObserver("moveScrollingColumn"))
     return true
 }

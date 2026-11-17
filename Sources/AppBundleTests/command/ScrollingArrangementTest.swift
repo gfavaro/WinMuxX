@@ -40,13 +40,13 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
     func testFocusScrollsTheStripToTheColumn() async throws {
         let (workspace, windows) = try await strip(4)
         workspace.scrollToFocusedColumnIfNeeded()
-        XCTAssertEqual(workspace.scrollingOffset, 0, accuracy: 0.5)
+        XCTAssertEqual(workspace.scrollingState.offset, 0, accuracy: 0.5)
         _ = windows[3].focusWindow()
         workspace.scrollToFocusedColumnIfNeeded()
         let metrics = workspace.scrollingMetrics
         let column = try XCTUnwrap(metrics.columns.last)
-        XCTAssertGreaterThan(workspace.scrollingOffset, 0)
-        XCTAssertLessThanOrEqual(column.start + column.width, workspace.scrollingOffset + metrics.areaWidth + 0.5,
+        XCTAssertGreaterThan(workspace.scrollingState.offset, 0)
+        XCTAssertLessThanOrEqual(column.start + column.width, workspace.scrollingState.offset + metrics.areaWidth + 0.5,
                                  "The focused column is wholly in view")
     }
 
@@ -115,12 +115,12 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         let (workspace, windows) = try await strip(4)
         workspace.scrollToFocusedColumnIfNeeded()
         try await succeed("scrolling-pan right")
-        XCTAssertGreaterThan(workspace.scrollingOffset, 0)
+        XCTAssertGreaterThan(workspace.scrollingState.offset, 0)
         XCTAssertTrue(focus.windowOrNil === windows[0])
         workspace.scrollToFocusedColumnIfNeeded()
-        XCTAssertGreaterThan(workspace.scrollingOffset, 0, "A layout after a pan does not scroll back to the focus")
+        XCTAssertGreaterThan(workspace.scrollingState.offset, 0, "A layout after a pan does not scroll back to the focus")
         try await succeed("scrolling-pan focus")
-        XCTAssertEqual(workspace.scrollingOffset, 0, accuracy: 0.5)
+        XCTAssertEqual(workspace.scrollingState.offset, 0, accuracy: 0.5)
     }
 
     func testDraggingAWindowEdgeSetsItsColumnWidth() async throws {
@@ -273,7 +273,7 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         try await workspace.layoutWorkspace()
         let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
         let second = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
-        let width = windows[0].scrollingColumnWidth, offset = workspace.scrollingOffset
+        let width = windows[0].scrollingColumnWidth, offset = workspace.scrollingState.offset
         let (_, items) = try XCTUnwrap(scrollingResizePreviewItems(windows[0], rect: Rect(
             topLeftX: shown.minX, topLeftY: shown.minY, width: shown.width + 100, height: shown.height)))
         let neighbour = try XCTUnwrap(items.first { $0.id == windows[1].windowId })
@@ -281,7 +281,7 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(neighbour.frame.minX - second.toAppKitScreenRect.minX, 100, accuracy: 2, "and move beside the wider one")
         XCTAssertFalse(items.contains { $0.id == windows[0].windowId })
         XCTAssertEqual(windows[0].scrollingColumnWidth, width, "Previewing changes nothing")
-        XCTAssertEqual(workspace.scrollingOffset, offset)
+        XCTAssertEqual(workspace.scrollingState.offset, offset)
     }
 
     func testAMouseResizeKeepsTheOtherEdgeWhereItWas() async throws {
@@ -353,11 +353,11 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
 
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
-        workspace.scrollingGestureMotionActive = true
-        workspace.scrollingGestureSessionID = UUID()
+        workspace.scrollingState.gestureMotionActive = true
+        workspace.scrollingState.gestureSessionID = UUID()
         try await succeed("workspace-layout dwindle")
-        XCTAssertFalse(workspace.scrollingGestureMotionActive)
-        XCTAssertNil(workspace.scrollingGestureSessionID)
+        XCTAssertFalse(workspace.scrollingState.gestureMotionActive)
+        XCTAssertNil(workspace.scrollingState.gestureSessionID)
     }
 
     func testCommandsRefuseOtherLayouts() async throws {

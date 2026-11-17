@@ -108,7 +108,7 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         let right = ScrollingPinIndicator.lineRect(pinned: pinned, side: .right, gap: 10)
         XCTAssertEqual(right.maxX, pinned.minX - 5 + ScrollingPinIndicator.thickness / 2, accuracy: 0.01)
         // Scrolling far right keeps the pinned column in place.
-        workspace.scrollingOffset = .greatestFiniteMagnitude
+        workspace.scrollingState.offset = .greatestFiniteMagnitude
         try await workspace.layoutWorkspace()
         XCTAssertEqual(windows[1].lastAppliedLayoutPhysicalRect, pinned)
         let code6 = try await run("scrolling-pin left")

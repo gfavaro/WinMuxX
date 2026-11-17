@@ -114,7 +114,7 @@ final class WindowMotion: NSObject {
             _ = try await window.restoreFromCorner(to: target)
             return
         }
-        if window.nodeWorkspace?.scrollingGestureMotionActive == true {
+        if window.nodeWorkspace?.scrollingState.gestureMotionActive == true {
             cancel(id)
             window.setScrollingGestureFrame(target)
             return

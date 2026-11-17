@@ -9,7 +9,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var projectId: WorkspaceProjectId = workspaceProjectDefaultId
     var restoredDisplayIndex: Int?
     var preferredMonitorPoint: CGPoint? {
-        didSet { if oldValue != preferredMonitorPoint { scrollingSessionEpoch &+= 1 } }
+        didSet { if oldValue != preferredMonitorPoint { scrollingState.sessionEpoch &+= 1 } }
     }
     var lifecycle: WorkspaceLifecycle = .durable
     var lastConfiguredLayout: WorkspaceLayoutSettings?
@@ -28,28 +28,11 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var arrangement: WorkspaceLayoutName = .dwindle {
         didSet {
             if arrangement != .dwindle { preservesTopLevelGroups = true }
-            if oldValue != arrangement { scrollingSessionEpoch &+= 1 }
+            if oldValue != arrangement { scrollingState.sessionEpoch &+= 1 }
         }
     }
-    /// Changes with the arrangement or display, ending anything begun on the strip before.
-    var scrollingSessionEpoch: UInt64 = 0
-    /// A column held at a screen edge, full height, while the rest of the strip scrolls.
-    weak var scrollingPinnedNode: TreeNode?
-    var scrollingPinSide = ScrollingPinCmdArgs.Side.left
-    /// The Scrolling strip's viewport: how far its left edge is scrolled along the columns.
-    @MainActor var scrollingOffset: CGFloat = 0
-    /// The window the strip last scrolled to, so focus scrolls it only when focus moves.
-    @MainActor var lastScrollingFocusWindowId: UInt32?
-    /// Where the anchor window's column sat in the viewport, so the strip keeps it there when
-    /// columns change width or the display does.
-    @MainActor var scrollingAnchorWindowId: UInt32?
-    @MainActor var scrollingAnchorViewportPosition: CGFloat?
-    @MainActor var scrollingAnchorAreaWidth: CGFloat?
-    @MainActor var scrollingAnchorLogicalCenter: CGFloat?
-    /// While fingers pan the strip, layouts write each step straight to the windows instead of
-    /// gliding to it, so the columns keep up with the fingers.
-    @MainActor var scrollingGestureMotionActive = false
-    @MainActor var scrollingGestureSessionID: UUID?
+    /// What the Scrolling arrangement keeps for this workspace.
+    var scrollingState = ScrollingWorkspaceState()
     private var savedMasterGroupIndex = 0
     private weak var masterGroup: TreeNode?
     @MainActor var masterGroupIndex: Int {
