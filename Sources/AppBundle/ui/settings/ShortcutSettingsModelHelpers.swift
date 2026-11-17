@@ -109,6 +109,9 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                   shortcutAction(id: "scrolling-pan-right", title: "Scroll Strip Right", command: "scrolling-pan right"),
                   shortcutAction(id: "scrolling-focus-first", title: "Focus First Column", command: "scrolling-focus first"),
                   shortcutAction(id: "scrolling-focus-last", title: "Focus Last Column", command: "scrolling-focus last"),
+                  shortcutAction(id: "scrolling-pin-left", title: "Pin Column Left", command: "scrolling-pin left"),
+                  shortcutAction(id: "scrolling-pin-right", title: "Pin Column Right", command: "scrolling-pin right"),
+                  shortcutAction(id: "scrolling-minimap", title: "Toggle Strip Map", command: "scrolling-minimap"),
               ]),
         .init(id: "managed-window", category: .managed, title: "Window", summary: nil,
               actions: [

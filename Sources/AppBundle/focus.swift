@@ -127,6 +127,7 @@ enum FocusChangeOrigin: Equatable { case explicit, native }
         return newFocus.workspace.isVisible || newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     }
     let oldFocus = focus
+    if oldFocus.workspace !== newFocus.workspace { WorkspaceScrollingMinimap.shared.dismiss() }
     let status = newFocus.workspace.workspaceMonitor.setActiveWorkspace(newFocus.workspace)
     guard status else { return false }
 

@@ -52,6 +52,8 @@ extension CmdArgs {
             case let args as SwapWithMasterCmdArgs: SwapWithMasterCommand(args: args)
             case let args as ScrollingCenterCmdArgs: ScrollingCenterCommand(args: args)
             case let args as ScrollingFocusCmdArgs: ScrollingFocusCommand(args: args)
+            case let args as ScrollingMinimapCmdArgs: ScrollingMinimapCommand(args: args)
+            case let args as ScrollingPinCmdArgs: ScrollingPinCommand(args: args)
             case let args as ScrollingMoveCmdArgs: ScrollingMoveCommand(args: args)
             case let args as ScrollingPanCmdArgs: ScrollingPanCommand(args: args)
             case let args as ScrollingWidthCmdArgs: ScrollingWidthCommand(args: args)

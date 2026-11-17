@@ -551,6 +551,7 @@ func refreshModel() {
     Workspace.reconcileWorkspaceState()
     checkOnFocusChangedCallbacks()
     normalizeContainers()
+    if !isUnitTest { WorkspaceScrollingMinimap.shared.modelDidChange() }
     if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 

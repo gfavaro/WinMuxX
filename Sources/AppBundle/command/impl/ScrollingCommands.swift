@@ -89,6 +89,7 @@ struct ScrollingPanCommand: Command {
         }
         // Panning keeps focus where it is: the next layout must not scroll back to it.
         if let window = target.windowOrNil { workspace.lastScrollingFocusWindowId = window.windowId }
+        WorkspaceScrollingMinimap.shared.show(workspace)
         workspace.captureScrollingViewportAnchor(using: workspace.scrollingMetrics)
         return true
     }
@@ -116,6 +117,48 @@ struct ScrollingWidthCommand: Command {
         }
         column.scrollingColumnWidth = CGFloat(next)
         // The resized column is scrolled into view again.
+        workspace.lastScrollingFocusWindowId = nil
+        return true
+    }
+}
+
+struct ScrollingMinimapCommand: Command {
+    let args: ScrollingMinimapCmdArgs
+    /*conforms*/ let shouldResetClosedWindowsCache = false
+    var isPresentation: Bool { true }
+
+    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+        guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        guard target.workspace.arrangement == .scrolling else { return io.err(notScrolling) }
+        guard config.scrolling.minimapEnabled else { return io.err("The Scrolling minimap is off in Settings") }
+        guard !target.workspace.workspaceLayoutUnits.isEmpty else { return io.err("The Scrolling strip has no columns") }
+        if WorkspaceScrollingMinimap.shared.isExplicitlyOpen {
+            WorkspaceScrollingMinimap.shared.dismiss()
+            return true
+        }
+        return WorkspaceScrollingMinimap.shared.show(target.workspace, explicitly: true)
+            || io.err("The Scrolling minimap is unavailable during this interaction")
+    }
+}
+
+struct ScrollingPinCommand: Command {
+    let args: ScrollingPinCmdArgs
+    /*conforms*/ let shouldResetClosedWindowsCache = false
+
+    func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
+        guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        let workspace = target.workspace
+        guard workspace.arrangement == .scrolling else { return io.err(notScrolling) }
+        guard let window = target.windowOrNil else { return io.err(noWindowIsFocused) }
+        let column = window.topLevelWorkspaceGroup
+        guard workspace.workspaceLayoutUnits.contains(where: { $0 === column }) else { return io.err("Only a tiled column can be pinned") }
+        if workspace.pinnedScrollingColumn === column, workspace.scrollingPinSide == args.side.val {
+            workspace.scrollingPinnedNode = nil
+        } else {
+            guard workspace.workspaceLayoutUnits.count > 1 else { return io.err("Pinning needs another column to scroll beside it") }
+            workspace.scrollingPinnedNode = column
+            workspace.scrollingPinSide = args.side.val
+        }
         workspace.lastScrollingFocusWindowId = nil
         return true
     }

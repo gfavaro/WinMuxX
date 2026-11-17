@@ -7,6 +7,8 @@ let tabGroupPadding: CGFloat = 30
 extension Workspace {
     @MainActor
     func layoutWorkspace() async throws {
+        var pinIndicatorShown = false
+        defer { if !pinIndicatorShown { ScrollingPinIndicator.shared.hide(self) } }
         applyConfiguredLayout()
         normalizeMasterLayout()
         if isEffectivelyEmpty { return }
@@ -74,6 +76,10 @@ extension Workspace {
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
             rootTilingContainer.lastAppliedLayoutVirtualRect = rect
             try await layoutWorkspaceGroups(in: rect, context)
+            if arrangement == .scrolling {
+                ScrollingPinIndicator.shared.update(self, rect: rect, gaps: context.resolvedGaps)
+                pinIndicatorShown = true
+            }
             for window in children.filterIsInstance(of: Window.self) {
                 window.lastAppliedLayoutPhysicalRect = nil
                 window.lastAppliedLayoutVirtualRect = nil
@@ -101,10 +107,12 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
     if scrolling { workspace.scrollToFocusedColumnIfNeeded() }
     let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
     let viewport = scrolling ? workspace.scrollingMetrics.geometry.area : nil
+    let pinned = scrolling ? workspace.pinnedScrollingColumn : nil
     for frame in frames {
         // A Scrolling column off the viewport is pushed against the display edge by macOS,
-        // so what it then reports is not the app's real size.
-        let concealed = viewport.map { !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size).intersects($0) } ?? false
+        // so what it then reports is not the app's real size. A pinned column is always shown.
+        let concealed = frame.node !== pinned &&
+            (viewport.map { !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size).intersects($0) } ?? false)
         for window in frame.node.allLeafWindowsRecursive { window.isConcealedByScrolling = concealed }
         try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
                                              height: frame.physical.height, virtual: frame.virtual, context)

@@ -254,19 +254,87 @@ struct ScrollingWorkspaceMetrics {
 }
 
 extension Workspace {
+    /// The pinned column while it is still a column of this strip and others remain.
+    @MainActor
+    var pinnedScrollingColumn: TreeNode? {
+        guard let node = scrollingPinnedNode, workspaceLayoutUnits.count > 1,
+              workspaceLayoutUnits.contains(where: { $0 === node }) else { return nil }
+        return node
+    }
+
+    /// The columns that scroll: every layout unit except a pinned one.
+    @MainActor
+    var scrollingStripUnits: [TreeNode] {
+        let pinned = pinnedScrollingColumn
+        return workspaceLayoutUnits.filter { $0 !== pinned }
+    }
+
+    /// The pinned column's frame at its screen edge, and the rect left for the strip.
+    @MainActor
+    func scrollingPinSplit(in rect: Rect, gaps: ResolvedGaps) -> (pinned: Rect, strip: Rect)? {
+        guard let pinned = pinnedScrollingColumn else { return nil }
+        let gap = CGFloat(gaps.inner.horizontal)
+        let share = min(pinned.scrollingColumnWidth ?? config.scrolling.columnWidth, 0.8)
+        let minimum = pinned.minimumLayoutExtent(along: .h, gaps: gaps)
+        let width = min(max((rect.width * share).rounded(), minimum), rect.width * 0.8).rounded()
+        let stripWidth = max(1, rect.width - width - gap)
+        return scrollingPinSide == .left
+            ? (Rect(topLeftX: rect.minX, topLeftY: rect.minY, width: width, height: rect.height),
+               Rect(topLeftX: rect.minX + width + gap, topLeftY: rect.minY, width: stripWidth, height: rect.height))
+            : (Rect(topLeftX: rect.maxX - width, topLeftY: rect.minY, width: width, height: rect.height),
+               Rect(topLeftX: rect.minX, topLeftY: rect.minY, width: stripWidth, height: rect.height))
+    }
+
+    /// Moves a strip column, by identity, to an index among the strip's columns.
+    @MainActor
+    func moveScrollingColumn(_ id: ObjectIdentifier, toStripIndex index: Int) {
+        let units = scrollingStripUnits
+        let parent = arrangementGroupParent
+        guard let column = units.first(where: { ObjectIdentifier($0) == id }), units.indices.contains(index),
+              column.parent === parent, units[index] !== column,
+              let target = parent.children.firstIndex(where: { $0 === units[index] }) else { return }
+        let binding = column.unbindFromParent()
+        column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: target)
+        lastScrollingFocusWindowId = nil
+        scheduleRefreshSession(.globalObserver("scrollingMove"))
+    }
+
+    /// Changes whenever a column, its width or the display changes, so a minimap click made on
+    /// an older picture of the strip does nothing.
+    @MainActor
+    var scrollingTopologySignature: String {
+        let bounds = workspaceTilingRect(self)
+        var values: [String] = [arrangement.rawValue, id.rawValue,
+            "\(bounds.minX),\(bounds.minY),\(bounds.width),\(bounds.height)"]
+        func visit(_ node: TreeNode) {
+            values.append("\(ObjectIdentifier(node).hashValue):\(node.bindingGeneration):\(node.children.count):\(node.scrollingColumnWidth ?? config.scrolling.columnWidth)")
+            if let window = node as? Window {
+                values.append("\(window.minimumLayoutSize.width),\(window.minimumLayoutSize.height)")
+            }
+            node.children.forEach(visit)
+        }
+        visit(rootTilingContainer)
+        return values.joined(separator: ",")
+    }
+
     @MainActor
     func scrollingGeometry(in rect: Rect? = nil, gaps: ResolvedGaps? = nil) -> ScrollingWorkspaceGeometry {
-        let rect = rect ?? workspaceTilingRect(self)
+        let fullRect = rect ?? workspaceTilingRect(self)
         let gaps = gaps ?? ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor)
+        let pin = scrollingPinSplit(in: fullRect, gaps: gaps)
+        let rect = pin?.strip ?? fullRect
         let bounds = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
         let monitorRect = workspaceMonitor.rect
         let parking = CGRect(x: monitorRect.minX, y: monitorRect.minY, width: monitorRect.width, height: monitorRect.height)
         let otherDisplays = monitors.filter { $0.rect.topLeftCorner != monitorRect.topLeftCorner }
         let overlapsVertically: (Rect) -> Bool = { $0.minY < monitorRect.maxY && $0.maxY > monitorRect.minY }
-        // A display beside this one is a wall: a column parked there would show on it.
-        let leftWall = otherDisplays.contains { abs($0.rect.maxX - monitorRect.minX) < 1 && overlapsVertically($0.rect) }
-        let rightWall = otherDisplays.contains { abs($0.rect.minX - monitorRect.maxX) < 1 && overlapsVertically($0.rect) }
-        let units = workspaceLayoutUnits
+        // A display beside this one is a wall: a column parked there would show on it. So is
+        // a pinned column: the strip shows no previews on its side.
+        let leftWall = pin != nil && scrollingPinSide == .left ||
+            otherDisplays.contains { abs($0.rect.maxX - monitorRect.minX) < 1 && overlapsVertically($0.rect) }
+        let rightWall = pin != nil && scrollingPinSide == .right ||
+            otherDisplays.contains { abs($0.rect.minX - monitorRect.maxX) < 1 && overlapsVertically($0.rect) }
+        let units = scrollingStripUnits
         let focused = lastScrollingFocusWindowId.flatMap(Window.get(byId:))
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
         let focusedIndex = focused.flatMap { focused in units.firstIndex(where: { $0 === focused.topLevelWorkspaceGroup }) }
@@ -284,7 +352,7 @@ extension Workspace {
 
     @MainActor
     var scrollingMetrics: ScrollingWorkspaceMetrics {
-        let units = workspaceLayoutUnits
+        let units = scrollingStripUnits
         let geometry = scrollingGeometry()
         let columns = zip(units, geometry.columns).map { node, frame in
             ScrollingColumnMetric(node: node,

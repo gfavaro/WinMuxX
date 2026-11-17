@@ -20,6 +20,8 @@ struct ScrollingConfig: ConvenienceCopyable, Equatable {
     /// The widths `scrolling-width next` and `previous` step through.
     var widthPresets = [0.3333, 0.5, 0.6667, 1.0]
     var centerFocusedColumn = ScrollingCenterMode.never
+    /// The map of the strip shown while it is panned, and by `scrolling-minimap`.
+    var minimapEnabled = true
 }
 
 func parseScrolling(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ errors: inout [TomlParseError]) -> ScrollingConfig {
@@ -35,6 +37,7 @@ func parseScrolling(_ raw: TOMLValueConvertible, _ trace: TomlBacktrace, _ error
         "edge-preview": Parser(\.edgePreview) { raw, trace in
             parseInt(raw, trace).filter(.semantic(trace, "Must be between 0 and 40 points")) { (0...40).contains($0) }
         },
+        "minimap-enabled": Parser(\.minimapEnabled, parseBool),
         "center-focused-column": Parser(\.centerFocusedColumn) { raw, trace in
             parseString(raw, trace).flatMap {
                 ScrollingCenterMode(rawValue: $0).orFailure(.semantic(trace, "Expected never, on-overflow or always"))

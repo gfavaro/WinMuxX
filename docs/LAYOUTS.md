@@ -91,7 +91,12 @@ column's share of the display. New windows open as a column right of the focused
 column's width, `scrolling-center` centres it, `scrolling-pan left`, `right` and `focus`
 scroll the strip half a display without moving focus or back to it, and
 `scrolling-focus` and `scrolling-move` take `1` to `9`, `first` or `last` (9 is the last
-column). Settings → Shortcuts lists them under Scrolling, and Settings → Windows →
+column). `scrolling-pin left` or `right` holds the focused column at that edge, full height,
+with a line beside it, while the rest of the strip scrolls; the same command again unpins
+it, and the pin lasts until WinMuxX quits. While you scroll the strip, and with
+`scrolling-minimap`, a map of its columns appears near the bottom of the display: click
+a column to go to it, drag one to reorder, or use the arrow keys and Return once the
+command opened it. Settings → Shortcuts lists them under Scrolling, and Settings → Windows →
 Scrolling workspaces edits the table below.
 With workspace swipes on and Swipe between full-screen apps on three fingers, three-finger
 left/right scrolls the strip with your fingers and focuses the column nearest the middle
@@ -106,6 +111,7 @@ column-width = 0.5                 # A new column's share of the display
 width-presets = [0.3333, 0.5, 0.6667, 1.0]
 edge-preview = 14                  # Points of an offscreen column left showing
 center-focused-column = 'never'    # never, on-overflow or always
+minimap-enabled = true             # The strip map while scrolling and on scrolling-minimap
 ```
 
 The strip geometry adapts Dinky's Scrolling layout (MIT; see

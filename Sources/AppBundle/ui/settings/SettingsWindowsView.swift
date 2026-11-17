@@ -13,6 +13,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("scrolling.width-presets", load: { config.scrolling.widthPresets.map { String(format: "%g", $0) }.joined(separator: ", ") }) private var scrollingWidthPresets: String
     @SettingsDraft("scrolling.edge-preview", load: { config.scrolling.edgePreview }) private var scrollingEdgePreview: Int
     @SettingsDraft("scrolling.center-focused-column", load: { config.scrolling.centerFocusedColumn }) private var scrollingCenter: ScrollingCenterMode
+    @SettingsDraft("scrolling.minimap-enabled", load: { config.scrolling.minimapEnabled }) private var scrollingMinimap: Bool
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
     @SettingsDraft("follow-app-activation.enabled", load: { config.followAppActivation.enabled }) private var followAppActivation: Bool
     @SettingsDraft("follow-app-activation.exclude-apps", load: { config.followAppActivation.excludeApps.joined(separator: ", ") }) private var followAppActivationExcluded: String
@@ -239,6 +240,10 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Center when cut off").tag(ScrollingCenterMode.onOverflow)
                 Text("Always center").tag(ScrollingCenterMode.always)
             } onChange: { persistConfig(section: "scrolling", key: "center-focused-column", value: "'\(scrollingCenter.rawValue)'") }
+            SettingsToggle("Show the strip map", id: "scrolling.minimap-enabled", isOn: $scrollingMinimap,
+                help: "A map of the strip's columns appears while you scroll it and with Toggle Strip Map; click a column to go to it, or drag it to reorder.") {
+                persistConfig(section: "scrolling", key: "minimap-enabled", value: scrollingMinimap ? "true" : "false")
+            }
         }
     }
 

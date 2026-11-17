@@ -57,6 +57,7 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
         workspace.scrollingOffset = offset
         // The strip moves without focus, so the layout must not scroll it back to the focus.
         workspace.lastScrollingFocusWindowId = focus.windowOrNil?.windowId
+        WorkspaceScrollingMinimap.shared.show(workspace, duringGesture: true)
         scheduleRefreshSession(.globalObserver("scrollingSwipe"))
     }
 
@@ -65,6 +66,7 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
         // The settle after the fingers lift glides as any layout does.
         workspace?.scrollingGestureMotionActive = false
         workspace?.scrollingGestureSessionID = nil
+        WorkspaceScrollingMinimap.shared.endGesture()
         guard commit, let workspace, workspace.isVisible, workspace.arrangement == .scrolling else {
             scheduleRefreshSession(.globalObserver("scrollingSwipeCancelled"))
             return

@@ -8,7 +8,9 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     private(set) var namingStyle: WorkspaceNamingStyle = .explicit
     var projectId: WorkspaceProjectId = workspaceProjectDefaultId
     var restoredDisplayIndex: Int?
-    var preferredMonitorPoint: CGPoint?
+    var preferredMonitorPoint: CGPoint? {
+        didSet { if oldValue != preferredMonitorPoint { scrollingSessionEpoch &+= 1 } }
+    }
     var lifecycle: WorkspaceLifecycle = .durable
     var lastConfiguredLayout: WorkspaceLayoutSettings?
     // Once workspace arrangements are used, returning to Dwindle must retain
@@ -24,8 +26,16 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     /// The groups as the last layout showed them, without those folded into another's bar.
     @MainActor var presentedTabbedLayout: TabbedLayout?
     var arrangement: WorkspaceLayoutName = .dwindle {
-        didSet { if arrangement != .dwindle { preservesTopLevelGroups = true } }
+        didSet {
+            if arrangement != .dwindle { preservesTopLevelGroups = true }
+            if oldValue != arrangement { scrollingSessionEpoch &+= 1 }
+        }
     }
+    /// Changes with the arrangement or display, ending anything begun on the strip before.
+    var scrollingSessionEpoch: UInt64 = 0
+    /// A column held at a screen edge, full height, while the rest of the strip scrolls.
+    weak var scrollingPinnedNode: TreeNode?
+    var scrollingPinSide = ScrollingPinCmdArgs.Side.left
     /// The Scrolling strip's viewport: how far its left edge is scrolled along the columns.
     @MainActor var scrollingOffset: CGFloat = 0
     /// The window the strip last scrolled to, so focus scrolls it only when focus moves.

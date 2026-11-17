@@ -28,6 +28,19 @@ public struct ScrollingMoveCmdArgs: CmdArgs {
     public var position: Lateinit<ScrollingColumnPosition> = .uninitialized
 }
 
+public struct ScrollingPinCmdArgs: CmdArgs {
+    public enum Side: String, CaseIterable, Sendable, Codable { case left, right }
+    public var commonState: CmdArgsCommonState
+    public init(rawArgs: StrArrSlice) { commonState = .init(rawArgs) }
+    public static let parser: CmdParser<Self> = .init(
+        kind: .scrollingPin,
+        allowInConfig: true,
+        help: "USAGE: winmuxx scrolling-pin (left|right)\nPin the focused column to that screen edge at full height while the strip scrolls beside it. The same command again unpins it.",
+        flags: [:], posArgs: [newMandatoryPosArgParser(\.side, parsePinSide, placeholder: Side.unionLiteral)],
+    )
+    public var side: Lateinit<Side> = .uninitialized
+}
+
 public struct ScrollingCenterCmdArgs: CmdArgs {
     public var commonState: CmdArgsCommonState
     public init(rawArgs: StrArrSlice) { commonState = .init(rawArgs) }
@@ -96,4 +109,12 @@ private func parseWidthTarget(input: PosArgParserInput) -> ParsedCliArgs<Scrolli
     if let action = ScrollingWidthCmdArgs.Action(rawValue: raw) { return .succ(.action(action), advanceBy: 1) }
     if let share = Double(raw), share.isFinite, (0.1...1).contains(share) { return .succ(.share(share), advanceBy: 1) }
     return .fail("Can't parse '\(raw)'\nPossible values: \(ScrollingWidthCmdArgs.Action.unionLiteral) or a share from 0.1 to 1", advanceBy: 1)
+}
+
+private func parsePinSide(input: PosArgParserInput) -> ParsedCliArgs<ScrollingPinCmdArgs.Side> {
+    guard let raw = input.nonFlagArgs().first else { return .fail("Expected left or right", advanceBy: 0) }
+    guard let side = ScrollingPinCmdArgs.Side(rawValue: raw) else {
+        return .fail("Can't parse '\(raw)'\nPossible values: \(ScrollingPinCmdArgs.Side.unionLiteral)", advanceBy: 1)
+    }
+    return .succ(side, advanceBy: 1)
 }
