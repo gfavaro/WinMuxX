@@ -376,7 +376,7 @@ change or user configuration rule was added.
 ## Runtime efficiency and TOML ownership (builds 82–83)
 
 The runtime changes and native measurement limits are recorded in
-[RUNTIME_EFFICIENCY.md](../RUNTIME_EFFICIENCY.md). The full local check passed **1,131
+[RUNTIME_EFFICIENCY.md](RUNTIME_EFFICIENCY.md). The full local check passed **1,131
 Swift tests and 20 Python tests**. Two focused Thread Sanitizer regressions passed
 for cancellation and persistence-worker ordering. The steady six-window layout
 benchmark now requires six frame writes over ten layouts; geometry-triggered
@@ -433,7 +433,7 @@ No production native registry or AX thread ownership was changed for this fix.
 Six Python tests validate process-counter units, the SDK v4 ABI size, PID reuse,
 interruption/coverage reporting and counter resets in `script/profile_runtime.py`.
 Native smoke checks verified completed and terminated partial reports. A detached
-two-hour observation is running; see [RELEASE_VALIDATION.md](../RELEASE_VALIDATION.md)
+two-hour observation is running; see [RELEASE_VALIDATION.md](RELEASE_VALIDATION.md)
 for its report path and the checks that remain blocked or unmeasured.
 
 ## Dinky 0.20 adaptations (build 98)

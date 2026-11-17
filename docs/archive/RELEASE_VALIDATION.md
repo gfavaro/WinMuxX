@@ -114,7 +114,7 @@ Build 98’s 60.001-second sample averaged **0.0122% of one CPU core**, with a
 scan found **0 leaks / 0 leaked bytes**. These bounded process observations do
 not certify long-session memory growth, battery life or compositor energy use.
 Evidence: `.local/validation/dinky-020-build98/`; feature/configuration details:
-[Dinky 0.20 adaptations](archive/DINKY_020_ADOPTION.md).
+[Dinky 0.20 adaptations](DINKY_020_ADOPTION.md).
 
 Earlier capture, gesture and parking reports retain their original build numbers.
 The feature changes remain local and uncommitted.
@@ -173,7 +173,7 @@ Before broader release, validate physical gestures, multi-display ownership and
 hotplug, sleep/wake, rapid native Mission Control interruption,
 and matched app/WindowServer energy traces. Passing synthetic tests does not
 replace those desktop checks. Native overview implementation and resource policy
-are documented in [Workspace overview](archive/WORKSPACE_OVERVIEW.md).
+are documented in [Workspace overview](WORKSPACE_OVERVIEW.md).
 
 The build 87 installation checksum check observed one concurrently added
 `single-window-aspect-ratio` setting. Removing that single added line reproduces
@@ -479,7 +479,7 @@ preferences, because that older app does not understand the new settings.
 
 No new live light-mode, accessibility-mode, IME or pointer-drag validation is
 claimed in this delivery. Automated UI policy and lifecycle coverage is described
-above. Current configuration semantics are documented in [configuration](CONFIGURATION.md).
+above. Current configuration semantics are documented in [configuration](../CONFIGURATION.md).
 
 ## Build 119 — adaptive tab chrome
 
@@ -536,7 +536,7 @@ fixed-seed rapid switching, diagnostic bounds/privacy/export failures/query
 isolation, native helper-layer reuse and memory trend calculations. The initial
 diagnostic-command implementation failed its query-isolation regression before
 the focused fix. The rule-to-test table and repeatable local protocol are in
-[ROBUSTNESS_VALIDATION.md](archive/ROBUSTNESS_VALIDATION.md).
+[ROBUSTNESS_VALIDATION.md](ROBUSTNESS_VALIDATION.md).
 
 Build **121** is signed with `WinMuxX Local Code Signing` and installed at
 `/Applications/WinMuxX.app`. Both client and server identify app source
@@ -609,7 +609,7 @@ Native theme checks used the current macOS appearance; explicit physical theme
 and accessibility toggles were not performed. Both scheme/contrast resolution
 policies are covered in automated tests. Live SketchyBar was not exercised; its
 optional adapter passed payload/ordering/reconnect identity/failure fixtures.
-See [STATE_API.md](STATE_API.md) and [MODE_LEADER_PLAN.md](archive/MODE_LEADER_PLAN.md).
+See [STATE_API.md](../STATE_API.md) and [MODE_LEADER_PLAN.md](MODE_LEADER_PLAN.md).
 Personal config, hook environment, reports and desktop screenshots remain private
 under `.release/`; none are committed.
 

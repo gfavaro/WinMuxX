@@ -52,9 +52,7 @@ Read [principles](PRINCIPLES.md) and [CONTRIBUTING](../CONTRIBUTING.md) first.
 ## Reference
 
 - [Reliability](RELIABILITY.md): AX failures, retries, UUID targeting, config backups, IPC limits.
-- [Runtime efficiency](RUNTIME_EFFICIENCY.md): persistence, notifications, queries, subscribers.
 - [Window management internals](WINDOW_MANAGEMENT_INTERNALS.md): AX measurements and tree geometry.
-- [Release validation](RELEASE_VALIDATION.md): completed checks and remaining gaps.
 - [State API](STATE_API.md)
 - [Roadmap](ROADMAP.md): progress, deferred work, manual validation.
 
@@ -84,3 +82,5 @@ guides above for today's settings and development workflow.
 - [Simplification review](archive/SIMPLIFY_REVIEW.md)
 - [Window motion](archive/WINDOW_MOTION.md)
 - [Plano de limpeza e controles nativos](archive/CODE_HEALTH_NATIVE_UI_PLAN.md)
+- [Runtime efficiency](archive/RUNTIME_EFFICIENCY.md): persistence, notifications, queries, subscribers.
+- [Release validation](archive/RELEASE_VALIDATION.md): completed checks and remaining gaps.

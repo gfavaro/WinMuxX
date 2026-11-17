@@ -150,7 +150,7 @@ For each row: identify existing coverage, add a regression only for a meaningful
 uncovered case, reproduce it, then make a separate fix if needed. Native Spaces
 workarounds from Dinky do not establish a defect in WinMuxX. Keep physical swipe
 latency, dock/undock, recovery and accessibility checks in the existing
-[roadmap](../ROADMAP.md) and [release validation](../RELEASE_VALIDATION.md).
+[roadmap](../ROADMAP.md) and [release validation](RELEASE_VALIDATION.md).
 
 ## Execution and completion
 
