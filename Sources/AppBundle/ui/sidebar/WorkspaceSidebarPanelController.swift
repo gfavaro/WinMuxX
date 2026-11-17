@@ -166,11 +166,10 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     func syncModelFromShared() {
         guard !isRetired else { return }
         var sidebarConfiguration = workspaceSidebarConfiguration()
-        // Scrolling columns slide under the sidebar, as at the display's edge: a see-through
-        // sidebar would show them, so it is frosted while its display shows a Scrolling workspace.
-        if sidebarConfiguration.background == .transparent,
-           workspaceSidebarMonitor(forScopeId: monitorScopeId)?.activeWorkspace.arrangement == .scrolling {
-            sidebarConfiguration.background = .sidebar
+        // Scrolling columns slide under the sidebar, as at the display's edge: a clear sidebar
+        // would show them, so it takes its background while its display shows a Scrolling workspace.
+        if workspaceSidebarMonitor(forScopeId: monitorScopeId)?.activeWorkspace.arrangement == .scrolling {
+            sidebarConfiguration.menuBarBackground = true
         }
         materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: viewModel.workspaceSidebarVisibleWidth)
         viewModel.setIfChanged(\.workspaceSidebarConfiguration, sidebarConfiguration)
