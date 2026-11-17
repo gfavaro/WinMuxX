@@ -4,11 +4,17 @@ func shouldSuppressSwapDestination(sourceWindow: Window, subject: WindowDragSubj
     subject == .window && sourceWindow.isFloating
 }
 
+/// A floating window dropped on another workspace stays floating there. True when it was one.
+@MainActor
+private func moveFloatingWindowIfNeeded(sourceNode: TreeNode, sourceWindow: Window, to targetWorkspace: Workspace) -> Bool {
+    guard sourceNode is Window, sourceWindow.isFloating else { return false }
+    sourceNode.bind(to: targetWorkspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    return true
+}
+
 @MainActor
 func applySidebarWorkspaceMove(sourceNode: TreeNode, sourceWindow: Window, targetWorkspace: Workspace) {
-    if sourceNode is Window, sourceWindow.isFloating {
-        sourceNode.bind(to: targetWorkspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-    } else {
+    if !moveFloatingWindowIfNeeded(sourceNode: sourceNode, sourceWindow: sourceWindow, to: targetWorkspace) {
         let binding = workspaceAppendBindingData(targetWorkspace: targetWorkspace, index: INDEX_BIND_LAST)
         sourceNode.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
     }
@@ -17,8 +23,7 @@ func applySidebarWorkspaceMove(sourceNode: TreeNode, sourceWindow: Window, targe
 // Internal to keep cross-workspace insertion semantics unit-testable.
 @MainActor
 func applyWorkspaceMove(sourceNode: TreeNode, sourceWindow: Window, mouseLocation: CGPoint, targetWorkspace: Workspace) {
-    if sourceNode is Window, sourceWindow.isFloating {
-        sourceNode.bind(to: targetWorkspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    if moveFloatingWindowIfNeeded(sourceNode: sourceNode, sourceWindow: sourceWindow, to: targetWorkspace) {
         _ = sourceWindow.focusWindow()
         return
     }
@@ -48,8 +53,7 @@ func applyWorkspaceZoneMove(
         )
         return
     }
-    if sourceNode is Window, sourceWindow.isFloating {
-        sourceNode.bind(to: targetWorkspace, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    if moveFloatingWindowIfNeeded(sourceNode: sourceNode, sourceWindow: sourceWindow, to: targetWorkspace) {
         _ = sourceWindow.focusWindow()
         return
     }
