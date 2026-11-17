@@ -208,6 +208,40 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.scrollingOffset, offset)
     }
 
+    func testAMouseResizeKeepsTheOtherEdgeWhereItWas() async throws {
+        let (workspace, windows) = try await strip(3)
+        _ = windows[1].focusWindow()
+        try await workspace.layoutWorkspace()
+        let shown = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
+        // The left edge is dragged 150 points left: the right edge stays put.
+        applyResizeWithMouse(windows[1], rect: Rect(topLeftX: shown.minX - 150, topLeftY: shown.minY,
+                                                    width: shown.width + 150, height: shown.height))
+        cancelManipulatedWithMouseState()
+        try await workspace.layoutWorkspace()
+        let wider = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(wider.maxX, shown.maxX, accuracy: 2, "The edge not dragged stays where it was")
+        XCTAssertEqual(wider.width, shown.width + 150, accuracy: 2)
+    }
+
+    func testWideningThenNarrowingInOneDragPreviewsWhatTheReleaseLaysOut() async throws {
+        let (workspace, windows) = try await strip(3)
+        try await workspace.layoutWorkspace()
+        let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        func rect(_ delta: CGFloat) -> Rect {
+            Rect(topLeftX: shown.minX, topLeftY: shown.minY, width: shown.width + delta, height: shown.height)
+        }
+        _ = scrollingResizePreviewItems(windows[0], rect: rect(300))
+        let narrower = try XCTUnwrap(scrollingResizePreviewItems(windows[0], rect: rect(-120))).1
+        let direct = try XCTUnwrap(scrollingResizePreviewItems(windows[0], rect: rect(-120))).1
+        XCTAssertEqual(narrower.map(\.frame), direct.map(\.frame), "Widening first leaves nothing behind")
+        applyResizeWithMouse(windows[0], rect: rect(-120))
+        cancelManipulatedWithMouseState()
+        try await workspace.layoutWorkspace()
+        let neighbour = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
+        let previewed = try XCTUnwrap(narrower.first { $0.id == windows[1].windowId })
+        XCTAssertEqual(neighbour.toAppKitScreenRect.minX, previewed.frame.minX, accuracy: 2, "The release lands where the preview showed")
+    }
+
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
         workspace.scrollingGestureMotionActive = true

@@ -526,6 +526,25 @@ extension Workspace {
         return true
     }
 
+    /// A mouse resize of `window`'s column from `previous` to `rect`: the width follows the dragged
+    /// edge and the strip scrolls so the other edge stays where it was on screen.
+    @MainActor
+    func resizeScrollingColumnWithMouse(_ window: Window, from previous: Rect, to rect: Rect) {
+        guard let group = scrollingColumn(of: window), abs(rect.width - previous.width) > 1,
+              let before = scrollingMetrics.columns.first(where: { $0.node === group }),
+              let range = scrollingColumnWidthRange(of: group) else { return }
+        let offset = scrollingOffset
+        guard setScrollingColumnWidth(of: group, to: range.width + rect.width - previous.width),
+              let after = scrollingMetrics.columns.first(where: { $0.node === group }) else { return }
+        let leftEdgeDragged = abs(rect.minX - previous.minX) > 1
+        scrollingOffset = leftEdgeDragged
+            ? after.start + after.width - (before.start + before.width - offset)
+            : after.start - (before.start - offset)
+        // The strip stays where the mouse left it: neither focus nor the anchor scrolls it back.
+        lastScrollingFocusWindowId = window.windowId
+        captureScrollingViewportAnchor(preferredWindow: window)
+    }
+
     @MainActor
     func centerFocusedScrollingColumn() {
         guard let window = focus.windowOrNil, window.nodeWorkspace === self else { return }

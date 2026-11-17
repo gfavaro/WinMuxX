@@ -138,15 +138,14 @@ func proposedTabbedMouseResize(_ window: Window, rect: Rect) -> (Workspace, Tabb
 func scrollingResizePreviewItems(_ window: Window, rect: Rect) -> (Workspace, [WindowResizePreviewItem])? {
     guard let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, workspace.isVisible,
           window.parent is TilingContainer, let column = workspace.scrollingColumn(of: window),
-          let previous = window.lastAppliedLayoutPhysicalRect,
-          let range = workspace.scrollingColumnWidthRange(of: column) else { return nil }
+          let previous = window.lastAppliedLayoutPhysicalRect else { return nil }
     // Laid out as the release will lay it out, scrolling included, then put back as it was.
+    // Laid out as the release will lay it out, then put back as it was.
     let saved = (width: column.scrollingColumnWidth, offset: workspace.scrollingOffset,
                  focus: workspace.lastScrollingFocusWindowId, anchor: workspace.scrollingAnchorWindowId,
                  position: workspace.scrollingAnchorViewportPosition, area: workspace.scrollingAnchorAreaWidth,
                  center: workspace.scrollingAnchorLogicalCenter)
-    workspace.setScrollingColumnWidth(of: column, to: range.width + rect.width - previous.width)
-    workspace.scrollToFocusedColumnIfNeeded()
+    workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect)
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
     let frames = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace), gaps: gaps)
     column.scrollingColumnWidth = saved.width
@@ -201,9 +200,8 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     if let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, window.parent is TilingContainer {
         if let previous = window.lastAppliedLayoutPhysicalRect, abs(rect.width - previous.width) > 1,
            let group = workspace.scrollingColumn(of: window) {
-            let current = workspace.scrollingColumnWidthRange(of: group)?.width ?? previous.width
-            let changed = workspace.setScrollingColumnWidth(of: group, to: current + rect.width - previous.width)
-            lastScrollingMouseResize = "window \(window.windowId) width \(Int(previous.width)) -> \(Int(rect.width)), column \(Int(current)) -> share \(group.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default")\(changed ? "" : " (unchanged)")"
+            workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect)
+            lastScrollingMouseResize = "window \(window.windowId) width \(Int(previous.width)) -> \(Int(rect.width)), share \(group.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default")"
         } else {
             lastScrollingMouseResize = "window \(window.windowId) released without a width change (laid out \(window.lastAppliedLayoutPhysicalRect.map { "\(Int($0.width))" } ?? "never"), dropped at \(Int(rect.width)))"
         }
