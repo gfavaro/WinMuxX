@@ -9,6 +9,16 @@ func dragSubjectNode(for sourceWindow: Window, subject: WindowDragSubject) -> Tr
     }
 }
 
+extension Window {
+    /// The tab group this window and `other` are both tabs of, if any: a tab dragged out of its
+    /// group and over the group again is going back, not onto another window.
+    @MainActor
+    func sharedTabGroup(with other: Window) -> TilingContainer? {
+        guard let group = parent as? TilingContainer, group.layout == .tabGroup, other.parent === group else { return nil }
+        return group
+    }
+}
+
 @MainActor
 func dragIntentTargetNode(
     sourceWindow: Window,
@@ -16,10 +26,7 @@ func dragIntentTargetNode(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> TreeNode {
-    guard let sourceParent = sourceWindow.parent as? TilingContainer,
-          sourceParent.layout == .tabGroup,
-          targetWindow.parent === sourceParent
-    else { return targetWindow.moveNode }
+    guard let sourceParent = sourceWindow.sharedTabGroup(with: targetWindow) else { return targetWindow.moveNode }
 
     if subject == .window, detachOrigin == .tabStrip {
         logWindowDragHitTestIfNeeded(

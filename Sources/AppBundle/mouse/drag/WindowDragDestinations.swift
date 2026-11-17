@@ -33,12 +33,7 @@ func windowSurfaceDestination(
         targetNode: targetNode,
         mouseLocation: mouseLocation,
     )
-    if detachOrigin == .tabStrip,
-       subject == .window,
-       let sourceParent = sourceWindow.parent as? TilingContainer,
-       sourceParent.layout == .tabGroup,
-       targetWindow.parent === sourceParent
-    {
+    if detachOrigin == .tabStrip, subject == .window, sourceWindow.sharedTabGroup(with: targetWindow) != nil {
         logWindowDragHitTestIfNeeded(
             signature: "self-tab-group-intent:source=\(sourceWindow.windowId):target=\(targetWindow.windowId):intent=\(resolvedIntent?.intent.zone.rawValue ?? "nil")",
             "windowDragTarget.selfTabGroupIntent mouse=\(debugDescribe(mouseLocation)) source=\(debugDescribe(sourceWindow)) target=\(debugDescribe(targetWindow)) targetNode=\(debugDescribe(targetNode)) visible=\(debugDescribe(targetNode.windowDragVisibleRect)) resolved=\(resolvedIntent?.intent.zone.rawValue ?? "nil")"

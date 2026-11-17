@@ -111,11 +111,7 @@ func currentTabDetachDestination(sourceWindow: Window, mouseLocation: CGPoint, o
 
 @MainActor
 func shouldSuppressSameTabGroupTabDestination(sourceWindow: Window, targetWindow: Window, detachOrigin _: TabDetachOrigin) -> Bool {
-    guard let sourceParent = sourceWindow.parent as? TilingContainer,
-          sourceParent.layout == .tabGroup,
-          targetWindow.parent === sourceParent
-    else { return false }
-    return true
+    sourceWindow.sharedTabGroup(with: targetWindow) != nil
 }
 
 @MainActor
@@ -125,11 +121,5 @@ func shouldSuppressSameTabGroupSwapDestination(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> Bool {
-    guard subject == .window,
-          detachOrigin == .tabStrip,
-          let sourceParent = sourceWindow.parent as? TilingContainer,
-          sourceParent.layout == .tabGroup,
-          targetWindow.parent === sourceParent
-    else { return false }
-    return true
+    subject == .window && detachOrigin == .tabStrip && sourceWindow.sharedTabGroup(with: targetWindow) != nil
 }

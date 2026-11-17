@@ -34,9 +34,7 @@ func ownTabGroupReturnDestination(
     guard subject == .window,
           detachOrigin == .tabStrip,
           config.windowTabs.enabled,
-          let sourceParent = sourceWindow.parent as? TilingContainer,
-          sourceParent.layout == .tabGroup,
-          targetWindow.parent === sourceParent
+          let sourceParent = sourceWindow.sharedTabGroup(with: targetWindow)
     else { return nil }
     let sourceIndex = sourceWindow.ownIndex ?? 0
     if let targetFrame = sourceParent.windowDragVisibleRect,
