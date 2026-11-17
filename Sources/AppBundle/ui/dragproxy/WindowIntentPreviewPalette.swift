@@ -2,34 +2,13 @@ import AppKit
 import SwiftUI
 
 enum WindowIntentPreviewPalette {
-    static func activeZoneFill(style: ChromeStyle, solidColor: Color) -> Color {
+    /// The drop preview's colour: the WinMuxX accent, as borders and tab pills use, or the
+    /// solid chrome colour when the chrome is solid.
+    @MainActor
+    static func tint(style: ChromeStyle, solidColor: Color) -> Color {
         switch style {
-            case .liquidGlass:
-                Color.primary.opacity(GlassToken.fillActive)
-            case .solid:
-                solidColor.opacity(0.68)
+            case .liquidGlass: Color(nsColor: winMuxAccentColor)
+            case .solid: solidColor
         }
-    }
-
-    static func activeZoneStroke(style: ChromeStyle, solidColor: Color) -> Color {
-        switch style {
-            case .liquidGlass:
-                Color.primary.opacity(GlassToken.strokeActive)
-            case .solid:
-                solidColor.opacity(0.96)
-        }
-    }
-
-    static func activeZoneGlow(style: ChromeStyle, solidColor: Color) -> Color {
-        switch style {
-            case .liquidGlass:
-                Color.primary.opacity(0.14)
-            case .solid:
-                solidColor.opacity(0.34)
-        }
-    }
-
-    static func zoneSymbol(isActive: Bool) -> Color {
-        Color.primary.opacity(isActive ? 1.0 : GlassToken.textTertiary)
     }
 }

@@ -26,16 +26,6 @@ final class WindowDragCursorProxyPanel: NSPanelHud {
         hostingView.autoresizingMask = [.width, .height]
     }
 
-    func show(label: String, isGroup: Bool, mouseScreenPoint: CGPoint) {
-        updateContent(label: label, isGroup: isGroup)
-        proxySize = windowDragCursorProxySize(label: label)
-        updateFrame(mouseScreenPoint: mouseScreenPoint)
-        startFollowingMouseIfNeeded()
-        if !isVisible {
-            orderFrontRegardless()
-        }
-    }
-
     func show(preview: WorkspaceSidebarDropPreviewViewModel, mouseScreenPoint: CGPoint) {
         updateContent(preview: preview)
         proxySize = windowDragCursorProxySize(label: preview.label)
@@ -71,13 +61,6 @@ struct WindowDragCursorProxyContent: Equatable {
 }
 
 extension WindowDragCursorProxyPanel {
-    func updateContent(label: String, isGroup: Bool) {
-        let nextContent = WindowDragCursorProxyContent(label: label, isGroup: isGroup)
-        guard currentContent != nextContent else { return }
-        hostingView.rootView = AnyView(WindowDragCursorProxyView(label: label, isGroup: isGroup))
-        currentContent = nextContent
-    }
-
     func updateContent(preview: WorkspaceSidebarDropPreviewViewModel) {
         let nextContent = WindowDragCursorProxyContent(
             label: preview.label,
@@ -90,8 +73,12 @@ extension WindowDragCursorProxyPanel {
     }
 }
 
+/// Room around the chip for its shadow.
+let windowDragCursorProxyShadowMargin: CGFloat = 12
+
 func windowDragCursorProxySize(label: String) -> CGSize {
-    CGSize(width: min(max(CGFloat(label.count) * 7 + 42, 96), 224), height: 28)
+    CGSize(width: min(max(CGFloat(label.count) * 7 + 42, 96), 224) + 2 * windowDragCursorProxyShadowMargin,
+           height: 28 + 2 * windowDragCursorProxyShadowMargin)
 }
 extension WindowDragCursorProxyPanel {
     func startFollowingMouseIfNeeded() {

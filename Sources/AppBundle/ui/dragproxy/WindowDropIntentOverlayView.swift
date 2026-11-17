@@ -3,13 +3,18 @@ import SwiftUI
 struct WindowDropIntentOverlayView: View {
     let model: WindowDropIntentOverlayModel
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        ZStack {
-            OverlaySurface(cornerRadius: cornerRadius)
-
-            ForEach(localZones) { zone in
-                dropZoneView(zone)
+        let tint = WindowIntentPreviewPalette.tint(style: config.workspaceSidebar.chromeStyle,
+                                                   solidColor: config.workspaceSidebar.resolvedSolidChromeColor)
+        ZStack(alignment: .topLeading) {
+            // A light wash, so the window being dropped on stays readable beneath.
+            shape.fill(tint.opacity(0.06))
+            shape.strokeBorder(tint.opacity(0.28), lineWidth: StrokeToken.hairline)
+            if let zone = model.activeZone {
+                landingGhost(zone, tint: tint)
             }
         }
         .clipShape(shape)
@@ -24,60 +29,60 @@ struct WindowDropIntentOverlayView: View {
         model.cornerRadius ?? min(max(min(model.targetFrame.width, model.targetFrame.height) * 0.018, 10), 14)
     }
 
-    private var localZones: [WindowIntentZone] {
-        WindowIntentZoneBuilder.zones(in: Rect(
-            topLeftX: 0,
-            topLeftY: 0,
-            width: model.targetFrame.width,
-            height: model.targetFrame.height
-        ))
-    }
+    private var size: CGSize { CGSize(width: model.targetFrame.width, height: model.targetFrame.height) }
 
-    private func dropZoneView(_ zone: WindowIntentZone) -> some View {
-        let unavailable = model.unavailableZones.contains(zone.zone)
-        let isActive = zone.zone == model.activeZone && !unavailable
-        let style = config.workspaceSidebar.chromeStyle
-        let solidColor = config.workspaceSidebar.resolvedSolidChromeColor
-        let activeShape = RoundedRectangle(cornerRadius: activeZoneCornerRadius(for: zone.frame), style: .continuous)
-        return ZStack {
-            if isActive {
-                activeShape
-                    .fill(WindowIntentPreviewPalette.activeZoneFill(style: style, solidColor: solidColor))
-                    .overlay(alignment: .center) {
-                        activeShape
-                            .stroke(
-                                WindowIntentPreviewPalette.activeZoneStroke(style: style, solidColor: solidColor),
-                                lineWidth: StrokeToken.emphasis
-                            )
-                    }
-                    .shadow(color: WindowIntentPreviewPalette.activeZoneGlow(style: style, solidColor: solidColor), radius: 10)
-                    .transition(.opacity)
+    /// Where the dragged window lands, drawn as a ghost of it: one shape that glides and reshapes
+    /// from zone to zone, with only that zone's symbol.
+    private func landingGhost(_ zone: WindowDropZone, tint: Color) -> some View {
+        let unavailable = model.unavailableZones.contains(zone)
+        let frame = landingFrame(for: zone).insetBy(dx: 8, dy: 8)
+        let ghost = RoundedRectangle(cornerRadius: max(cornerRadius - 4, RadiusToken.row), style: .continuous)
+        let color = unavailable ? Color.secondary : tint
+        return ZStack(alignment: .top) {
+            ghost.fill(color.opacity(unavailable ? 0.10 : 0.22))
+            if zone == .tab, !unavailable {
+                // Joining the tabs: the bar the window's tab joins, across the top.
+                UnevenRoundedRectangle(topLeadingRadius: max(cornerRadius - 4, RadiusToken.row),
+                                       topTrailingRadius: max(cornerRadius - 4, RadiusToken.row), style: .continuous)
+                    .fill(color.opacity(0.35))
+                    .frame(height: min(resolvedWindowTabBarHeight(), frame.height / 4))
             }
-            if unavailable {
-                // No room for a split here: say so where the pointer is, and drop nothing.
-                VStack(spacing: 6) {
-                    Image(systemName: "nosign")
-                        .font(.system(size: iconSize(for: zone.frame) * 0.8, weight: .semibold))
-                    if zone.zone == model.activeZone, let reason = model.unavailableReason {
-                        Text(reason)
-                            .font(.system(size: 11, weight: .medium))
-                            .multilineTextAlignment(.center)
-                            .frame(maxWidth: max(zone.frame.width - 16, 60))
-                    }
+            // Only the outline glows: a glow behind the translucent fill would show through it.
+            ghost.strokeBorder(color.opacity(unavailable ? 0.45 : 0.9),
+                               style: StrokeStyle(lineWidth: StrokeToken.emphasis, dash: unavailable ? [6, 5] : []))
+                .shadow(color: color.opacity(unavailable ? 0 : 0.45), radius: 10)
+            VStack(spacing: 6) {
+                Image(systemName: unavailable ? "nosign" : symbolName(for: zone))
+                    .font(.system(size: iconSize(for: frame), weight: .semibold))
+                if unavailable, let reason = model.unavailableReason {
+                    Text(reason)
+                        .font(.system(size: 11, weight: .medium))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: max(frame.width - 16, 60))
                 }
-                .foregroundStyle(WindowIntentPreviewPalette.zoneSymbol(isActive: false).opacity(0.6))
-            } else if let name = symbolName(for: zone.zone) {
-                Image(systemName: name)
-                    .font(.system(size: iconSize(for: zone.frame), weight: .semibold))
-                    .foregroundStyle(WindowIntentPreviewPalette.zoneSymbol(isActive: isActive))
             }
+            .foregroundStyle(unavailable ? Color.secondary : tint)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(width: zone.frame.width, height: zone.frame.height)
-        .position(x: zone.frame.center.x, y: zone.frame.center.y)
-        .animation(MotionToken.quick, value: model.activeZone)
+        .frame(width: frame.width, height: frame.height)
+        .offset(x: frame.minX, y: frame.minY)
+        .animation(reduceMotion ? nil : MotionToken.pill, value: zone)
     }
 
-    private func symbolName(for zone: WindowDropZone) -> String? {
+    /// The part of the target the window takes for each zone: a half for a split, all of it to
+    /// swap or join the tabs.
+    private func landingFrame(for zone: WindowDropZone) -> CGRect {
+        let w = size.width, h = size.height
+        return switch zone {
+            case .left: CGRect(x: 0, y: 0, width: w / 2, height: h)
+            case .right: CGRect(x: w / 2, y: 0, width: w / 2, height: h)
+            case .top: CGRect(x: 0, y: 0, width: w, height: h / 2)
+            case .bottom: CGRect(x: 0, y: h / 2, width: w, height: h / 2)
+            case .middle, .tab: CGRect(origin: .zero, size: size)
+        }
+    }
+
+    private func symbolName(for zone: WindowDropZone) -> String {
         switch zone {
             case .left:
                 "arrow.left"
@@ -94,11 +99,7 @@ struct WindowDropIntentOverlayView: View {
         }
     }
 
-    private func iconSize(for frame: Rect) -> CGFloat {
-        min(max(min(frame.width, frame.height) * 0.38, 14), 42)
-    }
-
-    private func activeZoneCornerRadius(for frame: Rect) -> CGFloat {
-        min(max(min(frame.width, frame.height) * 0.08, RadiusToken.row), RadiusToken.section)
+    private func iconSize(for frame: CGRect) -> CGFloat {
+        min(max(min(frame.width, frame.height) * 0.22, 18), 44)
     }
 }

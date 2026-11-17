@@ -4,12 +4,8 @@ struct WindowDragCursorProxyView: View {
     let label: String
     let isGroup: Bool
     let preview: WorkspaceSidebarDropPreviewViewModel?
-
-    init(label: String, isGroup: Bool) {
-        self.label = label
-        self.isGroup = isGroup
-        self.preview = nil
-    }
+    @State private var appeared = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(preview: WorkspaceSidebarDropPreviewViewModel) {
         self.label = preview.label
@@ -49,6 +45,12 @@ struct WindowDragCursorProxyView: View {
         .padding(.vertical, 4)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(WindowDragCursorProxyBackground(isGroup: isGroup))
+        .glassShadow(.raised)
+        // Picked up: the chip pops in under the pointer.
+        .scaleEffect(appeared || reduceMotion ? 1 : 0.86)
+        .opacity(appeared || reduceMotion ? 1 : 0)
+        .onAppear { withAnimation(MotionToken.appear) { appeared = true } }
+        .padding(windowDragCursorProxyShadowMargin)
         .modifier(ChromeResolvedAppearance())
         .allowsHitTesting(false)
     }
