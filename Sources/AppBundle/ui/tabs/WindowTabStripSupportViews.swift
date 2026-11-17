@@ -56,23 +56,7 @@ struct WindowTabGroupHandleView: View {
             guard let windowId, !isWindowTabStripDragInProgress() else { return }
             focusWindowFromTabStripClick(windowId, fallbackWorkspace: workspaceName)
         }
-        .simultaneousGesture(
-            DragGesture(minimumDistance: windowTabStripGroupDragMinimumDistance, coordinateSpace: .global)
-                .onChanged { _ in
-                    noteCurrentMousePointerSample()
-                    guard let windowId,
-                          shouldAllowTabStripChromeGroupDrag(windowId: windowId)
-                    else { return }
-                    updateMoveFromTabStrip(windowId)
-                }
-                .onEnded { _ in
-                    noteCurrentMousePointerSample()
-                    guard let windowId,
-                          shouldContinueCurrentGroupDrag(windowId: windowId)
-                    else { return }
-                    finishMoveFromTabStrip()
-                },
-        )
+        .simultaneousGesture(windowTabGroupDragGesture(for: windowId))
     }
 }
 

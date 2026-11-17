@@ -28,25 +28,27 @@ struct WindowTabStripView: View {
     }
 }
 
-extension WindowTabStripView {
-    func groupDragGesture(for windowId: UInt32?) -> some Gesture {
-        DragGesture(minimumDistance: windowTabStripGroupDragMinimumDistance, coordinateSpace: .global)
-            .onChanged { _ in
-                noteCurrentMousePointerSample()
-                guard let windowId,
-                      shouldAllowTabStripChromeGroupDrag(windowId: windowId)
-                else { return }
-                updateMoveFromTabStrip(windowId)
-            }
-            .onEnded { _ in
-                noteCurrentMousePointerSample()
-                guard let windowId,
-                      shouldContinueCurrentGroupDrag(windowId: windowId)
-                else { return }
-                finishMoveFromTabStrip()
-            }
-    }
+/// Dragging a tab group by its strip or its handle moves the whole group.
+@MainActor
+func windowTabGroupDragGesture(for windowId: UInt32?) -> some Gesture {
+    DragGesture(minimumDistance: windowTabStripGroupDragMinimumDistance, coordinateSpace: .global)
+        .onChanged { _ in
+            noteCurrentMousePointerSample()
+            guard let windowId,
+                  shouldAllowTabStripChromeGroupDrag(windowId: windowId)
+            else { return }
+            updateMoveFromTabStrip(windowId)
+        }
+        .onEnded { _ in
+            noteCurrentMousePointerSample()
+            guard let windowId,
+                  shouldContinueCurrentGroupDrag(windowId: windowId)
+            else { return }
+            finishMoveFromTabStrip()
+        }
+}
 
+extension WindowTabStripView {
     func tabScrollBackgroundGroupDragGesture(
         for windowId: UInt32?,
         context: WindowTabStripLayoutContext,
@@ -129,7 +131,7 @@ extension WindowTabStripView {
                         guard let groupDragWindowId, !isWindowTabStripDragInProgress() else { return }
                         focusWindowFromTabStripClick(groupDragWindowId, fallbackWorkspace: strip.workspaceName)
                     }
-                    .gesture(groupDragGesture(for: groupDragWindowId))
+                    .gesture(windowTabGroupDragGesture(for: groupDragWindowId))
             }
 
             WindowTabGroupHandleView(
