@@ -32,6 +32,12 @@ final class TilingContainer: TreeNode, NonLeafTreeNodeObject { // todo consider 
         dwindleOrientation ?? (width >= height ? .h : .v)
     }
 
+    /// The direction this split was made in. Dwindle navigates by the shape it last had on screen
+    /// (`navigationOrientation`); other layouts read the tree by this, which a resize cannot change.
+    var declaredOrientation: Orientation {
+        layout == .dwindle ? dwindleOrientation ?? orientation : orientation
+    }
+
     @MainActor
     var navigationOrientation: Orientation {
         guard layout == .dwindle else { return orientation }

@@ -101,7 +101,7 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
     if direction.orientation == .v {
         var node = window.moveNode
         while node !== column, let parent = node.parent as? TilingContainer {
-            if parent.navigationOrientation == direction.orientation, let ownIndex = node.ownIndex {
+            if parent.declaredOrientation == direction.orientation, let ownIndex = node.ownIndex {
                 let target = ownIndex + direction.focusOffset
                 if parent.children.indices.contains(target) {
                     let sibling = parent.children[target]
