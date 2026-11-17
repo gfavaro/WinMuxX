@@ -119,6 +119,24 @@ final class DwindleReferenceParityTest: XCTestCase {
         XCTAssertEqual(shares[2], 1.0 / 3, accuracy: 0.000001)
     }
 
+    func testWindowsFoundTogetherSpiralBeforeAnyIsLaidOut() {
+        bounds = Rect(topLeftX: 0, topLeftY: 0, width: 1600, height: 900)
+        let workspace = focus.workspace
+        workspace.rootTilingContainer.dwindleOrientation = nil
+        // As at startup: each window is placed before the previous ones have frames.
+        let windows: [TestWindow] = (1...4).map { id in
+            let binding = bindingDataForNewTilingWindow(workspace, window: nil)
+            let window = TestWindow.new(id: UInt32(id), parent: workspace)
+            window.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return window
+        }
+        let frames = render()
+        let rects = windows.map { frames[$0.windowId]! }
+        XCTAssertLessThan(rects[0].maxX, rects[1].minX + 1, "The first window takes the left side")
+        XCTAssertLessThan(rects[1].maxY, rects[2].minY + 1, "The next ones stack beneath")
+        XCTAssertGreaterThan(rects.map(\.width).min()!, bounds.width / 5, "No window is squeezed into a column")
+    }
+
     func testSpiralSavedByOlderVersionsRestoresWithTheSameFrames() async throws {
         bounds = Rect(topLeftX: 0, topLeftY: 0, width: 1600, height: 900)
         let workspace = focus.workspace

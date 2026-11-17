@@ -94,7 +94,10 @@ private func bindingDataBySplittingDwindleAnchor(workspace: Workspace, focusedWi
     while let parent = anchor.parent as? TilingContainer, parent.layout == .tabGroup {
         anchor = parent
     }
-    let splitRect = anchor.lastAppliedLayoutPhysicalRect ?? anchor.lastAppliedLayoutVirtualRect ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
+    // Windows found together, as at startup, arrive before any is laid out: the anchor's area then
+    // comes from the tree, not from the whole display, so they spiral instead of forming a row.
+    let splitRect = anchor.lastAppliedLayoutPhysicalRect ?? anchor.lastAppliedLayoutVirtualRect
+        ?? dwindleGeometry(in: workspace)[ObjectIdentifier(anchor)] ?? workspace.workspaceMonitor.visibleRectPaddedByOuterGaps
     let orientation: Orientation = splitRect.width >= splitRect.height ? .h : .v
     let parent = anchor.parent as? TilingContainer
     if let parent, parent.layout == .dwindle,
