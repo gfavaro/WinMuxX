@@ -47,8 +47,8 @@ extension Workspace {
             syncTabbedGroups()
             let gaps = context.resolvedGaps.inner
             let gap = CGSize(width: gaps.horizontal, height: gaps.vertical)
-            presentedTabbedLayout = foldedTabbedLayout(in: rect, gap: gap)
-            let frames = presentedTabbedLayout?.frames(in: rect, gap: gap) ?? []
+            tabbedState.presentedLayout = foldedTabbedLayout(in: rect, gap: gap)
+            let frames = tabbedState.presentedLayout?.frames(in: rect, gap: gap) ?? []
             // A group not shown now (its windows briefly missing, or folded into another's bar) is no
             // neighbour to move to.
             for group in tabbedGroups { group.lastFrame = nil }

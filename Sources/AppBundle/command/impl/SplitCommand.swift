@@ -15,8 +15,8 @@ struct SplitCommand: Command {
             let orientation: Orientation = switch args.arg.val {
                 case .vertical: .v
                 case .horizontal: .h
-                case .opposite: (workspace.presentedTabbedLayout?.nearestSplitOrientation(of: group.barGroup)
-                    ?? workspace.tabbedLayout?.nearestSplitOrientation(of: group) ?? .v).opposite
+                case .opposite: (workspace.tabbedState.presentedLayout?.nearestSplitOrientation(of: group.barGroup)
+                    ?? workspace.tabbedState.layout?.nearestSplitOrientation(of: group) ?? .v).opposite
             }
             let side: CardinalDirection = orientation == .h ? .right : .down
             // Where the windows would not fit, the new group would only fold back into this bar.

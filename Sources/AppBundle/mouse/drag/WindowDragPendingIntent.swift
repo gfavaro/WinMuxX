@@ -380,14 +380,14 @@ func bringTabbedGroupAlong(_ carried: (workspace: Workspace, windowIds: [UInt32]
         }
     }
     carried.workspace.tabbedGroups.forEach { $0.windowIds.removeAll { carried.windowIds.contains($0) } }
-    carried.workspace.tabbedLayout = carried.workspace.tabbedLayout?.pruned()
+    carried.workspace.tabbedState.layout = carried.workspace.tabbedState.layout?.pruned()
     guard target.arrangement == .tabbed else { return }
     target.syncTabbedGroups()
     guard let group = target.tabbedGroup(containing: window.windowId) else { return }
     for other in target.tabbedGroups where other !== group { other.windowIds.removeAll { carried.windowIds.contains($0) } }
     group.windowIds = group.windowIds.filter { !carried.windowIds.contains($0) } + carried.windowIds
     group.activeWindowId = window.windowId
-    target.tabbedLayout = target.tabbedLayout?.pruned()
+    target.tabbedState.layout = target.tabbedState.layout?.pruned()
 }
 
 /// Over a Tabbed workspace's bar, as over a tab strip: the dragged tab's own bar makes room where

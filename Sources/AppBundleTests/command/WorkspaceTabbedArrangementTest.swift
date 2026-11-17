@@ -413,8 +413,8 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
     func testNewWindowsFindTheFocusedGroupAfterARestore() async throws {
         let (workspace, windows, _, _) = try await makeTwoGroups()
         _ = windows[2].focusWindow()
-        let frozen = try XCTUnwrap(workspace.tabbedLayout.map(FrozenTabbedLayout.init))
-        workspace.tabbedLayout = frozen.restored(Dictionary(uniqueKeysWithValues: windows.map { ($0.windowId, $0 as Window) }))
+        let frozen = try XCTUnwrap(workspace.tabbedState.layout.map(FrozenTabbedLayout.init))
+        workspace.tabbedState.layout = frozen.restored(Dictionary(uniqueKeysWithValues: windows.map { ($0.windowId, $0 as Window) }))
         let opened = TestWindow.new(id: 29800, parent: workspace.rootTilingContainer)
         workspace.syncTabbedGroups()
         XCTAssertTrue(workspace.tabbedGroup(containing: opened.windowId) === workspace.tabbedGroup(containing: windows[2].windowId),
@@ -423,7 +423,7 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
 
     func testGroupsSurviveARestartWithNewWindowIds() async throws {
         let (workspace, windows, _, _) = try await makeTwoGroups()
-        let frozen = try XCTUnwrap(workspace.tabbedLayout.map(FrozenTabbedLayout.init))
+        let frozen = try XCTUnwrap(workspace.tabbedState.layout.map(FrozenTabbedLayout.init))
         let decoded = try JSONDecoder().decode(FrozenTabbedLayout.self, from: JSONEncoder().encode(frozen))
         let replacements = Dictionary(uniqueKeysWithValues: windows.enumerated().map { index, window in
             (window.windowId, TestWindow.new(id: UInt32(29500 + index), parent: workspace.rootTilingContainer) as Window)
@@ -439,7 +439,7 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         let (workspace, windows, left, right) = try await makeTwoGroups()
         windows[0].testMinimumSize = CGSize(width: 1200, height: 100)
         let rect = workspaceTilingRect(workspace)
-        let frames = try XCTUnwrap(workspace.tabbedLayout).frames(in: rect, gap: .zero)
+        let frames = try XCTUnwrap(workspace.tabbedState.layout).frames(in: rect, gap: .zero)
         let leftFrame = try XCTUnwrap(frames.first { $0.0 === left }?.1)
         XCTAssertGreaterThanOrEqual(leftFrame.width, min(1200, rect.width), "The left group widens for its window")
         XCTAssertTrue(frames.contains { $0.0 === right })
@@ -652,9 +652,9 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         let rect = workspaceTilingRect(focus.workspace)
         let (workspace, _, groups) = try await makeThreeColumns(width: (rect.width - 40) / 2)
         XCTAssertTrue(groups[2].foldedInto === groups[1])
-        let layout = try XCTUnwrap(workspace.tabbedLayout)
+        let layout = try XCTUnwrap(workspace.tabbedState.layout)
         XCTAssertEqual(layout.minimumExtent(horizontal: true, gap: .zero),
-                       try XCTUnwrap(workspace.presentedTabbedLayout).minimumExtent(horizontal: true, gap: .zero), accuracy: 0.5,
+                       try XCTUnwrap(workspace.tabbedState.presentedLayout).minimumExtent(horizontal: true, gap: .zero), accuracy: 0.5,
                        "The stored layout needs no more room than what is shown")
     }
 
@@ -664,7 +664,7 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         _ = windows[2].focusWindow()
         try await workspace.layoutWorkspace()
         XCTAssertTrue(groups[1].displayedWindow === windows[2])
-        workspace.lastTabbedGroup = groups[1]
+        workspace.tabbedState.lastGroup = groups[1]
         let newcomer = TestWindow.new(id: 29990, parent: workspace.rootTilingContainer)
         _ = newcomer.focusWindow()
         try await workspace.layoutWorkspace()

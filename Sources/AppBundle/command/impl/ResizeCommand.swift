@@ -21,8 +21,8 @@ struct ResizeCommand: Command {
             target.workspace.syncTabbedGroups()
             let nearest = target.workspace.tabbedGroup(containing: window.windowId).map(\.barGroup)
                 .flatMap { group in
-                    target.workspace.presentedTabbedLayout?.nearestSplitOrientation(of: group)
-                        ?? target.workspace.tabbedLayout?.nearestSplitOrientation(of: group)
+                    target.workspace.tabbedState.presentedLayout?.nearestSplitOrientation(of: group)
+                        ?? target.workspace.tabbedState.layout?.nearestSplitOrientation(of: group)
                 } ?? .h
             let axis: Orientation = switch args.dimension.val {
                 case .width: .h

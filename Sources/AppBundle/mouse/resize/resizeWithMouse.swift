@@ -114,7 +114,7 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
 @MainActor
 func proposedTabbedMouseResize(_ window: Window, rect: Rect) -> (Workspace, TabbedLayout)? {
     guard let workspace = window.nodeWorkspace, workspace.arrangement == .tabbed, window.parent is TilingContainer,
-          let previous = window.lastAppliedLayoutPhysicalRect, var layout = workspace.tabbedLayout else { return nil }
+          let previous = window.lastAppliedLayoutPhysicalRect, var layout = workspace.tabbedState.layout else { return nil }
     func resize(_ axis: Orientation, by delta: CGFloat, againstNext: Bool) {
         layout = workspace.tabbedLayout(layout, resizingGroupOf: window, along: axis, by: delta,
                                         againstNext: againstNext, strictSide: true) ?? layout
@@ -181,7 +181,7 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     // In a Tabbed workspace dragging a window's edge resizes its tab group against the one beside
     // that edge; the tree kept for other arrangements stays as it was.
     if let (workspace, layout) = proposedTabbedMouseResize(window, rect: rect) {
-        workspace.tabbedLayout = layout
+        workspace.tabbedState.layout = layout
         beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()
         return

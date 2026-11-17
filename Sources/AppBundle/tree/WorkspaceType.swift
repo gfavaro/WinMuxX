@@ -16,15 +16,8 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     // Once workspace arrangements are used, returning to Dwindle must retain
     // the same group boundaries rather than rerun the legacy tree migration.
     var preservesTopLevelGroups = false
-    /// The tab groups of the Tabbed arrangement; kept while other arrangements show, so returning
-    /// to Tabbed finds them again.
-    @MainActor var tabbedLayout: TabbedLayout?
-    /// The group last worked in, which windows opened later join.
-    @MainActor weak var lastTabbedGroup: TabbedGroup?
-    /// The window last focused in this Tabbed workspace, which a group joined later shows.
-    @MainActor var lastTabbedFocusedWindowId: UInt32?
-    /// The groups as the last layout showed them, without those folded into another's bar.
-    @MainActor var presentedTabbedLayout: TabbedLayout?
+    /// What the Tabbed arrangement keeps for this workspace, kept while other arrangements show.
+    @MainActor var tabbedState = TabbedWorkspaceState()
     var arrangement: WorkspaceLayoutName = .dwindle {
         didSet {
             if arrangement != .dwindle { preservesTopLevelGroups = true }

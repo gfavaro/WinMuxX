@@ -68,7 +68,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         preservesTopLevelGroups = workspace.preservesTopLevelGroups
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
-        tabbedLayout = workspace.tabbedLayout.map(FrozenTabbedLayout.init)
+        tabbedLayout = workspace.tabbedState.layout.map(FrozenTabbedLayout.init)
         scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingState.offset : nil
         if let window {
             let frozen = FrozenWindow(window)
@@ -235,7 +235,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
         restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST, windowsById: windowsById)
-        workspace.tabbedLayout = frozenWorkspace.tabbedLayout?.restored(windowsById)
+        workspace.tabbedState.layout = frozenWorkspace.tabbedLayout?.restored(windowsById)
             ?? migratedTabbedLayout(from: frozenWorkspace.rootTilingNode, windowsById,
                                     allWindows: workspace.rootTilingContainer.allLeafWindowsRecursive.map(\.windowId))
         workspace.transitionArrangement(to: frozenWorkspace.arrangement ??
