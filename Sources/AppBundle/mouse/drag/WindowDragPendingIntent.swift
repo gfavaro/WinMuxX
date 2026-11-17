@@ -183,6 +183,12 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
     else { return false }
     if let applied = applyTabbedGroupDragIntent(pendingWindowDragIntent.kind, sourceWindow: sourceWindow,
                                                 subject: pendingWindowDragIntent.sourceSubject) { return applied }
+    // In a Scrolling workspace the strip then shows the column the window landed in, whole.
+    defer {
+        if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .scrolling {
+            workspace.lastScrollingFocusWindowId = nil
+        }
+    }
     let sourceNode = dragSubjectNode(for: sourceWindow, subject: pendingWindowDragIntent.sourceSubject)
     // A Tabbed workspace's handle carries its whole group, which the tree does not hold.
     let carriedGroup = pendingWindowDragIntent.sourceSubject == .group ? tabbedGroupCarried(by: sourceWindow) : nil
