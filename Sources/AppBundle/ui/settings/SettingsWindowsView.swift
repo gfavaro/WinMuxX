@@ -82,7 +82,7 @@ struct ShortcutBehaviorSettingsView: View {
                 }
                 Text(DockWorkspaceSwipeSource.shared.status)
                     .font(.callout).foregroundStyle(.secondary)
-                Text("Needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it. At the first or last workspace macOS gets the swipe, so Mission Control or App Exposé opens; Mission Control also stays on its keyboard shortcut. Normal two-finger scrolling stays with your apps.")
+                Text("Needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it. At the first or last workspace the swipe does nothing; Mission Control stays on its keyboard shortcut. Normal two-finger scrolling stays with your apps.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Workspace overview") {

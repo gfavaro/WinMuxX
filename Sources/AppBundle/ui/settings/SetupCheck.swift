@@ -44,7 +44,7 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
     if input.workspaceSwipe {
         items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe up and down", ok: input.macThreeFingerVerticalSwipe,
             detail: input.macThreeFingerVerticalSwipe
-                ? "Three fingers up or down move to the workspace below or above, in sidebar order, with macOS's own recognition. With no workspace that way, Mission Control or App Exposé opens as usual."
+                ? "Three fingers up or down move to the workspace below or above, in sidebar order, with macOS's own recognition. Mission Control stays on its keyboard shortcut."
                 : "Set Trackpad › More Gestures › Mission Control to three fingers; WinMuxX switches workspaces with that swipe.",
             fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
     }

@@ -710,11 +710,11 @@ enabled = false
 When **System Settings → Trackpad → More Gestures → Mission Control** uses three
 fingers, macOS recognizes the swipe and WinMuxX acts on it,
 so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
-as in macOS. WinMuxX keeps the swipe from the Dock only when it switches a workspace:
-with no workspace that way, over a native full-screen app, while Mission Control is
-open or while WinMuxX is not taking swipes, macOS gets the swipe as usual, so Mission
-Control or App Exposé opens. Mission Control also stays on its keyboard shortcut, and
-three-finger left/right still switches macOS Spaces. While a
+as in macOS. WinMuxX keeps the swipe from the Dock;
+past the first or last workspace the swipe does nothing. Over a native full-screen
+app, while Mission Control is open or while WinMuxX is not taking swipes, macOS gets
+the swipe as usual. Mission Control stays on its keyboard shortcut, and three-finger
+left/right still switches macOS Spaces. While a
 window drag or the workspace overview is in progress, the swipe does nothing, so
 macOS does not open Mission Control underneath. macOS's own release speed decides a flick: a
 quick flick switches after a little travel, and flicking back cancels even past

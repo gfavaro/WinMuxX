@@ -122,9 +122,9 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         await fulfillment(of: [completed], timeout: 2)
     }
 
-    func testMacOSSwipeSwitchesAndAnEdgeIsLeftToMacOS() async throws {
-        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: false, progress: 0.1, timestamp: 1), .unavailable,
-                       "No previous workspace: the swipe goes back to macOS")
+    func testMacOSSwipeSwitchesAndAnEdgeDoesNothing() async throws {
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: false, progress: 0.1, timestamp: 1), .ignored,
+                       "No previous workspace: the swipe is kept, so Mission Control does not open")
         XCTAssertFalse(preview.isActive)
         XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         controller.updateDockSwipe(0.6, timestamp: 1.1)

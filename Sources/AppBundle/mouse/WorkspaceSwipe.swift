@@ -108,7 +108,8 @@ final class WorkspaceSwipeController {
     }
 
     /// macOS recognized a three-finger swipe toward the workspace below (`incomingFromBelow`) or
-    /// the one above. With no workspace that way it belongs to macOS.
+    /// the one above. Past the first or last workspace it is kept and does nothing, so the
+    /// end of the list does not open Mission Control or App Exposé.
     func beginDockSwipe(incomingFromBelow: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
         guard canNavigate else { return dockSwipeMayStart() }
         let point = dependencies.pointer()
@@ -119,7 +120,7 @@ final class WorkspaceSwipeController {
             return .started
         }
         let isNext = incomingFromBelow != dependencies.reversed()
-        guard workspaceSwipeTarget(on: monitor, isNext: isNext) != nil else { return .unavailable }
+        guard workspaceSwipeTarget(on: monitor, isNext: isNext) != nil else { return .ignored }
         let request = WorkspaceSwipeRequest(displayPoint: monitor.rect.topLeftCorner, isNext: isNext,
                                                        progress: progress, incomingFromBelow: incomingFromBelow)
         return begin(request, timestamp: timestamp) ? .started : .ignored
