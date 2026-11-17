@@ -187,6 +187,11 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
     // A Tabbed workspace's handle carries its whole group, which the tree does not hold.
     let carriedGroup = pendingWindowDragIntent.sourceSubject == .group ? tabbedGroupCarried(by: sourceWindow) : nil
     defer { if let carriedGroup { bringTabbedGroupAlong(carriedGroup, after: sourceWindow) } }
+    // Every drop that changes the layout first records it, and the windows it moves ignore the
+    // move events their own relayout causes.
+    guard let moved = windowIdsMovedByDrop(pendingWindowDragIntent.kind, sourceWindowId: sourceWindow.windowId) else { return false }
+    syncClosedWindowsCacheToCurrentWorld()
+    suppressPostDragAxObserverEvents(for: moved)
     switch pendingWindowDragIntent.kind {
         case .insertTab:
             return false
@@ -194,8 +199,6 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             guard pendingWindowDragIntent.sourceSubject == .window,
                   sourceWindow.windowId == windowId
             else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
             // A tab dragged out of a Tabbed workspace's bar and back moves along that bar.
             if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .tabbed,
                let group = workspace.tabbedGroup(containing: windowId) {
@@ -208,20 +211,14 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             guard let targetWindow = Window.get(byId: targetWindowId),
                   sourceWindow != targetWindow
             else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, targetWindow.windowId])
             createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow, newGroupLayout: .tabGroup)
             return true
         case .detachTab(let windowId):
             guard sourceWindow.windowId == windowId else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
             return removeWindowFromTabStack(sourceWindow)
         case .stackSplit(let targetWindowId, let position):
             guard let targetWindow = Window.get(byId: targetWindowId)
             else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, targetWindow.windowId])
             return applyWindowStackSplitDragIntent(
                 sourceWindow: sourceWindow,
                 sourceSubject: pendingWindowDragIntent.sourceSubject,
@@ -231,8 +228,6 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
         case .swap(let targetWindowId):
             guard let targetWindow = Window.get(byId: targetWindowId)
             else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId, targetWindow.windowId])
             return applyWindowSwapDragIntent(
                 sourceWindow: sourceWindow,
                 sourceSubject: pendingWindowDragIntent.sourceSubject,
@@ -240,8 +235,6 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             )
         case .moveToWorkspace(let workspaceName):
             guard let targetWorkspace = Workspace.existing(byName: workspaceName) else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
             if pendingWindowDragIntent.previewStyle == .sidebarWorkspaceMove {
                 applySidebarWorkspaceMove(sourceNode: sourceNode, sourceWindow: sourceWindow, targetWorkspace: targetWorkspace)
             } else {
@@ -250,13 +243,9 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             return true
         case .moveToWorkspaceZone(let workspaceName, let zone):
             guard let targetWorkspace = Workspace.existing(byName: workspaceName) else { return false }
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
             applyWorkspaceZoneMove(sourceNode: sourceNode, sourceWindow: sourceWindow, targetWorkspace: targetWorkspace, zone: zone)
             return true
         case .createWorkspace(let projectId, let monitorScopeId):
-            syncClosedWindowsCacheToCurrentWorld()
-            suppressPostDragAxObserverEvents(for: [sourceWindow.windowId])
             return createWorkspaceFromSidebarDrag(
                 sourceNode: sourceNode,
                 sourceWindow: sourceWindow,
@@ -265,6 +254,15 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             )
         case .sidebarHover, .unavailable:
             return false
+    }
+}
+
+/// The windows a drop moves, or nil for an intent that changes nothing.
+private func windowIdsMovedByDrop(_ kind: WindowDragIntentKind, sourceWindowId: UInt32) -> [UInt32]? {
+    switch kind {
+        case .reorderTab, .detachTab, .moveToWorkspace, .moveToWorkspaceZone, .createWorkspace: [sourceWindowId]
+        case .tabStack(let target), .stackSplit(let target, _), .swap(let target): [sourceWindowId, target]
+        case .insertTab, .sidebarHover, .unavailable: nil
     }
 }
 
