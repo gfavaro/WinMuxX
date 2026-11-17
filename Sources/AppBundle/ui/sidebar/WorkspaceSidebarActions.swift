@@ -123,7 +123,7 @@ func showWorkspaceSidebarError(_ body: String) {
 @MainActor
 func sidebarWorkspaceTargetMonitor(fallbackWindow: Window? = nil, fallbackPoint: CGPoint? = nil) -> Monitor {
     workspaceSidebarTargetMonitor(
-        selectedMonitor: selectedWorkspaceSidebarMonitorScope(),
+        selectedMonitor: nil,
         fallbackPoint: fallbackPoint,
         fallbackWindowMonitor: fallbackWindow?.nodeMonitor,
         focusedMonitor: focus.workspace.workspaceMonitor,
@@ -141,11 +141,6 @@ func workspaceSidebarTargetMonitor(
         fallbackPoint?.monitorApproximation ??
         fallbackWindowMonitor ??
         focusedMonitor
-}
-
-@MainActor
-func selectedWorkspaceSidebarMonitorScope() -> Monitor? {
-    workspaceSidebarMonitorForScopeId(TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId)
 }
 
 @MainActor
@@ -189,27 +184,9 @@ func workspaceSidebarWorkspaceCreateScope(
 }
 
 @MainActor
-func selectWorkspaceSidebarMonitorScope(_ scopeId: String, viewModel: TrayMenuModel = TrayMenuModel.shared) {
-    guard viewModel.workspaceSidebarMonitorScopes.contains(where: { $0.id == scopeId }) else { return }
-    guard viewModel.workspaceSidebarSelectedMonitorScopeId != scopeId else { return }
-    viewModel.workspaceSidebarSelectedMonitorScopeId = scopeId
-    let visibleWorkspaceNames = Set(viewModel.visibleWorkspaceSidebarWorkspaces.map(\.name))
-    let sanitizedHoveredWorkspaceName = sanitizedWorkspaceSidebarHoveredWorkspaceName(
-        visibleWorkspaceNames: visibleWorkspaceNames,
-        hoveredWorkspaceName: viewModel.workspaceSidebarHoveredWorkspaceName,
-    )
-    if viewModel.workspaceSidebarHoveredWorkspaceName != sanitizedHoveredWorkspaceName {
-        viewModel.workspaceSidebarHoveredWorkspaceName = sanitizedHoveredWorkspaceName
-    }
-}
-
-@MainActor
-func createWorkspaceFromSidebarButton() {
-    let targetMonitor = sidebarWorkspaceTargetMonitor()
-    createWorkspaceFromSidebarButton(
-        projectId: activeWorkspaceProjectId(for: targetMonitor),
-        monitorScopeId: TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId,
-    )
+func selectWorkspaceSidebarMonitorScope(_ scopeId: String, state: WorkspaceSidebarPanelState) {
+    guard TrayMenuModel.shared.workspaceSidebarMonitorScopes.contains(where: { $0.id == scopeId }) else { return }
+    state.selectedMonitorScopeId = scopeId
 }
 
 @MainActor

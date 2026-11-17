@@ -1,10 +1,10 @@
 import AppKit
-import Observation
 import Common
 import Observation
 
+/// What the menu bar, sidebars and tab strips show, shared by every display. A sidebar's own
+/// state is in its WorkspaceSidebarPanelState.
 @Observable
-
 public final class TrayMenuModel {
     @MainActor public static let shared = TrayMenuModel()
 
@@ -19,37 +19,18 @@ public final class TrayMenuModel {
     var shortcutHealth: ShortcutHealth = .available
     var workspaces: [WorkspaceViewModel] = []
     var workspaceSidebarWorkspaces: [WorkspaceSidebarWorkspaceViewModel] = []
-    var workspaceSidebarConfiguration: WorkspaceSidebarConfiguration = .empty
-    var workspaceSidebarWallpaperRefreshGeneration: UInt64 = 0
     var workspaceSidebarProjects: [WorkspaceSidebarProjectViewModel] = []
     var workspaceSidebarActiveProjectId: WorkspaceProjectId = workspaceProjectDefaultId
     var workspaceSidebarMonitorScopes: [WorkspaceSidebarMonitorScopeViewModel] = []
-    /// Panel-local UI state. The shared model keeps this only as a compatibility default for legacy callers.
-    var workspaceSidebarSelectedMonitorScopeId: String = workspaceSidebarDefaultScopeId
-    var workspaceSidebarTargetMonitorScopeId: String = workspaceSidebarDefaultScopeId
     var workspaceSidebarFocusedMonitorScopeId: String = ""
     var workspaceSidebarShowsMonitorSelector: Bool = false
     var workspaceSidebarDropPreview: WorkspaceSidebarDropPreviewViewModel? = nil
     var windowTabStrips: [WindowTabStripViewModel] = []
-    var isWorkspaceSidebarExpanded: Bool = false { didSet { if oldValue != isWorkspaceSidebarExpanded { MainActor.assumeIsolated { requestPublicStateUpdate() } } } }
-    var workspaceSidebarVisibleWidth: CGFloat = 0
-    /// Panel-local: whether the sidebar's view tree exists. See WorkspaceSidebarPanel.loadContent.
-    var workspaceSidebarContentLoaded: Bool = true
     var workspaceSidebarTopPadding: CGFloat = 12
     var workspaceSidebarHoveredWorkspaceName: String? = nil
     var menuBarConfiguration = MenuBarConfig()
-
-    var visibleWorkspaceSidebarWorkspaces: [WorkspaceSidebarWorkspaceViewModel] {
-        workspaceSidebarWorkspaces.filter {
-            $0.projectId == workspaceSidebarActiveProjectId &&
-            workspaceSidebarWorkspaceMatchesScope(
-                $0,
-                selectedScopeId: workspaceSidebarSelectedMonitorScopeId,
-                focusedMonitorScopeId: workspaceSidebarFocusedMonitorScopeId,
-            )
-        }
-    }
-
+    /// Bumped when the wallpaper changes, so whatever samples it samples again.
+    var wallpaperRefreshGeneration: UInt64 = 0
 }
 
 @MainActor func updateTrayText() {

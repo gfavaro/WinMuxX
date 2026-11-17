@@ -15,10 +15,8 @@ final class WindowTitleBenchmarkTest: XCTestCase {
         TrayMenuModel.shared.isEnabled = true
         TrayMenuModel.shared.workspaceSidebarWorkspaces = []
         TrayMenuModel.shared.windowTabStrips = []
-        TrayMenuModel.shared.workspaceSidebarVisibleWidth = 0
         TrayMenuModel.shared.workspaceSidebarTopPadding = 12
         TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = nil
-        TrayMenuModel.shared.isWorkspaceSidebarExpanded = false
 
         config.workspaceSidebar.enabled = true
         config.windowTabs.enabled = true

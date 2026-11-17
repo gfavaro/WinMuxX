@@ -18,7 +18,7 @@ final class WorkspaceSidebarPanelLifecycleTest: WorkspaceTestCase {
         panel.expandSidebar(to: 240)
         XCTAssertTrue(panel.pendingBackingResize === resize)
         XCTAssertFalse(resize.isCancelled)
-        XCTAssertEqual(panel.viewModel.workspaceSidebarVisibleWidth, 240)
+        XCTAssertEqual(panel.state.visibleWidth, 240)
         wait(for: [revealed], timeout: 1)
     }
 
@@ -31,14 +31,14 @@ final class WorkspaceSidebarPanelLifecycleTest: WorkspaceTestCase {
         let panel = try XCTUnwrap(WorkspaceSidebarPanel.panel(for: workspaceSidebarMonitorScopeId(for: screen)))
         panel.leftMousePressStartedInsideSidebar = true // Independent of a user's live mouse button.
         panel.handleHoverEnter(expandedWidth: 240, collapsedWidth: 0)
-        XCTAssertEqual(panel.viewModel.workspaceSidebarVisibleWidth, 0)
-        XCTAssertFalse(panel.viewModel.isWorkspaceSidebarExpanded)
+        XCTAssertEqual(panel.state.visibleWidth, 0)
+        XCTAssertFalse(panel.state.isExpanded)
         XCTAssertNotNil(panel.pendingExpand)
         let pending = panel.pendingExpand
         panel.handleHoverExit(collapsedWidth: 0)
         XCTAssertTrue(pending?.isCancelled == true)
         XCTAssertNil(panel.pendingExpand)
-        XCTAssertEqual(panel.viewModel.workspaceSidebarVisibleWidth, 0)
+        XCTAssertEqual(panel.state.visibleWidth, 0)
     }
 
     func testObsoleteMonitorPanelsAreReleasedAndRecreatedWithoutReplacingActivePanels() async throws {
@@ -112,7 +112,7 @@ final class WorkspaceSidebarPanelLifecycleTest: WorkspaceTestCase {
         panel.prepareForInlineTextEditing()
         XCTAssertFalse(panel.isVisible)
         XCTAssertFalse(panel.inlineTextEditingActive)
-        XCTAssertEqual(panel.viewModel.workspaceSidebarVisibleWidth, 0)
+        XCTAssertEqual(panel.state.visibleWidth, 0)
         XCTAssertNil(WorkspaceSidebarPanel.activeInlineTextEditingPanel)
     }
 

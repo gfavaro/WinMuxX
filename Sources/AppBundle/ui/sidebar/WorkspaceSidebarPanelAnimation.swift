@@ -7,7 +7,7 @@ extension WorkspaceSidebarPanel {
     func animateVisibleSidebarWidth(_ width: CGFloat, animation: Animation) {
         guard !isRetired else { return }
         loadContent()
-        debugLog(.sidebarHover, "animateWidth panel=\(monitorScopeId) from=\(viewModel.workspaceSidebarVisibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(viewModel.isWorkspaceSidebarExpanded)")
+        debugLog(.sidebarHover, "animateWidth panel=\(monitorScopeId) from=\(state.visibleWidth) to=\(width) frame=\(frame) mouse=\(NSEvent.mouseLocation) ignores=\(ignoresMouseEvents) expanded=\(state.isExpanded)")
         pendingBackingResize?.cancel()
         let resize = DispatchWorkItem { [weak self] in
             guard let self else { return }
@@ -28,7 +28,7 @@ extension WorkspaceSidebarPanel {
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + max(animationDuration, hoverCueAnimationResponse) + 0.1, execute: resize)
         withAnimation(NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? nil : animation) {
-            viewModel.workspaceSidebarVisibleWidth = width
+            state.visibleWidth = width
         }
         updateMousePassthrough()
         // The hover region just changed size under a possibly stationary cursor.
@@ -37,10 +37,10 @@ extension WorkspaceSidebarPanel {
 
     func expandSidebar(to expandedWidth: CGFloat) {
         guard !isRetired else { return }
-        debugLog(.sidebarHover, "expandSidebar panel=\(monitorScopeId) target=\(expandedWidth) visible=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
+        debugLog(.sidebarHover, "expandSidebar panel=\(monitorScopeId) target=\(expandedWidth) visible=\(state.visibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
         // Search focus and hover updates may request the same reveal again.
         // Keep its notification and animation intact instead of restarting them.
-        if viewModel.isWorkspaceSidebarExpanded, viewModel.workspaceSidebarVisibleWidth == expandedWidth,
+        if state.isExpanded, state.visibleWidth == expandedWidth,
            pendingCollapse == nil, pendingCollapseFinalize == nil {
             updateMousePassthrough()
             return
@@ -53,8 +53,8 @@ extension WorkspaceSidebarPanel {
         if !isVisible {
             refresh()
         }
-        viewModel.isWorkspaceSidebarExpanded = true
-        guard viewModel.workspaceSidebarVisibleWidth != expandedWidth else {
+        state.isExpanded = true
+        guard state.visibleWidth != expandedWidth else {
             updateMousePassthrough()
             return
         }

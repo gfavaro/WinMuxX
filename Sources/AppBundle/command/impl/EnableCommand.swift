@@ -36,7 +36,7 @@ struct EnableCommand: Command {
             WindowDetectionOperations.shared.cancelAll()
             WorkspaceGestureCoordinator.shared.reset()
             GlobalObserver.cancelFocusFollowsMouse()
-            TrayMenuModel.shared.isWorkspaceSidebarExpanded = false
+            for panel in WorkspaceSidebarPanel.visiblePanels { panel.state.isExpanded = false }
             clearPendingWindowDragIntent()
             cancelManipulatedWithMouseState()
         }

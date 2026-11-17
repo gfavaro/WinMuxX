@@ -12,7 +12,7 @@ struct WorkspaceSidebarMonitorSelector: View {
     let browsedProjectId: WorkspaceProjectId?
     let expansionProgress: CGFloat
     let sectionWidth: CGFloat
-    var onSelectScope: (String) -> Void = { selectWorkspaceSidebarMonitorScope($0) }
+    var onSelectScope: (String) -> Void
     var onSelectProject: (WorkspaceProjectId?) -> Void = { _ in }
     var onRenameProject: (WorkspaceSidebarProjectViewModel) -> Void = { _ in }
     @Binding var renamingProjectId: WorkspaceProjectId?

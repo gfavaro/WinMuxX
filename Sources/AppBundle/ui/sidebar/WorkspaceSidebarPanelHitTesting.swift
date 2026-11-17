@@ -13,8 +13,8 @@ extension WorkspaceSidebarPanel {
     }
 
     func visibleScreenRectNormalized() -> Rect? {
-        guard isVisible, viewModel.workspaceSidebarVisibleWidth > 0 else { return nil }
-        return workspaceSidebarVisibleFrame(panel: frame, width: viewModel.workspaceSidebarVisibleWidth, position: config.workspaceSidebar.position).monitorFrameNormalized()
+        guard isVisible, state.visibleWidth > 0 else { return nil }
+        return workspaceSidebarVisibleFrame(panel: frame, width: state.visibleWidth, position: config.workspaceSidebar.position).monitorFrameNormalized()
     }
 }
 
@@ -23,7 +23,7 @@ extension WorkspaceSidebarPanel {
         let inside = isMouseInsideVisibleRegion()
         let shouldIgnoreMouseEvents = !inside || shouldSuppressHoverForPointerPress
         if ignoresMouseEvents != shouldIgnoreMouseEvents {
-            debugLog(.sidebarHover, "mousePassthrough panel=\(monitorScopeId) ignores \(ignoresMouseEvents)->\(shouldIgnoreMouseEvents) insideVisible=\(inside) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
+            debugLog(.sidebarHover, "mousePassthrough panel=\(monitorScopeId) ignores \(ignoresMouseEvents)->\(shouldIgnoreMouseEvents) insideVisible=\(inside) visibleWidth=\(state.visibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation)")
             ignoresMouseEvents = shouldIgnoreMouseEvents
         }
     }
@@ -32,20 +32,20 @@ extension WorkspaceSidebarPanel {
         guard isVisible else { return false }
         let hoverWidth = workspaceSidebarHoverRegionWidth(
             config.workspaceSidebar,
-            visibleWidth: viewModel.workspaceSidebarVisibleWidth,
-            isExpanded: viewModel.isWorkspaceSidebarExpanded,
+            visibleWidth: state.visibleWidth,
+            isExpanded: state.isExpanded,
         )
         let hoverRegion = workspaceSidebarVisibleFrame(panel: frame, width: hoverWidth, position: config.workspaceSidebar.position)
         let inside = hoverRegion.contains(NSEvent.mouseLocation)
-        if viewModel.workspaceSidebarVisibleWidth > workspaceSidebarRestingWidth(config.workspaceSidebar) + 0.5 || pendingCollapse != nil {
-            debugLog(.sidebarHover, "hoverRegion panel=\(monitorScopeId) inside=\(inside) hoverWidth=\(hoverWidth) visibleWidth=\(viewModel.workspaceSidebarVisibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation) suppressUntil=\(splitBrowseCollapseSuppressedUntil)")
+        if state.visibleWidth > workspaceSidebarRestingWidth(config.workspaceSidebar) + 0.5 || pendingCollapse != nil {
+            debugLog(.sidebarHover, "hoverRegion panel=\(monitorScopeId) inside=\(inside) hoverWidth=\(hoverWidth) visibleWidth=\(state.visibleWidth) frame=\(frame) mouse=\(NSEvent.mouseLocation) suppressUntil=\(splitBrowseCollapseSuppressedUntil)")
         }
         return inside
     }
 
     func isMouseInsideVisibleRegion() -> Bool {
         guard isVisible else { return false }
-        let visibleRegion = workspaceSidebarVisibleFrame(panel: frame, width: viewModel.workspaceSidebarVisibleWidth, position: config.workspaceSidebar.position)
+        let visibleRegion = workspaceSidebarVisibleFrame(panel: frame, width: state.visibleWidth, position: config.workspaceSidebar.position)
         return visibleRegion.contains(NSEvent.mouseLocation)
     }
 

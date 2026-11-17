@@ -1,13 +1,10 @@
 import Foundation
 
 @MainActor
-func makeWorkspaceSidebarActionsAdapter(
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
-) -> WorkspaceSidebarActions {
+func makeWorkspaceSidebarActionsAdapter(state: WorkspaceSidebarPanelState) -> WorkspaceSidebarActions {
     WorkspaceSidebarActions(
         send: { action in
-            handleWorkspaceSidebarAction(action, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
+            handleWorkspaceSidebarAction(action, state: state)
         },
         setDropTargets: { targets in
             WorkspaceSidebarPanel.updateVisibleDropTargets(targets)
@@ -37,24 +34,23 @@ func makeWorkspaceSidebarActionsAdapter(
 @MainActor
 func handleWorkspaceSidebarAction(
     _ action: WorkspaceSidebarAction,
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
+    state: WorkspaceSidebarPanelState,
 ) {
     switch action {
         case .selectWorkspace(let name):
-            focusWorkspaceFromSidebar(name, targetMonitorScopeId: targetMonitorScopeId)
+            focusWorkspaceFromSidebar(name, targetMonitorScopeId: state.targetMonitorScopeId)
         case .overrideWorkspaceInUse(let name):
-            overrideWorkspaceInUseFromSidebar(name, targetMonitorScopeId: targetMonitorScopeId)
+            overrideWorkspaceInUseFromSidebar(name, targetMonitorScopeId: state.targetMonitorScopeId)
         case .moveWorkspaceToDisplay(let name, let displayUUID):
             moveWorkspaceToDisplayFromSidebar(name, displayUUID: displayUUID)
         case .selectWindow(let windowId):
             focusWindowFromSidebar(windowId)
         case .selectProject(let projectId):
-            debugLog(.sidebarProject, "adapterSelectProject project=\(projectId.rawValue) targetScope=\(targetMonitorScopeId ?? "nil") modelActive=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+            debugLog(.sidebarProject, "adapterSelectProject project=\(projectId.rawValue) targetScope=\(state.targetMonitorScopeId) modelActive=\(state.activeProjectId.rawValue)"
             )
-            selectWorkspaceSidebarProject(projectId, viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
+            selectWorkspaceSidebarProject(projectId, state: state)
         case .createProject:
-            createWorkspaceSidebarProject(viewModel: viewModel, targetMonitorScopeId: targetMonitorScopeId)
+            createWorkspaceSidebarProject(state: state)
         case .renameProject(let projectId, let displayName):
             renameWorkspaceSidebarProject(projectId, displayName: displayName)
         case .setProjectColor(let projectId, let colorHex):
@@ -63,10 +59,10 @@ func handleWorkspaceSidebarAction(
             }
         case .deleteProject(let projectId):
             if let project = workspaceSidebarProjectViewModel(projectId) {
-                deleteWorkspaceSidebarProject(project, viewModel: viewModel)
+                deleteWorkspaceSidebarProject(project, state: state)
             }
         case .selectMonitorScope(let scopeId):
-            selectWorkspaceSidebarMonitorScope(scopeId, viewModel: viewModel)
+            selectWorkspaceSidebarMonitorScope(scopeId, state: state)
         case .createWorkspace(let projectId, let monitorScopeId):
             createWorkspaceFromSidebarButton(projectId: projectId, monitorScopeId: monitorScopeId)
         case .renameWorkspace(let name, let displayName):

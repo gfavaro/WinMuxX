@@ -18,13 +18,13 @@ extension WorkspaceSidebarPanel {
 
     func beginMenuTrackingIfNeeded() {
         guard isVisible,
-              viewModel.workspaceSidebarVisibleWidth > 0,
+              state.visibleWidth > 0,
               isMouseInsideVisibleRegion()
         else { return }
         menuTrackingDepth += 1
         menuTrackingGraceUntil = .distantFuture
         cancelCollapse()
-        expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), viewModel.workspaceSidebarVisibleWidth))
+        expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), state.visibleWidth))
     }
 
     func endMenuTrackingIfNeeded() {

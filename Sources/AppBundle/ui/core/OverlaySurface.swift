@@ -37,7 +37,7 @@ struct OverlayAppearance: ViewModifier {
         } ?? tray.workspaceSidebarFocusedMonitorScopeId
         content.modifier(ChromeResolvedAppearance())
             .modifier(WorkspaceSidebarWallpaperContrast(configuration: configuration, visibleWidth: configuration.expandedWidth, targetMonitorScopeId: scope,
-                refreshGeneration: tray.workspaceSidebarWallpaperRefreshGeneration))
+                refreshGeneration: tray.wallpaperRefreshGeneration))
     }
 }
 

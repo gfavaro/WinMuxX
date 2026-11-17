@@ -29,37 +29,37 @@ extension WorkspaceSidebarPanel {
         if config.workspaceSidebar.alwaysExpanded {
             cancelExpansionWork()
             let targetWidth = workspaceSidebarPersistentVisibleWidth(
-                currentWidth: viewModel.workspaceSidebarVisibleWidth,
+                currentWidth: state.visibleWidth,
                 previousExpandedWidth: persistentExpansionWidth,
                 expandedWidth: layout.expandedWidth,
             )
             persistentExpansionWidth = layout.expandedWidth
-            viewModel.isWorkspaceSidebarExpanded = true
-            if viewModel.workspaceSidebarVisibleWidth != targetWidth {
-                viewModel.workspaceSidebarVisibleWidth = targetWidth
+            state.isExpanded = true
+            if state.visibleWidth != targetWidth {
+                state.visibleWidth = targetWidth
             }
         } else if persistentExpansionWidth != nil {
             cancelExpansionWork()
             persistentExpansionWidth = nil
-            viewModel.isWorkspaceSidebarExpanded = false
-            viewModel.workspaceSidebarVisibleWidth = layout.collapsedWidth
-        } else if viewModel.workspaceSidebarVisibleWidth == 0 {
-            viewModel.workspaceSidebarVisibleWidth = viewModel.isWorkspaceSidebarExpanded
+            state.isExpanded = false
+            state.visibleWidth = layout.collapsedWidth
+        } else if state.visibleWidth == 0 {
+            state.visibleWidth = state.isExpanded
                 ? layout.expandedWidth
                 : layout.collapsedWidth
-        } else if !viewModel.isWorkspaceSidebarExpanded,
+        } else if !state.isExpanded,
                   pendingExpand == nil,
                   pendingCollapse == nil,
-                  viewModel.workspaceSidebarVisibleWidth != layout.collapsedWidth
+                  state.visibleWidth != layout.collapsedWidth
         {
             // Apply auto-hide/collapsed-width changes immediately on config reload.
-            viewModel.workspaceSidebarVisibleWidth = layout.collapsedWidth
-        } else if viewModel.isWorkspaceSidebarExpanded,
+            state.visibleWidth = layout.collapsedWidth
+        } else if state.isExpanded,
                   pendingExpand == nil,
                   pendingCollapse == nil,
-                  viewModel.workspaceSidebarVisibleWidth != layout.expandedWidth
+                  state.visibleWidth != layout.expandedWidth
         {
-            viewModel.workspaceSidebarVisibleWidth = layout.expandedWidth
+            state.visibleWidth = layout.expandedWidth
         }
         updateMousePassthrough()
         orderFrontRegardless()
@@ -75,7 +75,7 @@ extension WorkspaceSidebarPanel {
         workspaceSidebarDropTargets = []
         setWorkspaceSidebarDropPreviewIfChanged(nil)
         TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = nil
-        viewModel.workspaceSidebarVisibleWidth = 0
+        state.visibleWidth = 0
         if isVisible {
             orderOut(nil)
         }
@@ -97,17 +97,17 @@ extension WorkspaceSidebarPanel {
     /// inserted with a transition.
     func loadContent() {
         guard !isRetired else { return }
-        viewModel.workspaceSidebarContentLoaded = true
+        state.contentLoaded = true
         scheduleContentUnload()
     }
 
     func syncContentLoading() {
         if workspaceSidebarUnloadsWhenResting(config.workspaceSidebar) {
-            if viewModel.workspaceSidebarContentLoaded, pendingContentUnload == nil { scheduleContentUnload() }
+            if state.contentLoaded, pendingContentUnload == nil { scheduleContentUnload() }
         } else {
             pendingContentUnload?.cancel()
             pendingContentUnload = nil
-            viewModel.workspaceSidebarContentLoaded = true
+            state.contentLoaded = true
         }
     }
 
@@ -119,7 +119,7 @@ extension WorkspaceSidebarPanel {
             guard let self, !self.isRetired else { return }
             self.pendingContentUnload = nil
             if self.isRestingHidden {
-                self.viewModel.workspaceSidebarContentLoaded = false
+                self.state.contentLoaded = false
             } else {
                 self.scheduleContentUnload()
             }
@@ -129,7 +129,7 @@ extension WorkspaceSidebarPanel {
     }
 
     private var isRestingHidden: Bool {
-        viewModel.workspaceSidebarVisibleWidth <= 0.5 && !viewModel.isWorkspaceSidebarExpanded &&
+        state.visibleWidth <= 0.5 && !state.isExpanded &&
             pendingExpand == nil && pendingCollapse == nil && pendingCollapseFinalize == nil &&
             !inlineTextEditingActive && !commandExpansionLocksCollapse && menuTrackingDepth == 0 &&
             !isMouseInsideHoverRegion() && !shouldLockExpansionForSidebarDrag()

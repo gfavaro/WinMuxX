@@ -89,11 +89,11 @@ func stateColorHex(_ color: NSColor) -> String {
             "configRevision": .number(Double(store.configRevision)),
         ]),
         "ui": .object([
-            "sidebarExpanded": .bool(TrayMenuModel.shared.isWorkspaceSidebarExpanded),
+            "sidebarExpanded": .bool(WorkspaceSidebarPanel.visiblePanels.contains { $0.state.isExpanded }),
             "sidebarEnabled": .bool(config.workspaceSidebar.enabled),
             "paletteVisible": .bool(store.paletteVisible), "overviewVisible": .bool(store.overviewVisible),
             "sidebarPanels": .array(isUnitTest ? [] : WorkspaceSidebarPanel.visiblePanels.sorted { $0.monitorScopeId < $1.monitorScopeId }.map {
-                .object(["scopeId": .string($0.monitorScopeId), "expanded": .bool($0.viewModel.isWorkspaceSidebarExpanded)])
+                .object(["scopeId": .string($0.monitorScopeId), "expanded": .bool($0.state.isExpanded)])
             }),
         ]),
         "focus": .object([

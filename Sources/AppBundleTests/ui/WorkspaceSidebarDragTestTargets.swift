@@ -195,13 +195,11 @@ extension WorkspaceSidebarDragTest {
 
     @MainActor
     func testMonitorScopeSelectionIsPanelLocal() {
-        let previousSharedScope = TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId
-        TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId = workspaceSidebarDefaultScopeId
-        defer { TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId = previousSharedScope }
-
-        let mainModel = TrayMenuModel()
-        let secondaryModel = TrayMenuModel()
-        mainModel.workspaceSidebarMonitorScopes = [
+        let previousScopes = TrayMenuModel.shared.workspaceSidebarMonitorScopes
+        defer { TrayMenuModel.shared.workspaceSidebarMonitorScopes = previousScopes }
+        let main = WorkspaceSidebarPanelState(targetMonitorScopeId: "monitor:0.0,0.0")
+        let secondary = WorkspaceSidebarPanelState(targetMonitorScopeId: "monitor:1440.0,0.0")
+        TrayMenuModel.shared.workspaceSidebarMonitorScopes = [
             WorkspaceSidebarMonitorScopeViewModel(
                 id: workspaceSidebarDefaultScopeId,
                 displayName: "Default",
@@ -217,13 +215,11 @@ extension WorkspaceSidebarDragTest {
                 isFocusedMonitor: false,
             ),
         ]
-        secondaryModel.workspaceSidebarMonitorScopes = mainModel.workspaceSidebarMonitorScopes
 
-        selectWorkspaceSidebarMonitorScope("monitor:1440.0,0.0", viewModel: mainModel)
+        selectWorkspaceSidebarMonitorScope("monitor:1440.0,0.0", state: main)
 
-        XCTAssertEqual(mainModel.workspaceSidebarSelectedMonitorScopeId, "monitor:1440.0,0.0")
-        XCTAssertEqual(secondaryModel.workspaceSidebarSelectedMonitorScopeId, workspaceSidebarDefaultScopeId)
-        XCTAssertEqual(TrayMenuModel.shared.workspaceSidebarSelectedMonitorScopeId, workspaceSidebarDefaultScopeId)
+        XCTAssertEqual(main.selectedMonitorScopeId, "monitor:1440.0,0.0")
+        XCTAssertEqual(secondary.selectedMonitorScopeId, workspaceSidebarDefaultScopeId, "Each display keeps its own filter")
     }
 
     @MainActor

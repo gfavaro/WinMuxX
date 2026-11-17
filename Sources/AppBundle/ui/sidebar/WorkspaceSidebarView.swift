@@ -146,7 +146,7 @@ struct WorkspaceSidebarView: View {
             let targetWidth = mode.isSplit ? expandedWidth * 2 : expandedWidth
             debugLog(.sidebarHover, "browseProjectWidthChange panel=\(snapshot.targetMonitorScopeId) project=\(mode.otherProjectId?.rawValue ?? "nil") snapshotWidth=\(snapshot.visibleWidth) target=\(targetWidth) frame=\(panel.frame) mouse=\(NSEvent.mouseLocation)")
             panel.cancelExpansionWork()
-            panel.viewModel.isWorkspaceSidebarExpanded = true
+            panel.state.isExpanded = true
             panel.splitBrowseCollapseSuppressedUntil = mode.isSplit ? Date().addingTimeInterval(0.65) : .distantPast
             isSidebarCollapsing = false
             isSidebarExpanding = false
@@ -186,7 +186,7 @@ struct WorkspaceSidebarView: View {
             let generation = panel?.hoverRevealGeneration
             // Posted just before expandSidebar marks the panel expanded; check once it has.
             DispatchQueue.main.async {
-                guard let panel, !panel.isRetired, panel.viewModel.isWorkspaceSidebarExpanded,
+                guard let panel, !panel.isRetired, panel.state.isExpanded,
                       panel.hoverRevealGeneration == generation else { return }
                 beginSidebarSearchIfNeeded(panel: panel)
             }
@@ -230,13 +230,13 @@ private func notificationPanel(from notification: Notification) -> WorkspaceSide
 }
 
 struct WorkspaceSidebarContainerView: View {
-    var viewModel: TrayMenuModel
+    let state: WorkspaceSidebarPanelState
     let actions: WorkspaceSidebarActions
 
     var body: some View {
-        let snapshot = workspaceSidebarSnapshot(from: viewModel)
+        let snapshot = workspaceSidebarSnapshot(shared: TrayMenuModel.shared, panel: state)
         Group {
-            if viewModel.workspaceSidebarContentLoaded {
+            if state.contentLoaded {
                 WorkspaceSidebarView(
                     snapshot: snapshot,
                     actions: actions
@@ -247,7 +247,7 @@ struct WorkspaceSidebarContainerView: View {
         }
         .modifier(WorkspaceSidebarWallpaperContrast(
             snapshot: snapshot,
-            refreshGeneration: viewModel.workspaceSidebarWallpaperRefreshGeneration
+            refreshGeneration: TrayMenuModel.shared.wallpaperRefreshGeneration
         ))
     }
 }

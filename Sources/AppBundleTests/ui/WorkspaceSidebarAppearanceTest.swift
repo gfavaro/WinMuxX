@@ -152,19 +152,18 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
     }
 
     func testConfigurationChangeNotifiesOnlyOnce() {
-        let model = TrayMenuModel()
+        let model = WorkspaceSidebarPanelState(targetMonitorScopeId: workspaceSidebarDefaultScopeId)
         var updated = WorkspaceSidebarConfiguration.empty
         updated.appearance = .custom
         updated.chromeStyle = .solid
         let updates = ObservationCounter()
-        withObservationTracking { _ = model.workspaceSidebarConfiguration } onChange: { updates.value += 1 }
-        model.workspaceSidebarConfiguration = updated
+        withObservationTracking { _ = model.configuration } onChange: { updates.value += 1 }
+        model.configuration = updated
         XCTAssertEqual(updates.value, 1)
-        XCTAssertEqual(workspaceSidebarSnapshot(from: model).configuration, updated)
-        withObservationTracking { _ = model.workspaceSidebarConfiguration } onChange: { updates.value += 1 }
-        model.workspaceSidebarConfiguration = updated
+        XCTAssertEqual(workspaceSidebarSnapshot(shared: TrayMenuModel(), panel: model).configuration, updated)
+        withObservationTracking { _ = model.configuration } onChange: { updates.value += 1 }
+        model.configuration = updated
         XCTAssertEqual(updates.value, 1, "The same configuration again does not notify")
-        XCTAssertTrue(model.workspaceSidebarWorkspaces.isEmpty)
     }
 
     func testSystemAppearanceIsDefaultAndDoesNotChangeSharedChrome() {

@@ -10,7 +10,7 @@ func openWorkspaceSidebarFromCommand() {
         ?? WorkspaceSidebarPanel.visiblePanels.first
         ?? WorkspaceSidebarPanel.shared
     if panel.inlineTextEditingActive ||
-        (panel.viewModel.isWorkspaceSidebarExpanded && !config.workspaceSidebar.alwaysExpanded)
+        (panel.state.isExpanded && !config.workspaceSidebar.alwaysExpanded)
     {
         closeWorkspaceSidebarFromCommand(panel)
         return
@@ -60,7 +60,7 @@ func closeWorkspaceSidebarFromCommand(_ panel: WorkspaceSidebarPanel) {
     panel.bufferedCommandSidebarSearchKeys = []
     panel.removeCommandMouseUnlockMonitors()
     panel.animateVisibleSidebarWidth(workspaceSidebarRestingWidth(config.workspaceSidebar), animation: .easeInOut(duration: panel.animationDuration))
-    panel.viewModel.isWorkspaceSidebarExpanded = config.workspaceSidebar.alwaysExpanded
+    panel.state.isExpanded = config.workspaceSidebar.alwaysExpanded
     panel.updateMousePassthrough()
 }
 

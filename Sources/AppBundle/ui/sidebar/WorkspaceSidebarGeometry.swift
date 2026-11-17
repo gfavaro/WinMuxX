@@ -58,8 +58,8 @@ extension WorkspaceSidebarPanel {
             frame: workspaceSidebarPanelFrame(screen: screen.frame, menuBarHeight: menuBarHeight, config: sidebarConfig, contentHeight: measuredContentHeight > 0 ? measuredContentHeight : screen.frame.height * 0.6,
                 backingWidth: workspaceSidebarBackingWidth(
                     config: sidebarConfig,
-                    visibleWidth: viewModel.workspaceSidebarVisibleWidth,
-                    isExpanded: viewModel.isWorkspaceSidebarExpanded,
+                    visibleWidth: state.visibleWidth,
+                    isExpanded: state.isExpanded,
                     isAnimating: pendingBackingResize != nil
                 )
             ),

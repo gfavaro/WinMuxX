@@ -4,12 +4,11 @@ import Common
 @MainActor
 func selectWorkspaceSidebarProject(
     _ projectId: WorkspaceProjectId,
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
+    state: WorkspaceSidebarPanelState,
 ) {
     let knownProjects = workspaceProjects()
-    let resolvedTargetScopeId = targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
-    debugLog(.sidebarProject, "selectProjectBegin project=\(projectId.rawValue) known=\(knownProjects.map(\.id.rawValue)) targetScope=\(resolvedTargetScopeId) activeBefore=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+    let resolvedTargetScopeId = state.targetMonitorScopeId
+    debugLog(.sidebarProject, "selectProjectBegin project=\(projectId.rawValue) known=\(knownProjects.map(\.id.rawValue)) targetScope=\(resolvedTargetScopeId) activeBefore=\(state.activeProjectId.rawValue)"
     )
     guard knownProjects.contains(where: { $0.id == projectId }) else {
         debugLog(.sidebarProject, "selectProjectAbort unknownProject=\(projectId.rawValue)")
@@ -17,7 +16,7 @@ func selectWorkspaceSidebarProject(
     }
     runWorkspaceSidebarSession {
         let monitor = workspaceSidebarTargetMonitor(
-            scopeId: targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
+            scopeId: state.targetMonitorScopeId
         )
         debugLog(.sidebarProject, "selectProjectSession project=\(projectId.rawValue) monitor=\(monitor.monitorAppKitNsScreenScreensId) visibleBefore=\(monitor.activeWorkspace.name) activeProjectBefore=\(activeWorkspaceProjectId(for: monitor).rawValue)"
         )
@@ -25,29 +24,28 @@ func selectWorkspaceSidebarProject(
             debugLog(.sidebarProject, "selectProjectSwitchResult project=\(projectId.rawValue) workspace=\(workspace.name) workspaceProject=\(workspace.projectId.rawValue)"
             )
             _ = workspace.focusWorkspace()
-            viewModel.workspaceSidebarActiveProjectId = projectId
+            state.activeProjectId = projectId
         } else {
             debugLog(.sidebarProject, "selectProjectSwitchResult project=\(projectId.rawValue) workspace=nil")
         }
         await updateWorkspaceSidebarModel()
-        debugLog(.sidebarProject, "selectProjectEnd project=\(projectId.rawValue) activeAfter=\(viewModel.workspaceSidebarActiveProjectId.rawValue)"
+        debugLog(.sidebarProject, "selectProjectEnd project=\(projectId.rawValue) activeAfter=\(state.activeProjectId.rawValue)"
         )
     }
 }
 
 @MainActor
 func createWorkspaceSidebarProject(
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
-    targetMonitorScopeId: String? = nil,
+    state: WorkspaceSidebarPanelState,
 ) {
     runWorkspaceSidebarSession {
         let project = createWorkspaceProject()
         let monitor = workspaceSidebarTargetMonitor(
-            scopeId: targetMonitorScopeId ?? viewModel.workspaceSidebarTargetMonitorScopeId
+            scopeId: state.targetMonitorScopeId
         )
         if let workspace = switchWorkspaceProject(project.id, on: monitor) {
             _ = workspace.focusWorkspace()
-            viewModel.workspaceSidebarActiveProjectId = project.id
+            state.activeProjectId = project.id
         }
         await updateWorkspaceSidebarModel()
     }
@@ -80,7 +78,7 @@ func setWorkspaceSidebarProjectColor(_ project: WorkspaceSidebarProjectViewModel
 @MainActor
 func deleteWorkspaceSidebarProject(
     _ project: WorkspaceSidebarProjectViewModel,
-    viewModel: TrayMenuModel = TrayMenuModel.shared,
+    state: WorkspaceSidebarPanelState,
 ) {
     guard canDeleteWorkspaceProject(project.id) else { return }
     guard confirmWorkspaceSidebarProjectDeletion(project) else { return }

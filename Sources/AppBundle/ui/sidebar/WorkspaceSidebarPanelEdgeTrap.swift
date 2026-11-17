@@ -23,7 +23,7 @@ extension WorkspaceSidebarPanel {
     func trapCursorForLeftEdgeSidebarActivationIfNeeded() {
         let sample = MousePointerTracker.shared.currentSample
         let collapsedWidth = workspaceSidebarRestingWidth(config.workspaceSidebar)
-        debugLog(.sidebarEdgeTrap, "entry panel=\(monitorScopeId) visible=\(isVisible) enabled=\(config.workspaceSidebar.enabled) shift=\(currentSessionModifierFlags().contains(.maskShift)) mouseDrag=\(isMouseWindowDragInProgress()) sidebarDrag=\(isWorkspaceSidebarItemDragActive()) width=\(viewModel.workspaceSidebarVisibleWidth) collapsed=\(collapsedWidth) sample=\(sample) previous=\(String(describing: lastEdgeTrapSample)) suppressUntil=\(edgeTrapSuppressedUntil) startedAt=\(String(describing: edgeTrapStartedAt))"
+        debugLog(.sidebarEdgeTrap, "entry panel=\(monitorScopeId) visible=\(isVisible) enabled=\(config.workspaceSidebar.enabled) shift=\(currentSessionModifierFlags().contains(.maskShift)) mouseDrag=\(isMouseWindowDragInProgress()) sidebarDrag=\(isWorkspaceSidebarItemDragActive()) width=\(state.visibleWidth) collapsed=\(collapsedWidth) sample=\(sample) previous=\(String(describing: lastEdgeTrapSample)) suppressUntil=\(edgeTrapSuppressedUntil) startedAt=\(String(describing: edgeTrapStartedAt))"
         )
         guard isVisible,
               config.workspaceSidebar.enabled,
@@ -32,7 +32,7 @@ extension WorkspaceSidebarPanel {
               !isMouseWindowDragInProgress(),
               !shouldSuppressHoverForPointerPress,
               !isWorkspaceSidebarItemDragActive(),
-              viewModel.workspaceSidebarVisibleWidth <= collapsedWidth + 0.5
+              state.visibleWidth <= collapsedWidth + 0.5
         else {
             debugLog(.sidebarEdgeTrap, "skipPreconditions panel=\(monitorScopeId)")
             edgeTrapStartedAt = nil

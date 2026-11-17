@@ -9,7 +9,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     static weak var activeInlineTextEditingPanel: WorkspaceSidebarPanel?
     static var menuBarColorScheme: ColorScheme?
 
-    let viewModel: TrayMenuModel
+    let state: WorkspaceSidebarPanelState
     let hostingView: WorkspaceSidebarHostingView
     let materialContainer: WorkspaceSidebarMaterialContainer
     let monitorScopeId: String
@@ -62,13 +62,13 @@ final class WorkspaceSidebarPanel: NSPanelHud {
 
     private init(monitor: Monitor) {
         monitorScopeId = workspaceSidebarMonitorScopeId(for: monitor)
-        viewModel = TrayMenuModel()
+        state = WorkspaceSidebarPanelState(targetMonitorScopeId: monitorScopeId)
         hostingView = WorkspaceSidebarHostingView(rootView: WorkspaceSidebarContainerView(
-            viewModel: viewModel,
-            actions: makeWorkspaceSidebarActionsAdapter(viewModel: viewModel, targetMonitorScopeId: monitorScopeId)
+            state: state,
+            actions: makeWorkspaceSidebarActionsAdapter(state: state)
         ))
         materialContainer = WorkspaceSidebarMaterialContainer()
-        viewModel.workspaceSidebarContentLoaded = !workspaceSidebarUnloadsWhenResting(config.workspaceSidebar)
+        state.contentLoaded = !workspaceSidebarUnloadsWhenResting(config.workspaceSidebar)
         super.init()
         identifier = NSUserInterfaceItemIdentifier("\(workspaceSidebarPanelId).\(monitorScopeId)")
         styleMask.remove(.nonactivatingPanel)
@@ -144,8 +144,8 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         // A search view may itself retain this panel. Drop the SwiftUI subtree
         // explicitly so removing the registry entry also breaks that ownership path.
         hostingView.rootView = nil
-        viewModel.isWorkspaceSidebarExpanded = false
-        viewModel.workspaceSidebarVisibleWidth = 0
+        state.isExpanded = false
+        state.visibleWidth = 0
         ignoresMouseEvents = true
         contentView = nil
         close()
@@ -158,9 +158,7 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     }
 
     static func refreshWallpaperContrast() {
-        for panel in panelsByMonitorScopeId.values {
-            panel.viewModel.workspaceSidebarWallpaperRefreshGeneration &+= 1
-        }
+        TrayMenuModel.shared.wallpaperRefreshGeneration &+= 1
     }
 
     func syncModelFromShared() {
@@ -171,26 +169,12 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         if let monitor = workspaceSidebarMonitor(forScopeId: monitorScopeId), scrollingColumnIsUnderSidebar(on: monitor) {
             sidebarConfiguration.menuBarBackground = true
         }
-        materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: viewModel.workspaceSidebarVisibleWidth)
-        viewModel.workspaceSidebarConfiguration = sidebarConfiguration
-        // Equality-guarded: this runs several times per refresh session, and each unguarded
-        // write would invalidate the whole sidebar SwiftUI tree even when nothing
-        // changed. workspaceSidebarVisibleWidth/isWorkspaceSidebarExpanded are panel-local and
-        // never synced. Menu-bar configuration belongs to the shared native menu model.
-        viewModel.isEnabled = TrayMenuModel.shared.isEnabled
-        viewModel.workspaces = TrayMenuModel.shared.workspaces
-        viewModel.workspaceSidebarWorkspaces = TrayMenuModel.shared.workspaceSidebarWorkspaces
-        viewModel.workspaceSidebarProjects = TrayMenuModel.shared.workspaceSidebarProjects
-        viewModel.workspaceSidebarActiveProjectId = resolvedLocalActiveProjectId()
-        viewModel.workspaceSidebarMonitorScopes = TrayMenuModel.shared.workspaceSidebarMonitorScopes
-        viewModel.workspaceSidebarSelectedMonitorScopeId = resolvedLocalSelectedMonitorScopeId()
-        viewModel.workspaceSidebarTargetMonitorScopeId = monitorScopeId
-        viewModel.workspaceSidebarFocusedMonitorScopeId = TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId
-        viewModel.workspaceSidebarShowsMonitorSelector = TrayMenuModel.shared.workspaceSidebarShowsMonitorSelector
-        viewModel.workspaceSidebarDropPreview = TrayMenuModel.shared.workspaceSidebarDropPreview
-        viewModel.windowTabStrips = TrayMenuModel.shared.windowTabStrips
-        viewModel.workspaceSidebarTopPadding = TrayMenuModel.shared.workspaceSidebarTopPadding
-        viewModel.workspaceSidebarHoveredWorkspaceName = resolvedLocalHoveredWorkspaceName()
+        materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: state.visibleWidth)
+        // Only what differs per display is kept here; shared values are read from
+        // TrayMenuModel.shared directly, and Observation skips unchanged writes.
+        state.configuration = sidebarConfiguration
+        state.activeProjectId = resolvedLocalActiveProjectId()
+        state.selectedMonitorScopeId = resolvedLocalSelectedMonitorScopeId()
     }
 
     private func resolvedLocalActiveProjectId() -> WorkspaceProjectId {
@@ -200,22 +184,10 @@ final class WorkspaceSidebarPanel: NSPanelHud {
 
     private func resolvedLocalSelectedMonitorScopeId() -> String {
         let validScopeIds = Set(TrayMenuModel.shared.workspaceSidebarMonitorScopes.map(\.id))
-        if validScopeIds.contains(viewModel.workspaceSidebarSelectedMonitorScopeId) {
-            return viewModel.workspaceSidebarSelectedMonitorScopeId
+        if validScopeIds.contains(state.selectedMonitorScopeId) {
+            return state.selectedMonitorScopeId
         }
         return workspaceSidebarDefaultScopeId
-    }
-
-    private func resolvedLocalHoveredWorkspaceName() -> String? {
-        let visibleWorkspaceNames = visibleWorkspaceNamesForSidebar(
-            workspaces: TrayMenuModel.shared.workspaceSidebarWorkspaces,
-            selectedMonitorScopeId: viewModel.workspaceSidebarSelectedMonitorScopeId,
-            focusedMonitorScopeId: TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId,
-        )
-        return sanitizedWorkspaceSidebarHoveredWorkspaceName(
-            visibleWorkspaceNames: visibleWorkspaceNames,
-            hoveredWorkspaceName: TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName,
-        )
     }
 
     override var canBecomeKey: Bool { true }

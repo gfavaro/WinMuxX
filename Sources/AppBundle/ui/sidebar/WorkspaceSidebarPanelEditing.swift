@@ -141,7 +141,7 @@ extension WorkspaceSidebarPanel {
         guard !isRetired else { return }
         debugLog(.sidebarRename, "prepareForInlineTextEditing before visible=\(isVisible) isKey=\(isKeyWindow) ignoresMouse=\(ignoresMouseEvents) firstResponder=\(String(describing: firstResponder))")
         // Focusing the editor must not cancel an in-flight reveal or its backing resize.
-        expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), viewModel.workspaceSidebarVisibleWidth))
+        expandSidebar(to: max(CGFloat(config.workspaceSidebar.width), state.visibleWidth))
         ignoresMouseEvents = false
         orderFrontRegardless()
         guard activatesWindow else { return }
@@ -276,7 +276,7 @@ extension WorkspaceSidebarPanel {
 
     func isScreenPointInsideVisibleRegion(_ point: CGPoint) -> Bool {
         guard isVisible else { return false }
-        let visibleRegion = workspaceSidebarVisibleFrame(panel: frame, width: viewModel.workspaceSidebarVisibleWidth, position: config.workspaceSidebar.position)
+        let visibleRegion = workspaceSidebarVisibleFrame(panel: frame, width: state.visibleWidth, position: config.workspaceSidebar.position)
         return visibleRegion.contains(point)
     }
 }

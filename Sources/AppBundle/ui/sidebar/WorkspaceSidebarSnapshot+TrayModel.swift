@@ -1,18 +1,28 @@
 import Foundation
 
+/// One display's sidebar: the shared workspaces and projects, as that display's panel shows them.
 @MainActor
-func workspaceSidebarSnapshot(from model: TrayMenuModel) -> WorkspaceSidebarSnapshot {
-    WorkspaceSidebarSnapshot(
-        workspaces: model.workspaceSidebarWorkspaces,
-        projects: model.workspaceSidebarProjects,
-        activeProjectId: model.workspaceSidebarActiveProjectId,
-        monitorScopes: model.workspaceSidebarMonitorScopes,
-        selectedMonitorScopeId: model.workspaceSidebarSelectedMonitorScopeId,
-        targetMonitorScopeId: model.workspaceSidebarTargetMonitorScopeId,
-        focusedMonitorScopeId: model.workspaceSidebarFocusedMonitorScopeId,
-        visibleWidth: model.workspaceSidebarVisibleWidth,
-        hoveredWorkspaceName: model.workspaceSidebarHoveredWorkspaceName,
-        dropPreview: model.workspaceSidebarDropPreview,
-        configuration: model.workspaceSidebarConfiguration,
+func workspaceSidebarSnapshot(shared: TrayMenuModel, panel: WorkspaceSidebarPanelState) -> WorkspaceSidebarSnapshot {
+    let visibleWorkspaceNames = visibleWorkspaceNamesForSidebar(
+        workspaces: shared.workspaceSidebarWorkspaces,
+        selectedMonitorScopeId: panel.selectedMonitorScopeId,
+        focusedMonitorScopeId: shared.workspaceSidebarFocusedMonitorScopeId,
+    )
+    return WorkspaceSidebarSnapshot(
+        workspaces: shared.workspaceSidebarWorkspaces,
+        projects: shared.workspaceSidebarProjects,
+        activeProjectId: panel.activeProjectId,
+        monitorScopes: shared.workspaceSidebarMonitorScopes,
+        selectedMonitorScopeId: panel.selectedMonitorScopeId,
+        targetMonitorScopeId: panel.targetMonitorScopeId,
+        focusedMonitorScopeId: shared.workspaceSidebarFocusedMonitorScopeId,
+        visibleWidth: panel.visibleWidth,
+        // Hover is shared; a panel shows it only on a workspace it lists.
+        hoveredWorkspaceName: sanitizedWorkspaceSidebarHoveredWorkspaceName(
+            visibleWorkspaceNames: visibleWorkspaceNames,
+            hoveredWorkspaceName: shared.workspaceSidebarHoveredWorkspaceName,
+        ),
+        dropPreview: shared.workspaceSidebarDropPreview,
+        configuration: panel.configuration,
     )
 }
