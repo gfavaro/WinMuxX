@@ -215,8 +215,8 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
     }
 
     func testJoiningAWindowWrappedInAVerticalSplitStillStacks() async throws {
-        // Dwindle leaves windows wrapped in one-child splits; a stack made inside a vertical one
-        // was turned sideways by normalization.
+        // Dwindle leaves windows wrapped in one-child splits; joining must stack the windows in one
+        // column whatever wraps the target.
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
         root.layout = .dwindle

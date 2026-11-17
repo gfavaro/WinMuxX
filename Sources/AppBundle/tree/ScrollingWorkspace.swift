@@ -255,12 +255,9 @@ struct ScrollingWorkspaceMetrics {
 
 /// A node's Scrolling columns: a window, a vertical stack and a tab group are each one column;
 /// a side-by-side split opens up into its children's columns.
-/// A container holding a single child (which Dwindle leaves behind) is not a column of its own:
-/// its child decides.
 @MainActor
 private func scrollingColumnUnits(_ node: TreeNode) -> [TreeNode] {
     guard let container = node as? TilingContainer, container.layout != .tabGroup else { return [node] }
-    if let only = container.children.singleOrNil() { return scrollingColumnUnits(only) }
     // A stack column a little wider than tall is still a stack.
     guard container.children.count > 1, container.declaredOrientation == .h else { return [node] }
     return container.children.flatMap(scrollingColumnUnits)
@@ -312,12 +309,8 @@ extension Workspace {
             window.unbindFromParent()
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         } else {
-            // The stack takes the column's place in the side-by-side split, past any one-child
-            // wrappers Dwindle left around it: inside a vertical wrapper, normalization would turn
-            // a vertical stack sideways.
-            var slot: TreeNode = target
-            while let wrapper = slot.parent as? TilingContainer, wrapper !== rootTilingContainer,
-                  wrapper.layout != .tabGroup, wrapper.children.count == 1 { slot = wrapper }
+            // The stack takes the column's place in the side-by-side split.
+            let slot = target
             guard let row = slot.parent as? TilingContainer else { return }
             let windowBinding = window.unbindFromParent()
             guard let index = row.children.firstIndex(where: { $0 === slot }) else {
