@@ -143,3 +143,18 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(atEnd?.node === first.node, "Nothing past the first column")
     }
 }
+
+@MainActor
+final class ScrollingDefaultLayoutTest: WorkspaceTestCase {
+    func testScrollingAsTheDefaultStartsNewWorkspacesAsAStrip() {
+        let parsed = parseConfig("default-root-container-layout = 'scrolling'")
+        XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
+        XCTAssertEqual(parsed.config.defaultRootLayoutChoice, .scrolling)
+        XCTAssertEqual(parsed.config.defaultRootContainerLayout, .tiles, "The tree under the strip is plain tiles")
+        config.defaultRootLayoutChoice = .scrolling
+        XCTAssertEqual(Workspace.get(byName: "fresh-scrolling").arrangement, .scrolling)
+        config.defaultRootLayoutChoice = .container(.dwindle)
+        XCTAssertEqual(Workspace.get(byName: "fresh-dwindle").arrangement, .dwindle)
+        XCTAssertEqual(parseConfig("default-root-container-layout = 'master'").config.defaultRootLayoutChoice, .container(.master))
+    }
+}

@@ -79,7 +79,8 @@ and returns on its own once there is room, on a larger display or after a merge.
 Scrolling lays the workspace out as one horizontal strip of columns, wider than the
 display when needed, as StripMuxX does for macOS Spaces. Choose it with
 `workspace-layout scrolling`, Arrange Windows → Scrolling, or a workspace's layout in
-Settings → Windows. Each top-level group is a column: a window, a vertical stack, or a tab
+Settings → Windows. `default-root-container-layout = 'scrolling'` (Settings → Windows →
+Default layout) starts new workspaces as a strip. Each top-level group is a column: a window, a vertical stack, or a tab
 group. The tree is untouched, so returning to Dwindle, Master or Tabbed restores it.
 
 Focus left and right steps through the columns and scrolls the strip to show the focused

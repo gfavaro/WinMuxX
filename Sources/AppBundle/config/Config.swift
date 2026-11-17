@@ -46,6 +46,19 @@ struct Config: ConvenienceCopyable {
     var afterStartupCommand: [any Command] = []
     var enableNormalizationFlattenContainers: Bool = true
     var defaultRootContainerLayout: Layout = .dwindle
+    /// `default-root-container-layout = 'scrolling'`: new workspaces start as a Scrolling strip
+    /// over a tiles root.
+    var defaultWorkspaceScrolling = false
+    /// The single `default-root-container-layout` key, which also names the Scrolling arrangement.
+    var defaultRootLayoutChoice: DefaultRootLayoutChoice {
+        get { defaultWorkspaceScrolling ? .scrolling : .container(defaultRootContainerLayout) }
+        set {
+            switch newValue {
+                case .container(let layout): defaultRootContainerLayout = layout; defaultWorkspaceScrolling = false
+                case .scrolling: defaultRootContainerLayout = .tiles; defaultWorkspaceScrolling = true
+            }
+        }
+    }
     var defaultRootContainerOrientation: DefaultContainerOrientation = .auto
     var startWorkspacesOnMainMonitor: Bool = false
     var startAtLogin: Bool = false
@@ -310,5 +323,18 @@ extension WorkspaceSidebarConfig {
         return monitor
             .compactMap { $0.resolveMonitor(sortedMonitors: sortedMonitors) }
             .filter { seenTopLeftCorners.insert($0.rect.topLeftCorner).inserted }
+    }
+}
+
+/// What new workspaces start with: a container layout for their tree, or the Scrolling strip.
+enum DefaultRootLayoutChoice: Hashable {
+    case container(Layout)
+    case scrolling
+
+    var rawValue: String {
+        switch self {
+            case .container(let layout): layout.rawValue
+            case .scrolling: "scrolling"
+        }
     }
 }

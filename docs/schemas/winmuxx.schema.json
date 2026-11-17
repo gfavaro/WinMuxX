@@ -15,7 +15,7 @@
     "on-focused-monitor-changed": {"$ref": "#/$defs/commands"},
     "enable-normalization-flatten-containers": {"type": "boolean"},
     "enable-normalization-opposite-orientation-for-nested-containers": {"type": "boolean"},
-    "default-root-container-layout": {"$ref": "#/$defs/layout"},
+    "default-root-container-layout": {"enum": ["dwindle", "master", "tiles", "accordion", "tab-group", "tabbed", "scrolling"]},
     "default-root-container-orientation": {"$ref": "#/$defs/orientation"},
     "start-workspaces-on-main-monitor": {"type": "boolean"},
     "start-at-login": {"type": "boolean"},

@@ -21,7 +21,7 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("auto-add-new-windows-to-tab-group", load: { config.autoAddNewWindowsToTabGroup }) private var autoAddNewWindowsToTabGroup: Bool
     @SettingsDraft("enable-shake-to-toggle-tiling", load: { config.enableShakeToToggleTiling }) private var enableShakeToToggleTiling: Bool
     @SettingsDraft("automatically-unhide-macos-hidden-apps", load: { config.automaticallyUnhideMacosHiddenApps }) private var automaticallyUnhideMacosHiddenApps: Bool
-    @SettingsDraft("default-root-container-layout", load: { config.defaultRootContainerLayout }) private var defaultLayout: Layout
+    @SettingsDraft("default-root-container-layout", load: { config.defaultRootLayoutChoice }) private var defaultLayout: DefaultRootLayoutChoice
     @SettingsDraft("default-root-container-orientation", load: { config.defaultRootContainerOrientation }) private var defaultOrientation: DefaultContainerOrientation
     @SettingsDraft("enable-normalization-flatten-containers", load: { config.enableNormalizationFlattenContainers }) private var flattenContainers: Bool
     @SettingsDraft("enable-normalization-opposite-orientation-for-nested-containers", load: { config.enableNormalizationOppositeOrientationForNestedContainers }) private var normalizeNestedContainers: Bool
@@ -43,12 +43,13 @@ struct ShortcutBehaviorSettingsView: View {
             SettingsSection("Default layout") {
                 SettingsPictogramPicker(title: SettingsControl.defaultLayout.title, id: SettingsControl.defaultLayout.id,
                     selection: $defaultLayout, options: [
-                        .init(value: Layout.dwindle, title: "Dwindle", pictogram: .dwindle),
-                        .init(value: Layout.master, title: "Master", pictogram: .master),
-                        .init(value: Layout.tiles, title: "Tiles", pictogram: .tiles),
-                        .init(value: Layout.tabGroup, title: "Tabbed", pictogram: .tabbed),
+                        .init(value: DefaultRootLayoutChoice.container(.dwindle), title: "Dwindle", pictogram: .dwindle),
+                        .init(value: DefaultRootLayoutChoice.container(.master), title: "Master", pictogram: .master),
+                        .init(value: DefaultRootLayoutChoice.container(.tiles), title: "Tiles", pictogram: .tiles),
+                        .init(value: DefaultRootLayoutChoice.container(.tabGroup), title: "Tabbed", pictogram: .tabbed),
+                        .init(value: DefaultRootLayoutChoice.scrolling, title: "Scrolling", pictogram: .scrolling),
                     ],
-                    help: "Used for new workspaces. Dwindle splits the focused area for each new window; Master keeps one main window with the others beside it. Selecting Dwindle also updates existing tiled workspaces.") {
+                    help: "Used for new workspaces. Dwindle splits the focused area for each new window; Master keeps one main window with the others beside it; Scrolling lays the windows out as a strip of columns. Selecting Dwindle also updates existing tiled workspaces.") {
                     persistRootString("default-root-container-layout", defaultLayout.rawValue)
                 }
                 SettingsPicker(.defaultOrientation, selection: $defaultOrientation, help: "Controls how new tiled containers split.") {

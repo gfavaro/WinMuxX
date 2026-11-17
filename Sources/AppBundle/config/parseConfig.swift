@@ -72,7 +72,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "enable-normalization-flatten-containers": Parser(\.enableNormalizationFlattenContainers, parseBool),
     "enable-normalization-opposite-orientation-for-nested-containers": Parser(\.enableNormalizationOppositeOrientationForNestedContainers, parseBool),
 
-    "default-root-container-layout": Parser(\.defaultRootContainerLayout, parseLayout),
+    "default-root-container-layout": Parser(\.defaultRootLayoutChoice, parseDefaultRootLayout),
     "default-root-container-orientation": Parser(\.defaultRootContainerOrientation, parseDefaultContainerOrientation),
 
     "start-workspaces-on-main-monitor": Parser(\.startWorkspacesOnMainMonitor, parseBool),
@@ -254,9 +254,12 @@ func parseTable<T: ConvenienceCopyable>(
     return table.parseTable(initial, fieldsParser, backtrace, &errors)
 }
 
-private func parseLayout(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<Layout> {
-    parseString(raw, backtrace)
-        .flatMap { $0.parseLayout().orFailure(.semantic(backtrace, "Can't parse layout '\($0)'")) }
+private func parseDefaultRootLayout(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<DefaultRootLayoutChoice> {
+    parseString(raw, backtrace).flatMap { value in
+        if value == "scrolling" { return .success(.scrolling) }
+        return value.parseLayout().map(DefaultRootLayoutChoice.container)
+            .orFailure(.semantic(backtrace, "Can't parse layout '\(value)'"))
+    }
 }
 
 private func parseShortcutsPreset(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace) -> ParsedToml<ShortcutsPreset> {

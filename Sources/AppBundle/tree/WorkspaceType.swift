@@ -61,6 +61,8 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
         self.name = name
         self.nameLogicalSegments = name.toLogicalSegments()
         super.init(parent: NilTreeNode.instance, adaptiveWeight: 0, index: 0)
+        // Restored and configured workspaces set their own arrangement after this.
+        if config.defaultWorkspaceScrolling { arrangement = .scrolling }
     }
 
     @MainActor static var all: [Workspace] {
