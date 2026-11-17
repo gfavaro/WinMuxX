@@ -195,12 +195,6 @@ final class TreeWindowDragArrangement: WindowDragArrangement {
                 guard subject == .window,
                       sourceWindow.windowId == windowId
                 else { return false }
-                // A tab dragged out of a Tabbed workspace's bar and back moves along that bar.
-                if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .tabbed,
-                   let group = workspace.tabbedGroup(containing: windowId) {
-                    guard workspace.insertTabbedTab(windowId, intoBarOf: group.barGroup, at: targetIndex) else { return false }
-                    return sourceWindow.focusWindow()
-                }
                 return reorderWindowTabInCurrentGroup(sourceWindow, toIndex: targetIndex)
             case .tabStack(let targetWindowId):
                 guard subject == .window else { return false }
