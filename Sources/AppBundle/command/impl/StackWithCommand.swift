@@ -23,6 +23,21 @@ struct StackWithCommand: Command {
             return MoveCommand(args: moveArgs).run(env, io)
         }
 
+        // In a Scrolling workspace left and right make the window a tab of the column on that side,
+        // as join-with stacks it there.
+        if target.workspace.arrangement == .scrolling, direction.orientation == .h {
+            let workspace = target.workspace
+            let columns = workspace.scrollingColumns
+            guard let own = workspace.scrollingColumn(of: currentWindow),
+                  let index = columns.firstIndex(where: { $0 === own }),
+                  let neighbor = columns.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive else {
+                return io.err("No windows in the specified direction")
+            }
+            createOrAppendWindowTabStack(sourceWindow: currentWindow, onto: neighbor)
+            workspace.lastScrollingFocusWindowId = nil
+            return true
+        }
+
         // Normal: stack with window in the specified direction
         guard let (parent, ownIndex) = currentWindow.closestParent(hasChildrenInDirection: direction, withLayout: nil) else {
             return io.err("No windows in the specified direction")

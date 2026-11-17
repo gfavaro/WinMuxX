@@ -333,6 +333,24 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(narrow.getWeight(root.orientation), 1)
     }
 
+    func testStackWithMakesATabOfTheColumnBeside() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        let wrapper = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        let wrapped = TestWindow.new(id: 76900, parent: wrapper)
+        let tabbing = TestWindow.new(id: 76901, parent: root)
+        _ = TestWindow.new(id: 76902, parent: root)
+        _ = tabbing.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        try await succeed("stack-with left")
+        let group = try XCTUnwrap(workspace.scrollingColumn(of: tabbing) as? TilingContainer)
+        XCTAssertEqual(group.layout, .tabGroup)
+        XCTAssertTrue(workspace.scrollingColumn(of: wrapped) === group, "The two windows are tabs of one column")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2)
+    }
+
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
         workspace.scrollingGestureMotionActive = true
