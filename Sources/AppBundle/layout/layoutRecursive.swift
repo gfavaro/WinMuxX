@@ -108,24 +108,12 @@ private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) asyn
     let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
     let viewport = scrolling ? workspace.scrollingMetrics.geometry.area : nil
     let pinned = scrolling ? workspace.pinnedScrollingColumn : nil
-    let sidebar = scrolling ? workspace.workspaceMonitor.workspaceSidebarEdge : nil
     for frame in frames {
         // A Scrolling column off the viewport is pushed against the display edge by macOS,
         // so what it then reports is not the app's real size. A pinned column is always shown.
         let concealed = frame.node !== pinned &&
             (viewport.map { !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size).intersects($0) } ?? false)
-        let windows = frame.node.allLeafWindowsRecursive
-        // A column may slide under the see-through sidebar, but one gone wholly beneath it
-        // would only show there: it waits out of view, as Tabbed's background windows do.
-        if let sidebar, frame.node !== pinned, sidebar.covers(frame.physical),
-           !windows.contains(where: { $0 === focus.windowOrNil }) {
-            for window in windows {
-                window.isConcealedByScrolling = true
-                try await window.parkHiddenLayoutWindow()
-            }
-            continue
-        }
-        for window in windows { window.isConcealedByScrolling = concealed }
+        for window in frame.node.allLeafWindowsRecursive { window.isConcealedByScrolling = concealed }
         try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
                                              height: frame.physical.height, virtual: frame.virtual, context)
     }
