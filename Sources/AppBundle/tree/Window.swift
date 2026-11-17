@@ -12,6 +12,13 @@ open class Window: TreeNode, Hashable {
     // Width chosen by the user for a lone tile on ultrawide, persisted with its layout.
     var singleWindowManualWidth: CGFloat?
     var isFullscreen: Bool = false
+    /// Scrolling concealment is independent of inactive-workspace corner parking.
+    @MainActor private var scrollingColumnConcealed = false
+    /// In a column off the Scrolling viewport, which macOS holds against the display edge.
+    @MainActor var isConcealedByScrolling: Bool {
+        get { scrollingColumnConcealed && nodeWorkspace?.arrangement == .scrolling && parent is TilingContainer }
+        set { scrollingColumnConcealed = newValue }
+    }
     var noOuterGapsInFullscreen: Bool = false
     var layoutReason: LayoutReason = .standard
     /// Event-invalidated caches of the native window state (frame, fullscreen, minimized),

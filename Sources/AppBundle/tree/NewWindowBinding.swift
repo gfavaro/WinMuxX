@@ -42,8 +42,9 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newl
     if let tabGroupBinding = autoAddNewWindowToFocusedTabGroupBinding(workspace) {
         return tabGroupBinding
     }
-    if workspace.arrangement == .master {
-        if let newBundleId = newlyOpenedBundleId,
+    // A Scrolling strip is never full: a new window is a new column right of the focused one.
+    if workspace.arrangement == .master || workspace.arrangement == .scrolling {
+        if workspace.arrangement == .master, let newBundleId = newlyOpenedBundleId,
            let joined = masterTabGroupBindingInsteadOfCrowdingStack(workspace: workspace, newBundleId: newBundleId) {
             return joined
         }

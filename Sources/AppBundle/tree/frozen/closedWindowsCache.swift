@@ -39,6 +39,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
     let masterGroupIndex: Int?
     let masterRatio: CGFloat?
     let tabbedLayout: FrozenTabbedLayout?
+    let scrollingOffset: CGFloat?
 
     private enum CodingKeys: String, CodingKey {
         case name
@@ -54,6 +55,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         case masterGroupIndex
         case masterRatio
         case tabbedLayout
+        case scrollingOffset
     }
 
     @MainActor init(_ workspace: Workspace, assignmentFor window: Window? = nil) {
@@ -67,6 +69,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterRatio
         tabbedLayout = workspace.tabbedLayout.map(FrozenTabbedLayout.init)
+        scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingOffset : nil
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace
@@ -94,13 +97,14 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         rootTilingNode = try container.decode(FrozenContainer.self, forKey: .rootTilingNode)
         floatingWindows = try container.decode([FrozenWindow].self, forKey: .floatingWindows)
         macosUnconventionalWindows = try container.decode([FrozenWindow].self, forKey: .macosUnconventionalWindows)
-        // Lenient: an arrangement WinMuxX no longer has (scrolling) restores as the default.
+        // Lenient: an arrangement this build does not know restores as the default.
         arrangement = (try? container.decodeIfPresent(WorkspaceLayoutName.self, forKey: .arrangement)) ?? nil
         preservesTopLevelGroups = try container.decodeIfPresent(Bool.self, forKey: .preservesTopLevelGroups)
         masterGroupIndex = try container.decodeIfPresent(Int.self, forKey: .masterGroupIndex)
         masterRatio = try container.decodeIfPresent(CGFloat.self, forKey: .masterRatio)
         // Lenient, like the arrangement: an unreadable group layout restores as one group.
         tabbedLayout = (try? container.decodeIfPresent(FrozenTabbedLayout.self, forKey: .tabbedLayout)) ?? nil
+        scrollingOffset = try container.decodeIfPresent(CGFloat.self, forKey: .scrollingOffset)
     }
 }
 
@@ -207,6 +211,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         workspace.arrangement = frozenWorkspace.arrangement ?? (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle)
         workspace.preservesTopLevelGroups = (frozenWorkspace.preservesTopLevelGroups ?? false) || workspace.arrangement != .dwindle
         workspace.masterRatio = frozenWorkspace.masterRatio
+        if let offset = frozenWorkspace.scrollingOffset, offset.isFinite { workspace.scrollingOffset = offset }
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
         workspace.restoredDisplayIndex = frozenWorkspace.displayIndex
@@ -284,6 +289,7 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
     container.isMasterStack = frozenContainer.isMasterStack ?? false
     container.presentsAsStrip = frozenContainer.presentsAsStrip ?? false
     container.masterRatio = frozenContainer.masterRatio
+    container.scrollingColumnWidth = frozenContainer.scrollingColumnWidth
     container.dwindleOrientation = frozenContainer.dwindleOrientation
     for child in frozenContainer.children {
         switch child {
@@ -309,6 +315,7 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
     window.isFullscreen = frozenWindow.isFullscreen
     window.noOuterGapsInFullscreen = frozenWindow.noOuterGapsInFullscreen
     window.layoutReason = frozenWindow.layoutReason
+    window.scrollingColumnWidth = frozenWindow.scrollingColumnWidth
     if let frame = frozenWindow.workspacePreviewFrame,
        let valid = normalizedWorkspacePreviewFrame(frame, origin: .zero, desktopSize: CGSize(width: 1, height: 1), minimumVisibleSize: 0)
     {

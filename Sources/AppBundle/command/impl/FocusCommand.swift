@@ -37,6 +37,28 @@ struct FocusCommand: Command {
                     }
                     return hitWorkspaceBoundaries(target, io, args, direction)
                 }
+                // A Scrolling workspace steps left and right through its columns, scrolling hidden
+                // ones in, and up and down within the focused column.
+                if target.workspace.arrangement == .scrolling, let window {
+                    let groups = target.workspace.workspaceLayoutUnits
+                    if direction.orientation == .h, let index = groups.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) {
+                        if let destination = groups.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive {
+                            return destination.focusWindow()
+                        }
+                        return hitWorkspaceBoundaries(target, io, args, direction)
+                    }
+                    let column = window.topLevelWorkspaceGroup.allLeafWindowsRecursive
+                    if let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction, candidates: column) {
+                        return neighbor.focusWindow()
+                    }
+                    switch args.boundariesAction {
+                        case .stop: return true
+                        case .fail: return false
+                        case .wrapAroundTheWorkspace, .wrapAroundAllMonitors:
+                            return spatialWrapFocusTarget(in: target.workspace, from: window, direction: direction,
+                                                          candidates: column)?.focusWindow() ?? false
+                    }
+                }
                 // Inside a strip, left and right step through its columns, scrolling hidden ones in.
                 if direction.orientation == .h, let window, let strip = window.nearestWindowTabGroup, strip.isWindowStrip,
                    let column = window.directChild(in: strip), let index = column.ownIndex,

@@ -7,6 +7,14 @@ struct ResizeCommand: Command {
 
     func run(_ env: CmdEnv, _ io: CmdIo) -> Bool {
         guard let target = args.resolveTargetOrReportError(env, io) else { return false }
+        if target.workspace.arrangement == .scrolling, let window = target.windowOrNil {
+            switch args.dimension.val {
+                case .width, .smart:
+                    return resizeScrollingColumn(window, units: args.units.val, workspace: target.workspace, io: io)
+                case .height, .smartOpposite:
+                    break
+            }
+        }
 
         // A Tabbed workspace resizes its tab groups, never the tree it keeps for other arrangements.
         if target.workspace.arrangement == .tabbed, let window = target.windowOrNil, window.parent is TilingContainer {
@@ -107,4 +115,31 @@ struct ResizeCommand: Command {
         node.setWeight(orientation, node.getWeight(orientation) + diff)
         return true
     }
+}
+
+/// Width resizes the column on the strip: the share of the display it takes.
+@MainActor
+private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units, workspace: Workspace, io: CmdIo) -> Bool {
+    let group = window.topLevelWorkspaceGroup
+    let metrics = workspace.scrollingMetrics
+    guard let column = metrics.columns.first(where: { $0.node === group }) else { return io.err("The focused window has no scrolling column") }
+    let lower = column.node.minimumLayoutExtent(along: .h, rect: workspaceTilingRect(workspace))
+    let requested: CGFloat = switch units {
+        case .set(let value): CGFloat(value)
+        case .add(let value): column.width + CGFloat(value)
+        case .subtract(let value): column.width - CGFloat(value)
+    }
+    let maximum = max(metrics.areaWidth - column.frameStartInset - column.frameEndInset, lower)
+    let actual = min(max(requested, lower), maximum)
+    if requested + 1 < lower, let blocked = group.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }).first(where: { $0.minimumLayoutSize.width > 0 }) {
+        NoticePanel.shared.showMinimumSize(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
+                                           dimension: "width", minimum: blocked.minimumLayoutSize)
+    }
+    if abs(actual - column.width) < 0.5 {
+        io.out("resize: nothing to do")
+        return true
+    }
+    group.scrollingColumnWidth = min(max((actual + column.frameStartInset + column.frameEndInset) / max(metrics.areaWidth, 1), 0.1), 1)
+    scheduleRefreshSession(.globalObserver("resizeScrollingColumn"))
+    return true
 }

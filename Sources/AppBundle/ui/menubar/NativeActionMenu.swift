@@ -214,7 +214,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         switch focus.workspace.arrangement {
             case .master:
                 sections[.swapWithMaster] = addCommand("Swap with Master", script: "swap-with-master", to: menu)
-            case .dwindle, .tabbed:
+            case .dwindle, .tabbed, .scrolling:
                 break
         }
         menu.addItem(.separator())

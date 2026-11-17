@@ -2,7 +2,7 @@ import SwiftUI
 
 /// The arrangement a pictogram card draws.
 enum LayoutPictogram {
-    case dwindle, master, tiles, tabbed, inherit
+    case dwindle, master, tiles, tabbed, scrolling, inherit
 }
 
 /// Main choices as pictogram cards, the way System Settings presents appearance options.
@@ -125,6 +125,13 @@ func layoutPictogramRects(_ kind: LayoutPictogram, in size: CGSize, gap: CGFloat
             let strip: CGFloat = 8
             return [CGRect(x: 0, y: strip + gap, width: w, height: h - strip - gap)]
                 + (0..<3).map { CGRect(x: CGFloat($0) * (tab + gap), y: 0, width: tab, height: strip) }
+        case .scrolling:
+            // One column in view with its neighbours cut off at both edges.
+            let column = (w - 2 * gap) * 0.6
+            let side = (w - column - 2 * gap) / 2
+            return [CGRect(x: 0, y: h * 0.1, width: side, height: h * 0.8),
+                    CGRect(x: side + gap, y: 0, width: column, height: h),
+                    CGRect(x: side + gap + column + gap, y: h * 0.1, width: side, height: h * 0.8)]
         case .inherit:
             return [CGRect(x: 0, y: 0, width: w, height: h)]
     }

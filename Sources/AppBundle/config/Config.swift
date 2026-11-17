@@ -58,6 +58,7 @@ struct Config: ConvenienceCopyable {
     var followAppActivation = FollowAppActivationConfig()
     var shortcutsPreset: ShortcutsPreset = .none
     var workspaceSwipe = WorkspaceSwipeConfig()
+    var scrolling = ScrollingConfig()
     var enableNormalizationOppositeOrientationForNestedContainers: Bool = true
     var persistentWorkspaces: OrderedSet<String> = []
     var execOnWorkspaceChange: [String] = [] // todo deprecate

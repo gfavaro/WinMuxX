@@ -20,7 +20,8 @@ struct SettingsWorkspaceLayoutSection: View {
                 .init(value: "dwindle", title: "Dwindle", pictogram: .dwindle),
                 .init(value: "master", title: "Master", pictogram: .master),
                 .init(value: "tabbed", title: "Tabbed", pictogram: .tabbed),
-            ], help: "Sets the workspace-wide arrangement. Tabbed shows every window as a tab under a browser-style bar. Each existing group keeps its nested splits and tabs, so switching back restores them. A matching display override may take precedence.") {
+                .init(value: "scrolling", title: "Scrolling", pictogram: .scrolling),
+            ], help: "Sets the workspace-wide arrangement. Tabbed shows every window as a tab under a browser-style bar. Scrolling lays the windows out as a strip of columns that scrolls to the focused one. Each existing group keeps its nested splits and tabs, so switching back restores them. A matching display override may take precedence.") {
                 save()
             }
             .disabled(workspace.isEmpty)

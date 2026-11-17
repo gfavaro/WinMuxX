@@ -68,7 +68,7 @@ extension Workspace {
             }
             return
         }
-        if arrangement == .master {
+        if arrangement == .master || arrangement == .scrolling {
             lastAppliedLayoutPhysicalRect = rect
             lastAppliedLayoutVirtualRect = rect
             rootTilingContainer.lastAppliedLayoutPhysicalRect = rect
@@ -97,11 +97,19 @@ func workspaceTabbedContentRect(_ rect: Rect) -> Rect {
 @MainActor
 private func layoutWorkspaceGroups(in rect: Rect, _ context: LayoutContext) async throws {
     let workspace = context.workspace
+    let scrolling = workspace.arrangement == .scrolling
+    if scrolling { workspace.scrollToFocusedColumnIfNeeded() }
     let frames = workspace.arrangementGroupFrames(in: rect, gaps: context.resolvedGaps)
+    let viewport = scrolling ? workspace.scrollingMetrics.geometry.area : nil
     for frame in frames {
+        // A Scrolling column off the viewport is pushed against the display edge by macOS,
+        // so what it then reports is not the app's real size.
+        let concealed = viewport.map { !CGRect(origin: frame.virtual.topLeftCorner, size: frame.virtual.size).intersects($0) } ?? false
+        for window in frame.node.allLeafWindowsRecursive { window.isConcealedByScrolling = concealed }
         try await frame.node.layoutRecursive(frame.physical.topLeftCorner, width: frame.physical.width,
                                              height: frame.physical.height, virtual: frame.virtual, context)
     }
+    if scrolling { workspace.captureScrollingViewportAnchor() }
 }
 
 extension TreeNode {

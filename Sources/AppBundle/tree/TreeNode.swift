@@ -21,6 +21,8 @@ open class TreeNode: Equatable, WinMuxAny {
     // - move-mouse command
     var lastAppliedLayoutPhysicalRect: Rect? = nil // with real inner gaps
     var stripColumnWidth: CGFloat? = nil
+    /// The share of the display this node takes as a Scrolling column; nil uses `scrolling.column-width`.
+    var scrollingColumnWidth: CGFloat? = nil
     final var unboundStacktrace: String? = nil
     var isBound: Bool { parent != nil } // todo drop, once https://github.com/nikitabobko/WinMux/issues/1215 is fixed
 

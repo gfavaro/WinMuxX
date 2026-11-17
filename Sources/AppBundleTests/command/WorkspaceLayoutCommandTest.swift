@@ -26,10 +26,11 @@ final class WorkspaceLayoutCommandTest: WorkspaceTestCase {
 
     func testWorkspaceAndContainerCommandsHaveSeparateParsers() {
         for command in ["layout master", "layout dwindle", "layout tiles master", "layout scrolling",
-                        "workspace-layout scrolling", "workspace-layout tiles", "workspace-layout accordion", "workspace-layout"] {
+                        "workspace-layout tiles", "workspace-layout accordion", "workspace-layout"] {
             XCTAssertNotNil(parseCommand(command).errorOrNil, command)
         }
-        for command in ["workspace-layout master", "workspace-layout dwindle master", "layout tiles accordion"] {
+        for command in ["workspace-layout master", "workspace-layout dwindle master", "workspace-layout scrolling",
+                        "layout tiles accordion"] {
             XCTAssertNil(parseCommand(command).errorOrNil, command)
         }
         let old = parseConfig("[mode.main.binding]\nalt-space = 'layout dwindle'")

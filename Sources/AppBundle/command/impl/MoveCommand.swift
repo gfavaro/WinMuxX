@@ -35,6 +35,9 @@ struct MoveCommand: Command {
             swapNodes(column, neighbor)
             return true
         }
+        if target.workspace.arrangement == .scrolling {
+            return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
+        }
         if target.workspace.arrangement == .master {
             // Swap with the window on that side, as master always did. Master is tracked by its
             // group, so a move between master and stack also hands the master role across.
@@ -86,6 +89,63 @@ struct MoveCommand: Command {
                 return false // Impossible
         }
     }
+}
+
+/// In a Scrolling workspace left and right move the window's column along the strip; a window
+/// in a stack leaves it as a column of its own. Up and down move it within its stack.
+@MainActor
+private func moveScrollingNode(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
+    let groups = workspace.workspaceLayoutUnits
+    let column = window.topLevelWorkspaceGroup
+    guard let index = groups.firstIndex(where: { $0 === column }) else { return false }
+    if direction.orientation == .v {
+        var node = window.moveNode
+        while let parent = node.parent as? TilingContainer, parent !== column.parent {
+            if parent.navigationOrientation == direction.orientation, let ownIndex = node.ownIndex {
+                let target = ownIndex + direction.focusOffset
+                if parent.children.indices.contains(target) {
+                    let sibling = parent.children[target]
+                    if node is TilingContainer || (sibling as? TilingContainer)?.layout == .tabGroup {
+                        let binding = node.unbindFromParent()
+                        node.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: target)
+                    } else if let siblingContainer = sibling as? TilingContainer {
+                        return deepMoveIn(node: node, into: siblingContainer, moveDirection: direction)
+                    } else {
+                        swapNodes(node, sibling)
+                    }
+                    scheduleRefreshSession(.globalObserver("moveWithinScrollingColumn"))
+                    return true
+                }
+            }
+            if parent === column { break }
+            node = parent
+        }
+        return false
+    }
+    // Positions are taken from the tree, next to the neighbouring column.
+    if column.allLeafWindowsRecursive.count <= 1 {
+        guard let parent = column.parent as? TilingContainer, parent === workspace.arrangementGroupParent,
+              groups.indices.contains(index + direction.focusOffset) else { return false }
+        let neighbor = groups[index + direction.focusOffset]
+        let binding = column.unbindFromParent()
+        guard let neighborIndex = parent.children.firstIndex(where: { $0 === neighbor }) else {
+            column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return false
+        }
+        column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: neighborIndex + (direction.isPositive ? 1 : 0))
+    } else {
+        let width = column.scrollingColumnWidth
+        window.unbindFromParent()
+        let parent = workspace.arrangementGroupParent !== workspace.rootTilingContainer
+            ? workspace.arrangementGroupParent : ensureRootSupportsColumns(workspace)
+        let at = parent.children.firstIndex(where: { $0 === column }) ?? index
+        let insertion = min(max(at + (direction.isPositive ? 1 : 0), 0), parent.children.count)
+        window.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: insertion)
+        window.scrollingColumnWidth = width
+        workspace.normalizeContainers()
+    }
+    scheduleRefreshSession(.globalObserver("moveScrollingColumn"))
+    return true
 }
 
 @MainActor

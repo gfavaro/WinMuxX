@@ -17,6 +17,17 @@ extension Workspace {
         switch arrangement {
             // Tabbed shows one window at a time; layoutWorkspace places it under the tab bar.
             case .dwindle, .tabbed: return []
+            case .scrolling:
+                let geometry = scrollingGeometry(in: rect, gaps: gaps)
+                scrollingOffset = geometry.clampedOffset
+                return zip(groups, geometry.columns).map { node, frame in
+                    WorkspaceGroupFrame(node: node,
+                        physical: Rect(topLeftX: frame.physicalFrame.minX, topLeftY: frame.physicalFrame.minY,
+                                       width: frame.physicalFrame.width, height: frame.physicalFrame.height),
+                        virtual: Rect(topLeftX: frame.logicalFrame.minX, topLeftY: frame.logicalFrame.minY,
+                                      width: frame.logicalFrame.width, height: frame.logicalFrame.height),
+                        stackingIndex: geometry.stackingOrder.firstIndex(of: frame.index) ?? frame.index)
+                }
             case .master:
                 let primary = masterGroupIndex
                 guard groups.indices.contains(primary) else { return [] }

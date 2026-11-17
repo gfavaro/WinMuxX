@@ -124,37 +124,28 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
         XCTAssertTrue(parseConfig(migrated).errors.isEmpty, "\(parseConfig(migrated).errors)")
     }
 
-    func testScrollingConfigurationIsRemovedAndItsWorkspacesUseTheDefault() throws {
+    func testScrollingConfigurationLoadsAndIsKept() throws {
         let original = """
-        # Kept
-        scrolling.gesture-enabled = false
         [scrolling]
-        column-width = 0.5
-        keep-window-height = true
+        column-width = 0.6
+        width-presets = [0.5, 1]
+        edge-preview = 20
+        center-focused-column = 'on-overflow'
         [workspace.'Code']
         layout = 'scrolling'
-        orientation = 'vertical'
         [mode.main.binding]
-        alt-ctrl-m = 'scrolling-minimap'
-        alt-w = 'workspace-layout dwindle master scrolling'
-        alt-s = 'workspace-layout scrolling'
-        alt-x = ['focus left', 'scrolling-center']
-        alt-h = 'focus left'
-        alt-t = 'exec-and-forget open -a Scrolling scrolling'
+        alt-s = 'workspace-layout dwindle scrolling'
         """
-        let migrated = try removingRetiredConfigKeys(in: original)
-        XCTAssertTrue(migrated.contains("alt-w = \"workspace-layout dwindle master\""), migrated)
-        XCTAssertFalse(migrated.contains("alt-s"), "workspace-layout with nothing left goes")
-        XCTAssertTrue(migrated.contains("alt-x = \"focus left\""), "the rest of a command list stays")
-        XCTAssertTrue(migrated.contains("alt-t = 'exec-and-forget open -a Scrolling scrolling'"), "other commands are untouched")
-        XCTAssertFalse(migrated.contains("scrolling-"), migrated)
-        XCTAssertFalse(migrated.contains("[scrolling]"), migrated)
-        XCTAssertTrue(migrated.contains("# Kept"))
-        let parsed = parseConfig(migrated)
+        XCTAssertEqual(try removingRetiredConfigKeys(in: original), original)
+        let parsed = parseConfig(original)
         XCTAssertTrue(parsed.errors.isEmpty, "\(parsed.errors)")
-        XCTAssertNil(parsed.config.workspaceLayouts["Code"]?.defaults.layout)
-        XCTAssertEqual(parsed.config.workspaceLayouts["Code"]?.defaults.orientation, .vertical)
-        XCTAssertEqual(try removingRetiredConfigKeys(in: migrated), migrated)
+        XCTAssertEqual(parsed.config.scrolling.columnWidth, 0.6)
+        XCTAssertEqual(parsed.config.scrolling.widthPresets, [0.5, 1])
+        XCTAssertEqual(parsed.config.scrolling.edgePreview, 20)
+        XCTAssertEqual(parsed.config.scrolling.centerFocusedColumn, .onOverflow)
+        XCTAssertEqual(parsed.config.workspaceLayouts["Code"]?.defaults.layout, .scrolling)
+        XCTAssertFalse(parseConfig("[scrolling]\ncolumn-width = 2").errors.isEmpty)
+        XCTAssertFalse(parseConfig("[scrolling]\nwidth-presets = [0.6, 0.5]").errors.isEmpty)
     }
 
     func testSmallerMinimumDoesNotRewriteExplicitNamesOrComments() throws {

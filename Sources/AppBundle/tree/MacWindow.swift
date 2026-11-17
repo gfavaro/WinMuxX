@@ -474,7 +474,7 @@ final class MacWindow: Window {
         minimumRequest = (topLeft, size)
         frameRequestGeneration &+= 1
         minimumObservation?.cancel()
-        guard let topLeft, let size, parent is TilingContainer, !isFullscreen,
+        guard let topLeft, let size, parent is TilingContainer, !isFullscreen, !isConcealedByScrolling,
               TrayMenuModel.shared.isEnabled, lastKnownActualRect?.size != size else { return }
         let generation = frameRequestGeneration
         minimumObservation = Task { @MainActor [weak self] in
@@ -515,7 +515,7 @@ final class MacWindow: Window {
     private func canObserveMinimum(_ generation: UInt64) -> Bool {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
-            !isFullscreen && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
+            !isFullscreen && !isConcealedByScrolling && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
             !WindowMotion.shared.screensChanging &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites

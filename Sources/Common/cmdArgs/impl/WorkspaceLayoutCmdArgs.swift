@@ -5,7 +5,7 @@ public struct WorkspaceLayoutCmdArgs: CmdArgs {
         kind: .workspaceLayout,
         allowInConfig: true,
         help: """
-        USAGE: winmuxx workspace-layout [--window-id <window-id>] (dwindle|master)...
+        USAGE: winmuxx workspace-layout [--window-id <window-id>] (dwindle|master|tabbed|scrolling)...
 
         Switch the target window's workspace-wide arrangement. Multiple choices cycle
         after the current mode, wrapping to the first. Requires a tiled window.
@@ -18,7 +18,8 @@ public struct WorkspaceLayoutCmdArgs: CmdArgs {
 
 public enum WorkspaceLayoutName: String, CaseIterable, Equatable, Sendable, Codable {
     /// `tabbed` shows every tiled window as a tab of one full-screen group, like a browser.
-    case dwindle, master, tabbed
+    /// `scrolling` lays the groups out as one horizontal strip of columns that scrolls to the focus.
+    case dwindle, master, tabbed, scrolling
 }
 
 private func parseWorkspaceLayoutChoices(input: PosArgParserInput) -> ParsedCliArgs<[WorkspaceLayoutName]> {

@@ -26,6 +26,16 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var arrangement: WorkspaceLayoutName = .dwindle {
         didSet { if arrangement != .dwindle { preservesTopLevelGroups = true } }
     }
+    /// The Scrolling strip's viewport: how far its left edge is scrolled along the columns.
+    @MainActor var scrollingOffset: CGFloat = 0
+    /// The window the strip last scrolled to, so focus scrolls it only when focus moves.
+    @MainActor var lastScrollingFocusWindowId: UInt32?
+    /// Where the anchor window's column sat in the viewport, so the strip keeps it there when
+    /// columns change width or the display does.
+    @MainActor var scrollingAnchorWindowId: UInt32?
+    @MainActor var scrollingAnchorViewportPosition: CGFloat?
+    @MainActor var scrollingAnchorAreaWidth: CGFloat?
+    @MainActor var scrollingAnchorLogicalCenter: CGFloat?
     private var savedMasterGroupIndex = 0
     private weak var masterGroup: TreeNode?
     @MainActor var masterGroupIndex: Int {

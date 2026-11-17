@@ -74,6 +74,33 @@ at those sizes, the group farthest from the one in use folds into its neighbour'
 its tabs show there, and choosing one shows it in that area. The group itself stays,
 and returns on its own once there is room, on a larger display or after a merge.
 
+## Scrolling
+
+Scrolling lays the workspace out as one horizontal strip of columns, wider than the
+display when needed, as StripMuxX does for macOS Spaces. Choose it with
+`workspace-layout scrolling`, Arrange Windows → Scrolling, or a workspace's layout in
+Settings → Windows. Each top-level group is a column: a window, a vertical stack, or a tab
+group. The tree is untouched, so returning to Dwindle, Master or Tabbed restores it.
+
+Focus left and right steps through the columns and scrolls the strip to show the focused
+one; up and down move within its column. `move left` and `right` move the column along the
+strip, and a window in a stack leaves it as a column of its own. `resize width` changes the
+column's share of the display. New windows open as a column right of the focused one.
+Columns off the display wait at its edge, showing `scrolling.edge-preview` points, or behind
+it where another display sits beside it. Column widths and the strip's position survive a
+restart.
+
+```toml
+[scrolling]
+column-width = 0.5                 # A new column's share of the display
+width-presets = [0.3333, 0.5, 0.6667, 1.0]
+edge-preview = 14                  # Points of an offscreen column left showing
+center-focused-column = 'never'    # never, on-overflow or always
+```
+
+The strip geometry adapts Dinky's Scrolling layout (MIT; see
+[the license](licenses/Dinky-MIT.txt)).
+
 ## Container modes and tabs
 
 `layout tiles` places the focused container's children beside one another, and

@@ -98,6 +98,7 @@ private let configParser: [String: any ParserProtocol<Config>] = [
     "single-window-aspect-ratio": Parser(\.singleWindowAspectRatio, parseSingleWindowAspectRatio),
     "gaps": Parser(\.gaps, parseGaps),
     "workspace-swipe": Parser(\.workspaceSwipe, parseWorkspaceSwipe),
+    "scrolling": Parser(\.scrolling, parseScrolling),
     "workspace-sidebar": Parser(\.workspaceSidebar, parseWorkspaceSidebar),
     "menu-bar": Parser(\.menuBar, parseMenuBar),
     "window-tabs": Parser(\.windowTabs, parseWindowTabs),
