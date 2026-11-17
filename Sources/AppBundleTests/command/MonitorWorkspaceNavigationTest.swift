@@ -548,7 +548,7 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
             case .window(let window): return "w\(window.windowId)"
             case .tilingContainer(let container):
                 let active = container.layout == .tabGroup ? " active=\(container.tabActiveWindow?.windowId ?? 0)" : ""
-                return "\(container.layout)/\(container.orientation)\(active) \(container.dwindleChildRatios ?? [])(" +
+                return "\(container.layout)/\(container.orientation)\(active) \(container.dwindleChildRatios)(" +
                     container.children.map(treeShape).joined(separator: ",") + ")"
             default: return "?"
         }

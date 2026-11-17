@@ -106,8 +106,8 @@ struct SettingsStepper: View {
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { submitted = value }
         .onDisappear { commit() }
-        .onChange(of: focused) { if !$0 { commit() } }
-        .onChange(of: value) { newValue in
+        .onChange(of: focused) { _, newValue in if !newValue { commit() } }
+        .onChange(of: value) { _, newValue in
             if !focused { submitted = newValue }
         }
     }
@@ -167,7 +167,7 @@ struct SettingsDoubleStepper: View {
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { submitted = value }
         .onDisappear { commit() }
-        .onChange(of: focused) { if !$0 { commit() } }
+        .onChange(of: focused) { _, newValue in if !newValue { commit() } }
     }
 
     private func commit() {
@@ -272,7 +272,7 @@ struct SettingsTextField: View {
                 .focused($isFocused)
                 .onAppear { committedText = text }
                 .onSubmit(commit)
-                .onChange(of: isFocused) { focused in if !focused { commit() } }
+                .onChange(of: isFocused) { _, focused in if !focused { commit() } }
                 .onDisappear { commit() }
                 .settingsAutosave(value: text, enabled: wasEdited, commit: commit)
                 .help(help)
@@ -340,7 +340,7 @@ struct SettingsMultilineField: View {
         .padding(12)
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { savedText = savedValue }
-        .onChange(of: savedValue) { savedText = $0; isSaving = false }
+        .onChange(of: savedValue) { _, newValue in savedText = newValue; isSaving = false }
         .settingsAutosave(value: text, enabled: wasEdited && !isSaving) { commit() }
         .onReceive(ShortcutSettingsModel.shared.$failedSettingID) { failedID in
             if failedID == id { isSaving = false }

@@ -1,61 +1,5 @@
-import CoreGraphics
-import CoreVideo
-import Foundation
+import AppKit
 import QuartzCore
-import os
-
-private let displayRefreshHostClockFrequency = CVGetHostClockFrequency()
-
-private func displayRefreshDriverCallback(
-    _: CVDisplayLink,
-    _ now: UnsafePointer<CVTimeStamp>,
-    _: UnsafePointer<CVTimeStamp>,
-    _: CVOptionFlags,
-    _: UnsafeMutablePointer<CVOptionFlags>,
-    _ userInfo: UnsafeMutableRawPointer?,
-) -> CVReturn {
-    guard let userInfo else { return kCVReturnSuccess }
-    let driver = Unmanaged<DisplayRefreshDriver>.fromOpaque(userInfo).takeUnretainedValue()
-    let timestamp = displayRefreshHostClockFrequency > 0
-        ? Double(now.pointee.hostTime) / displayRefreshHostClockFrequency
-        : CACurrentMediaTime()
-    driver.enqueueFrame(timestamp: timestamp)
-    return kCVReturnSuccess
-}
-
-/// Backpressure between the display-link thread and the main actor. A busy main
-/// actor needs the most recent frame, rather than a queue of obsolete frames.
-final class DisplayRefreshFrameMailbox: Sendable {
-    private struct State {
-        var timestamp: CFTimeInterval?
-        var generation: UInt64 = 0
-    }
-
-    private let state = OSAllocatedUnfairLock(initialState: State())
-
-    func enqueue(timestamp: CFTimeInterval) -> UInt64? {
-        state.withLock { state in
-            let needsDelivery = state.timestamp == nil
-            state.timestamp = timestamp
-            return needsDelivery ? state.generation : nil
-        }
-    }
-
-    func take(generation: UInt64) -> CFTimeInterval? {
-        state.withLock { state in
-            guard generation == state.generation else { return nil }
-            defer { state.timestamp = nil }
-            return state.timestamp
-        }
-    }
-
-    func reset() {
-        state.withLock { state in
-            state.generation &+= 1
-            state.timestamp = nil
-        }
-    }
-}
 
 @MainActor
 final class DisplayRefreshDriver {
@@ -67,19 +11,11 @@ final class DisplayRefreshDriver {
     }
 
     private var subscriptions: [ObjectIdentifier: Subscription] = [:]
-    private var displayLink: CVDisplayLink?
+    /// Calls back on the main run loop, once per frame of the main display.
+    private var displayLink: CADisplayLink?
     private var fallbackTimer: Timer?
-    nonisolated private let frameMailbox = DisplayRefreshFrameMailbox()
 
     private init() {}
-
-    nonisolated fileprivate func enqueueFrame(timestamp: CFTimeInterval) {
-        guard let generation = frameMailbox.enqueue(timestamp: timestamp) else { return }
-        Task { @MainActor in
-            guard let timestamp = frameMailbox.take(generation: generation) else { return }
-            fire(timestamp: timestamp)
-        }
-    }
 
     func add(owner: AnyObject, callback: @escaping (CFTimeInterval) -> Void) {
         subscriptions[ObjectIdentifier(owner)] = Subscription(owner: owner, callback: callback)
@@ -100,19 +36,11 @@ final class DisplayRefreshDriver {
     }
 
     private func startDisplayLink() -> Bool {
-        var rawLink: CVDisplayLink?
-        guard CVDisplayLinkCreateWithActiveCGDisplays(&rawLink) == kCVReturnSuccess,
-              let rawLink
-        else {
-            return false
-        }
-        let userInfo = Unmanaged.passUnretained(self).toOpaque()
-        guard CVDisplayLinkSetOutputCallback(rawLink, displayRefreshDriverCallback, userInfo) == kCVReturnSuccess,
-              CVDisplayLinkStart(rawLink) == kCVReturnSuccess
-        else {
-            return false
-        }
-        displayLink = rawLink
+        guard let screen = NSScreen.main else { return false }
+        let link = screen.displayLink(target: DisplayRefreshLinkTarget { [weak self] in self?.fire(timestamp: $0) },
+                                      selector: #selector(DisplayRefreshLinkTarget.frame))
+        link.add(to: .main, forMode: .common)
+        displayLink = link
         return true
     }
 
@@ -129,13 +57,10 @@ final class DisplayRefreshDriver {
     private func stopIfIdle() {
         pruneReleasedOwners()
         guard subscriptions.isEmpty else { return }
-        if let displayLink {
-            CVDisplayLinkStop(displayLink)
-            self.displayLink = nil
-        }
+        displayLink?.invalidate()
+        displayLink = nil
         fallbackTimer?.invalidate()
         fallbackTimer = nil
-        frameMailbox.reset()
     }
 
     private func pruneReleasedOwners() {
@@ -152,7 +77,7 @@ final class DisplayRefreshDriver {
         }
     }
 
-    fileprivate func fire(timestamp: CFTimeInterval) {
+    private func fire(timestamp: CFTimeInterval) {
         pruneReleasedOwners()
         guard !subscriptions.isEmpty else {
             stopIfIdle()
@@ -163,6 +88,16 @@ final class DisplayRefreshDriver {
         }
     }
 
+}
+
+/// The display link's target: it holds the link's callback, as the link retains its target.
+@MainActor
+private final class DisplayRefreshLinkTarget: NSObject {
+    private let callback: (CFTimeInterval) -> Void
+
+    init(_ callback: @escaping (CFTimeInterval) -> Void) { self.callback = callback }
+
+    @objc func frame(_ link: CADisplayLink) { callback(link.timestamp) }
 }
 
 func displayRefreshInterpolate(_ start: CGFloat, _ end: CGFloat, progress: CGFloat) -> CGFloat {

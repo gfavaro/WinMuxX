@@ -16,10 +16,10 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
         for value in 0...7 {
             try ConfigFileStore.edit(at: url) { _ in "gaps.inner.horizontal = \(value)\n" }
         }
-        XCTAssertEqual(try String(contentsOf: url), "gaps.inner.horizontal = 7\n")
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "gaps.inner.horizontal = 7\n")
         for index in 1...5 {
             let backup = url.appendingPathExtension("backup.\(index)")
-            XCTAssertEqual(try String(contentsOf: backup), "gaps.inner.horizontal = \(7 - index)\n")
+            XCTAssertEqual(try String(contentsOf: backup, encoding: .utf8), "gaps.inner.horizontal = \(7 - index)\n")
             XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: backup.path)[.posixPermissions] as? Int, 0o600)
         }
         XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o600)
@@ -31,7 +31,7 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
         try ConfigFileStore.replace(at: url, text: original, expected: nil)
         XCTAssertFalse(try ConfigFileStore.edit(at: url) { $0 })
         XCTAssertThrowsError(try ConfigFileStore.edit(at: url) { _ in "gaps.inner.horizontal = 'bad'" })
-        XCTAssertEqual(try String(contentsOf: url), original)
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), original)
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.appendingPathExtension("backup.1").path))
     }
 
@@ -39,7 +39,7 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
         try ConfigFileStore.replace(at: url, text: "gaps.inner.horizontal = 3", expected: nil)
         try "gaps.inner.horizontal = 4".write(to: url, atomically: true, encoding: .utf8)
         XCTAssertThrowsError(try ConfigFileStore.replace(at: url, text: "gaps.inner.horizontal = 5", expected: "gaps.inner.horizontal = 3"))
-        XCTAssertEqual(try String(contentsOf: url), "gaps.inner.horizontal = 4")
+        XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), "gaps.inner.horizontal = 4")
     }
 
     func testStructuredEditReappliesToExternalChangesAndPreservesSymlink() throws {
@@ -53,7 +53,7 @@ final class AeroSporkAdoptionConfigTest: XCTestCase {
             return text + "# our edit\n"
         }
         XCTAssertEqual(attempts, 2)
-        XCTAssertEqual(try String(contentsOf: target), "# external\ngaps.inner.horizontal = 4\n# our edit\n")
+        XCTAssertEqual(try String(contentsOf: target, encoding: .utf8), "# external\ngaps.inner.horizontal = 4\n# our edit\n")
         XCTAssertEqual(try FileManager.default.destinationOfSymbolicLink(atPath: url.path), target.path)
     }
 

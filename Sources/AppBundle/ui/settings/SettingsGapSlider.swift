@@ -45,7 +45,7 @@ struct SettingsGapSlider: View {
         }
         .modifier(SettingsFieldFeedback(id: id, title: title))
         .onAppear { maximum = max(range.upperBound, value) }
-        .onChange(of: numberFocused) { if !$0 { commit() } }
+        .onChange(of: numberFocused) { _, newValue in if !newValue { commit() } }
         .onDisappear { debounce?.cancel(); commit() }
     }
 

@@ -288,7 +288,7 @@ final class MacApp: AbstractApp {
         )
         if useActivationOnly
         {
-            nsApp.activate(options: .activateIgnoringOtherApps)
+            nsApp.activate()
         } else {
             MacApp.focusJob = withWindowAsync(windowId) { [nsApp, axApp] window, job in
                 try job.checkCancellation()
@@ -300,7 +300,7 @@ final class MacApp: AbstractApp {
                 let raiseError = measuredAXOperation(.axAction, { AXUIElementPerformAction(window, kAXRaiseAction as CFString) })
                 AXWindowOperation.current?.record(raiseError, from: ObjectIdentifier(window))
                 try job.checkCancellation()
-                nsApp.activate(options: .activateIgnoringOtherApps)
+                nsApp.activate()
             }
         }
     }

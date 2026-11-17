@@ -17,12 +17,13 @@ final class DetectionRestorationOwnershipTest: XCTestCase {
         defer { setUpWorkspacesForTests() }
         let original = TestWindow.new(id: 7002, parent: focus.workspace.rootTilingContainer)
         let replacement = TestWindow.new(id: 7003, parent: focus.workspace.rootTilingContainer)
-        var current: Window = original
-        let commit = DetectionCommit(original, isCurrent: { $0 === current })
+        final class Owner: @unchecked Sendable { var window: Window; init(_ window: Window) { self.window = window } }
+        let current = Owner(original)
+        let commit = DetectionCommit(original, isCurrent: { $0 === current.window })
 
         XCTAssertNoThrow(try commit.check())
         // Simulates the owner changing while an AX/restoration await is suspended.
-        current = replacement
+        current.window = replacement
         XCTAssertThrowsError(try commit.check()) { error in
             XCTAssertTrue(error is CancellationError)
         }

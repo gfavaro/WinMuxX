@@ -20,10 +20,10 @@ extension WorkspaceSidebarProjectPager {
             .onAppear {
                 scrollCompactProjectTrackToCurrent(proxy)
             }
-            .onChange(of: selectedProjectId) { _ in
+            .onChange(of: selectedProjectId) {
                 scrollCompactProjectTrackToCurrent(proxy)
             }
-            .onChange(of: compactProjectControlsHeight) { _ in
+            .onChange(of: compactProjectControlsHeight) {
                 scrollCompactProjectTrackToCurrent(proxy)
             }
         }
@@ -46,10 +46,10 @@ extension WorkspaceSidebarProjectPager {
                             .onAppear {
                                 updateProjectTrackMetrics(geometry)
                             }
-                            .onChange(of: geometry.frame(in: .named("workspaceSidebarProjectTrack")).minX) { _ in
+                            .onChange(of: geometry.frame(in: .named("workspaceSidebarProjectTrack")).minX) {
                                 updateProjectTrackMetrics(geometry)
                             }
-                            .onChange(of: geometry.size.width) { _ in
+                            .onChange(of: geometry.size.width) {
                                 updateProjectTrackMetrics(geometry)
                             }
                     }
@@ -62,13 +62,13 @@ extension WorkspaceSidebarProjectPager {
             .onAppear {
                 scrollProjectTrackToCurrent(proxy)
             }
-            .onChange(of: selectedProjectId) { _ in
+            .onChange(of: selectedProjectId) {
                 scrollProjectTrackToCurrent(proxy)
             }
-            .onChange(of: projectTrackScrollTargetId) { projectId in
+            .onChange(of: projectTrackScrollTargetId) { _, projectId in
                 scrollProjectTrack(to: projectId, proxy: proxy)
             }
-            .onChange(of: projectTrackWidth) { _ in
+            .onChange(of: projectTrackWidth) {
                 scrollProjectTrackToCurrent(proxy)
             }
         }

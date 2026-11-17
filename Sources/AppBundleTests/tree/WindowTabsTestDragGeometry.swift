@@ -302,7 +302,7 @@ import XCTest
         let root = workspace.rootTilingContainer
         root.changeOrientation(.v)
         let target = TestWindow.new(id: 1, parent: root)
-        let source = TestWindow.new(id: 2, parent: root)
+        _ = TestWindow.new(id: 2, parent: root)
 
         XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .above))
         XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .below))
@@ -317,7 +317,7 @@ import XCTest
         let root = workspace.rootTilingContainer
         let leftStack = TilingContainer.newVTiles(parent: root, adaptiveWeight: WEIGHT_AUTO)
         _ = TestWindow.new(id: 1, parent: leftStack)
-        let source = TestWindow.new(id: 2, parent: leftStack)
+        _ = TestWindow.new(id: 2, parent: leftStack)
         let target = TestWindow.new(id: 3, parent: root)
 
         XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .left))

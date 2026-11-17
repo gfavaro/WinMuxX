@@ -280,7 +280,7 @@ extension Workspace {
         var current: TreeNode? = node
         while let candidate = current {
             if columns.contains(where: { $0 === candidate }) { return candidate }
-            current = candidate.parent as? TreeNode
+            current = candidate.parent
         }
         return nil
     }

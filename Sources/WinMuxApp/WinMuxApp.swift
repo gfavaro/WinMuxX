@@ -19,11 +19,11 @@ struct WinMuxApp: App {
 
     var body: some Scene {
         getShortcutSettingsWindow(model: shortcutSettingsModel)
-            .onChange(of: shortcutSettingsModel.openRequestId) { _ in
+            .onChange(of: shortcutSettingsModel.openRequestId) {
                 openShortcutSettingsWindow(openWindow)
             }
         getMessageWindow(messageModel: messageModel)
-            .onChange(of: messageModel.message) { message in
+            .onChange(of: messageModel.message) { _, message in
                 if message != nil {
                     openWindow(id: messageWindowId)
                 }

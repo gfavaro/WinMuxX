@@ -233,7 +233,7 @@ struct ShortcutSettingsView: View {
                 .padding(.vertical, 6)
             }
             .onAppear { showsAdvanced = selectedItem?.isAdvanced == true }
-            .onChange(of: storedPage) { _ in
+            .onChange(of: storedPage) {
                 if selectedItem?.isAdvanced == true { showsAdvanced = true }
             }
             .listStyle(.sidebar)
@@ -269,7 +269,7 @@ struct ShortcutSettingsView: View {
             }
 
             .environment(\.settingsSearchTarget, searchTarget)
-            .onChange(of: settingsSearch) { _ in searchTarget = nil; selectedControl = nil }
+            .onChange(of: settingsSearch) { searchTarget = nil; selectedControl = nil }
             .navigationTitle(selectedItem?.label ?? "")
         }
     }

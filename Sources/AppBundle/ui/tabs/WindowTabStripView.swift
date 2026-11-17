@@ -154,7 +154,7 @@ extension WindowTabStripView {
         ))
         .animation(reduceMotion ? nil : windowTabPillAnimation, value: hoveredTabId)
         .animation(reduceMotion ? nil : windowTabPillAnimation, value: activeWindowId)
-        .onChange(of: context.tabOrder) { newOrder in
+        .onChange(of: context.tabOrder) { _, newOrder in
             clearPendingReorderDropIfModelApplied(currentOrder: newOrder)
         }
     }
@@ -184,7 +184,7 @@ extension WindowTabStripView {
             }
             // A tab chosen from the keyboard while scrolled out of view comes into view.
             .onAppear { scrollToActiveTab(scroller) }
-            .onChange(of: strip.activeWindowId) { _ in scrollToActiveTab(scroller) }
+            .onChange(of: strip.activeWindowId) { scrollToActiveTab(scroller) }
         }
         .coordinateSpace(name: context.scrollCoordinateSpaceName)
         .onPreferenceChange(WindowTabStripScrollContentFramePreferenceKey.self) { nextFrame in

@@ -95,7 +95,7 @@ struct WorkspaceSidebarView: View {
         }
         .environment(\.workspaceSidebarAppearance, snapshot.configuration.appearance)
         .modifier(WorkspaceSidebarColorScheme(appearance: snapshot.configuration.appearance, solidColorScheme: solidColorScheme, theme: snapshot.configuration.theme))
-        .onChange(of: snapshot.visibleWidth) { visibleWidth in
+        .onChange(of: snapshot.visibleWidth) { _, visibleWidth in
             if visibleWidth <= collapsedWidth + 0.5 {
                 resetTransientSidebarState()
                 finishSidebarSearch(clearText: true)
@@ -107,7 +107,7 @@ struct WorkspaceSidebarView: View {
                 beginSidebarSearchIfNeeded()
             }
         }
-        .onChange(of: snapshot.activeProjectId) { projectId in
+        .onChange(of: snapshot.activeProjectId) { _, projectId in
             debugLog(.sidebarProject, "snapshotActiveProjectChanged active=\(projectId.rawValue) visibleWidth=\(snapshot.visibleWidth) projects=\(snapshot.projects.map(\.id.rawValue))"
             )
             browseMode = .activeProject
@@ -122,15 +122,15 @@ struct WorkspaceSidebarView: View {
                   panel.monitorScopeId == snapshot.targetMonitorScopeId else { return }
             activeInUseOverrideWorkspaceName = nil
         }
-        .onChange(of: selectedSearchTarget) { target in
+        .onChange(of: selectedSearchTarget) { _, target in
             if let name = activeInUseOverrideWorkspaceName, target != .workspace(name) {
                 activeInUseOverrideWorkspaceName = nil
             }
         }
-        .onChange(of: searchText) { _ in
+        .onChange(of: searchText) {
             selectFirstSearchTarget()
         }
-        .onChange(of: overrideConfirmationState) { state in
+        .onChange(of: overrideConfirmationState) { _, state in
             synchronizeOverrideConfirmation(state)
         }
         .onAppear {
@@ -139,7 +139,7 @@ struct WorkspaceSidebarView: View {
         .onDisappear {
             WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)?.overrideConfirmationLocksCollapse = false
         }
-        .onChange(of: browseMode) { mode in
+        .onChange(of: browseMode) { _, mode in
             guard snapshot.visibleWidth > collapsedWidth + 0.5,
                   let panel = WorkspaceSidebarPanel.panel(for: snapshot.targetMonitorScopeId)
             else { return }
@@ -152,7 +152,7 @@ struct WorkspaceSidebarView: View {
             isSidebarExpanding = false
             panel.animateVisibleSidebarWidth(targetWidth, animation: .easeInOut(duration: panel.animationDuration))
         }
-        .onChange(of: snapshot.projects) { _ in
+        .onChange(of: snapshot.projects) {
             if let browsedProjectId, !snapshot.projects.contains(where: { $0.id == browsedProjectId }) {
                 browseMode = .activeProject
             }
@@ -311,7 +311,7 @@ extension WorkspaceSidebarView {
                                  showsPinnedActiveWorkspace: showsPinnedActiveWorkspace, showsCreateWorkspace: showsCreateWorkspace,
                                  allowsActivation: allowsActivation)
             }
-            .onChange(of: selectedSearchTarget) { target in
+            .onChange(of: selectedSearchTarget) { _, target in
                 guard isInteractive, let target,
                     workspaceSidebarSearchSelections(workspaces: workspaces, includeWorkspaceHeaders: true).contains(target) else { return }
                 proxy.scrollTo(target, anchor: .top)

@@ -75,10 +75,10 @@ struct ShortcutAdvancedView: View {
                 .overlay(Rectangle().stroke(Color(nsColor: .separatorColor), lineWidth: 0.5))
         }
         .padding(18)
-        .onChange(of: model.settingsRevision) { _ in
+        .onChange(of: model.settingsRevision) {
             if configText == savedText { loadFromDisk(preservingDraft: true) }
         }
-        .onChange(of: configText) { model.configurationDraft = $0 == savedText ? nil : RawConfigDraft(text: $0, baseline: diskTextAtLoad) }
+        .onChange(of: configText) { _, newValue in model.configurationDraft = newValue == savedText ? nil : RawConfigDraft(text: newValue, baseline: diskTextAtLoad) }
         .task {
             guard !hasLoaded else { return }
             hasLoaded = true

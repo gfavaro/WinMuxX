@@ -32,7 +32,7 @@ struct WorkspaceOverviewView: View {
                         ScrollView { grid(cardHeight: metrics.cardHeight) }
                             // The opening selection is set before the view appears; reveal it too.
                             .onAppear { if let id = model.selectedCard?.id { proxy.scrollTo(id) } }
-                            .onChange(of: model.selection) { _ in
+                            .onChange(of: model.selection) {
                                 if let id = model.selectedCard?.id { proxy.scrollTo(id) }
                             }
                     }
@@ -44,9 +44,9 @@ struct WorkspaceOverviewView: View {
             }.padding(32)
         }
         .onAppear { accessibilitySelection = model.accessibilitySelection }
-        .onChange(of: model.accessibilitySelection) { accessibilitySelection = $0 }
-        .onChange(of: accessibilitySelection) { model.syncAccessibilityFocus($0) }
-        .onChange(of: model.focusRequest) { _ in accessibilitySelection = model.accessibilitySelection }
+        .onChange(of: model.accessibilitySelection) { _, newValue in accessibilitySelection = newValue }
+        .onChange(of: accessibilitySelection) { _, newValue in model.syncAccessibilityFocus(newValue) }
+        .onChange(of: model.focusRequest) { accessibilitySelection = model.accessibilitySelection }
         .background {
             // One shared surface; cards do not allocate additional blur layers.
             OverlaySurface()

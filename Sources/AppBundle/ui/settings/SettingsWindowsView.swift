@@ -152,7 +152,7 @@ struct ShortcutBehaviorSettingsView: View {
         }
         .navigationTitle("Windows")
         .onAppear { refreshFitDiagnostics() }
-        .onChange(of: minimums.revision) { _ in refreshFitDiagnostics() }
+        .onChange(of: minimums.revision) { refreshFitDiagnostics() }
         .confirmationDialog("Forget all learned minimum sizes?", isPresented: $confirmsForgetAllMinimums, titleVisibility: .visible) {
             Button("Forget All", role: .destructive) { minimums.forgetAll() }
         } message: {

@@ -34,7 +34,7 @@ struct SettingsModeOptionsView: View {
             }
             SettingsDescription("Modes use the shortcuts defined in Configuration. New modes include Escape to return to main; add an entry shortcut there when ready.")
         }
-        .onChange(of: model.settingsRevision) { _ in
+        .onChange(of: model.settingsRevision) {
             if config.modes[selected] == nil { selected = mainModeId }
         }
     }

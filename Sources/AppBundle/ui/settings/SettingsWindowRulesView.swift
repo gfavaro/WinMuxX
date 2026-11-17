@@ -260,7 +260,7 @@ struct SettingsWindowRulesView: View {
         }
         .disabled(model.savingSettingIDs.contains("on-window-detected"))
         .onAppear { rules.load() }
-        .onChange(of: model.settingsRevision) { _ in rules.load() }
+        .onChange(of: model.settingsRevision) { rules.load() }
         .alert("Delete this rule?", isPresented: $confirmsDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) { rules.change(using: model, delete: true) }

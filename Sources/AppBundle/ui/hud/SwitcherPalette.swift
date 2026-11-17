@@ -422,7 +422,7 @@ struct SwitcherPaletteView: View {
                         Text("No matching windows").foregroundStyle(.secondary).allowsHitTesting(false)
                     }
                 }
-                .onChange(of: selectedId) { id in
+                .onChange(of: selectedId) { _, id in
                     if let id { proxy.scrollTo(id, anchor: nil) }
                 }
             }

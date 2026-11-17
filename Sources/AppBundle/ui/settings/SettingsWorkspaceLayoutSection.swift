@@ -28,7 +28,7 @@ struct SettingsWorkspaceLayoutSection: View {
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
         }
         .onAppear { load() }
-        .onChange(of: workspace) { _ in load() }
+        .onChange(of: workspace) { load() }
     }
 
     private var saved: String {
