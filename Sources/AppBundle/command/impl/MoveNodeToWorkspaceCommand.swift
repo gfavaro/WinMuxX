@@ -18,7 +18,7 @@ struct MoveNodeToWorkspaceCommand: Command {
                     wrapAround: args.wrapAround,
                     stdin: args.useStdin ? io.readStdin() : nil,
                 )
-                    ?? createNextTransientBlankWorkspaceForMoveIfAllowed(
+                    ?? createNextTransientBlankWorkspaceIfAllowed(
                         from: subjectWs,
                         isNext: nextPrev == .next,
                         wrapAround: args.wrapAround,
@@ -38,18 +38,6 @@ struct MoveNodeToWorkspaceCommand: Command {
         }
         return moveWindowToWorkspace(window, targetWorkspace, io, focusFollowsWindow: args.focusFollowsWindow, failIfNoop: args.failIfNoop)
     }
-}
-
-@MainActor
-private func createNextTransientBlankWorkspaceForMoveIfAllowed(
-    from current: Workspace,
-    isNext: Bool,
-    wrapAround: Bool,
-    usesStdin: Bool,
-) -> Workspace? {
-    guard isNext, !wrapAround, !usesStdin else { return nil }
-    let nextWorkspaceIndex = nextAdjacentWorkspaceDisplayIndex(current: current)
-    return createAdjacentTransientBlankWorkspaceIfAllowed(named: String(nextWorkspaceIndex), from: current)
 }
 
 @MainActor

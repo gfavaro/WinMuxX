@@ -102,18 +102,6 @@ struct WorkspaceCommand: Command {
 }
 
 @MainActor
-private func createNextTransientBlankWorkspaceIfAllowed(
-    from current: Workspace,
-    isNext: Bool,
-    wrapAround: Bool,
-    usesStdin: Bool,
-) -> Workspace? {
-    guard isNext, !wrapAround, !usesStdin else { return nil }
-    let nextWorkspaceIndex = nextAdjacentWorkspaceDisplayIndex(current: current)
-    return createAdjacentTransientBlankWorkspaceIfAllowed(named: String(nextWorkspaceIndex), from: current)
-}
-
-@MainActor
 private func findDirectWorkspaceTarget(named workspaceName: String, from current: Workspace) -> Workspace? {
     if let targetIndex = parsePositiveWorkspaceDisplayIndex(workspaceName) {
         if let workspace = scopedAutomaticDisplayWorkspaces(current: current).first(where: { automaticWorkspaceDisplayIndex($0, focusedWorkspace: current) == targetIndex }) {

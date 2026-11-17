@@ -92,3 +92,17 @@ func nextAdjacentWorkspaceDisplayIndex(current: Workspace) -> Int {
     }
     return (indices.max() ?? 0) + 1
 }
+
+/// `next` past the last workspace, without wrapping or a list from stdin, may open a new blank
+/// workspace after it, for `workspace` and `move-node-to-workspace` alike.
+@MainActor
+func createNextTransientBlankWorkspaceIfAllowed(
+    from current: Workspace,
+    isNext: Bool,
+    wrapAround: Bool,
+    usesStdin: Bool,
+) -> Workspace? {
+    guard isNext, !wrapAround, !usesStdin else { return nil }
+    let nextWorkspaceIndex = nextAdjacentWorkspaceDisplayIndex(current: current)
+    return createAdjacentTransientBlankWorkspaceIfAllowed(named: String(nextWorkspaceIndex), from: current)
+}
