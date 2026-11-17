@@ -167,8 +167,8 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         guard !isRetired else { return }
         var sidebarConfiguration = workspaceSidebarConfiguration()
         // Scrolling columns slide under the sidebar, as at the display's edge: a clear sidebar
-        // would show them, so it takes its background while its display shows a Scrolling workspace.
-        if workspaceSidebarMonitor(forScopeId: monitorScopeId)?.activeWorkspace.arrangement == .scrolling {
+        // would show them, so it takes its background while one is beneath it.
+        if let monitor = workspaceSidebarMonitor(forScopeId: monitorScopeId), scrollingColumnIsUnderSidebar(on: monitor) {
             sidebarConfiguration.menuBarBackground = true
         }
         materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: viewModel.workspaceSidebarVisibleWidth)
@@ -420,5 +420,19 @@ extension WorkspaceSidebarPanel {
     func cancelCollapse() {
         pendingCollapseWork?.cancel()
         pendingCollapseWork = nil
+    }
+}
+
+/// Whether the Scrolling workspace shown on `monitor` has a window laid out under its sidebar.
+@MainActor
+private func scrollingColumnIsUnderSidebar(on monitor: Monitor) -> Bool {
+    let workspace = monitor.activeWorkspace
+    let inset = monitor.workspaceSidebarInset
+    guard workspace.arrangement == .scrolling, inset > 0 else { return false }
+    let onRight = config.workspaceSidebar.position == .right
+    let edge = onRight ? monitor.visibleRect.maxX - inset : monitor.visibleRect.minX + inset
+    return workspace.rootTilingContainer.allLeafWindowsRecursive.contains { window in
+        guard let rect = window.lastAppliedLayoutPhysicalRect else { return false }
+        return onRight ? rect.maxX > edge + 1 : rect.minX < edge - 1
     }
 }
