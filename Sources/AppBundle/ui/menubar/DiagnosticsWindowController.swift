@@ -24,9 +24,10 @@ final class DiagnosticsWindowController {
 }
 
 @MainActor
-final class DiagnosticsModel: ObservableObject {
-    @Published var report = ""
-    @Published var isRefreshing = false
+@Observable
+final class DiagnosticsModel {
+    var report = ""
+    var isRefreshing = false
 
     func refresh() {
         guard !isRefreshing else { return }
@@ -39,7 +40,7 @@ final class DiagnosticsModel: ObservableObject {
 }
 
 private struct DiagnosticsView: View {
-    @ObservedObject var model: DiagnosticsModel
+    var model: DiagnosticsModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {

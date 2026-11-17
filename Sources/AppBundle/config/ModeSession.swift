@@ -134,6 +134,6 @@ func updateModePresentation() {
        let name = activeMode, name != mainModeId, let mode = config.modes[name], mode.showIndicator {
         presentation = ModePresentation(name: name, mode: mode)
     } else { presentation = nil }
-    TrayMenuModel.shared.setIfChanged(\.modePresentation, presentation)
+    TrayMenuModel.shared.modePresentation = presentation
     requestPublicStateUpdate()
 }

@@ -6,9 +6,9 @@ import SwiftUI
 @main
 struct WinMuxApp: App {
     @NSApplicationDelegateAdaptor(WinMuxApplicationDelegate.self) var applicationDelegate
-    @StateObject var viewModel = TrayMenuModel.shared
-    @StateObject var messageModel = MessageModel.shared
-    @StateObject var shortcutSettingsModel = ShortcutSettingsModel.shared
+    @State var viewModel = TrayMenuModel.shared
+    @State var messageModel = MessageModel.shared
+    @State var shortcutSettingsModel = ShortcutSettingsModel.shared
     @Environment(\.openWindow) var openWindow: OpenWindowAction
 
     init() {

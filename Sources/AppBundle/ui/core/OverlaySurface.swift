@@ -28,7 +28,7 @@ struct OverlaySurface: View {
 
 struct OverlayAppearance: ViewModifier {
     var monitor: MonitorViewportId? = nil
-    @ObservedObject private var tray = TrayMenuModel.shared
+    private var tray = TrayMenuModel.shared
 
     func body(content: Content) -> some View {
         let configuration = workspaceSidebarConfiguration()

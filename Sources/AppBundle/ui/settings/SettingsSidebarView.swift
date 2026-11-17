@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ShortcutSidebarSettingsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @SettingsDraft("workspace-sidebar.enabled", load: { config.workspaceSidebar.enabled }) private var sidebarEnabled: Bool
     @SettingsDraft("workspace-sidebar.enable-focus", load: { config.workspaceSidebar.enableFocus }) private var sidebarFocusEnabled: Bool
     @SettingsDraft("workspace-sidebar.display-mode", load: { SettingsSidebarDisplayMode(config.workspaceSidebar) }) private var sidebarDisplayMode: SettingsSidebarDisplayMode

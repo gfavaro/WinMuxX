@@ -3,7 +3,7 @@ import Common
 import SwiftUI
 
 struct SettingsModeOptionsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @State private var selected = mainModeId
     @State private var newModeName = ""
 
@@ -41,13 +41,13 @@ struct SettingsModeOptionsView: View {
 }
 
 private struct SettingsModeFields: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let name: String
-    @ObservedObject private var drafts: SettingsDraftStore
+    private var drafts: SettingsDraftStore
     init(model: ShortcutSettingsModel, name: String) {
         self.model = model
         self.name = name
-        _drafts = ObservedObject(wrappedValue: model.drafts)
+        drafts = model.drafts
     }
     private var mode: Mode { config.modes[name] ?? .zero }
     private var prefix: String { "mode." + settingsQuotedString(name) }

@@ -6,7 +6,7 @@ struct WorkspaceOverviewView: View {
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.workspaceSidebarPreviewAccessibility) private var previewAccessibility
     @AccessibilityFocusState private var accessibilitySelection: WorkspaceOverviewAccessibilitySelection?
-    @ObservedObject var model: WorkspaceOverviewDisplayModel
+    var model: WorkspaceOverviewDisplayModel
     let monitorName: String
     private var increasedContrast: Bool { contrast == .increased || previewAccessibility.increasedContrast }
     var body: some View {

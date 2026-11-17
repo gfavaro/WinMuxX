@@ -1,5 +1,5 @@
 import AppKit
-import Combine
+import Observation
 import Common
 
 /// AppKit can notify effectiveAppearance again while a status button is rendered.
@@ -37,7 +37,6 @@ public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
 final class NativeActionMenu: NSObject, NSMenuDelegate {
     static let shared = NativeActionMenu()
     private var statusItem: NSStatusItem?
-    private var observation: AnyCancellable?
     private var accessibilityObservation: NSObjectProtocol?
     private var appearanceObservation: NSKeyValueObservation?
     private var checkForUpdates: (() -> Void)?
@@ -77,9 +76,13 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 requestPublicStateUpdate()
             }
         }
-        updateIcon()
-        observation = TrayMenuModel.shared.objectWillChange.sink { [weak self] _ in
-            Task { @MainActor in self?.updateIcon() }
+        observeIcon()
+    }
+
+    /// Redraws the icon from what it shows, and again whenever any of that changes.
+    private func observeIcon() {
+        withObservationTracking { updateIcon() } onChange: { [weak self] in
+            Task { @MainActor in self?.observeIcon() }
         }
     }
 

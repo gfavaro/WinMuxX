@@ -1,5 +1,7 @@
 import AppKit
+import Observation
 import Common
+import Observation
 
 struct WorkspaceOverviewWindow: Identifiable, Equatable {
     let id: UInt32
@@ -69,21 +71,22 @@ func buildWorkspaceOverviewCards(project: WorkspaceProjectId, monitors: [Monitor
 }
 
 @MainActor
-final class WorkspaceOverviewDisplayModel: ObservableObject {
+@Observable
+final class WorkspaceOverviewDisplayModel {
     var monitor: MonitorViewportId?
-    @Published var cards: [WorkspaceOverviewCard] = []
-    @Published var images: [WorkspaceId: CGImage] = [:]
-    @Published var page = 0
-    @Published var selection = 0
-    @Published var selectedWindow: UInt32?
+    var cards: [WorkspaceOverviewCard] = []
+    var images: [WorkspaceId: CGImage] = [:]
+    var page = 0
+    var selection = 0
+    var selectedWindow: UInt32?
     var activate: ((WorkspaceId, UInt32?) -> Void)?
     var pageChanged: (() -> Void)?
     var dismiss: (() -> Void)?
     /// Moves keyboard and VoiceOver focus to the previous (-1) or next (+1) display's overview; bound to [ and ].
     var switchDisplay: ((Int) -> Void)?
-    @Published var canSwitchDisplay = false
+    var canSwitchDisplay = false
     /// Incremented when this display's overview receives focus from another display.
-    @Published var focusRequest = 0
+    var focusRequest = 0
     static let pageSize = 12
     var pageCount: Int { max(1, (cards.count + Self.pageSize - 1) / Self.pageSize) }
     var visibleCards: [WorkspaceOverviewCard] { Array(cards.dropFirst(page * Self.pageSize).prefix(Self.pageSize)) }

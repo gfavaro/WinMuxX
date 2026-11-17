@@ -2,6 +2,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import Observation
 import XCTest
 
 @MainActor
@@ -150,20 +151,20 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertLessThan(medium.headerHeight, large.headerHeight)
     }
 
-    func testConfigurationChangePublishesWithoutWorkspaceChanges() {
+    func testConfigurationChangeNotifiesOnlyOnce() {
         let model = TrayMenuModel()
-        var updates = 0
-        let subscription = model.objectWillChange.sink { updates += 1 }
         var updated = WorkspaceSidebarConfiguration.empty
         updated.appearance = .custom
         updated.chromeStyle = .solid
-        model.setIfChanged(\.workspaceSidebarConfiguration, updated)
-        XCTAssertEqual(updates, 1)
+        let updates = ObservationCounter()
+        withObservationTracking { _ = model.workspaceSidebarConfiguration } onChange: { updates.value += 1 }
+        model.workspaceSidebarConfiguration = updated
+        XCTAssertEqual(updates.value, 1)
         XCTAssertEqual(workspaceSidebarSnapshot(from: model).configuration, updated)
-        model.setIfChanged(\.workspaceSidebarConfiguration, updated)
-        XCTAssertEqual(updates, 1)
+        withObservationTracking { _ = model.workspaceSidebarConfiguration } onChange: { updates.value += 1 }
+        model.workspaceSidebarConfiguration = updated
+        XCTAssertEqual(updates.value, 1, "The same configuration again does not notify")
         XCTAssertTrue(model.workspaceSidebarWorkspaces.isEmpty)
-        withExtendedLifetime(subscription) {}
     }
 
     func testSystemAppearanceIsDefaultAndDoesNotChangeSharedChrome() {

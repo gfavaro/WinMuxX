@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ShortcutAppearanceSettingsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @SettingsDraft("appearance", load: { config.appearance }) private var appearance: AppAppearance
     @SettingsDraft("menu-bar.indicator", load: { config.menuBar.indicator }) private var menuBarIndicator: MenuBarIndicator
     @SettingsDraft("menu-bar.icon-appearance", load: { config.menuBar.iconAppearance }) private var menuBarIconAppearance: MenuBarIconAppearance

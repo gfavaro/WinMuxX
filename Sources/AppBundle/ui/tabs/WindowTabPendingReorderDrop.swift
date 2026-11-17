@@ -1,5 +1,6 @@
-import Combine
+import Observation
 import CoreGraphics
+import Observation
 
 struct WindowTabIncomingDrop: Equatable {
     let stripId: ObjectIdentifier
@@ -20,12 +21,13 @@ struct WindowTabPendingReorderDrop: Equatable {
 /// whole TrayMenuModel (which republishes on every refresh session) just for this one value.
 /// Writes happen on every drag tick, so the setter is equality-guarded.
 @MainActor
-final class WindowTabReentryPreviewModel: ObservableObject {
+@Observable
+final class WindowTabReentryPreviewModel {
     static let shared = WindowTabReentryPreviewModel()
 
-    @Published private(set) var value: WindowTabPendingReorderDrop? = nil
+    private(set) var value: WindowTabPendingReorderDrop? = nil
     /// A tab from elsewhere over a Tabbed workspace's bar: the bar opens a gap where it would land.
-    @Published private(set) var incoming: WindowTabIncomingDrop? = nil
+    private(set) var incoming: WindowTabIncomingDrop? = nil
 
     func set(_ newValue: WindowTabPendingReorderDrop?) {
         if value != newValue {

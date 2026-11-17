@@ -1,5 +1,6 @@
 import AppKit
-import Combine
+import Observation
+import Observation
 
 struct AppMinimumEvidence: Equatable, Identifiable {
     let bundleId: String
@@ -16,7 +17,8 @@ struct MinimumEvidenceGeneration: Equatable, Codable {
 }
 
 /// Confirmed evidence only. Invalid persisted values never constrain a layout.
-@MainActor final class PersistedAppMinimums: ObservableObject {
+@MainActor @Observable
+final class PersistedAppMinimums {
     static let shared = PersistedAppMinimums(defaults: .standard)
     private let defaults: UserDefaults
     private let key = "confirmedAppMinimumSizes.v2"
@@ -25,7 +27,7 @@ struct MinimumEvidenceGeneration: Equatable, Codable {
     private var sizes: [String: [Double]]
     private var globalGeneration: UInt64
     private var appGenerations: [String: UInt64]
-    @Published private(set) var revision: UInt64 = 0
+    private(set) var revision: UInt64 = 0
 
     init(defaults: UserDefaults) {
         self.defaults = defaults

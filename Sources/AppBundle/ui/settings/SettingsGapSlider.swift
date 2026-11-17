@@ -8,7 +8,7 @@ struct SettingsGapSlider: View {
     let help: String
     let savedValue: Int
     let save: () -> Void
-    @ObservedObject private var model = ShortcutSettingsModel.shared
+    private var model = ShortcutSettingsModel.shared
     @FocusState private var numberFocused: Bool
     @State private var dragging = false
     @State private var maximum = 0

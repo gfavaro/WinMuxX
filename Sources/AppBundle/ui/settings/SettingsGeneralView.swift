@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct ShortcutGeneralSettingsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @SettingsDraft("start-at-login", load: { config.startAtLogin }) private var startAtLogin: Bool
     @SettingsDraft("auto-reload-config", load: { config.autoReloadConfig }) private var autoReloadConfig: Bool
 

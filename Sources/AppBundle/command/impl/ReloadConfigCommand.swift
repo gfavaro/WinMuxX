@@ -145,7 +145,7 @@ func applyUpdatedDefaultWindowLayout(previousLayout: Layout) {
         NSApp?.appearance = config.appearance.nativeAppearance
         WindowResizePreviewPanel.existing?.refreshAppearance()
     }
-    TrayMenuModel.shared.setIfChanged(\.menuBarConfiguration, config.menuBar)
+    TrayMenuModel.shared.menuBarConfiguration = config.menuBar
     updateTrayText()
     ShortcutSettingsModel.shared.reload()
     WorkspaceSidebarPanel.refreshAll()

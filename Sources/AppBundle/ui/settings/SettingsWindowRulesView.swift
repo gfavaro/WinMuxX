@@ -113,19 +113,20 @@ struct SettingsRuleDraft: Equatable {
 }
 
 @MainActor
-final class SettingsWindowRulesModel: ObservableObject {
-    @Published private(set) var document = SettingsRuleDocument("")
-    @Published private(set) var rows: [SettingsRuleRow] = []
-    @Published private(set) var selection: Int?
-    @Published var draft: SettingsRuleDraft?
-    @Published private(set) var original: SettingsRuleDraft?
-    @Published var error: String?
+@Observable
+final class SettingsWindowRulesModel {
+    private(set) var document = SettingsRuleDocument("")
+    private(set) var rows: [SettingsRuleRow] = []
+    private(set) var selection: Int?
+    var draft: SettingsRuleDraft?
+    private(set) var original: SettingsRuleDraft?
+    var error: String?
     private let readText: () throws -> String
     init(readText: @escaping () throws -> String = { try ConfigFileStore.read(preferredEditableConfigUrl()) ?? "" }) {
         self.readText = readText
     }
-    @Published private(set) var isNewRule = false
-    @Published private(set) var isSaving = false
+    private(set) var isNewRule = false
+    private(set) var isSaving = false
     private var attemptedDraft: SettingsRuleDraft?
     var isDirty: Bool { isNewRule || draft != original }
 
@@ -226,8 +227,8 @@ final class SettingsWindowRulesModel: ObservableObject {
 }
 
 struct SettingsWindowRulesView: View {
-    @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject var rules: SettingsWindowRulesModel
+    var model: ShortcutSettingsModel
+    var rules: SettingsWindowRulesModel
     var onRawEditor: () -> Void
     @State private var confirmsDelete = false
 

@@ -47,7 +47,7 @@ private let sequenceChordTimeoutNs: UInt64 = 300_000_000 // 300ms
     hotkeyState.pendingUnboundModeExit = false
     hotkeyState.unboundPassthroughKeyCode = nil
     hotkeyState.modeSession.invalidate()
-    TrayMenuModel.shared.setIfChanged(\.modePresentation, nil)
+    TrayMenuModel.shared.modePresentation = nil
     // Explicitly unregister all hotkeys. We cannot always rely on destruction of the HotKey object to trigger
     // unregistration because we might be running inside a hotkey handler that is keeping its HotKey object alive.
     for (_, key) in hotkeyState.hotkeys {

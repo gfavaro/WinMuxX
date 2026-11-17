@@ -4,7 +4,7 @@ import MASShortcut
 import SwiftUI
 
 struct ShortcutAdvancedView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @State private var configText = ""
     @State private var validationMessage: String? = nil
     @State private var saveMessage: String? = nil

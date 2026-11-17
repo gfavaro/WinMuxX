@@ -4,7 +4,7 @@ import MASShortcut
 import SwiftUI
 
 struct WorkspaceShortcutSectionView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @State private var showsOverrides = false
 
     var body: some View {
@@ -28,7 +28,7 @@ struct WorkspaceShortcutSectionView: View {
 }
 
 private struct WorkspacePatternRow: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let kind: ShortcutSettingsModel.WorkspaceShortcutKind
 
     var body: some View {
@@ -51,7 +51,7 @@ private struct WorkspacePatternRow: View {
 }
 
 private struct WorkspaceModifierMenu: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let kind: ShortcutSettingsModel.WorkspaceShortcutKind
 
     private let modifiers: [(String, NSEvent.ModifierFlags)] = [
@@ -79,7 +79,7 @@ private struct WorkspaceModifierMenu: View {
 }
 
 private struct WorkspaceOverridesGrid: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
 
     var body: some View {
         Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
@@ -103,7 +103,7 @@ private struct WorkspaceOverridesGrid: View {
 }
 
 private struct WorkspaceOverrideRecorder: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let workspaceName: String
     let kind: ShortcutSettingsModel.WorkspaceShortcutKind
 

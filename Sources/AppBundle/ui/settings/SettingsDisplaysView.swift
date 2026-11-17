@@ -14,9 +14,10 @@ struct SettingsDisplayRow: Identifiable, Equatable {
 }
 
 @MainActor
-final class SettingsDisplaysModel: ObservableObject {
-    @Published private(set) var rows: [SettingsDisplayRow] = []
-    @Published var assignment = SettingsAssignmentDraft()
+@Observable
+final class SettingsDisplaysModel {
+    private(set) var rows: [SettingsDisplayRow] = []
+    var assignment = SettingsAssignmentDraft()
 
     func refresh() {
         let next = sortedMonitors.map { monitor in
@@ -29,7 +30,7 @@ final class SettingsDisplaysModel: ObservableObject {
                 activeWorkspace: runtime.workspaces.visibleWorkspace(for: monitor)?.name,
             )
         }
-        setIfChanged(\.rows, next)
+        rows = next
     }
 
     func bringHere(workspace: String, selector: String, expectedVisibleWorkspace: String? = nil) async throws {
@@ -77,9 +78,9 @@ func validateSecondarySettingsAssignments(_ text: String) throws {
 }
 
 struct SettingsDisplaysView: View {
-    @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject var displays: SettingsDisplaysModel
-    @ObservedObject private var tray = TrayMenuModel.shared
+    var model: ShortcutSettingsModel
+    @Bindable var displays: SettingsDisplaysModel
+    private var tray = TrayMenuModel.shared
     @State private var isSavingAssignment = false
     @State private var attemptedAssignment: SettingsAssignmentDraft?
     @State private var workspace = ""
@@ -160,8 +161,8 @@ struct SettingsDisplaysView: View {
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
         }
         .onAppear { displays.refresh() }
-        .onReceive(tray.$workspaceSidebarWorkspaces) { _ in displays.refresh() }
-        .onReceive(tray.$workspaceSidebarMonitorScopes) { _ in displays.refresh() }
+        .onChange(of: tray.workspaceSidebarWorkspaces) { displays.refresh() }
+        .onChange(of: tray.workspaceSidebarMonitorScopes) { displays.refresh() }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).receive(on: RunLoop.main)) { _ in displays.refresh() }
         .alert("Bring this workspace here?", isPresented: $confirmsMove) {
             Button("Cancel", role: .cancel) { pendingMove = nil }

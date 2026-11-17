@@ -172,25 +172,25 @@ final class WorkspaceSidebarPanel: NSPanelHud {
             sidebarConfiguration.menuBarBackground = true
         }
         materialContainer.configure(configuration: sidebarConfiguration, visibleWidth: viewModel.workspaceSidebarVisibleWidth)
-        viewModel.setIfChanged(\.workspaceSidebarConfiguration, sidebarConfiguration)
+        viewModel.workspaceSidebarConfiguration = sidebarConfiguration
         // Equality-guarded: this runs several times per refresh session, and each unguarded
-        // @Published write would invalidate the whole sidebar SwiftUI tree even when nothing
+        // write would invalidate the whole sidebar SwiftUI tree even when nothing
         // changed. workspaceSidebarVisibleWidth/isWorkspaceSidebarExpanded are panel-local and
         // never synced. Menu-bar configuration belongs to the shared native menu model.
-        viewModel.setIfChanged(\.isEnabled, TrayMenuModel.shared.isEnabled)
-        viewModel.setIfChanged(\.workspaces, TrayMenuModel.shared.workspaces)
-        viewModel.setIfChanged(\.workspaceSidebarWorkspaces, TrayMenuModel.shared.workspaceSidebarWorkspaces)
-        viewModel.setIfChanged(\.workspaceSidebarProjects, TrayMenuModel.shared.workspaceSidebarProjects)
-        viewModel.setIfChanged(\.workspaceSidebarActiveProjectId, resolvedLocalActiveProjectId())
-        viewModel.setIfChanged(\.workspaceSidebarMonitorScopes, TrayMenuModel.shared.workspaceSidebarMonitorScopes)
-        viewModel.setIfChanged(\.workspaceSidebarSelectedMonitorScopeId, resolvedLocalSelectedMonitorScopeId())
-        viewModel.setIfChanged(\.workspaceSidebarTargetMonitorScopeId, monitorScopeId)
-        viewModel.setIfChanged(\.workspaceSidebarFocusedMonitorScopeId, TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId)
-        viewModel.setIfChanged(\.workspaceSidebarShowsMonitorSelector, TrayMenuModel.shared.workspaceSidebarShowsMonitorSelector)
-        viewModel.setIfChanged(\.workspaceSidebarDropPreview, TrayMenuModel.shared.workspaceSidebarDropPreview)
-        viewModel.setIfChanged(\.windowTabStrips, TrayMenuModel.shared.windowTabStrips)
-        viewModel.setIfChanged(\.workspaceSidebarTopPadding, TrayMenuModel.shared.workspaceSidebarTopPadding)
-        viewModel.setIfChanged(\.workspaceSidebarHoveredWorkspaceName, resolvedLocalHoveredWorkspaceName())
+        viewModel.isEnabled = TrayMenuModel.shared.isEnabled
+        viewModel.workspaces = TrayMenuModel.shared.workspaces
+        viewModel.workspaceSidebarWorkspaces = TrayMenuModel.shared.workspaceSidebarWorkspaces
+        viewModel.workspaceSidebarProjects = TrayMenuModel.shared.workspaceSidebarProjects
+        viewModel.workspaceSidebarActiveProjectId = resolvedLocalActiveProjectId()
+        viewModel.workspaceSidebarMonitorScopes = TrayMenuModel.shared.workspaceSidebarMonitorScopes
+        viewModel.workspaceSidebarSelectedMonitorScopeId = resolvedLocalSelectedMonitorScopeId()
+        viewModel.workspaceSidebarTargetMonitorScopeId = monitorScopeId
+        viewModel.workspaceSidebarFocusedMonitorScopeId = TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId
+        viewModel.workspaceSidebarShowsMonitorSelector = TrayMenuModel.shared.workspaceSidebarShowsMonitorSelector
+        viewModel.workspaceSidebarDropPreview = TrayMenuModel.shared.workspaceSidebarDropPreview
+        viewModel.windowTabStrips = TrayMenuModel.shared.windowTabStrips
+        viewModel.workspaceSidebarTopPadding = TrayMenuModel.shared.workspaceSidebarTopPadding
+        viewModel.workspaceSidebarHoveredWorkspaceName = resolvedLocalHoveredWorkspaceName()
     }
 
     private func resolvedLocalActiveProjectId() -> WorkspaceProjectId {

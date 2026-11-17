@@ -7,8 +7,8 @@ enum SettingsAutomationSection: String, CaseIterable {
 
 struct ShortcutAutomationSettingsView: View {
     @AppStorage("settings.automationSection") private var storedSection = SettingsAutomationSection.rules.rawValue
-    @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject var rules: SettingsWindowRulesModel
+    var model: ShortcutSettingsModel
+    var rules: SettingsWindowRulesModel
     var onRawEditor: () -> Void
     @SettingsDraft("after-startup-command", load: { config.afterStartupCommand.map { $0.args.description }.joined(separator: "\n") }) private var startupCommands: String
     @SettingsDraft("exec-on-workspace-change", load: { config.execOnWorkspaceChange.joined(separator: "\n") }) private var workspaceCommands: String

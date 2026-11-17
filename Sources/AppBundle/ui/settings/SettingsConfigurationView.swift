@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsConfigurationView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     var onNavigate: (SettingsSidebarItem) -> Void = { _ in }
     @State private var showsReference = false
     var body: some View {

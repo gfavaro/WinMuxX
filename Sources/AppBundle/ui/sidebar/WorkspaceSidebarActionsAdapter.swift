@@ -13,11 +13,11 @@ func makeWorkspaceSidebarActionsAdapter(
             WorkspaceSidebarPanel.updateVisibleDropTargets(targets)
         },
         hoverWorkspace: { name, isHovering in
-            TrayMenuModel.shared.setIfChanged(\.workspaceSidebarHoveredWorkspaceName, nextWorkspaceSidebarHoveredWorkspaceName(
+            TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = nextWorkspaceSidebarHoveredWorkspaceName(
                 currentHoveredWorkspaceName: TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName,
                 workspaceName: name,
                 isHovering: isHovering,
-            ))
+            )
         },
         windowDragChanged: { windowId, pointer in
             updateSidebarWindowDrag(windowId, subject: .window, pointer: pointer)

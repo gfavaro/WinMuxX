@@ -3,8 +3,8 @@ import SwiftUI
 import Common
 
 struct ShortcutBehaviorSettingsView: View {
-    @ObservedObject private var minimums = PersistedAppMinimums.shared
-    @ObservedObject var model: ShortcutSettingsModel
+    private var minimums = PersistedAppMinimums.shared
+    var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool

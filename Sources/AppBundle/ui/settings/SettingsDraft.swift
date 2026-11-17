@@ -2,16 +2,22 @@ import SwiftUI
 
 /// Keep user drafts across page changes and reloads without replacing view identity.
 @MainActor
-final class SettingsDraftStore: ObservableObject {
+@Observable
+final class SettingsDraftStore {
     struct Entry {
         let value: Any
         let matches: (Any) -> Bool
     }
     static let shared = SettingsDraftStore()
-    @Published private(set) var entries: [String: Entry] = [:]
+    private(set) var entries: [String: Entry] = [:]
+
+    /// Saved values come from the config, which views cannot observe: reading this makes a
+    /// view that shows one redraw when the config is saved.
+    private var savedValuesGeneration: UInt64 = 0
 
     func value<Value>(for id: String, fallback: @MainActor () -> Value) -> Value {
-        entries[id]?.value as? Value ?? fallback()
+        _ = savedValuesGeneration
+        return entries[id]?.value as? Value ?? fallback()
     }
 
     func set<Value: Equatable>(_ value: Value, for id: String) {
@@ -24,13 +30,13 @@ final class SettingsDraftStore: ObservableObject {
         }
     }
 
-    func refreshSavedValues() { objectWillChange.send() }
+    func refreshSavedValues() { savedValuesGeneration &+= 1 }
 }
 
 @propertyWrapper
 @MainActor
 struct SettingsDraft<Value: Equatable>: DynamicProperty {
-    @ObservedObject private var store = SettingsDraftStore.shared
+    private var store = SettingsDraftStore.shared
     private let id: String
     private let load: @MainActor () -> Value
 
@@ -57,13 +63,13 @@ struct SettingsDraft<Value: Equatable>: DynamicProperty {
 }
 
 struct SettingsSaveSummary: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     var additionalUnsaved = false
-    @ObservedObject private var drafts: SettingsDraftStore
+    private var drafts: SettingsDraftStore
     init(model: ShortcutSettingsModel, additionalUnsaved: Bool = false) {
         self.model = model
         self.additionalUnsaved = additionalUnsaved
-        self._drafts = ObservedObject(wrappedValue: model.drafts)
+        self.drafts = model.drafts
     }
     var body: some View {
         if !model.savingSettingIDs.isEmpty {

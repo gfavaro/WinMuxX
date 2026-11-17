@@ -1,6 +1,6 @@
 @MainActor
 func setWorkspaceSidebarDropPreviewIfChanged(_ preview: WorkspaceSidebarDropPreviewViewModel?) {
-    if TrayMenuModel.shared.setIfChanged(\.workspaceSidebarDropPreview, preview) {
-        WorkspaceSidebarPanel.syncVisiblePanelModelsFromShared()
-    }
+    guard TrayMenuModel.shared.workspaceSidebarDropPreview != preview else { return }
+    TrayMenuModel.shared.workspaceSidebarDropPreview = preview
+    WorkspaceSidebarPanel.syncVisiblePanelModelsFromShared()
 }

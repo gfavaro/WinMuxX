@@ -25,7 +25,7 @@ public func getMessageWindow(messageModel: MessageModel) -> some Scene {
 public let messageWindowId = "\(winMuxAppName).messageView"
 
 struct MessageView: View {
-    @StateObject private var model: MessageModel
+    @State private var model: MessageModel
     @Environment(\.dismiss) private var dismiss: DismissAction
     @FocusState var focus: Bool
 
@@ -99,9 +99,11 @@ struct MessageView: View {
     }
 }
 
-public final class MessageModel: ObservableObject {
+@Observable
+
+public final class MessageModel {
     @MainActor public static let shared = MessageModel()
-    @Published public var message: Message? = nil
+    public var message: Message? = nil
 
     private init() {}
 }

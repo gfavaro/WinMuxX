@@ -7,7 +7,7 @@ struct WindowTabStripView: View {
 
     // Observes only the reentry preview, not the whole TrayMenuModel: the shared model
     // republishes on every refresh session, which would re-render every tab strip.
-    @ObservedObject var reentryPreviewModel = WindowTabReentryPreviewModel.shared
+    var reentryPreviewModel = WindowTabReentryPreviewModel.shared
     @State var draggingTabId: UInt32?
     @State var hoveredTabId: UInt32?
     @State var dragTranslationX: CGFloat = 0

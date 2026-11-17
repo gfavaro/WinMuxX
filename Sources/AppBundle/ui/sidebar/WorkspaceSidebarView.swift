@@ -230,7 +230,7 @@ private func notificationPanel(from notification: Notification) -> WorkspaceSide
 }
 
 struct WorkspaceSidebarContainerView: View {
-    @ObservedObject var viewModel: TrayMenuModel
+    var viewModel: TrayMenuModel
     let actions: WorkspaceSidebarActions
 
     var body: some View {

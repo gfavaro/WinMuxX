@@ -1,6 +1,6 @@
 @testable import AppBundle
 import AppKit
-import Combine
+import Observation
 import Common
 import XCTest
 
@@ -15,27 +15,27 @@ final class MenuBarLayoutIconTest: WorkspaceTestCase {
         updateTrayText()
 
         let shared = TrayMenuModel.shared
-        shared.setIfChanged(\.menuBarWorkspaceArrangement, first.arrangement)
-        var publishCount = 0
-        let subscription = shared.objectWillChange.sink { publishCount += 1 }
-        defer { subscription.cancel() }
+        shared.menuBarWorkspaceArrangement = first.arrangement
+        /// Whether what the menu bar icon shows was reported changed while `update` ran.
+        func notifies(_ update: () -> Void) -> Bool {
+            let changes = ObservationCounter()
+            withObservationTracking {
+                _ = (shared.menuBarWorkspaceArrangement, shared.menuBarWorkspaceIndicator, shared.menuBarWorkspaceName)
+            } onChange: { changes.value += 1 }
+            update()
+            return changes.value > 0
+        }
 
         first.arrangement = .master
-        updateTrayText()
+        XCTAssertTrue(notifies { updateTrayText() })
         XCTAssertEqual(shared.menuBarWorkspaceArrangement, .master)
-        XCTAssertGreaterThan(publishCount, 0)
-        let afterChange = publishCount
-
-        updateTrayText()
-        XCTAssertEqual(publishCount, afterChange, "refreshing an unchanged arrangement must not publish")
+        XCTAssertFalse(notifies { updateTrayText() }, "refreshing an unchanged arrangement must not notify")
 
         second.arrangement = .dwindle
         XCTAssertTrue(second.focusWorkspace())
         updateTrayText()
         XCTAssertEqual(shared.menuBarWorkspaceArrangement, .dwindle)
-        let afterSwitch = publishCount
-        updateTrayText()
-        XCTAssertEqual(publishCount, afterSwitch, "a settled workspace switch must not republish")
+        XCTAssertFalse(notifies { updateTrayText() }, "a settled workspace switch must not notify again")
     }
 
     func testRendererMapsEachLayoutAndAppliesKeyboardTint() throws {

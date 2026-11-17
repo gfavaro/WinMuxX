@@ -72,9 +72,9 @@ private let releaseSettingsPagesOnClose: Void = {
 /// Holds the pages while the window is open. The rule and display editors live here so
 /// their unsaved edits outlast a close, like the other setting drafts.
 struct ShortcutSettingsWindowContent: View {
-    @ObservedObject var model: ShortcutSettingsModel
-    @StateObject private var displays = SettingsDisplaysModel()
-    @StateObject private var rules = SettingsWindowRulesModel()
+    var model: ShortcutSettingsModel
+    @State private var displays = SettingsDisplaysModel()
+    @State private var rules = SettingsWindowRulesModel()
 
     var body: some View {
         if model.isWindowShown {
@@ -146,9 +146,9 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
 }
 
 struct ShortcutSettingsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject var displays: SettingsDisplaysModel
-    @ObservedObject var rules: SettingsWindowRulesModel
+    var model: ShortcutSettingsModel
+    var displays: SettingsDisplaysModel
+    var rules: SettingsWindowRulesModel
     @AppStorage("settings.selectedPage") private var storedPage = SettingsSidebarItem.general.rawValue
     @State private var shortcutSearch = ""
     @State private var settingsSearch = ""
@@ -276,7 +276,7 @@ struct ShortcutSettingsView: View {
 }
 
 struct ShortcutSettingsShortcutsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @Binding var query: String
 
     var body: some View {
@@ -285,7 +285,7 @@ struct ShortcutSettingsShortcutsView: View {
 }
 
 struct ShortcutSettingsWorkspacePane: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
 
     var body: some View {
         ShortcutCategoryView(model: model, category: .common)
@@ -293,7 +293,7 @@ struct ShortcutSettingsWorkspacePane: View {
 }
 
 struct ShortcutCategoryView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let category: ShortcutSettingsModel.Category
     @Binding var query: String
 
@@ -391,7 +391,7 @@ struct ShortcutCategoryView: View {
 }
 
 struct ShortcutSectionView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let section: ShortcutSettingsModel.Section
 
     var body: some View {
@@ -427,7 +427,7 @@ struct ShortcutSectionView: View {
 
 
 struct ShortcutRow: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let action: ShortcutSettingsModel.Action
 
     var body: some View {

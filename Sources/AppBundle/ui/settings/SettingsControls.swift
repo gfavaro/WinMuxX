@@ -342,7 +342,8 @@ struct SettingsMultilineField: View {
         .onAppear { savedText = savedValue }
         .onChange(of: savedValue) { _, newValue in savedText = newValue; isSaving = false }
         .settingsAutosave(value: text, enabled: wasEdited && !isSaving) { commit() }
-        .onReceive(ShortcutSettingsModel.shared.$failedSettingID) { failedID in
+        // Each save resets the failed id first, so a repeated failure is still a change.
+        .onChange(of: ShortcutSettingsModel.shared.failedSettingID) { _, failedID in
             if failedID == id { isSaving = false }
         }
     }
@@ -505,7 +506,7 @@ struct SettingsSolidColorPalette: View {
 struct SettingsFieldFeedback: ViewModifier {
     let id: String
     let title: String
-    @ObservedObject private var model = ShortcutSettingsModel.shared
+    private var model = ShortcutSettingsModel.shared
     @Environment(\.settingsSearchTarget) private var searchTarget
 
     func body(content: Content) -> some View {

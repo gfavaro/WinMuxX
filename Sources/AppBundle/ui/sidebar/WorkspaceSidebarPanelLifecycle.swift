@@ -74,8 +74,8 @@ extension WorkspaceSidebarPanel {
         // they don't invalidate every observer each session.
         workspaceSidebarDropTargets = []
         setWorkspaceSidebarDropPreviewIfChanged(nil)
-        TrayMenuModel.shared.setIfChanged(\.workspaceSidebarHoveredWorkspaceName, nil)
-        viewModel.setIfChanged(\.workspaceSidebarVisibleWidth, 0)
+        TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = nil
+        viewModel.workspaceSidebarVisibleWidth = 0
         if isVisible {
             orderOut(nil)
         }
@@ -97,7 +97,7 @@ extension WorkspaceSidebarPanel {
     /// inserted with a transition.
     func loadContent() {
         guard !isRetired else { return }
-        _ = viewModel.setIfChanged(\.workspaceSidebarContentLoaded, true)
+        viewModel.workspaceSidebarContentLoaded = true
         scheduleContentUnload()
     }
 
@@ -107,7 +107,7 @@ extension WorkspaceSidebarPanel {
         } else {
             pendingContentUnload?.cancel()
             pendingContentUnload = nil
-            _ = viewModel.setIfChanged(\.workspaceSidebarContentLoaded, true)
+            viewModel.workspaceSidebarContentLoaded = true
         }
     }
 
@@ -119,7 +119,7 @@ extension WorkspaceSidebarPanel {
             guard let self, !self.isRetired else { return }
             self.pendingContentUnload = nil
             if self.isRestingHidden {
-                _ = self.viewModel.setIfChanged(\.workspaceSidebarContentLoaded, false)
+                self.viewModel.workspaceSidebarContentLoaded = false
             } else {
                 self.scheduleContentUnload()
             }

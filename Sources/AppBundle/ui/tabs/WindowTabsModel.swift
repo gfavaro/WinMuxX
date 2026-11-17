@@ -8,7 +8,7 @@ func updateWindowTabModel() async {
     // A Tabbed workspace needs its bar to switch windows even when tab strips are off.
     if let bars = await buildWorkspaceTabBarModels() { WorkspaceTabBarController.shared.update(bars) }
     guard TrayMenuModel.shared.isEnabled, config.windowTabs.enabled else {
-        TrayMenuModel.shared.setIfChanged(\.windowTabStrips, [])
+        TrayMenuModel.shared.windowTabStrips = []
         WindowTabStripPanelController.shared.refresh(updateBorders: false)
         debugLog(.focus, "updateWindowTabModel disabled -> cleared")
         return

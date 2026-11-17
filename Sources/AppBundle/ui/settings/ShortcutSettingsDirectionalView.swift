@@ -1,11 +1,10 @@
 import AppKit
-import Combine
 import Common
 import MASShortcut
 import SwiftUI
 
 struct ManagedDirectionalShortcutsView: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     @State private var availableWidth: CGFloat = .zero
 
     private static let horizontalLayoutMinWidth: CGFloat = 880
@@ -212,7 +211,7 @@ struct SplitDemoView: View {
 }
 
 struct CompassPad<Demo: View>: View {
-    @ObservedObject var model: ShortcutSettingsModel
+    var model: ShortcutSettingsModel
     let title: String
     let prefix: String
     let demo: Demo

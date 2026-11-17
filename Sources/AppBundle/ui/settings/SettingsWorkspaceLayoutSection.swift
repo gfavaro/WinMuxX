@@ -3,8 +3,8 @@ import SwiftUI
 /// One workspace's own arrangement, beside the default it overrides. It was a form on the
 /// Displays page, away from the layout it changes; a card choice now saves directly.
 struct SettingsWorkspaceLayoutSection: View {
-    @ObservedObject var model: ShortcutSettingsModel
-    @ObservedObject private var tray = TrayMenuModel.shared
+    var model: ShortcutSettingsModel
+    private var tray = TrayMenuModel.shared
     @State private var workspace = ""
     @State private var choice = "inherit"
     @State private var error: String?

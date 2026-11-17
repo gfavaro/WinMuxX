@@ -1,15 +1,18 @@
 import AppKit
+import Observation
 import Common
+import Observation
 import Foundation
 
 @MainActor
-public final class ShortcutSettingsModel: ObservableObject {
+@Observable
+public final class ShortcutSettingsModel {
     public static let shared = ShortcutSettingsModel()
 
-    @Published var sections: [Section] = []
-    @Published var assignments: [String: String] = [:] { didSet { conflictMessages = nil } }
-    @Published var tapBindings: [Summary] = []
-    @Published var customBindings: [Summary] = [] { didSet { conflictMessages = nil } }
+    var sections: [Section] = []
+    var assignments: [String: String] = [:] { didSet { conflictMessages = nil } }
+    var tapBindings: [Summary] = []
+    var customBindings: [Summary] = [] { didSet { conflictMessages = nil } }
     /// macOS's own shortcuts, read when Settings loads; never changed by WinMuxX.
     var systemShortcuts: [SystemShortcut] = isUnitTest ? [] : SystemShortcuts.current() { didSet { conflictMessages = nil } }
     private var conflictMessages: [String: String]?
@@ -22,22 +25,22 @@ public final class ShortcutSettingsModel: ObservableObject {
         }
         return conflictMessages?[actionId]
     }
-    @Published var workspaceNumbers: [String] = []
-    @Published var workspaceSwitchModifiers: NSEvent.ModifierFlags = defaultWorkspaceSwitchModifiers
-    @Published var workspaceMoveModifiers: NSEvent.ModifierFlags = defaultWorkspaceMoveModifiers
-    @Published var workspaceOverrides: [WorkspaceOverride] = []
-    @Published public var openRequestId: Int = 0
+    var workspaceNumbers: [String] = []
+    var workspaceSwitchModifiers: NSEvent.ModifierFlags = defaultWorkspaceSwitchModifiers
+    var workspaceMoveModifiers: NSEvent.ModifierFlags = defaultWorkspaceMoveModifiers
+    var workspaceOverrides: [WorkspaceOverride] = []
+    public var openRequestId: Int = 0
     /// The settings pages exist only while their window is open; see ShortcutSettingsWindowContent.
-    @Published var isWindowShown = false
-    @Published var failedSaveRevision: Int = 0
-    @Published var settingsRevision: Int = 0
-    @Published var savingSettingIDs: Set<String> = []
-    @Published var failedSettingID: String? = nil
+    var isWindowShown = false
+    var failedSaveRevision: Int = 0
+    var settingsRevision: Int = 0
+    var savingSettingIDs: Set<String> = []
+    var failedSettingID: String? = nil
     var retrySettingsSave: (() -> Void)?
     var configurationDraft: RawConfigDraft?
-    @Published var failedSettingTitle: String? = nil
+    var failedSettingTitle: String? = nil
     var activeSettingTitle: String? = nil
-    @Published var errorMessage: String? = nil
+    var errorMessage: String? = nil
 
     let saveQueue = SettingsSaveQueue()
     let configAccess: SettingsConfigAccess

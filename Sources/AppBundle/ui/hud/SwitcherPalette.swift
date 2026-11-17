@@ -23,16 +23,17 @@ struct SwitcherPaletteItem: Identifiable {
 // MARK: - Panel
 
 @MainActor
-final class SwitcherPaletteModel: ObservableObject {
-    @Published var query = "" {
+@Observable
+final class SwitcherPaletteModel {
+    var query = "" {
         didSet { if query != oldValue { selection = 0 } }
     }
-    @Published var selection = 0
-    @Published var groupByWorkspace = false {
+    var selection = 0
+    var groupByWorkspace = false {
         didSet { if groupByWorkspace != oldValue { selection = 0 } }
     }
     var items: [SwitcherPaletteItem] = []
-    var onSelect: ((UInt32) -> Void)? = nil
+    @ObservationIgnored var onSelect: ((UInt32) -> Void)? = nil
 
     var results: [SwitcherPaletteItem] {
         let matches = filterSwitcherPaletteItems(items, query: query)
@@ -132,7 +133,6 @@ final class SwitcherPalettePanel: NSPanelHud {
         // toggle may have dismissed the palette in the meantime.
         guard isPaletteActive, presentationGeneration == generation else { return }
         model.items = items
-        model.objectWillChange.send()
         model.groupByWorkspace = groupByWorkspace
         model.query = ""
         model.selection = 0
@@ -217,7 +217,6 @@ final class SwitcherPalettePanel: NSPanelHud {
         pendingRelease = nil
         guard !isPaletteActive else { return }
         model.items = []
-        model.objectWillChange.send()
         hostingView.rootView = AnyView(EmptyView())
         hasPaletteView = false
     }
@@ -362,7 +361,7 @@ func filterSwitcherPaletteItems(_ items: [SwitcherPaletteItem], query: String) -
 // MARK: - View
 
 struct SwitcherPaletteView: View {
-    @ObservedObject var model: SwitcherPaletteModel
+    @Bindable var model: SwitcherPaletteModel
     let dismiss: () -> Void
 
     var body: some View {
