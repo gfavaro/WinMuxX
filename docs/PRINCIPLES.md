@@ -58,8 +58,7 @@ Today WinMuxX uses its own workspaces and parks hidden windows offscreen; these 
 distinct from native macOS Spaces. That mechanism is the current implementation,
 not the product's defining principle.
 
-The experimental native Spaces backend moved to the separate SpaceMuxX project on
-2026-11-06; WinMuxX has one backend.
+The experimental native Spaces backend lives in the separate SpaceMuxX project; WinMuxX has one backend.
 
 ## Evidence matters
 

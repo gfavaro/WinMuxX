@@ -24,7 +24,7 @@ compositor: it moves ordinary windows through the Accessibility API.
 ## Highlights
 
 - **Dwindle tiling** by default, with built-in window borders and optional master,
-  tabbed and strip layouts. See [layouts](docs/LAYOUTS.md).
+  tabbed and Scrolling layouts. See [layouts](docs/LAYOUTS.md).
 - **Ultrawide friendly.** A lone window keeps a width and alignment you choose.
   See [windows](docs/WINDOWS.md#lone-windows-and-fullscreen-width).
 - **Sidebar** with projects, workspaces and windows, in Liquid Glass or a solid
@@ -62,7 +62,7 @@ upstream updates disabled. The upstream Homebrew cask installs WinMux, not WinMu
 3. Open **Settings** from the WinMuxX menu. Everyday pages are always visible;
    Automation and Configuration sit under Advanced. **Find settings** searches by
    name, TOML key or description.
-4. If something misbehaves, open Settings → General → **Setup check**, or run
+4. If something misbehaves, open Settings → General → **Setup Check**, or run
    `winmuxx doctor`.
 
 Run `winmuxx --help` for every CLI command, or `winmuxx <command> --help` for one.

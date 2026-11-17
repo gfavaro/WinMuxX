@@ -6,12 +6,17 @@ they affect.
 
 | Group | Commands | Notes |
 | --- | --- | --- |
-| Focused window | `focus`, `move`, `resize`, `swap`, `join-with`, `layout`, `fullscreen`, `close`, `macos-native-fullscreen`, `macos-native-minimize` | Use the focused window unless the command's help documents a target |
-| Workspace tree | `workspace-layout`, `flatten-workspace-tree`, `balance-sizes` | `workspace-layout` changes the whole workspace; `layout` changes the selected container. See [layouts](LAYOUTS.md) |
-| Workspace and project | `workspace`, `workspace-back-and-forth`, `project`, `move-node-to-workspace`, `move-node-to-project`, `move-workspace-to-monitor` | The `move-*` commands explicitly change ownership or placement |
-| Display | `focus-monitor`, `move-node-to-monitor`, `list-monitors` | A workspace switch never moves the workspace |
-| Inspect and maintain | `list-workspaces`, `list-windows`, `list-apps`, `list-modes`, `list-exec-env-vars`, `config`, `doctor`, `reload-config`, `enable` | `agent` validates and applies agent-oriented layout JSON; read its help first |
-| Automation | `exec-and-forget`, `trigger-binding`, `mode`, `subscribe`, `debug-windows` | `debug-windows` records Accessibility details; review before sharing |
+| Focused window | `focus`, `focus-back-and-forth`, `move`, `resize`, `swap`, `split`, `join-with`, `stack-with`, `layout`, `fullscreen`, `close`, `close-all-windows-but-current`, `macos-native-fullscreen`, `macos-native-minimize` | Use the focused window unless the command's help documents a target. `move-through` is an alias for `move`; `move-workspace-to-display` for `move-workspace-to-monitor` |
+| Workspace tree | `workspace-layout`, `flatten-workspace-tree`, `balance-sizes`, `swap-with-master` | `workspace-layout` changes the whole workspace; `layout` changes the selected container. See [layouts](LAYOUTS.md) |
+| Scrolling | `scrolling-focus`, `scrolling-move`, `scrolling-width`, `scrolling-center`, `scrolling-pan`, `scrolling-pin`, `scrolling-minimap` | Act on the columns of a Scrolling workspace. See [layouts](LAYOUTS.md#scrolling) |
+| Workspace and project | `workspace`, `workspace-back-and-forth`, `project`, `move-node-to-workspace`, `move-node-to-project`, `move-workspace-to-monitor`, `summon-workspace` | The `move-*` commands and `summon-workspace` explicitly change ownership or placement |
+| Display | `focus-monitor`, `move-node-to-monitor`, `list-monitors`, `move-mouse` | A workspace switch never moves the workspace |
+| Interface | `open-sidebar`, `palette`, `no-peek`, `retile`, `undo-layout` | Detailed below and in [shortcuts](SHORTCUTS.md#window-search-palette) |
+| Inspect and maintain | `state`, `list-workspaces`, `list-windows`, `list-apps`, `list-modes`, `list-exec-env-vars`, `config`, `doctor`, `reload-config`, `enable` | `state` reads a versioned snapshot; see the [State API](STATE_API.md). `agent` validates and applies agent-oriented layout JSON; read its help first |
+| Automation | `trigger-binding`, `mode`, `subscribe`, `debug-windows` | `debug-windows` records Accessibility details; review before sharing |
+
+`exec-and-forget` is a configuration command for bindings and callbacks, not a CLI
+subcommand.
 
 ## Undo
 

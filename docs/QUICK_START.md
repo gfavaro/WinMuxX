@@ -22,7 +22,7 @@ and position app windows. It never asks for Screen Recording.
 
 ## 4. If something looks wrong
 
-- Settings → General → **Setup check** looks for missing Accessibility access,
+- Settings → General → **Setup Check** looks for missing Accessibility access,
   other window managers and trackpad gestures that clash with WinMuxX (in native
   mode, Spaces settings instead). It opens once on first launch if something needs
   attention.

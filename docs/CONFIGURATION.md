@@ -219,5 +219,4 @@ layout = 'dwindle'
 ```
 
 A display override in a workspace section chooses another arrangement while the
-workspace is on that display. Scrolling workspaces moved to SpaceMuxX; a config that
-still sets them is cleaned up at launch, and those workspaces use the default arrangement.
+workspace is on that display.

@@ -12,4 +12,4 @@ What is still open. Everything else is shipped.
 
 Record remote CI and physical runtime checks separately from local test results.
 
-Not planned: fixed grids and scrolling workspace layouts.
+Not planned: fixed grids.
