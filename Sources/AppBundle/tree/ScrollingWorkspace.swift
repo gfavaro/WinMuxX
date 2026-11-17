@@ -261,7 +261,10 @@ struct ScrollingWorkspaceMetrics {
 private func scrollingColumnUnits(_ node: TreeNode) -> [TreeNode] {
     guard let container = node as? TilingContainer, container.layout != .tabGroup else { return [node] }
     if let only = container.children.singleOrNil() { return scrollingColumnUnits(only) }
-    guard container.children.count > 1, container.navigationOrientation == .h else { return [node] }
+    // A Dwindle split's own orientation, not one read from the shape it last had on screen: a
+    // stack column a little wider than tall is still a stack.
+    let orientation = container.layout == .dwindle ? container.dwindleOrientation ?? container.orientation : container.orientation
+    guard container.children.count > 1, orientation == .h else { return [node] }
     return container.children.flatMap(scrollingColumnUnits)
 }
 

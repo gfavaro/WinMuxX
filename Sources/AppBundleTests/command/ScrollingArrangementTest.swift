@@ -179,6 +179,23 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(workspace.scrollingColumn(of: terminal) === terminal)
     }
 
+    func testAWideDwindleStackStaysOneColumn() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let left = TestWindow.new(id: 76500, parent: root)
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .v, .dwindle, index: INDEX_BIND_LAST)
+        stack.dwindleOrientation = .v
+        _ = TestWindow.new(id: 76501, parent: stack)
+        let lower = TestWindow.new(id: 76502, parent: stack)
+        // Last laid out wider than tall, as a wide Scrolling column is.
+        stack.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 0, width: 1000, height: 900)
+        _ = left.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2)
+        XCTAssertTrue(workspace.scrollingColumn(of: lower) === stack)
+    }
+
     func testJoinStacksIntoTheNeighbourAndMoveTakesItOutAgain() async throws {
         let (workspace, windows) = try await strip(3)
         _ = windows[1].focusWindow()
