@@ -75,6 +75,3 @@ Add narrowly scoped skills when a subsystem needs reusable decision guidance.
 Keep product principles here in the linked guides and implementation details in
 HACKING; skills should route to them rather than maintain competing copies.
 
-Use the optional [agent evaluation](docs/AGENT_EVALUATION.md) when testing a model
-or significant guidance change. It records assisted results separately from
-first-pass success; ordinary contributions do not require a model trial.

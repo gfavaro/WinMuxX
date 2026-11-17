@@ -16,8 +16,7 @@ Master gives one window a larger area and arranges the remaining windows in a
 stack beside it. Choose it for a workspace with `workspace-layout master`; run
 `workspace-layout dwindle` to return to a splitting tree. The
 [master tiles](assets/layouts/master-tiles.svg) diagram shows the stack. `swap-with-master` exchanges the selected pane with the master.
-`balance-sizes` resets split shares; it does not rebuild the tree. See
-[master settings](archive/DINKY_020_ADOPTION.md#master-layout).
+`balance-sizes` resets split shares; it does not rebuild the tree.
 
 Master keeps one main window on every display, including ultrawide displays. The
 remaining windows form a stack beside it. Two windows share the screen.
@@ -148,11 +147,23 @@ See [single-window sizing](../README.md#single-window-on-ultrawide).
 
 ## Workspace and container commands
 
-`workspace-layout` requires a focused tiled window and changes that window's
-whole workspace. `layout` changes the focused window's container, or toggles its
-floating state. Layout choices preserve existing nested containers as described
-in the [command migration notes](archive/DINKY_021_ADOPTION.md).
+`workspace-layout` requires a focused tiled window and changes that window's whole
+workspace; it accepts `--window-id` and fails without changes for empty, floating or
+invalid targets. `layout` changes the focused window's container, or toggles its
+floating state. Layout choices preserve existing nested containers, and workspace
+choices cannot be mixed with container choices in one cycle.
 
-The query value `fixed` describes a tiles or tab-group root. It does
-not provide a reserved-cell fixed grid. See
-[workspace layout commands](archive/DINKY_021_ADOPTION.md#migrating-commands).
+Workspace choices no longer parse in `layout`, including in bindings and callback
+command lists:
+
+| Before | After |
+| --- | --- |
+| `layout dwindle` | `workspace-layout dwindle` |
+| `layout master` | `workspace-layout master` |
+| `layout dwindle master` | `workspace-layout dwindle master` |
+| `layout master tiles` | `workspace-layout master dwindle` |
+
+`layout tiles accordion` and `layout floating tiling` keep their scopes. Entering
+master promotes the targeted pane and keeps tab groups atomic; leaving it keeps
+existing containers. The query value `fixed` describes a tiles or tab-group root,
+not a reserved-cell fixed grid.

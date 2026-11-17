@@ -5,7 +5,7 @@ for product expectations and the contribution workflow. Coding agents enter thro
 [AGENTS.md](AGENTS.md) and its repository-local skill.
 
 WinMuxX uses its own workspaces and parks hidden windows offscreen. The experimental
-native Spaces backend moved to the separate SpaceMuxX project on 2026-11-06.
+native Spaces backend lives in the separate SpaceMuxX project.
 
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for
 bundle identity, configuration ownership, upstream integration and signing policy.

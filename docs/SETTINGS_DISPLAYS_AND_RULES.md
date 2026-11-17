@@ -52,8 +52,7 @@ WinMuxX fullscreen; fullscreen stays centered. The available width excludes
 sidebar space and outer gaps. These values also support `[display.<selector>]`,
 `[workspace.<internal-name>]` and nested workspace/display tables. Omitted keys
 inherit through workspace/display → workspace → display → global. Changing the
-global controls preserves override tables. See [configuration examples and
-migration](archive/DINKY_022_ADOPTION.md).
+global controls preserves override tables.
 
 ## Window rules
 
@@ -118,4 +117,4 @@ of the exact App ID. All supplied conditions must match. Automation → Events a
 **On display connect/disconnect**, after the display topology settles, with
 `WINMUX_DISPLAYS` and `WINMUX_PREV_DISPLAYS` available to shell commands.
 Optional `[workspace.<internal-name>.display.<selector>]` layout/orientation defaults
-are advanced configuration; see [the notes](archive/DINKY_019_ADOPTION.md).
+are advanced configuration.

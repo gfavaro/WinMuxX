@@ -66,7 +66,6 @@ on-display-changed = 'exec-and-forget echo "$WINMUX_PREV_DISPLAYS -> $WINMUX_DIS
 
 The hook receives display counts after a settled topology change. `exec-and-forget`
 puts the bundled `winmuxx` CLI on PATH. Remove the root key to undo the hook.
-See [the adoption notes](archive/DINKY_019_ADOPTION.md#configuration).
 
 ## Send an app to a workspace only when it launches
 

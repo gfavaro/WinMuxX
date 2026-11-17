@@ -79,7 +79,7 @@ existing immediate interactions.
 
 Tiled windows glide into place by default (150 ms). Set `animations.enabled = false`
 or `animations.duration-ms = 0` for immediate placement. Reduce Motion disables
-the glide. See [window motion](archive/WINDOW_MOTION.md) for configuration and limits.
+the glide.
 
 ```toml
 [workspace-sidebar]

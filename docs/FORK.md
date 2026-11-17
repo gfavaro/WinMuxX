@@ -41,7 +41,7 @@ diagnostics, and sockets remain separate. No original launch agents are deleted.
 
 The owned config is `${XDG_CONFIG_HOME:-~/.config}/winmuxx/winmux.toml`.
 On first launch, an existing original WinMux config is copied, not modified.
-If none exists, the original AeroSpace import behavior is retained; otherwise a
+If none exists, AeroSpace import is offered; otherwise a
 starter config is generated. `--config-path` overrides this selection. Explicitly
 sharing a config makes settings edits shared as well. Never run two window managers
 at once: distinct bundle IDs do not prevent competing window manipulation.
@@ -57,7 +57,7 @@ when the target workspace is visible on another display.
 Hidden workspaces also retain their assigned display during ordinary selection.
 Only unassigned/new workspaces use the requested/focused display. Explicit move
 and summon commands relocate workspaces. With WinMuxX workspaces, forced assignments
-hold as in AeroSpace: an assigned workspace shows only on its display while it is
+hold: an assigned workspace shows only on its display while it is
 connected, and moving it elsewhere is refused.
 
 ### Border compatibility

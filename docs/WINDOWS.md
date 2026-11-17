@@ -9,6 +9,7 @@ Choose a share of the available width for a lone tiled window and WinMuxX's
 
 ```toml
 fullscreen-width = 0.70
+single-window-alignment = 'center' # center | left | right
 ```
 
 `fullscreen-width` accepts `0.1` to `1.0`; the default is `1.0`. Width is measured
@@ -47,8 +48,10 @@ changes are ignored.
 
 The old `single-window-aspect-ratio` setting remains readable for compatibility
 when no explicit width applies. New configs use `fullscreen-width`; an explicit
-width, including `1.0`, takes priority over the old setting. See
-[the migration notes](archive/DINKY_022_ADOPTION.md).
+width, including `1.0`, takes priority over the old setting. To migrate, replace the root
+`single-window-aspect-ratio` line with `fullscreen-width` and
+`single-window-alignment`; 70% is a new preference, not an exact conversion of a
+3:2 ratio.
 
 ## Layout for the next window
 

@@ -33,8 +33,7 @@ updates whenever it opens. Actions without shortcuts remain clickable.
 shows every window as a tab. `layout` acts on a container, and `%{workspace-layout}`
 reports the workspace mode. Master mode arranges each top-level group as a whole,
 keeping nested splits and tabs; `workspace-layout dwindle` restores the default
-arrangement. See [layouts](LAYOUTS.md#tabbed) and the
-[command migration notes](archive/DINKY_021_ADOPTION.md).
+arrangement. See [layouts](LAYOUTS.md#tabbed).
 
 ## Diagnostics
 

@@ -50,7 +50,7 @@ actual navigation destination, including keyboard use.
 Prefer native events and coalesced, bounded work. Give asynchronous operations an
 owner and cancellation or generation checks so old completions cannot affect a new
 interaction. Keep geometry and policy testable separately from native side effects.
-See [runtime efficiency](archive/RUNTIME_EFFICIENCY.md) and [HACKING](../HACKING.md).
+See [HACKING](../HACKING.md).
 
 ## The backend serves these behaviors
 

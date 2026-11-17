@@ -141,16 +141,10 @@ release navigation gates before destroying the fixture. Session gates deliberate
 allow cancelled native work to return, so stale success and error paths are tested.
 All waits have bounded XCTest expectations; no timing sleeps are used.
 
-## Validation history
-
-Build-by-build results, test counts and native checks up to build 100 are in the
-[validation log](archive/VALIDATION_LOG.md). They record what was true for those
-builds; the sections above and below describe how to test today.
-
-## Runtime and UI reliability checks (2026-10-20)
+## Runtime and UI reliability checks
 
 Run `make check` for the Swift suite, Python tooling checks and pinned dependency
-resolution. The reliability changes passed 1,271 Swift tests and 47 Python checks.
+resolution.
 Native palette fixtures are written to `.build/native-overlay-fixtures/`; CI
 uploads these with `.build/test-output.log`. Pixel assertions use the same AppKit
 color-profile pipeline for actual and reference images. Resolver tests cover
@@ -166,8 +160,7 @@ swift test --filter RuntimePerformanceScenarioTest
 
 It performs 20 warm-up and 100 measured cycles of palette/sidebar cleanup and
 workspace navigation, asserting balanced monitors and cleared deferred work.
-Overview tests separately exercise capture bounds, late callbacks and 1,000
-presentation sessions. No desktop applications are moved by these fixtures.
+No desktop applications are moved by these fixtures.
 
 For process measurements, record build, OS, display arrangement, config hash and
 scenario alongside the output. After a 30-second warm-up, sample the app for

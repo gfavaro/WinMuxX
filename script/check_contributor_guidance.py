@@ -16,7 +16,7 @@ GUIDES = (
     "AGENTS.md", "CONTRIBUTING.md", "HACKING.md", "README.md", "docs/README.md",
     ".github/PULL_REQUEST_TEMPLATE.md",
     "docs/PRINCIPLES.md", "docs/TESTING.md", "docs/CONTRIBUTOR_TASKS.md",
-    "docs/WORKSPACE_BEHAVIOR.md", "docs/AGENT_EVALUATION.md",
+    "docs/WORKSPACE_BEHAVIOR.md",
     ".agents/skills/winmuxx-workspaces/SKILL.md",
 )
 
