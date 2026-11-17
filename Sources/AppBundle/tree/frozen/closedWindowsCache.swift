@@ -289,7 +289,8 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
     container.isMasterStack = frozenContainer.isMasterStack ?? false
     container.presentsAsStrip = frozenContainer.presentsAsStrip ?? false
     container.masterRatio = frozenContainer.masterRatio
-    container.scrollingColumnWidth = frozenContainer.scrollingColumnWidth
+    container.scrollingColumnWidth = validColumnShare(frozenContainer.scrollingColumnWidth)
+    container.stripColumnWidth = validColumnShare(frozenContainer.stripColumnWidth)
     container.dwindleOrientation = frozenContainer.dwindleOrientation
     for child in frozenContainer.children {
         switch child {
@@ -315,7 +316,8 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
     window.isFullscreen = frozenWindow.isFullscreen
     window.noOuterGapsInFullscreen = frozenWindow.noOuterGapsInFullscreen
     window.layoutReason = frozenWindow.layoutReason
-    window.scrollingColumnWidth = frozenWindow.scrollingColumnWidth
+    window.scrollingColumnWidth = validColumnShare(frozenWindow.scrollingColumnWidth)
+    window.stripColumnWidth = validColumnShare(frozenWindow.stripColumnWidth)
     if let frame = frozenWindow.workspacePreviewFrame,
        let valid = normalizedWorkspacePreviewFrame(frame, origin: .zero, desktopSize: CGSize(width: 1, height: 1), minimumVisibleSize: 0)
     {
@@ -456,4 +458,9 @@ private func collectFrozenWindowsRecursive(_ frozenContainer: FrozenContainer, r
 @MainActor func resetClosedWindowsCache() {
     invalidateLateRestartTreeRestoration()
     runtime.recovery.closedWindows = FrozenWorld(workspaces: [], monitors: [], windowIds: [])
+}
+
+/// A saved column width is a share of the display; anything else restores as the default.
+func validColumnShare(_ share: CGFloat?) -> CGFloat? {
+    share.flatMap { $0.isFinite && $0 > 0 && $0 <= 1 ? $0 : nil }
 }
