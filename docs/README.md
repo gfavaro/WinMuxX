@@ -29,8 +29,8 @@ Start with the [project README](../README.md), then pick a path.
 
 ## Migrate
 
-- [Dinky 0.22 width and alignment](DINKY_022_ADOPTION.md)
-- [Dinky 0.21 command migration](DINKY_021_ADOPTION.md)
+- [Width and alignment](archive/DINKY_022_ADOPTION.md): percentages, display and workspace overrides, legacy keys
+- [Command migration](archive/DINKY_021_ADOPTION.md): workspace and container commands, format output
 
 ## Contribute
 

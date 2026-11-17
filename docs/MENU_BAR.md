@@ -18,7 +18,7 @@ icon-appearance = 'color'  # color or monochrome
 
 ## The menu
 
-The menu follows Dinky’s everyday actions: workspace navigation and moves, Focus,
+The menu offers the everyday actions: workspace navigation and moves, Focus,
 Move Window, Join With, Resize, Layout, Fullscreen and Balance Sizes. Display and
 Mode menus appear only when there is more than one choice. Settings, Reload Config,
 Enabled and Quit stay directly accessible. Projects, tab controls, extra container
@@ -27,17 +27,14 @@ operations and maintenance tools live in Settings or the CLI.
 Shortcuts come from the effective configuration for the active mode, and the menu
 updates whenever it opens. Actions without shortcuts remain clickable.
 
-## Dinky adaptations
+## Workspace layouts
 
-| Dinky | What it added | Notes |
-| --- | --- | --- |
-| 0.19 | `hyper`/`meh` shortcut aliases, bundle-ID regex rules, per-display workspace layouts, settled display-change actions | [Notes](archive/DINKY_019_ADOPTION.md) |
-| 0.20 | Master layout and `swap-with-master`, app-activation exclusions, browser overlay filtering, original-frame restoration on disable/quit | [Notes](archive/DINKY_020_ADOPTION.md) |
-| 0.21 | `workspace-layout dwindle master` for workspace modes, `workspace-layout tabbed`, `%{workspace-layout}` | [Migration](DINKY_021_ADOPTION.md) |
-
-Master mode arranges each top-level group as a whole, keeping nested splits and
-tabs. `layout` acts on a container; `workspace-layout dwindle` restores the
-workspace's default arrangement. See [layouts](LAYOUTS.md#tabbed).
+`workspace-layout dwindle master` selects workspace modes and `workspace-layout tabbed`
+shows every window as a tab. `layout` acts on a container, and `%{workspace-layout}`
+reports the workspace mode. Master mode arranges each top-level group as a whole,
+keeping nested splits and tabs; `workspace-layout dwindle` restores the default
+arrangement. See [layouts](LAYOUTS.md#tabbed) and the
+[command migration notes](archive/DINKY_021_ADOPTION.md).
 
 ## Diagnostics
 

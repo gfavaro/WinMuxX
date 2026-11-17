@@ -78,8 +78,7 @@ multiple workspaces; each secondary is replaced by the explicitly brought worksp
 Reconciliation also returns hidden secondary assignments to main after restoration
 or display changes, keeping only the visible workspace on each secondary.
 The source gets a local fallback or empty workspace; other displays keep their current
-workspace. Forced assignments (`workspace-to-monitor-force-assignment`) work as in
-AeroSpace: while its display is connected, an assigned workspace shows only there,
+workspace. Forced assignments (`workspace-to-monitor-force-assignment`) work like this: while its display is connected, an assigned workspace shows only there,
 selecting it from any display shows it there, and moving it elsewhere is refused.
 
 At launch, display ownership is restored by default, and assignments do not override it. Enable **Settings → General →

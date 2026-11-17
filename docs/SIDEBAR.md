@@ -3,9 +3,8 @@
 The sidebar lists your projects, workspaces and windows. Appearance is shared with tab groups and the switcher.
 
 ## Sidebar
-The sidebar shows your workspaces beside your windows. You can use it as an
-alternative to [Sketchybar](https://github.com/felixkratz/sketchybar) or a workspace
-menu in the menu bar.
+The sidebar shows your workspaces beside your windows. Use it instead of a
+workspace menu in the menu bar.
 
 Drag windows or tab groups through the sidebar to move them between workspaces.
 You can also drag a window back onto the current workspace.

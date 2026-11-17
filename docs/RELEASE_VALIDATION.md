@@ -365,7 +365,7 @@ Reviewed upstream release `v0.21` at `38a2effdcb9d34f4e402a3f69476f39be660a878`.
 Workspace mode choices now use `workspace-layout dwindle|master`; old choices in
 `layout` fail parsing. Container cycles advance after the last matching state.
 Workspace/window queries expose `%{workspace-layout}`, and menu/Settings actions
-use the new grammar. Migration details are in `DINKY_021_ADOPTION.md`.
+use the new grammar. Migration details are in `archive/DINKY_021_ADOPTION.md`.
 
 The cycling regression failed against the original implementation before the fix.
 The complete `make check` passed 1,255 Swift tests and 26 Python checks. Focused

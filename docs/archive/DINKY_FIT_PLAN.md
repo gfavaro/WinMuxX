@@ -32,7 +32,7 @@ Reviewed Dinky's current [README](https://github.com/mikker/Dinky/blob/main/READ
 These main-branch references can change; this is a dated evaluation, not a claim
 that later releases have been audited. Earlier source-level adoption records are
 [0.19](DINKY_019_ADOPTION.md), [0.20](DINKY_020_ADOPTION.md) and
-[0.21](../DINKY_021_ADOPTION.md), with pinned upstream references.
+[0.21](DINKY_021_ADOPTION.md), with pinned upstream references.
 
 | Dinky idea | WinMuxX evidence / fit | Decision |
 | --- | --- | --- |

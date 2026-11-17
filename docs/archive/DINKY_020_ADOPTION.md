@@ -2,7 +2,7 @@
 
 This document records the 0.20 adoption. Historical command syntax below may
 pre-date the 0.21 migration. Current workspace mode choices use
-`workspace-layout`; see the [migration guide](../DINKY_021_ADOPTION.md) and the
+`workspace-layout`; see the [migration guide](DINKY_021_ADOPTION.md) and the
 [current layouts guide](../LAYOUTS.md).
 
 Reference: [Dinky v0.20](https://github.com/mikker/Dinky/releases/tag/v0.20),

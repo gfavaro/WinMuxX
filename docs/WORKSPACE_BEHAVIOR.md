@@ -10,7 +10,7 @@ workspaces. Unless stated otherwise, no forced assignment applies.
 | A on M, B on S; ordinary selection of B requests M | B stays on S and receives focus there | `testSidebarFocusesWorkspaceOnItsExistingDisplay` |
 | B hidden but owned by S; ordinary selection requests M | B activates on S; ownership is not inferred from the requesting display | `testHiddenWorkspaceSwitchKeepsItsOwningMonitor` in `WorkspaceCommandTest` |
 | A on M, B on S, C on T; explicitly bring A to S | A becomes visible on S; M receives a same-project fallback; B is hidden and returns to M ownership where allowed; T retains C | `testSidebarOverrideBringsWorkspaceToDestinationWithoutSwapping` |
-| A assigned to M in config; explicitly move A to T | Refused; nothing changes (as in AeroSpace) | `testOverrideRefusesToMoveAWorkspaceAssignedElsewhere` |
+| A assigned to M in config; explicitly move A to T | Refused; nothing changes | `testOverrideRefusesToMoveAWorkspaceAssignedElsewhere` |
 | C assigned to S in config; WinMuxX starts, then the user shows B on S, then selects C | C starts on S; B may replace it, C stays hidden on S, and selecting C shows it on S again. Moving or summoning C elsewhere is refused | `testStartupShowsAnAssignedWorkspaceWhichStaysOnItsDisplay` |
 | C assigned to S in config; C hidden; select C from M | C shows on S | `testAssignedHiddenWorkspaceActivatesOnItsAssignedDisplay`, `testAnAssignedWorkspaceOpensOnItsDisplayFromAnyDisplay` |
 | B on M; an assignment of B to T is added (reload) | B moves to T and keeps focus; M gets a fallback | `testAnAssignedWorkspaceShowingElsewhereMovesToItsDisplay` |

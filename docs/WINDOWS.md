@@ -20,7 +20,7 @@ A second tiled window restores the usual full-width layout. Floating windows,
 minimized windows, hidden apps and popups do not count toward the lone tile.
 Settings → Windows exposes the global width percentage and shows
 the current workspace's resolved values. Display and workspace overrides use
-Dinky-style tables; omitted keys inherit independently:
+tables; omitted keys inherit independently:
 
 ```toml
 [display.'Built-in']
@@ -48,7 +48,7 @@ changes are ignored.
 The old `single-window-aspect-ratio` setting remains readable for compatibility
 when no explicit width applies. New configs use `fullscreen-width`; an explicit
 width, including `1.0`, takes priority over the old setting. See
-[the migration notes](DINKY_022_ADOPTION.md).
+[the migration notes](archive/DINKY_022_ADOPTION.md).
 
 ## Layout for the next window
 
@@ -103,8 +103,7 @@ by side as columns that scroll within the group, see
 [layouts](LAYOUTS.md#container-modes-and-tabs). Choose Tabbed in Settings →
 Windows for new roots, or use `winmuxx layout tabbed strip` to toggle the focused
 container. `layout tab-group` remains supported. The accordion layout was removed;
-`accordion` and `stacked` in configuration and commands now give a tab group, as an
-imported AeroSpace configuration already did.
+`accordion` and `stacked` in configuration and commands now give a tab group.
 
 ## Tiling and floating
 

@@ -17,7 +17,7 @@ requires reviewing the move again.
 **Configured assignments** edits `[workspace-to-monitor-force-assignment]` using
 workspace and display pickers. Display labels retain their internal workspace IDs.
 Advanced entry supports future workspace names and custom selectors or ordered
-selector arrays. As in AeroSpace, an assigned workspace shows only on its display while
+selector arrays. An assigned workspace shows only on its display while
 that display is connected: selecting it shows it there, moving it elsewhere (move,
 summon, Bring Here) is refused, and one showing elsewhere after a reload, restoration
 or display change moves to its display. When WinMuxX starts without restoring a saved
@@ -53,7 +53,7 @@ sidebar space and outer gaps. These values also support `[display.<selector>]`,
 `[workspace.<internal-name>]` and nested workspace/display tables. Omitted keys
 inherit through workspace/display → workspace → display → global. Changing the
 global controls preserves override tables. See [configuration examples and
-migration](DINKY_022_ADOPTION.md).
+migration](archive/DINKY_022_ADOPTION.md).
 
 ## Window rules
 
@@ -113,9 +113,9 @@ The cached scan from the planning stage was not used as sole deletion evidence.
 Remaining scanner findings are candidates, not automatically unused code. This
 cleanup adds no packages and makes no measured swipe-latency claim.
 
-Dinky 0.19 additions: the Rules editor also accepts an **App ID regex**, independently
+The Rules editor also accepts an **App ID regex**, independently
 of the exact App ID. All supplied conditions must match. Automation → Events adds
 **On display connect/disconnect**, after the display topology settles, with
 `WINMUX_DISPLAYS` and `WINMUX_PREV_DISPLAYS` available to shell commands.
 Optional `[workspace.<internal-name>.display.<selector>]` layout/orientation defaults
-are advanced configuration; see [the adoption notes](archive/DINKY_019_ADOPTION.md).
+are advanced configuration; see [the notes](archive/DINKY_019_ADOPTION.md).

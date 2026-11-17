@@ -151,8 +151,8 @@ See [single-window sizing](../README.md#single-window-on-ultrawide).
 `workspace-layout` requires a focused tiled window and changes that window's
 whole workspace. `layout` changes the focused window's container, or toggles its
 floating state. Layout choices preserve existing nested containers as described
-in the [0.21 migration notes](DINKY_021_ADOPTION.md).
+in the [command migration notes](archive/DINKY_021_ADOPTION.md).
 
 The query value `fixed` describes a tiles or tab-group root. It does
-not provide Dinky's reserved-cell fixed grid. See
-[workspace layout commands](DINKY_021_ADOPTION.md#migrating-commands).
+not provide a reserved-cell fixed grid. See
+[workspace layout commands](archive/DINKY_021_ADOPTION.md#migrating-commands).

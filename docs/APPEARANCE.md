@@ -6,7 +6,7 @@ Window borders and the gaps between tiled windows.
 
 WinMux draws click-through borders around visible managed windows, with a different color for the
 focused window. In tabbed layouts, one border encloses the tab panel and the active
-window together, using the group’s outer corner shape. Built-in borders are enabled by default. The settings follow [Dinky's `[borders]` configuration](https://github.com/mikker/Dinky/blob/main/docs/configuration.md#borders):
+window together, using the group’s outer corner shape. Built-in borders are enabled by default. Configure them in `[borders]`:
 
 ```toml
 [borders]
@@ -19,7 +19,7 @@ window together, using the group’s outer corner shape. Built-in borders are en
 ```
 
 Changes apply on config reload. Borders hide with their windows and in fullscreen. If you previously
-started JankyBorders in `after-startup-command`, remove that command and stop the external `borders`
+started an external border tool in `after-startup-command`, remove that command and stop the external `borders`
 process to avoid drawing two sets of borders.
 
 ## Window and sidebar spacing
