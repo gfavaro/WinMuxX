@@ -249,14 +249,16 @@ final class WindowShakeLayoutToggleTest: XCTestCase {
         PendingWindowDragIntent(
             sourceWindowId: windowId,
             sourceSubject: .window,
-            kind: .moveToWorkspace(workspaceName: "elsewhere"),
-            previewRect: Rect(topLeftX: 0, topLeftY: 0, width: 10, height: 10),
-            interactionRect: Rect(topLeftX: 0, topLeftY: 0, width: 10, height: 10),
-            title: "Move",
-            subtitle: "Move",
-            previewStyle: .workspaceMove,
-            previewGeometry: .rounded,
-            isGroup: false,
+            destination: WindowDragIntentDestination(
+                kind: .moveToWorkspace(workspaceName: "elsewhere"),
+                previewRect: Rect(topLeftX: 0, topLeftY: 0, width: 10, height: 10),
+                interactionRect: Rect(topLeftX: 0, topLeftY: 0, width: 10, height: 10),
+                title: "Move",
+                subtitle: "Move",
+                previewStyle: .workspaceMove,
+                previewGeometry: .rounded,
+                isGroup: false,
+            ),
             isPointerSettled: true,
         )
     }

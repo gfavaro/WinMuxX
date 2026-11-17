@@ -76,14 +76,7 @@ func setPendingWindowDragIntent(
     if let pendingWindowDragIntent,
        pendingWindowDragIntent.sourceWindowId == sourceWindowId,
        pendingWindowDragIntent.sourceSubject == sourceSubject,
-       pendingWindowDragIntent.kind == destination.kind,
-       pendingWindowDragIntent.title == destination.title,
-       pendingWindowDragIntent.subtitle == destination.subtitle,
-       pendingWindowDragIntent.previewStyle == destination.previewStyle,
-       pendingWindowDragIntent.previewGeometry == destination.previewGeometry,
-       pendingWindowDragIntent.isGroup == destination.isGroup,
-       pendingWindowDragIntent.previewRect.isEqual(to: destination.previewRect),
-       pendingWindowDragIntent.interactionRect.isEqual(to: destination.interactionRect)
+       pendingWindowDragIntent.destination.isSameIntent(as: destination)
     {
         return true
     }
@@ -92,14 +85,7 @@ func setPendingWindowDragIntent(
     pendingWindowDragIntent = PendingWindowDragIntent(
         sourceWindowId: sourceWindowId,
         sourceSubject: sourceSubject,
-        kind: destination.kind,
-        previewRect: destination.previewRect,
-        interactionRect: destination.interactionRect,
-        title: destination.title,
-        subtitle: destination.subtitle,
-        previewStyle: destination.previewStyle,
-        previewGeometry: destination.previewGeometry,
-        isGroup: destination.isGroup,
+        destination: destination,
         isPointerSettled: isPointerSettled,
     )
     let signature =
