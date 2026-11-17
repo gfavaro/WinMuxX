@@ -30,6 +30,9 @@ func resizedObs(_: AXObserver, ax: AXUIElement, notif: CFString, _: UnsafeMutabl
         // An unanswered read says neither that this is a drag nor that the app resized itself.
         guard let manipulated = try? await isManipulatedWithMouse(window) else { return }
         guard manipulated else {
+            if window.nodeWorkspace?.arrangement == .scrolling, isLeftMouseButtonDown {
+                lastScrollingMouseResize = "window \(windowId) resized with the mouse down but not taken as a drag (not the focused window?)"
+            }
             FrameRecovery.shared.windowChanged(window) { scheduleRefreshSession(.ax(notif)) }
             return
         }
@@ -135,6 +138,9 @@ func tabbedResizePreviewItems(in workspace: Workspace, layout: TabbedLayout, exc
     }
 }
 
+/// What the last edge drag in a Scrolling workspace did, for `winmuxx doctor`.
+@MainActor var lastScrollingMouseResize = "none"
+
 @MainActor
 func applyResizeWithMouse(_ window: Window, rect: Rect) {
     syncClosedWindowsCacheToCurrentWorld()
@@ -152,7 +158,10 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
         if let previous = window.lastAppliedLayoutPhysicalRect, abs(rect.width - previous.width) > 1 {
             let group = window.topLevelWorkspaceGroup
             let current = workspace.scrollingColumnWidthRange(of: group)?.width ?? previous.width
-            workspace.setScrollingColumnWidth(of: group, to: current + rect.width - previous.width)
+            let changed = workspace.setScrollingColumnWidth(of: group, to: current + rect.width - previous.width)
+            lastScrollingMouseResize = "window \(window.windowId) width \(Int(previous.width)) -> \(Int(rect.width)), column \(Int(current)) -> share \(group.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default")\(changed ? "" : " (unchanged)")"
+        } else {
+            lastScrollingMouseResize = "window \(window.windowId) released without a width change (laid out \(window.lastAppliedLayoutPhysicalRect.map { "\(Int($0.width))" } ?? "never"), dropped at \(Int(rect.width)))"
         }
         beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()

@@ -65,6 +65,12 @@ func buildDiagnosticsReport() async -> String {
         io.out(String(format: "Last macOS %@ swipe: %@ samples=%d maxProgress=%.3f finalProgress=%.3f velocity=%.2f endVelocity=%.2f",
                       axis, swipe.outcome, swipe.samples, swipe.maximumProgress, swipe.finalProgress, swipe.velocity, swipe.endVelocity))
     }
+    let scrolling = focus.workspace
+    if scrolling.arrangement == .scrolling {
+        let shares = scrolling.workspaceLayoutUnits.map { $0.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default" }
+        io.out("Scrolling: offset=\(Int(scrolling.scrollingOffset)) columns=[\(shares.joined(separator: ", "))] pinned=\(scrolling.pinnedScrollingColumn != nil)")
+    }
+    io.out("Last Scrolling edge drag: \(lastScrollingMouseResize)")
     let preview = WorkspaceSwipePreview.shared
     if let timing = preview.timings.last {
         let submission = timing.submissionMs.map { String(format: "%.1fms", $0) } ?? "not submitted"
