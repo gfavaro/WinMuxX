@@ -1,5 +1,10 @@
 import AppKit
 
+// The find stage of a window drag, in priority order: the sidebar first, then a drop on the
+// surface of the workspace under the pointer (the arrangement there decides how it resolves),
+// then the sticky target of the previous intent, then detaching a tab, then moving to another
+// workspace. The show and apply stages live in WindowDragPendingIntent.swift; each stage asks
+// the arrangement the drop lands in, which the WindowDragArrangement implementations decide.
 @MainActor
 func currentWindowDragIntentDestination(
     sourceWindow: Window,

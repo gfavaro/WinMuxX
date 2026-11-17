@@ -10,91 +10,35 @@ func destinationFromWindowDropIntent(
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
 ) -> WindowDragIntentDestination? {
-    func intentOverlayDestination(_ destination: WindowDragIntentDestination) -> WindowDragIntentDestination {
-        var result = destination
-        result.previewRect = windowDropIntentActivePreviewRect(for: resolution)
-        result.interactionRect = resolution.targetFrame
-        result.dropIntentOverlay = WindowDropIntentOverlayModel(
-            targetFrame: resolution.targetFrame,
-            activeZone: resolution.intent.zone,
-            cornerRadius: resolution.targetCornerRadius.map(CGFloat.init),
-            unavailableZones: destination.dropIntentOverlay?.unavailableZones ?? [],
-            unavailableReason: destination.dropIntentOverlay?.unavailableReason,
-        )
-        return result
-    }
+    windowDragArrangement(for: targetWindow.nodeWorkspace)
+        .dropIntentDestination(resolution: resolution, sourceWindow: sourceWindow, targetWindow: targetWindow,
+                               mouseLocation: mouseLocation, subject: subject, detachOrigin: detachOrigin)
+        .map { windowDropIntentOverlayDestination($0, resolution: resolution) }
+}
 
-    // A drop on a Tabbed workspace's window lands in its tab groups, which are kept apart from
-    // the tree, so the tree's own containers have no say.
-    if let workspace = targetWindow.nodeWorkspace, workspace.arrangement == .tabbed {
-        let source = workspace.tabbedGroup(containing: sourceWindow.windowId)
-        return tabbedGroupDropDestination(resolution, source: source, sourceWindow: sourceWindow, targetWindow: targetWindow,
-                                          subject: subject).map(intentOverlayDestination)
-    }
-    switch resolution.intent.zone {
-        case .tab:
-            if let destination = ownTabGroupReturnDestination(
-                sourceWindow: sourceWindow,
-                targetWindow: targetWindow,
-                mouseLocation: mouseLocation,
-                subject: subject,
-                detachOrigin: detachOrigin,
-                resolution: resolution,
-            ) {
-                return intentOverlayDestination(destination)
-            }
-            guard config.windowTabs.enabled,
-                  isWindowDragIntentKindEnabled(.tabStack(targetWindowId: targetWindow.windowId)),
-                  !shouldSuppressSameTabGroupTabDestination(
-                      sourceWindow: sourceWindow,
-                      targetWindow: targetWindow,
-                      detachOrigin: detachOrigin
-                  )
-            else { return nil }
-            return intentOverlayDestination(WindowDragIntentDestination(
-                kind: .tabStack(targetWindowId: targetWindow.windowId),
-                previewRect: windowDropIntentActivePreviewRect(for: resolution),
-                interactionRect: resolution.targetFrame,
-                title: "Insert Into Tabs",
-                subtitle: "Drop in the top zone to add this window",
-                previewStyle: .tabInsert,
-                previewGeometry: .tabStrip,
-                isGroup: false,
-            ))
-        case .middle:
-            if let destination = ownTabGroupReturnDestination(
-                sourceWindow: sourceWindow,
-                targetWindow: targetWindow,
-                mouseLocation: mouseLocation,
-                subject: subject,
-                detachOrigin: detachOrigin,
-                resolution: resolution,
-            ) {
-                return intentOverlayDestination(destination)
-            }
-            guard let destination = swapDestination(
-                sourceWindow: sourceWindow,
-                targetWindow: targetWindow,
-                subject: subject,
-                detachOrigin: detachOrigin,
-            ) else { return nil }
-            return intentOverlayDestination(destination)
-        case .left, .right, .top, .bottom:
-            guard let position = resolution.intent.zone.stackSplitPosition else { return nil }
-            guard let destination = stackSplitDestination(
-                sourceWindow: sourceWindow,
-                targetWindow: targetWindow,
-                subject: subject,
-                position: position,
-                detachOrigin: detachOrigin,
-            ) else { return nil }
-            return intentOverlayDestination(destination)
-    }
+/// A destination's overlay for the drop zone it came from: the active zone's frame, and the
+/// zones the target says are unavailable.
+@MainActor
+func windowDropIntentOverlayDestination(
+    _ destination: WindowDragIntentDestination,
+    resolution: WindowDropIntentResolution,
+) -> WindowDragIntentDestination {
+    var result = destination
+    result.previewRect = windowDropIntentActivePreviewRect(for: resolution)
+    result.interactionRect = resolution.targetFrame
+    result.dropIntentOverlay = WindowDropIntentOverlayModel(
+        targetFrame: resolution.targetFrame,
+        activeZone: resolution.intent.zone,
+        cornerRadius: resolution.targetCornerRadius.map(CGFloat.init),
+        unavailableZones: destination.dropIntentOverlay?.unavailableZones ?? [],
+        unavailableReason: destination.dropIntentOverlay?.unavailableReason,
+    )
+    return result
 }
 
 /// The middle or top of a window moves the tab into its group; an edge opens a new group on that side.
 @MainActor
-private func tabbedGroupDropDestination(
+func tabbedGroupDropDestination(
     _ resolution: WindowDropIntentResolution,
     source: TabbedGroup?,
     sourceWindow: Window,

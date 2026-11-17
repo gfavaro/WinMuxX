@@ -143,7 +143,7 @@ func clearPendingWindowDragIntent() {
 
 @MainActor
 private func updateWindowTabReentryPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) {
-    if updateTabbedBarDropPreview(sourceWindowId: sourceWindowId, destination: destination) { return }
+    if windowDragArrangement(for: destination.kind).updateBarDropPreview(sourceWindowId: sourceWindowId, destination: destination) { return }
     WindowTabReentryPreviewModel.shared.setIncoming(nil)
     guard case .reorderTab(let windowId, let targetIndex) = destination.kind,
           windowId == sourceWindowId,
@@ -181,90 +181,21 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
           pendingWindowDragIntent.interactionRect.contains(currentMouseLocation),
           isWindowDragIntentKindEnabled(pendingWindowDragIntent.kind)
     else { return false }
-    if let applied = applyTabbedGroupDragIntent(pendingWindowDragIntent.kind, sourceWindow: sourceWindow,
-                                                subject: pendingWindowDragIntent.sourceSubject) { return applied }
-    // In a Scrolling workspace the strip then shows the column the window landed in, whole.
-    defer {
-        if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .scrolling {
-            workspace.scrollingState.lastFocusWindowId = nil
-        }
-    }
-    let sourceNode = dragSubjectNode(for: sourceWindow, subject: pendingWindowDragIntent.sourceSubject)
-    // A Tabbed workspace's handle carries its whole group, which the tree does not hold.
-    let carriedGroup = pendingWindowDragIntent.sourceSubject == .group ? tabbedGroupCarried(by: sourceWindow) : nil
-    defer { if let carriedGroup { bringTabbedGroupAlong(carriedGroup, after: sourceWindow) } }
-    // Every drop that changes the layout first records it, and the windows it moves ignore the
-    // move events their own relayout causes.
-    guard let moved = windowIdsMovedByDrop(pendingWindowDragIntent.kind, sourceWindowId: sourceWindow.windowId) else { return false }
-    syncClosedWindowsCacheToCurrentWorld()
-    suppressPostDragAxObserverEvents(for: moved)
-    switch pendingWindowDragIntent.kind {
-        case .insertTab:
-            return false
-        case .reorderTab(let windowId, let targetIndex):
-            guard pendingWindowDragIntent.sourceSubject == .window,
-                  sourceWindow.windowId == windowId
-            else { return false }
-            // A tab dragged out of a Tabbed workspace's bar and back moves along that bar.
-            if let workspace = sourceWindow.nodeWorkspace, workspace.arrangement == .tabbed,
-               let group = workspace.tabbedGroup(containing: windowId) {
-                guard workspace.insertTabbedTab(windowId, intoBarOf: group.barGroup, at: targetIndex) else { return false }
-                return sourceWindow.focusWindow()
-            }
-            return reorderWindowTabInCurrentGroup(sourceWindow, toIndex: targetIndex)
-        case .tabStack(let targetWindowId):
-            guard pendingWindowDragIntent.sourceSubject == .window else { return false }
-            guard let targetWindow = Window.get(byId: targetWindowId),
-                  sourceWindow != targetWindow
-            else { return false }
-            createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow)
-            return true
-        case .detachTab(let windowId):
-            guard sourceWindow.windowId == windowId else { return false }
-            return removeWindowFromTabStack(sourceWindow)
-        case .stackSplit(let targetWindowId, let position):
-            guard let targetWindow = Window.get(byId: targetWindowId)
-            else { return false }
-            return applyWindowStackSplitDragIntent(
-                sourceWindow: sourceWindow,
-                sourceSubject: pendingWindowDragIntent.sourceSubject,
-                targetWindow: targetWindow,
-                position: position,
-            )
-        case .swap(let targetWindowId):
-            guard let targetWindow = Window.get(byId: targetWindowId)
-            else { return false }
-            return applyWindowSwapDragIntent(
-                sourceWindow: sourceWindow,
-                sourceSubject: pendingWindowDragIntent.sourceSubject,
-                targetWindow: targetWindow,
-            )
-        case .moveToWorkspace(let workspaceName):
-            guard let targetWorkspace = Workspace.existing(byName: workspaceName) else { return false }
-            if pendingWindowDragIntent.previewStyle == .sidebarWorkspaceMove {
-                applySidebarWorkspaceMove(sourceNode: sourceNode, sourceWindow: sourceWindow, targetWorkspace: targetWorkspace)
-            } else {
-                applyWorkspaceMove(sourceNode: sourceNode, sourceWindow: sourceWindow, mouseLocation: mouseLocation, targetWorkspace: targetWorkspace)
-            }
-            return true
-        case .moveToWorkspaceZone(let workspaceName, let zone):
-            guard let targetWorkspace = Workspace.existing(byName: workspaceName) else { return false }
-            applyWorkspaceZoneMove(sourceNode: sourceNode, sourceWindow: sourceWindow, targetWorkspace: targetWorkspace, zone: zone)
-            return true
-        case .createWorkspace(let projectId, let monitorScopeId):
-            return createWorkspaceFromSidebarDrag(
-                sourceNode: sourceNode,
-                sourceWindow: sourceWindow,
-                projectId: projectId,
-                monitorScopeId: monitorScopeId,
-            )
-        case .sidebarHover, .unavailable:
-            return false
-    }
+    if let applied = windowDragArrangement(for: pendingWindowDragIntent.kind).applyDrop(
+        kind: pendingWindowDragIntent.kind,
+        sourceWindow: sourceWindow,
+        subject: pendingWindowDragIntent.sourceSubject,
+    ) { return applied }
+    // The drop's arrangement declined it: the tree's apply takes the rest.
+    return TreeWindowDragArrangement.shared.applyDrop(
+        kind: pendingWindowDragIntent.kind,
+        sourceWindow: sourceWindow,
+        subject: pendingWindowDragIntent.sourceSubject,
+    ) ?? false
 }
 
 /// The windows a drop moves, or nil for an intent that changes nothing.
-private func windowIdsMovedByDrop(_ kind: WindowDragIntentKind, sourceWindowId: UInt32) -> [UInt32]? {
+func windowIdsMovedByDrop(_ kind: WindowDragIntentKind, sourceWindowId: UInt32) -> [UInt32]? {
     switch kind {
         case .reorderTab, .detachTab, .moveToWorkspace, .moveToWorkspaceZone, .createWorkspace: [sourceWindowId]
         case .tabStack(let target), .stackSplit(let target, _), .swap(let target): [sourceWindowId, target]
@@ -394,7 +325,7 @@ func bringTabbedGroupAlong(_ carried: (workspace: Workspace, windowIds: [UInt32]
 /// it would go back, and another bar opens a gap where it would land. False when the drop is
 /// not on such a bar.
 @MainActor
-private func updateTabbedBarDropPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) -> Bool {
+func updateTabbedBarDropPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) -> Bool {
     let preview = WindowTabReentryPreviewModel.shared
     let mouse = MousePointerTracker.shared.currentSample.point
     switch destination.kind {
