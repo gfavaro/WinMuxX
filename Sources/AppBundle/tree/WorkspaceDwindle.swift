@@ -10,7 +10,7 @@ func applyDwindleToExistingTiledWorkspaces() -> Bool {
     for workspace in Workspace.all where config.workspaceLayouts[workspace.name]?.settings(on: workspace.workspaceMonitor).layout == nil {
         let root = workspace.rootTilingContainer
         if root.layout == .tiles {
-            root.layout = .dwindle
+            workspace.adoptDwindleSpiral()
             changed = true
         }
     }

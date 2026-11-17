@@ -16,24 +16,6 @@ final class DwindleParityTest: XCTestCase {
         return root
     }
 
-    func testClosingCollapsesItsSplitAndInsertionSplitsDonor() {
-        let root = root()
-        let first = TestWindow.new(id: 18001, parent: root)
-        let middle = TestWindow.new(id: 18002, parent: root)
-        let last = TestWindow.new(id: 18003, parent: root)
-        root.setDwindleSplitRatio(0.6, at: 0)
-        root.setDwindleSplitRatio(0.25, at: 1)
-        middle.unbindFromParent()
-        XCTAssertEqual(root.dwindleSplitRatio(at: 0), 0.6, accuracy: 0.0001)
-        let inserted = TestWindow.new(id: 18004, parent: focus.workspace)
-        inserted.bind(to: root, adaptiveWeight: 1, index: 1)
-        XCTAssertEqual(root.children, [first, inserted, last])
-        let shares = root.dwindleShares(count: 3)
-        for (share, expected) in zip(shares, [0.3, 0.3, 0.4]) {
-            XCTAssertEqual(share, expected, accuracy: 0.0001)
-        }
-    }
-
     func testRemovingAnyOfThreeDefaultWindowsLeavesEqualTiles() async throws {
         for removedIndex in 0..<3 {
             setUpWorkspacesForTests()
@@ -57,17 +39,16 @@ final class DwindleParityTest: XCTestCase {
         let workspace = focus.workspace
         let root = root()
         let windows = (0..<4).map { TestWindow.new(id: UInt32(18110 + $0), parent: root) }
-        root.setDwindleSplitRatio(0.6, at: 0)
-        root.setDwindleSplitRatio(0.3, at: 1)
-        root.setDwindleSplitRatio(0.7, at: 2)
+        workspace.adoptDwindleSpiral(ratios: [0.6, 0.3, 0.7])
         let destination = Workspace.get(byName: "destination")
         windows[1].bind(to: destination.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         workspace.normalizeContainers()
         try await workspace.layoutWorkspace()
-        XCTAssertEqual(root.dwindleShares(count: root.children.count), [0.6, 0.4])
-        let branch = root.children[1] as? TilingContainer
-        XCTAssertEqual(branch?.dwindleChildRatios?.first ?? 0, 0.7, accuracy: 0.000001)
-        XCTAssertEqual(branch?.dwindleChildRatios?.last ?? 0, 0.3, accuracy: 0.000001)
+        // The first window keeps its 60%; the two left behind share the rest 70/30, side by side
+        // in one split with the first, since they run the same way.
+        let shares = root.dwindleShares(count: root.children.count)
+        XCTAssertEqual(root.children, [windows[0], windows[2], windows[3]])
+        for (share, expected) in zip(shares, [0.6, 0.28, 0.12]) { XCTAssertEqual(share, expected, accuracy: 0.000001) }
         XCTAssertTrue(windows[1].nodeWorkspace === destination)
         XCTAssertEqual(root.allLeafWindowsRecursive.count, 3)
     }
@@ -211,14 +192,15 @@ final class DwindleParityTest: XCTestCase {
         XCTAssertTrue(floating.parent === focus.workspace)
         XCTAssertTrue(focus.windowOrNil === second)
         XCTAssertTrue(root.mostRecentWindowRecursive === second)
-        XCTAssertTrue(root.dwindleSplitRatios.isEmpty)
+        XCTAssertEqual(root.dwindleChildRatios, [1, 1, 1])
         XCTAssertNil(root.dwindleOrientation)
     }
-    func testCornerResizeProcessesAxesSequentiallyAndSkipsFlippedSplit() async throws {
+    func testCornerResizeProcessesAxesSequentially() async throws {
         let root = root()
         TestWindow.new(id: 18080, parent: root)
         TestWindow.new(id: 18081, parent: root)
         let last = TestWindow.new(id: 18082, parent: root)
+        focus.workspace.adoptDwindleSpiral()
         try await focus.workspace.layoutWorkspace()
         let original = last.lastAppliedLayoutPhysicalRect.orDie()
         let corner = Rect(topLeftX: original.minX - 80, topLeftY: original.minY - 60,
@@ -231,19 +213,6 @@ final class DwindleParityTest: XCTestCase {
         try await focus.workspace.layoutWorkspace()
         XCTAssertEqual(last.lastAppliedLayoutPhysicalRect, corner)
         XCTAssertEqual(geometry[ObjectIdentifier(last)], corner)
-
-        root.dwindleSplitRatios = []
-        try await focus.workspace.layoutWorkspace()
-        let flipped = Rect(topLeftX: original.minX - 400, topLeftY: original.minY - 60,
-            width: original.width + 400, height: original.height + 60)
-        let flippedMap = try XCTUnwrap(proposedResizeWeightMap(last, rect: flipped))
-        XCTAssertEqual(flippedMap.dwindleChanges.count, 1)
-        let predicted = dwindleGeometry(in: focus.workspace, weightMap: flippedMap, physical: true)
-        applyResizeWithMouse(last, rect: flipped)
-        cancelManipulatedWithMouseState()
-        try await focus.workspace.layoutWorkspace()
-        XCTAssertEqual(predicted[ObjectIdentifier(last)], last.lastAppliedLayoutPhysicalRect)
-        XCTAssertEqual(root.dwindleSplitRatio(at: 1), 0.5)
     }
 
     func testDirectionalFocusTreatsTabsAsOneSlotAndTabCommandsReachHiddenTabs() async throws {

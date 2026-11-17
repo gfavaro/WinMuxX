@@ -14,7 +14,7 @@ struct DwindleResizeTarget {
 
     @MainActor
     func resize(_ units: ResizeCmdArgs.Units) -> Bool {
-        if container.isExplicitDwindle, let index = resizedChildIndex,
+        if let index = resizedChildIndex,
            let rect = container.lastAppliedLayoutPhysicalRect, let workspace = container.nodeWorkspace {
             let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
             let extent = rect.getDimension(orientation) - CGFloat(gaps.inner.get(orientation).toDouble()) * CGFloat(container.children.count - 1)
@@ -81,37 +81,17 @@ extension TreeNode {
               let ownIndex, let rect = geometry?[ObjectIdentifier(container)] ?? container.lastAppliedLayoutPhysicalRect,
               let workspace = nodeWorkspace else { return [] }
         let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
-        if container.isExplicitDwindle {
-            let axis = container.dwindleAxis(width: rect.width, height: rect.height)
-            let gap = CGFloat(gaps.inner.get(axis).toDouble())
-            return [ownIndex, ownIndex - 1].compactMap { index in
-                guard index >= 0, index + 1 < container.children.count,
-                      let a = geometry?[ObjectIdentifier(container.children[index])] ?? container.children[index].lastAppliedLayoutPhysicalRect,
-                      let b = geometry?[ObjectIdentifier(container.children[index + 1])] ?? container.children[index + 1].lastAppliedLayoutPhysicalRect else { return nil }
-                return DwindleResizeTarget(container: container, splitIndex: index, orientation: axis,
-                    availableLength: a.getDimension(axis) + b.getDimension(axis),
-                    leadingLength: a.getDimension(axis), resizesLeadingChild: index == ownIndex,
-                    resizeEdge: (axis == .h ? a.maxX : a.maxY) + (index == ownIndex ? 0 : gap), resizedChildIndex: ownIndex)
-            }
+        let axis = container.dwindleAxis(width: rect.width, height: rect.height)
+        let gap = CGFloat(gaps.inner.get(axis).toDouble())
+        return [ownIndex, ownIndex - 1].compactMap { index in
+            guard index >= 0, index + 1 < container.children.count,
+                  let a = geometry?[ObjectIdentifier(container.children[index])] ?? container.children[index].lastAppliedLayoutPhysicalRect,
+                  let b = geometry?[ObjectIdentifier(container.children[index + 1])] ?? container.children[index + 1].lastAppliedLayoutPhysicalRect else { return nil }
+            return DwindleResizeTarget(container: container, splitIndex: index, orientation: axis,
+                availableLength: a.getDimension(axis) + b.getDimension(axis),
+                leadingLength: a.getDimension(axis), resizesLeadingChild: index == ownIndex,
+                resizeEdge: (axis == .h ? a.maxX : a.maxY) + (index == ownIndex ? 0 : gap), resizedChildIndex: ownIndex)
         }
-        var width = rect.width
-        var height = rect.height
-        var targets: [DwindleResizeTarget] = []
-        for index in 0..<min(ownIndex + 1, max(container.children.count - 1, 0)) {
-            guard let childRect = geometry?[ObjectIdentifier(container.children[index])] ?? container.children[index].lastAppliedLayoutPhysicalRect else { return [] }
-            let orientation: Orientation = container.dwindleAxis(width: width, height: height)
-            let gap = CGFloat(gaps.inner.get(orientation).toDouble())
-            let leadingLength = childRect.getDimension(orientation)
-            targets.append(DwindleResizeTarget(
-                container: container, splitIndex: index, orientation: orientation,
-                availableLength: max((orientation == .h ? width : height) - gap, 0),
-                leadingLength: leadingLength, resizesLeadingChild: index == ownIndex,
-                resizeEdge: (orientation == .h ? childRect.maxX : childRect.maxY) + (index == ownIndex ? 0 : gap),
-            ))
-            if orientation == .h { width = max(width - leadingLength - gap, 0) }
-            else { height = max(height - leadingLength - gap, 0) }
-        }
-        return targets.reversed()
     }
 }
 

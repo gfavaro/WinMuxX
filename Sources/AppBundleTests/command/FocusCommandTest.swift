@@ -94,6 +94,7 @@ final class FocusCommandTest: WorkspaceTestCase {
         let left = TestWindow.new(id: 7101, parent: root)
         let upperRight = TestWindow.new(id: 7102, parent: root)
         let lowerRight = TestWindow.new(id: 7103, parent: root)
+        workspace.adoptDwindleSpiral()
         try await workspace.layoutWorkspace()
 
         XCTAssertTrue(left.focusWindow())

@@ -317,20 +317,18 @@ private func moveDwindleNode(_ node: TreeNode, beside neighbor: TreeNode, direct
         swapNodes(node, neighbor)
         return true
     }
-    if (parent.layout == .tiles || parent.isExplicitDwindle), parent.navigationOrientation == direction.orientation {
+    if (parent.layout == .tiles || parent.layout == .dwindle), parent.navigationOrientation == direction.orientation {
         node.unbindFromParent()
         node.bind(to: parent, adaptiveWeight: WEIGHT_AUTO,
             index: neighbor.ownIndex.orDie() + (direction.isPositive ? 0 : 1))
         return true
     }
-    let ratios = parent.dwindleSplitRatios
     let siblingRatios = parent.dwindleChildRatios
     let binding = neighbor.unbindFromParent()
     let split = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight,
         direction.orientation, .dwindle, index: binding.index)
     split.dwindleOrientation = direction.orientation
     split.dwindleChildRatios = []
-    parent.dwindleSplitRatios = ratios
     parent.dwindleChildRatios = siblingRatios
     neighbor.bind(to: split, adaptiveWeight: 1, index: 0)
     node.bind(to: split, adaptiveWeight: 1, index: direction.isPositive ? 0 : 1)

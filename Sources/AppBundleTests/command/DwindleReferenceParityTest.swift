@@ -119,15 +119,35 @@ final class DwindleReferenceParityTest: XCTestCase {
         XCTAssertEqual(shares[2], 1.0 / 3, accuracy: 0.000001)
     }
 
-    func testLegacySpiralMigratesWithoutResettingFrames() {
+    func testSpiralSavedByOlderVersionsRestoresWithTheSameFrames() async throws {
         bounds = Rect(topLeftX: 0, topLeftY: 0, width: 1600, height: 900)
-        let root = focus.workspace.rootTilingContainer
-        root.dwindleChildRatios = nil
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
         root.dwindleOrientation = nil
-        for id: UInt32 in 1...4 { _ = TestWindow.new(id: id, parent: root) }
+        let windows = (1...4).map { TestWindow.new(id: UInt32($0), parent: root) }
+        workspace.adoptDwindleSpiral(ratios: [0.6, 0.3])
         let before = render()
-        focus.workspace.normalizeContainers()
-        XCTAssertTrue(root.isExplicitDwindle)
+        // Older versions saved the same spiral as one list of windows with a ratio for each split.
+        let data = try JSONEncoder().encode(snapshotCurrentFrozenWorld())
+        var world = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        var workspaces = try XCTUnwrap(world["workspaces"] as? [[String: Any]])
+        let index = try XCTUnwrap(workspaces.firstIndex { $0["name"] as? String == workspace.name })
+        var legacyRoot = try XCTUnwrap(workspaces[index]["rootTilingNode"] as? [String: Any])
+        func windowNodes(_ node: [String: Any]) -> [[String: Any]] {
+            (node["children"] as? [[String: Any]] ?? []).flatMap { child in
+                child["kind"] as? String == "window" ? [child] : windowNodes(child["container"] as? [String: Any] ?? child)
+            }
+        }
+        legacyRoot["children"] = windowNodes(legacyRoot)
+        legacyRoot["dwindleSplitRatios"] = [0.6, 0.3]
+        legacyRoot.removeValue(forKey: "dwindleChildRatios")
+        legacyRoot.removeValue(forKey: "dwindleOrientation")
+        workspaces[index]["rootTilingNode"] = legacyRoot
+        world["workspaces"] = workspaces
+        let legacy = try JSONDecoder().decode(FrozenWorld.self, from: JSONSerialization.data(withJSONObject: world))
+        XCTAssertEqual(windowNodes(legacyRoot).count, windows.count)
+        let restored = try await restoreFrozenWorldIfNeeded(legacy, newlyDetectedWindow: windows[0])
+        XCTAssertTrue(restored)
         XCTAssertEqual(render(), before)
     }
 
@@ -141,7 +161,6 @@ final class DwindleReferenceParityTest: XCTestCase {
         let snapshot = snapshotCurrentFrozenWorld()
         let restored = try await restoreFrozenWorldIfNeeded(snapshot, newlyDetectedWindow: first)
         XCTAssertTrue(restored)
-        XCTAssertTrue(focus.workspace.rootTilingContainer.isExplicitDwindle)
         XCTAssertEqual(render(), before)
     }
 }

@@ -234,7 +234,10 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         let prevRoot = workspace.rootTilingContainer // Save prevRoot into a variable to avoid it being garbage collected earlier than needed
         let potentialOrphans = prevRoot.allLeafWindowsRecursive
         prevRoot.unbindFromParent()
-        restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST, windowsById: windowsById)
+        var spirals: [ObjectIdentifier: [CGFloat]] = [:]
+        restoreTreeRecursive(frozenContainer: frozenWorkspace.rootTilingNode, parent: workspace, index: INDEX_BIND_LAST,
+                             windowsById: windowsById, spirals: &spirals)
+        workspace.adoptRestoredDwindleSpirals(spirals)
         workspace.tabbedState.layout = frozenWorkspace.tabbedLayout?.restored(windowsById)
             ?? migratedTabbedLayout(from: frozenWorkspace.rootTilingNode, windowsById,
                                     allWindows: workspace.rootTilingContainer.allLeafWindowsRecursive.map(\.windowId))
@@ -277,7 +280,10 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
 
 @discardableResult
 @MainActor
-func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeNodeObject, index: Int, windowsById: [UInt32: Window]) -> Bool {
+/// Dwindle splits saved by older WinMuxX as a spiral are noted in `spirals`, with their ratios, to
+/// be rebuilt once the whole tree is back and each split's area is known.
+func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeNodeObject, index: Int, windowsById: [UInt32: Window],
+                          spirals: inout [ObjectIdentifier: [CGFloat]]) -> Bool {
     let container = TilingContainer(
         parent: parent,
         adaptiveWeight: frozenContainer.weight,
@@ -301,12 +307,16 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
                 window.bind(to: container, adaptiveWeight: w.weight, index: INDEX_BIND_LAST)
             case .container(let c):
                 // There is no reason to continue
-                if !restoreTreeRecursive(frozenContainer: c, parent: container, index: INDEX_BIND_LAST, windowsById: windowsById) { return false }
+                if !restoreTreeRecursive(frozenContainer: c, parent: container, index: INDEX_BIND_LAST, windowsById: windowsById,
+                                         spirals: &spirals) { return false }
         }
     }
     if container.children.count == frozenContainer.children.count {
-        container.dwindleSplitRatios = frozenContainer.dwindleSplitRatios ?? []
-        container.dwindleChildRatios = frozenContainer.dwindleChildRatios
+        if let shares = frozenContainer.dwindleChildRatios {
+            container.dwindleChildRatios = shares
+        } else if container.layout == .dwindle, container.children.count > 1 {
+            spirals[ObjectIdentifier(container)] = frozenContainer.dwindleSplitRatios ?? []
+        }
     }
     return true
 }
@@ -353,8 +363,8 @@ func migrateLegacyMasterTree(_ workspace: Workspace) {
         stack.unbindFromParent()
     }
     workspace.masterGroupIndex = 0
-    root.layout = .dwindle
     root.isMasterStack = false
+    workspace.adoptDwindleSpiral()
 }
 
 func validRestoredWindowSize(_ size: CGSize) -> Bool {

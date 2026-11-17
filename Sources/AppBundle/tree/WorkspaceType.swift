@@ -14,7 +14,7 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     var lifecycle: WorkspaceLifecycle = .durable
     var lastConfiguredLayout: WorkspaceLayoutSettings?
     // Once workspace arrangements are used, returning to Dwindle must retain
-    // the same group boundaries rather than rerun the legacy tree migration.
+    // the same group boundaries rather than turn their Tiles splits into Dwindle ones.
     var preservesTopLevelGroups = false
     /// What the Tabbed arrangement keeps for this workspace, kept while other arrangements show.
     @MainActor var tabbedState = TabbedWorkspaceState()

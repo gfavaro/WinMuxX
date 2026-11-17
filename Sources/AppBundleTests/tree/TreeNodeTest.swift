@@ -35,7 +35,7 @@ final class TreeNodeTest: XCTestCase {
 
         XCTAssertNotNil(split)
         XCTAssertEqual(split?.layout, .dwindle)
-        XCTAssertTrue(split?.isExplicitDwindle == true)
+        XCTAssertEqual(split?.layout, .dwindle)
         XCTAssertEqual(split?.children, [first, second])
         XCTAssertEqual(split?.orientation, .h)
     }

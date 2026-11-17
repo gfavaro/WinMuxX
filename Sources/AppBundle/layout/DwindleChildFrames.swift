@@ -5,11 +5,7 @@ extension TilingContainer {
     @MainActor
     func dwindleMinimumExtent(children: ArraySlice<TreeNode>, along axis: Orientation, rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil) -> CGFloat {
         let snapshots = children.map(makeLayoutMinimumSnapshot)
-        let ratios = (0..<max(children.count - 1, 0)).map { index in
-            ratioAt?(children.startIndex + index) ?? dwindleSplitRatio(at: children.startIndex + index)
-        }
-        let settings = DwindleMinimumSettings(orientationHorizontal: dwindleOrientation.map { $0 == .h },
-            explicitShares: explicitDwindleShares, ratios: ratios)
+        let settings = DwindleMinimumSettings(orientationHorizontal: dwindleOrientation.map { $0 == .h })
         let node = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: orientation == .h,
             children: snapshots, dwindle: settings, tabChrome: .zero)
         let extent = node.extent(horizontal: axis == .h,
@@ -21,8 +17,9 @@ extension TilingContainer {
     @MainActor
     func dwindleChildFrames(in rect: Rect, gaps: ResolvedGaps, ratioAt: ((Int) -> CGFloat)? = nil, enforceMinimums: Bool = true) -> [Rect] {
         let children = children
-        var shares = explicitDwindleShares
-        if let ratioAt, var explicit = shares, explicit.count > 1 {
+        var shares = dwindleChildShares
+        if let ratioAt, shares.count > 1 {
+            var explicit = shares
             for index in 0..<(explicit.count - 1) {
                 let ratio = ratioAt(index)
                 if ratio != dwindleSplitRatio(at: index) {
@@ -33,12 +30,11 @@ extension TilingContainer {
             }
             shares = explicit
         }
-        let ratios = (0..<max(children.count - 1, 0)).map { ratioAt?($0) ?? dwindleSplitRatio(at: $0) }
         let input = DwindleLayoutInput(origin: rect.topLeftCorner, size: rect.size,
             horizontalGap: CGFloat(gaps.inner.horizontal.toDouble()), verticalGap: CGFloat(gaps.inner.vertical.toDouble()),
             children: children.map(makeLayoutMinimumSnapshot),
-            orientationHorizontal: dwindleOrientation.map { $0 == .h }, explicitShares: shares,
-            ratios: ratios, enforceMinimums: enforceMinimums)
+            orientationHorizontal: dwindleOrientation.map { $0 == .h }, shares: shares,
+            enforceMinimums: enforceMinimums)
         return DwindleLayoutGeometry.calculate(input).map { Rect(topLeftX: $0.minX, topLeftY: $0.minY, width: $0.width, height: $0.height) }
     }
 }
@@ -52,9 +48,7 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
         let chrome = container.layout == .tabGroup && container.showsWindowTabs
             ? windowTabGroupChromeSize(headerHeight: resolvedWindowTabReservedHeight()) : .zero
         let dwindle = container.layout == .dwindle
-            ? DwindleMinimumSettings(orientationHorizontal: container.dwindleOrientation.map { $0 == .h },
-                explicitShares: container.explicitDwindleShares,
-                ratios: (0..<max(children.count - 1, 0)).map { container.dwindleSplitRatio(at: $0) })
+            ? DwindleMinimumSettings(orientationHorizontal: container.dwindleOrientation.map { $0 == .h })
             : nil
         return .container(layout: container.layout, horizontal: container.orientation == .h,
             children: children.map(makeLayoutMinimumSnapshot), dwindle: dwindle,
@@ -64,7 +58,7 @@ private func makeLayoutMinimumSnapshot(_ node: TreeNode) -> LayoutMinimumSnapsho
 }
 
 extension TilingContainer {
-    @MainActor var explicitDwindleShares: [CGFloat]? {
-        isExplicitDwindle ? dwindleShares(count: children.count) : nil
+    @MainActor var dwindleChildShares: [CGFloat] {
+        dwindleShares(count: children.count)
     }
 }

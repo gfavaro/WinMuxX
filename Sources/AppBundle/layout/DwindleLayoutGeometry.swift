@@ -22,43 +22,20 @@ indirect enum LayoutMinimumSnapshot {
         }
     }
 
+    /// A Dwindle split lays its children side by side along its axis, by their shares.
     private static func dwindleExtent(children: [LayoutMinimumSnapshot], settings: DwindleMinimumSettings,
                                       axisHorizontal: Bool, rect: CGRect, gap: CGSize) -> CGFloat {
-        guard let first = children.first else { return 0 }
         let splitHorizontal = settings.orientationHorizontal ?? (rect.width >= rect.height)
-        if settings.explicitShares != nil {
-            let values = children.map { $0.extent(horizontal: axisHorizontal, in: rect, gap: gap) }
-            return splitHorizontal == axisHorizontal
-                ? values.reduce(0, +) + CGFloat(max(values.count - 1, 0)) * (splitHorizontal ? gap.width : gap.height)
-                : values.max() ?? 0
-        }
-        guard children.count > 1 else { return first.extent(horizontal: axisHorizontal, in: rect, gap: gap) }
-        let ratio = settings.ratios.first ?? 0.5
-        let splitGap = splitHorizontal ? gap.width : gap.height
-        let firstLength = max((splitHorizontal ? rect.width : rect.height) - splitGap, 0) * ratio
-        let firstRect = CGRect(x: rect.minX, y: rect.minY,
-            width: splitHorizontal ? firstLength : rect.width,
-            height: splitHorizontal ? rect.height : firstLength)
-        let tailLength = max((splitHorizontal ? rect.width : rect.height) - splitGap - firstLength, 0)
-        let tailRect = CGRect(x: rect.minX, y: rect.minY,
-            width: splitHorizontal ? tailLength : rect.width,
-            height: splitHorizontal ? rect.height : tailLength)
-        let firstMinimum = first.extent(horizontal: axisHorizontal, in: firstRect, gap: gap)
-        let tail = LayoutMinimumSnapshot.container(layout: .dwindle, horizontal: settings.orientationHorizontal ?? splitHorizontal,
-            children: Array(children.dropFirst()), dwindle: settings.droppingFirstRatio,
-            tabChrome: .zero).extent(horizontal: axisHorizontal, in: tailRect, gap: gap)
-        return splitHorizontal == axisHorizontal ? firstMinimum + splitGap + tail : max(firstMinimum, tail)
+        let values = children.map { $0.extent(horizontal: axisHorizontal, in: rect, gap: gap) }
+        return splitHorizontal == axisHorizontal
+            ? values.reduce(0, +) + CGFloat(max(values.count - 1, 0)) * (splitHorizontal ? gap.width : gap.height)
+            : values.max() ?? 0
     }
 }
 
 struct DwindleMinimumSettings {
+    /// nil chooses the axis from the area's shape.
     let orientationHorizontal: Bool?
-    let explicitShares: [CGFloat]?
-    let ratios: [CGFloat]
-    var droppingFirstRatio: DwindleMinimumSettings {
-        DwindleMinimumSettings(orientationHorizontal: orientationHorizontal, explicitShares: nil,
-                               ratios: Array(ratios.dropFirst()))
-    }
 }
 
 struct DwindleLayoutInput {
@@ -68,8 +45,7 @@ struct DwindleLayoutInput {
     let verticalGap: CGFloat
     let children: [LayoutMinimumSnapshot]
     let orientationHorizontal: Bool?
-    let explicitShares: [CGFloat]?
-    let ratios: [CGFloat]
+    let shares: [CGFloat]
     let enforceMinimums: Bool
 }
 
@@ -77,61 +53,26 @@ enum DwindleLayoutGeometry {
     static func calculate(_ input: DwindleLayoutInput) -> [CGRect] {
         guard !input.children.isEmpty else { return [] }
         let gapSize = CGSize(width: input.horizontalGap, height: input.verticalGap)
-        if let shares = input.explicitShares {
-            let splitHorizontal = input.orientationHorizontal ?? (input.size.width >= input.size.height)
-            let splitGap = splitHorizontal ? gapSize.width : gapSize.height
-            let extent = splitHorizontal ? input.size.width : input.size.height
-            let available = max(extent - CGFloat(max(shares.count - 1, 0)) * splitGap, 0)
-            let requested = shares.map { $0 * available }
-            let minimums = input.children.map { $0.extent(horizontal: splitHorizontal,
-                in: CGRect(origin: input.origin, size: input.size), gap: gapSize) }
-            let sizes = input.enforceMinimums ? TileLayoutGeometry.fit(requested, minimums: minimums, total: available) : requested
-            var point = input.origin
-            return sizes.map { size in
-                let frame = CGRect(x: point.x, y: point.y, width: splitHorizontal ? size : input.size.width,
-                                   height: splitHorizontal ? input.size.height : size)
-                if splitHorizontal { point.x += size + splitGap } else { point.y += size + splitGap }
-                return frame
-            }
+        let shares = input.shares
+        let splitHorizontal = input.orientationHorizontal ?? (input.size.width >= input.size.height)
+        let splitGap = splitHorizontal ? gapSize.width : gapSize.height
+        let extent = splitHorizontal ? input.size.width : input.size.height
+        let available = max(extent - CGFloat(max(shares.count - 1, 0)) * splitGap, 0)
+        let requested = shares.map { $0 * available }
+        // Each child's minimum is measured in the area it is given: a nested split picks its axis
+        // from that area's shape.
+        let minimums = zip(input.children, requested).map { child, length in
+            child.extent(horizontal: splitHorizontal, in: CGRect(origin: input.origin,
+                size: splitHorizontal ? CGSize(width: length, height: input.size.height) : CGSize(width: input.size.width, height: length)),
+                gap: gapSize)
         }
+        let sizes = input.enforceMinimums ? TileLayoutGeometry.fit(requested, minimums: minimums, total: available) : requested
         var point = input.origin
-        var width = input.size.width, height = input.size.height
-        var frames: [CGRect] = []
-        for (index, child) in input.children.enumerated() {
-            let last = index == input.children.count - 1
-            let horizontal = input.orientationHorizontal ?? (width >= height)
-            let length = horizontal ? width : height
-            let splitGap = last ? 0 : (horizontal ? gapSize.width : gapSize.height)
-            let ratio = input.ratios.indices.contains(index) ? input.ratios[index] : 0.5
-            var childLength = last ? length : max(length - splitGap, 0) * ratio
-            if !last && input.enforceMinimums {
-                for _ in 0..<3 {
-                    let childRect = CGRect(x: point.x, y: point.y, width: horizontal ? childLength : width,
-                                           height: horizontal ? height : childLength)
-                    let tailLength = max(length - splitGap - childLength, 0)
-                    let tailRect = CGRect(x: point.x, y: point.y, width: horizontal ? tailLength : width,
-                                          height: horizontal ? height : tailLength)
-                    let remaining = LayoutMinimumSnapshot.container(layout: .dwindle,
-                        horizontal: input.orientationHorizontal ?? horizontal,
-                        children: Array(input.children.dropFirst(index + 1)),
-                        dwindle: DwindleMinimumSettings(orientationHorizontal: input.orientationHorizontal,
-                            explicitShares: nil, ratios: Array(input.ratios.dropFirst(index + 1))),
-                        tabChrome: .zero).extent(horizontal: horizontal, in: tailRect, gap: gapSize)
-                    let minimum = child.extent(horizontal: horizontal, in: childRect, gap: gapSize)
-                    let available = max(length - splitGap, 0)
-                    let requested = available * ratio
-                    let fitted = TileLayoutGeometry.fit([requested, available - requested],
-                        minimums: [minimum, remaining], total: available)[0]
-                    if abs(fitted - childLength) < 0.001 { break }
-                    childLength = fitted
-                }
-            }
-            frames.append(CGRect(x: point.x, y: point.y, width: horizontal ? childLength : width,
-                                 height: horizontal ? height : childLength))
-            let consumed = childLength + splitGap
-            if horizontal { point.x += consumed; width = max(width - consumed, 0) }
-            else { point.y += consumed; height = max(height - consumed, 0) }
+        return sizes.map { size in
+            let frame = CGRect(x: point.x, y: point.y, width: splitHorizontal ? size : input.size.width,
+                               height: splitHorizontal ? input.size.height : size)
+            if splitHorizontal { point.x += size + splitGap } else { point.y += size + splitGap }
+            return frame
         }
-        return frames
     }
 }

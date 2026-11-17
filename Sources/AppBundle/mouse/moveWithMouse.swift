@@ -155,10 +155,8 @@ func swapWindows(_ window1: Window, _ window2: Window) {
 func swapNodes(_ node1: TreeNode, _ node2: TreeNode) {
     if node1 == node2 { return }
     let containers = [node1.parent as? TilingContainer, node2.parent as? TilingContainer].compactMap { $0 }
-    let ratios = containers.map(\.dwindleSplitRatios)
     let siblingRatios = containers.map(\.dwindleChildRatios)
     defer {
-        for (container, ratios) in zip(containers, ratios) { container.dwindleSplitRatios = ratios }
         for (container, ratios) in zip(containers, siblingRatios) { container.dwindleChildRatios = ratios }
     }
     guard let index1 = node1.ownIndex else { return }

@@ -84,16 +84,13 @@ final class DwindleResizeCommandTest: XCTestCase {
         XCTAssertTrue(focus.windowOrNil === first)
     }
 
-    func testRatiosPersistAndOlderSnapshotsDefaultToHalf() async throws {
+    func testRatiosPersistAsShares() async throws {
         let (workspace, _, _) = try await pair()
         workspace.rootTilingContainer.setDwindleSplitRatio(0.65, at: 0)
         let data = try JSONEncoder().encode(FrozenContainer(workspace.rootTilingContainer))
         let restored = try JSONDecoder().decode(FrozenContainer.self, from: data)
-        XCTAssertEqual(restored.dwindleSplitRatios, [0.65])
-        var legacy = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        legacy.removeValue(forKey: "dwindleSplitRatios")
-        let old = try JSONDecoder().decode(FrozenContainer.self, from: JSONSerialization.data(withJSONObject: legacy))
-        XCTAssertNil(old.dwindleSplitRatios)
+        XCTAssertEqual(restored.dwindleChildRatios?.first ?? 0, 0.65, accuracy: 0.000001)
+        XCTAssertNil(restored.dwindleSplitRatios, "The spiral format is only read, never written")
     }
 
     func testExtremeResizeKeepsBothSidesVisible() async throws {
@@ -109,21 +106,22 @@ final class DwindleResizeCommandTest: XCTestCase {
     func testSmartOppositeResizesOuterSplitFromLastWindow() async throws {
         let (workspace, _, _) = try await pair()
         let last = TestWindow.new(id: 17003, parent: workspace.rootTilingContainer)
+        workspace.adoptDwindleSpiral()
         _ = last.focusWindow()
         try await workspace.layoutWorkspace()
-        let targets = last.dwindleResizeTargets()
-        XCTAssertEqual(targets.count, 2)
+        XCTAssertEqual(last.dwindleResizeTargets().count, 1, "Its own split; the outer one is its parent's")
         let result = try await parseCommand("resize smart-opposite +40").cmdOrDie.run(.defaultEnv, .emptyStdin)
         XCTAssertEqual(result.exitCode, 0)
         XCTAssertNotEqual(workspace.rootTilingContainer.dwindleSplitRatio(at: 0), 0.5)
-        XCTAssertEqual(workspace.rootTilingContainer.dwindleSplitRatio(at: 1), 0.5)
+        let inner = try XCTUnwrap(workspace.rootTilingContainer.children.last as? TilingContainer)
+        XCTAssertEqual(inner.dwindleSplitRatio(at: 0), 0.5)
     }
 
     func testRestoringWorldRetainsDwindleRatios() async throws {
         let (workspace, first, _) = try await pair()
         workspace.rootTilingContainer.setDwindleSplitRatio(0.65, at: 0)
         let snapshot = snapshotCurrentFrozenWorld()
-        workspace.rootTilingContainer.dwindleSplitRatios = []
+        workspace.rootTilingContainer.dwindleChildRatios = []
         let restored = try await restoreFrozenWorldIfNeeded(snapshot, newlyDetectedWindow: first)
         XCTAssertTrue(restored)
         XCTAssertEqual(workspace.rootTilingContainer.dwindleSplitRatio(at: 0), 0.65)

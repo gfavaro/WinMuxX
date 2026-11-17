@@ -34,7 +34,6 @@ extension TilingContainer {
         }
         guard !isRootContainer, layout != .tabGroup, let only = children.singleOrNil(),
               let parent = parent as? TilingContainer else { return }
-        let ratios = parent.dwindleSplitRatios
         let siblingRatios = parent.dwindleChildRatios
         let wasMostRecent = parent.mostRecentChild === self
         let columnWidth = scrollingColumnWidth, stripWidth = stripColumnWidth
@@ -43,7 +42,6 @@ extension TilingContainer {
         only.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
         if only.scrollingColumnWidth == nil { only.scrollingColumnWidth = columnWidth }
         if only.stripColumnWidth == nil { only.stripColumnWidth = stripWidth }
-        parent.dwindleSplitRatios = ratios
         parent.dwindleChildRatios = siblingRatios
         if wasMostRecent { only.markAsMostRecentChild() }
     }
@@ -53,13 +51,11 @@ extension TilingContainer {
         let preservesDwindleRoot = (isRootContainer && (layout == .dwindle || layout == .master)) || (parent as? TilingContainer)?.layout == .master
         if let child = children.singleOrNil(), config.enableNormalizationFlattenContainers && !preservesDwindleRoot && (child is TilingContainer || !isRootContainer) {
             let dwindleParent = parent as? TilingContainer
-            let ratios = dwindleParent?.dwindleSplitRatios
             let siblingRatios = dwindleParent?.dwindleChildRatios
             child.unbindFromParent()
             let mru = parent?.mostRecentChild
             let previousBinding = unbindFromParent()
             child.bind(to: previousBinding.parent, adaptiveWeight: previousBinding.adaptiveWeight, index: previousBinding.index)
-            if let ratios { dwindleParent?.dwindleSplitRatios = ratios }
             if let siblingRatios { dwindleParent?.dwindleChildRatios = siblingRatios }
             (child as? TilingContainer)?.unbindEmptyAndAutoFlatten()
             if mru != self {

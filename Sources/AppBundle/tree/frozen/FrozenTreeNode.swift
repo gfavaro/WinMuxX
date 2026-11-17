@@ -13,6 +13,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let weight: CGFloat
     let isMasterStack: Bool?
     let masterRatio: CGFloat?
+    /// Read from state saved by older WinMuxX, which kept Dwindle splits as a spiral; never written.
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
@@ -38,7 +39,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         self.init(
             children: children,
             policyOf: container,
-            dwindleSplitRatios: container.dwindleSplitRatios.isEmpty ? nil : container.dwindleSplitRatios,
+            dwindleSplitRatios: nil,
             dwindleOrientation: container.dwindleOrientation,
             dwindleChildRatios: container.dwindleChildRatios,
         )

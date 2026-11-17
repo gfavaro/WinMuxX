@@ -81,7 +81,9 @@ final class WindowStripTest: XCTestCase {
         let frozen = FrozenContainer(group)
         XCTAssertEqual(frozen.presentsAsStrip, true)
         let restored = Workspace.get(byName: name + "-restored")
-        XCTAssertTrue(restoreTreeRecursive(frozenContainer: frozen, parent: restored.rootTilingContainer, index: 0, windowsById: [:]))
+        var spirals: [ObjectIdentifier: [CGFloat]] = [:]
+        XCTAssertTrue(restoreTreeRecursive(frozenContainer: frozen, parent: restored.rootTilingContainer, index: 0, windowsById: [:],
+                                           spirals: &spirals))
         XCTAssertEqual((restored.rootTilingContainer.children.first as? TilingContainer)?.presentsAsStrip, true)
 
         let tabs = try XCTUnwrap(parseCommand("layout tab-group").cmdOrDie as? LayoutCommand)
