@@ -1,7 +1,6 @@
 import AppKit
 import Observation
 import Common
-import Observation
 import Foundation
 
 @MainActor

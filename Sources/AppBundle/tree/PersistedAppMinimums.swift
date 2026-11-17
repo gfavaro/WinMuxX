@@ -1,6 +1,5 @@
 import AppKit
 import Observation
-import Observation
 
 struct AppMinimumEvidence: Equatable, Identifiable {
     let bundleId: String

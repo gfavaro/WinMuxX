@@ -311,12 +311,11 @@ func restoreTreeRecursive(frozenContainer: FrozenContainer, parent: NonLeafTreeN
                                          spirals: &spirals) { return false }
         }
     }
-    if container.children.count == frozenContainer.children.count {
-        if let shares = frozenContainer.dwindleChildRatios {
-            container.dwindleChildRatios = shares
-        } else if container.layout == .dwindle, container.children.count > 1 {
-            spirals[ObjectIdentifier(container)] = frozenContainer.dwindleSplitRatios ?? []
-        }
+    if frozenContainer.dwindleChildRatios == nil, container.layout == .dwindle, container.children.count > 1 {
+        // A spiral, even with windows still missing: the ones present spiral among themselves.
+        spirals[ObjectIdentifier(container)] = frozenContainer.dwindleSplitRatios ?? []
+    } else if container.children.count == frozenContainer.children.count, let shares = frozenContainer.dwindleChildRatios {
+        container.dwindleChildRatios = shares
     }
     return true
 }
@@ -364,7 +363,9 @@ func migrateLegacyMasterTree(_ workspace: Workspace) {
     }
     workspace.masterGroupIndex = 0
     root.isMasterStack = false
-    workspace.adoptDwindleSpiral()
+    // The groups stay the workspace's top-level groups, side by side, as Master shows them.
+    root.layout = .dwindle
+    root.dwindleChildRatios = []
 }
 
 func validRestoredWindowSize(_ size: CGSize) -> Bool {

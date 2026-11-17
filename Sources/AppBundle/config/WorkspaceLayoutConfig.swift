@@ -147,7 +147,9 @@ extension Workspace {
         let root = rootTilingContainer
         let orientation = settings?.orientation ?? config.defaultRootContainerOrientation
         if let layout = settings?.layout { transitionArrangement(to: layout) }
-        if let rootLayout = settings?.rootLayout { root.layout = rootLayout }
+        if let rootLayout = settings?.rootLayout {
+            if rootLayout == .dwindle, root.layout != .dwindle { root.adoptDwindleSpiral() } else { root.layout = rootLayout }
+        }
         if arrangement == .dwindle {
             root.dwindleOrientation = switch orientation {
                 case .horizontal: .h

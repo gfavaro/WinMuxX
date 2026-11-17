@@ -387,7 +387,7 @@ extension TreeNode {
                 let children = container.children
                 let rect = rect ?? container.lastAppliedLayoutPhysicalRect ?? container.nodeMonitor?.visibleRectPaddedByOuterGaps
                 if container.layout == .dwindle, let rect {
-                    return container.dwindleMinimumExtent(children: children[...], along: axis, rect: rect, gaps: gaps)
+                    return container.dwindleMinimumExtent(along: axis, rect: rect, gaps: gaps)
                 }
                 let minimums = children.map { $0.minimumLayoutExtent(along: axis, gaps: gaps, rect: rect) }
                 guard !minimums.isEmpty else { return 0 }

@@ -12,13 +12,20 @@ final class ExistingDwindleWindowsTest: XCTestCase {
         config.enableNormalizationOppositeOrientationForNestedContainers = true
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
-        let windows = (1...4).map { TestWindow.new(id: UInt32(1100 + $0), parent: root) }
+        // As at startup, each already-open window is placed before any has been laid out.
+        let windows = (1...4).map { id in
+            let binding = bindingDataForNewTilingWindow(workspace, window: nil)
+            let window = TestWindow.new(id: UInt32(1100 + id), parent: workspace)
+            window.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return window
+        }
 
         applyStartupWindowLayout(restoredWorld: false)
         workspace.normalizeContainers()
         try await workspace.layoutWorkspace()
 
         XCTAssertTrue(workspace.rootTilingContainer === root)
+        XCTAssertEqual(root.children.count, 2, "A spiral: the first window, then the rest split again")
         XCTAssertEqual(root.layout, .dwindle)
         let frames = windows.map { $0.lastAppliedLayoutPhysicalRect.orDie() }
         XCTAssertLessThan(frames[0].minX, frames[1].minX)

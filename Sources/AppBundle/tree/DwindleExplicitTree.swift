@@ -59,11 +59,21 @@ extension TilingContainer {
     @MainActor
     func adoptDwindleSpiral(ratios: [CGFloat], in rect: Rect, gaps: ResolvedGaps) {
         let nodes = children
-        let fixedAxis = layout == .dwindle ? dwindleOrientation : nil
+        let fixedAxis = dwindleOrientation
         for node in nodes { node.unbindFromParent() }
         layout = .dwindle
         dwindleChildRatios = []
         populateDwindleSpiral(nodes: nodes[...], ratios: ratios[...], rect: rect, gaps: gaps, fixedAxis: fixedAxis)
+    }
+
+    /// Becomes a Dwindle spiral in the area it was last laid out in, as a configured Dwindle
+    /// root layout does.
+    @MainActor
+    func adoptDwindleSpiral() {
+        guard let workspace = nodeWorkspace else { layout = .dwindle; return }
+        let monitor = workspace.workspaceMonitor
+        adoptDwindleSpiral(ratios: [], in: lastAppliedLayoutPhysicalRect ?? monitor.visibleRectPaddedByOuterGaps,
+                           gaps: ResolvedGaps(gaps: config.gaps, monitor: monitor))
     }
 
     @MainActor

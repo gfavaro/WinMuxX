@@ -100,7 +100,6 @@ struct MessageView: View {
 }
 
 @Observable
-
 public final class MessageModel {
     @MainActor public static let shared = MessageModel()
     public var message: Message? = nil

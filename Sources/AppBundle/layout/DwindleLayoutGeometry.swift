@@ -26,7 +26,17 @@ indirect enum LayoutMinimumSnapshot {
     private static func dwindleExtent(children: [LayoutMinimumSnapshot], settings: DwindleMinimumSettings,
                                       axisHorizontal: Bool, rect: CGRect, gap: CGSize) -> CGFloat {
         let splitHorizontal = settings.orientationHorizontal ?? (rect.width >= rect.height)
-        let values = children.map { $0.extent(horizontal: axisHorizontal, in: rect, gap: gap) }
+        // Each child measured in the area its share gives it, as layout places it.
+        let splitGap = splitHorizontal ? gap.width : gap.height
+        let available = max((splitHorizontal ? rect.width : rect.height) - CGFloat(max(children.count - 1, 0)) * splitGap, 0)
+        let shares = settings.shares.count == children.count ? settings.shares
+            : Array(repeating: 1 / CGFloat(children.count), count: children.count)
+        let values = zip(children, shares).map { child, share in
+            let length = share * available
+            let area = CGRect(origin: rect.origin, size: splitHorizontal ? CGSize(width: length, height: rect.height)
+                                                                         : CGSize(width: rect.width, height: length))
+            return child.extent(horizontal: axisHorizontal, in: area, gap: gap)
+        }
         return splitHorizontal == axisHorizontal
             ? values.reduce(0, +) + CGFloat(max(values.count - 1, 0)) * (splitHorizontal ? gap.width : gap.height)
             : values.max() ?? 0
@@ -36,6 +46,8 @@ indirect enum LayoutMinimumSnapshot {
 struct DwindleMinimumSettings {
     /// nil chooses the axis from the area's shape.
     let orientationHorizontal: Bool?
+    /// The children's shares along the split; empty shares it equally.
+    var shares: [CGFloat] = []
 }
 
 struct DwindleLayoutInput {

@@ -342,9 +342,9 @@ struct SettingsMultilineField: View {
         .onAppear { savedText = savedValue }
         .onChange(of: savedValue) { _, newValue in savedText = newValue; isSaving = false }
         .settingsAutosave(value: text, enabled: wasEdited && !isSaving) { commit() }
-        // Each save resets the failed id first, so a repeated failure is still a change.
-        .onChange(of: ShortcutSettingsModel.shared.failedSettingID) { _, failedID in
-            if failedID == id { isSaving = false }
+        // The revision counts every failure: the same field failing twice in one turn is still seen.
+        .onChange(of: ShortcutSettingsModel.shared.failedSaveRevision) {
+            if ShortcutSettingsModel.shared.failedSettingID == id { isSaving = false }
         }
     }
 

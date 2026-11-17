@@ -169,6 +169,19 @@ final class DwindleReferenceParityTest: XCTestCase {
         XCTAssertEqual(render(), before)
     }
 
+    func testOldMasterTreeKeepsItsGroups() {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .master
+        let main = TestWindow.new(id: 40, parent: root)
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        stack.isMasterStack = true
+        let groups = (1...3).map { TestWindow.new(id: UInt32(40 + $0), parent: stack) }
+        migrateLegacyMasterTree(workspace)
+        XCTAssertEqual(root.children, [main] + groups, "Every group stays a top-level group")
+        XCTAssertEqual(root.layout, .dwindle)
+    }
+
     func testExplicitRatiosAndAxisSurviveSnapshotRestore() async throws {
         let first = insert(1)
         _ = insert(2)

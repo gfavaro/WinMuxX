@@ -1,7 +1,6 @@
 import AppKit
 import Observation
 import Common
-import Observation
 
 struct WorkspaceOverviewWindow: Identifiable, Equatable {
     let id: UInt32

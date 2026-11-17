@@ -11,11 +11,26 @@ final class DisplayRefreshDriver {
     }
 
     private var subscriptions: [ObjectIdentifier: Subscription] = [:]
-    /// Calls back on the main run loop, once per frame of the main display.
+    /// Calls back on the main run loop, once per frame of the fastest display.
     private var displayLink: CADisplayLink?
     private var fallbackTimer: Timer?
 
-    private init() {}
+    private init() {
+        // The link follows one display: when displays come or go, bind to the fastest again.
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification,
+                                               object: nil, queue: .main) { _ in
+            MainActor.assumeIsolated { DisplayRefreshDriver.shared.rebindDisplayLink() }
+        }
+    }
+
+    private func rebindDisplayLink() {
+        guard displayLink != nil || fallbackTimer != nil else { return }
+        displayLink?.invalidate()
+        displayLink = nil
+        fallbackTimer?.invalidate()
+        fallbackTimer = nil
+        startIfNeeded()
+    }
 
     func add(owner: AnyObject, callback: @escaping (CFTimeInterval) -> Void) {
         subscriptions[ObjectIdentifier(owner)] = Subscription(owner: owner, callback: callback)
@@ -36,7 +51,7 @@ final class DisplayRefreshDriver {
     }
 
     private func startDisplayLink() -> Bool {
-        guard let screen = NSScreen.main else { return false }
+        guard let screen = NSScreen.screens.max(by: { $0.maximumFramesPerSecond < $1.maximumFramesPerSecond }) else { return false }
         let link = screen.displayLink(target: DisplayRefreshLinkTarget { [weak self] in self?.fire(timestamp: $0) },
                                       selector: #selector(DisplayRefreshLinkTarget.frame))
         link.add(to: .main, forMode: .common)

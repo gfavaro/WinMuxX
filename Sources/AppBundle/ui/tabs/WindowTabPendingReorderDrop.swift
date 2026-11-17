@@ -1,6 +1,5 @@
 import Observation
 import CoreGraphics
-import Observation
 
 struct WindowTabIncomingDrop: Equatable {
     let stripId: ObjectIdentifier

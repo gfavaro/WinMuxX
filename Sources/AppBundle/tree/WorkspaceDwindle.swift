@@ -9,7 +9,8 @@ func applyDwindleToExistingTiledWorkspaces() -> Bool {
     var changed = false
     for workspace in Workspace.all where config.workspaceLayouts[workspace.name]?.settings(on: workspace.workspaceMonitor).layout == nil {
         let root = workspace.rootTilingContainer
-        if root.layout == .tiles {
+        // A workspace that has used another arrangement keeps its groups as they are.
+        if root.layout == .tiles, workspace.arrangement == .dwindle, !workspace.preservesTopLevelGroups {
             workspace.adoptDwindleSpiral()
             changed = true
         }

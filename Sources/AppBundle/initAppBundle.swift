@@ -138,17 +138,7 @@ func applyStartupWorkspacePlacement(restoredWorld: Bool) {
 @MainActor
 func applyStartupWindowLayout(restoredWorld: Bool) {
     if config.defaultRootContainerLayout == .dwindle {
-        var changed = applyDwindleToExistingTiledWorkspaces()
-        // Windows already open when nothing was restored were added one after another; they
-        // become a spiral, as if opened one at a time.
-        if !restoredWorld {
-            for workspace in Workspace.all where workspace.rootTilingContainer.layout == .dwindle
-                && workspace.rootTilingContainer.children.count > 2 {
-                workspace.adoptDwindleSpiral()
-                changed = true
-            }
-        }
-        if changed { syncClosedWindowsCacheToCurrentWorld() }
+        if applyDwindleToExistingTiledWorkspaces() { syncClosedWindowsCacheToCurrentWorld() }
         return
     }
     guard !restoredWorld else { return }

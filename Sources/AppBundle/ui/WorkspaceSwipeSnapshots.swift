@@ -224,6 +224,19 @@ actor WorkspaceSwipeSnapshotRenderer {
             windows.sort { (rank[$0.id] ?? 0) > (rank[$1.id] ?? 0) }
         }
         let capturable = request.allowCapture ? (try? await WindowImageCapture.windows()) ?? [:] : [:]
+        // All windows at once; drawn afterwards in stacking order.
+        let images = await withTaskGroup(of: (UInt32, CGImage?).self) { group in
+            for window in windows {
+                let id = window.id
+                // An SCWindow is an immutable description of a window, safe to hand to another task.
+                guard let window = capturable[id] else { continue }
+                nonisolated(unsafe) let source = window
+                group.addTask { (id, try? await WindowImageCapture.image(of: source)) }
+            }
+            var images: [UInt32: CGImage] = [:]
+            for await (id, image) in group { images[id] = image }
+            return images
+        }
         for window in windows {
             try Task.checkCancellation()
             // A missing capture still has truthful geometry; no extra AX read or retry.
@@ -233,9 +246,7 @@ actor WorkspaceSwipeSnapshotRenderer {
             }
             context.setFillColor(CGColor(gray: 0.23, alpha: 1))
             context.fill(window.frame)
-            if let source = capturable[window.id], let image = try? await WindowImageCapture.image(of: source) {
-                context.draw(image, in: window.frame)
-            }
+            if let image = images[window.id] { context.draw(image, in: window.frame) }
         }
         try Task.checkCancellation()
         guard let image = context.makeImage() else { throw CocoaError(.coderInvalidValue) }
