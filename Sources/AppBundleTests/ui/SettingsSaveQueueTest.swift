@@ -56,6 +56,26 @@ final class SettingsSaveQueueTest: WorkspaceTestCase {
         XCTAssertEqual(model.bindingsDraftRevision, model.savedBindingsRevision)
     }
 
+    /// A field shows "Saving…" until its save succeeds or fails. The same field failing twice in
+    /// a row resets and sets the same failed id within one turn, so views watch the failure count.
+    func testEveryFailureIsCountedEvenForTheSameFieldTwice() async {
+        struct Rejected: Error {}
+        let model = ShortcutSettingsModel(configAccess: SettingsConfigAccess(edit: { _ in throw Rejected() },
+                                                                             reload: { _ in true }),
+                                          drafts: SettingsDraftStore())
+        let done = expectation(description: "both saves failed")
+        let before = model.failedSaveRevision
+        for _ in 0 ..< 2 {
+            model.enqueueSettingsSave(ids: ["gaps.inner.horizontal"], title: "Gaps", retry: {}) {
+                _ = try model.configAccess.edit { $0 }
+            }
+        }
+        model.saveQueue.enqueue { done.fulfill() }
+        await fulfillment(of: [done], timeout: 1)
+        XCTAssertEqual(model.failedSaveRevision, before + 2, "Each failure is counted")
+        XCTAssertEqual(model.failedSettingID, "gaps.inner.horizontal")
+    }
+
     func testReloadFailureRetainsDraftAndRetryDoesNotClearNewerEdit() async {
         let completed = expectation(description: "failed save completed")
         let retried = expectation(description: "retry completed")
