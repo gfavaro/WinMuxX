@@ -16,9 +16,7 @@ struct SetupCheckInput {
     var accessibilityGranted: Bool
     var otherWindowManagers: [String]
     var workspaceSwipe: Bool
-    var overviewThreeFingerUp: Bool
-    /// macOS trackpad settings: 2 assigns the gesture to three fingers.
-    var macThreeFingerHorizontalSwipe: Bool
+    /// macOS trackpad setting: 2 assigns the gesture to three fingers.
     var macThreeFingerVerticalSwipe: Bool
 
     @MainActor static var current: Self {
@@ -26,8 +24,6 @@ struct SetupCheckInput {
             accessibilityGranted: AXIsProcessTrusted(),
             otherWindowManagers: runningOtherWindowManagers(),
             workspaceSwipe: config.workspaceSwipe.enabled,
-            overviewThreeFingerUp: config.workspaceOverview.threeFingerUp,
-            macThreeFingerHorizontalSwipe: macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2,
             macThreeFingerVerticalSwipe: macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2,
         )
     }
@@ -44,19 +40,12 @@ func setupCheckItems(_ input: SetupCheckInput) -> [SetupCheckItem] {
         SetupCheckItem(id: "other-window-managers", title: "No other window manager", ok: input.otherWindowManagers.isEmpty,
                        detail: input.otherWindowManagers.isEmpty ? "None running." : "\(input.otherWindowManagers.joined(separator: ", ")) also moves windows; quit it so the two do not fight."),
     ]
-    // The swipes are macOS's own: they need the matching gesture on three fingers.
+    // The swipe is macOS's own: it needs Mission Control's gesture on three fingers.
     if input.workspaceSwipe {
-        items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe", ok: input.macThreeFingerHorizontalSwipe,
-            detail: input.macThreeFingerHorizontalSwipe
-                ? "WinMuxX switches workspaces with macOS's own three-finger swipe recognition."
-                : "Set Trackpad › More Gestures › Swipe between full-screen applications to three fingers; WinMuxX switches workspaces with that swipe.",
-            fixURL: input.macThreeFingerHorizontalSwipe ? nil : trackpadSettings))
-    }
-    if input.overviewThreeFingerUp {
-        items.append(SetupCheckItem(id: "three-finger-up", title: "Three-finger swipe up", ok: input.macThreeFingerVerticalSwipe,
+        items.append(SetupCheckItem(id: "three-finger-swipe", title: "Three-finger swipe up and down", ok: input.macThreeFingerVerticalSwipe,
             detail: input.macThreeFingerVerticalSwipe
-                ? "Three fingers up opens the overview with macOS's own recognition, in place of Mission Control. Mission Control stays on its keyboard shortcut."
-                : "Set Trackpad › More Gestures › Mission Control to three fingers; the swipe then opens the overview instead.",
+                ? "Three fingers up or down move to the workspace below or above, in sidebar order, with macOS's own recognition. With no workspace that way, Mission Control or App Exposé opens as usual."
+                : "Set Trackpad › More Gestures › Mission Control to three fingers; WinMuxX switches workspaces with that swipe.",
             fixURL: input.macThreeFingerVerticalSwipe ? nil : trackpadSettings))
     }
     return items

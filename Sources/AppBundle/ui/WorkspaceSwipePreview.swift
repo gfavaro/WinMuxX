@@ -20,7 +20,7 @@ struct WorkspaceSwipePreviewGeometry {
         // A cubic from the finger's speed to rest; its peak stays within about a third above
         // the average speed, and a slower finger accelerates gradually instead of at once.
         let slope = min(3, max(0, towards * duration))
-        let animation = CABasicAnimation(keyPath: "transform.translation.x")
+        let animation = CABasicAnimation(keyPath: "transform.translation.y")
         animation.fromValue = from
         animation.toValue = to
         animation.duration = duration
@@ -28,10 +28,12 @@ struct WorkspaceSwipePreviewGeometry {
         return animation
     }
 
-    static func offsets(width: CGFloat, progress: Double, slidesLeft: Bool) -> (outgoing: CGFloat, incoming: CGFloat) {
-        let travel = width * CGFloat(min(1, max(0, progress)))
-        let outgoing = slidesLeft ? -travel : travel
-        return (outgoing, outgoing + (slidesLeft ? width : -width))
+    /// Vertical offsets in the layer's y-up space: workspaces stack like the sidebar, so the
+    /// next one rises from below while the current one leaves upward.
+    static func offsets(height: CGFloat, progress: Double, incomingFromBelow: Bool) -> (outgoing: CGFloat, incoming: CGFloat) {
+        let travel = height * CGFloat(min(1, max(0, progress)))
+        let outgoing = incomingFromBelow ? travel : -travel
+        return (outgoing, outgoing + (incomingFromBelow ? -height : height))
     }
 }
 
@@ -60,7 +62,7 @@ final class WorkspaceSwipePreview {
     private var panel: NSPanel?
     private var outgoing: CALayer?
     private var incoming: CALayer?
-    private var slidesLeft = true
+    private var incomingFromBelow = true
     private var progress = 0.0
     private var sampleTime = 0.0
     private var velocity = 0.0
@@ -134,7 +136,7 @@ final class WorkspaceSwipePreview {
         }
     }
 
-    func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
+    func begin(on monitor: Monitor, target: Workspace, incomingFromBelow: Bool,
                isValid: @escaping @MainActor () -> Bool) {
         guard canPreview else {
             invalidate()
@@ -143,23 +145,23 @@ final class WorkspaceSwipePreview {
         let started = CACurrentMediaTime()
         let (rect, capture) = area(on: monitor)
         let request = WorkspaceSwipeSnapshotRequest(workspace: target, monitor: monitor, rect: rect)
-        begin(request: request, capture: capture, rect: rect, slidesLeft: slidesLeft, started: started, isValid: isValid)
+        begin(request: request, capture: capture, rect: rect, incomingFromBelow: incomingFromBelow, started: started, isValid: isValid)
     }
 
     /// Screen capture uses the same bounded worker as incoming composition. Only the
     /// newest interaction can publish; lifting before capture finishes cancels the preview.
     func begin(request: WorkspaceSwipeSnapshotRequest, capture: WorkspaceSwipeSnapshotRequest,
-               rect: Rect, slidesLeft: Bool, started: Double = CACurrentMediaTime(),
+               rect: Rect, incomingFromBelow: Bool, started: Double = CACurrentMediaTime(),
                isValid: @escaping @MainActor () -> Bool = { true }) {
         if var front = touchdownFront, front.key == capture.key, CACurrentMediaTime() - front.at < Self.touchdownFrontLifetime {
             if let image = front.image {
                 touchdownFront = nil
-                return begin(request: request, front: image, rect: rect, slidesLeft: slidesLeft, started: started, isValid: isValid)
+                return begin(request: request, front: image, rect: rect, incomingFromBelow: incomingFromBelow, started: started, isValid: isValid)
             }
             // Still capturing: take that capture over rather than starting the same one again.
             clear(reason: "superseded")
             let cached = snapshots.cache.image(for: request.key)
-            prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: nil,
+            prepare(incomingFromBelow: incomingFromBelow, cacheHit: cached != nil, captureMs: nil,
                     requestMs: (CACurrentMediaTime() - started) * 1000)
             let token = generation
             front.arrived = { [weak self] image in
@@ -173,7 +175,7 @@ final class WorkspaceSwipePreview {
         }
         cancel()
         let cached = snapshots.cache.image(for: request.key)
-        prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: nil,
+        prepare(incomingFromBelow: incomingFromBelow, cacheHit: cached != nil, captureMs: nil,
                 requestMs: (CACurrentMediaTime() - started) * 1000)
         let token = generation
         snapshots.request(capture) { [weak self] result in
@@ -196,18 +198,18 @@ final class WorkspaceSwipePreview {
     }
 
     /// Synthetic front images exercise the same presentation path without desktop capture.
-    func begin(request: WorkspaceSwipeSnapshotRequest, front: CGImage, rect: Rect, slidesLeft: Bool,
+    func begin(request: WorkspaceSwipeSnapshotRequest, front: CGImage, rect: Rect, incomingFromBelow: Bool,
                started: Double = CACurrentMediaTime(),
                isValid: @escaping @MainActor () -> Bool = { true }) {
         cancel()
         let cached = snapshots.cache.image(for: request.key)
-        prepare(slidesLeft: slidesLeft, cacheHit: cached != nil, captureMs: 0, requestMs: 0)
+        prepare(incomingFromBelow: incomingFromBelow, cacheHit: cached != nil, captureMs: 0, requestMs: 0)
         prepareIncoming(request, front: front, cached: cached, rect: rect, started: started, isValid: isValid)
         updateTiming { $0.mainMs = (CACurrentMediaTime() - started) * 1000 }
     }
 
-    private func prepare(slidesLeft: Bool, cacheHit: Bool, captureMs: Double?, requestMs: Double) {
-        self.slidesLeft = slidesLeft
+    private func prepare(incomingFromBelow: Bool, cacheHit: Bool, captureMs: Double?, requestMs: Double) {
+        self.incomingFromBelow = incomingFromBelow
         phase = .preparing
         timings.append(Timing(generation: generation, cacheHit: cacheHit, captureMs: captureMs,
                               requestMs: requestMs, mainMs: 0))
@@ -331,12 +333,12 @@ final class WorkspaceSwipePreview {
 
     private func applyProgress() {
         guard let panel else { return }
-        let offset = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: progress, slidesLeft: slidesLeft)
+        let offset = WorkspaceSwipePreviewGeometry.offsets(height: panel.frame.height, progress: progress, incomingFromBelow: incomingFromBelow)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         for (layer, to) in [(outgoing, offset.outgoing), (incoming, offset.incoming)] {
             guard let layer else { continue }
-            layer.transform = CATransform3DMakeTranslation(to, 0, 0)
+            layer.transform = CATransform3DMakeTranslation(0, to, 0)
         }
         CATransaction.commit()
     }
@@ -346,9 +348,9 @@ final class WorkspaceSwipePreview {
         if phase == .preparing { cancel(); return }
         guard let panel, phase == .tracking else { return }
         phase.settle(commit: commit)
-        let start = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: progress, slidesLeft: slidesLeft)
+        let start = WorkspaceSwipePreviewGeometry.offsets(height: panel.frame.height, progress: progress, incomingFromBelow: incomingFromBelow)
         let releaseVelocity = timestamp >= sampleTime && timestamp - sampleTime < 0.08 ? velocity : 0
-        let end = WorkspaceSwipePreviewGeometry.offsets(width: panel.frame.width, progress: commit ? 1 : 0, slidesLeft: slidesLeft)
+        let end = WorkspaceSwipePreviewGeometry.offsets(height: panel.frame.height, progress: commit ? 1 : 0, incomingFromBelow: incomingFromBelow)
         let remaining = commit ? 1 - progress : progress
         let duration = max(0.12, Double(config.animations.durationMs) / 1000 * sqrt(remaining))
         var settlingDuration = 0.0
@@ -356,9 +358,9 @@ final class WorkspaceSwipePreview {
         CATransaction.setDisableActions(true)
         for (layer, from, to) in [(outgoing, start.outgoing, end.outgoing), (incoming, start.incoming, end.incoming)] {
             guard let layer else { continue }
-            let visible = layer.presentation()?.transform.m41 ?? from
-            layer.transform = CATransform3DMakeTranslation(to, 0, 0)
-            let speed = releaseVelocity * panel.frame.width * (slidesLeft ? -1 : 1)
+            let visible = layer.presentation()?.transform.m42 ?? from
+            layer.transform = CATransform3DMakeTranslation(0, to, 0)
+            let speed = releaseVelocity * panel.frame.height * (incomingFromBelow ? 1 : -1)
             let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: visible, to: to, speed: speed, duration: duration)
             settlingDuration = max(settlingDuration, animation.duration)
             layer.add(animation, forKey: "workspaceSwipe")

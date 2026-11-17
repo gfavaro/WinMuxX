@@ -63,7 +63,6 @@ enum SettingsControl: String, CaseIterable, Identifiable {
     case defaultOrientation = "default-root-container-orientation"
     case fullscreenWidth = "fullscreen-width"
     case workspaceSwipes = "workspace-swipe.enabled"
-    case overviewGesture = "workspace-overview.three-finger-up"
     case focusFollowsMouse = "focus-follows-mouse"
     case followAppActivation = "follow-app-activation.enabled"
     case tabEnabled = "window-tabs.enabled"
@@ -98,7 +97,6 @@ enum SettingsControl: String, CaseIterable, Identifiable {
             case .defaultOrientation: "Root orientation"
             case .fullscreenWidth: "Width"
             case .workspaceSwipes: "Enable workspace swipes"
-            case .overviewGesture: "Three-finger swipe up"
             case .focusFollowsMouse: "Focus windows under the pointer"
             case .followAppActivation: "Follow app activation"
             case .tabEnabled: "Show tab strips"
@@ -111,7 +109,7 @@ enum SettingsControl: String, CaseIterable, Identifiable {
             case .startWorkspacesOnMain, .startAtLogin, .autoReloadConfig: .general
             case .appearance, .chromeStyle, .menuBarIndicator, .glideEnabled, .glideDuration, .bordersEnabled, .borderOrder, .dimInactive: .appearance
             case .sidebarEnabled, .sidebarDisplayMode, .sidebarPosition, .showClock, .showSeconds, .showDate, .showWeekday: .sidebar
-            case .automaticallyTileNewWindows, .autoAddNewWindowsToTabGroup, .automaticallyUnhideApps, .defaultLayout, .defaultOrientation, .fullscreenWidth, .workspaceSwipes, .overviewGesture, .focusFollowsMouse, .followAppActivation, .tabEnabled, .shakeToToggleTiling: .windows
+            case .automaticallyTileNewWindows, .autoAddNewWindowsToTabGroup, .automaticallyUnhideApps, .defaultLayout, .defaultOrientation, .fullscreenWidth, .workspaceSwipes, .focusFollowsMouse, .followAppActivation, .tabEnabled, .shakeToToggleTiling: .windows
         }
     }
 }

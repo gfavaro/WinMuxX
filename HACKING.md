@@ -134,16 +134,17 @@ elsewhere is refused at `CGPoint.setActiveWorkspace`, fallbacks and new automati
 names skip it, and reconciliation moves one showing elsewhere to its display.
 
 `WorkspaceGestureCoordinator` wires the gestures to their configuration.
-`DockWorkspaceSwipeSource` reads macOS's three-finger Dock swipe events when macOS
-assigns a gesture to three fingers: horizontal for workspace swipes, vertical
-(Mission Control) for the overview. WinMuxX does not read raw touches; scrolling
-workspaces and their raw-touch pan moved to SpaceMuxX. `DockSwipeTracker` decides which
-swipes WinMuxX keeps from the Dock and replays the rest; vertical progress follows
-Natural scrolling, horizontal progress already accounts for it. On macOS 27 the Dock must still receive the physical Ended event (motion
+`DockWorkspaceSwipeSource` reads macOS's three-finger up/down Dock swipe events when
+macOS assigns Mission Control to three fingers: workspaces stack like the sidebar, so up
+and down move to the workspace below or above. Left/right stays with macOS. WinMuxX does
+not read raw touches; scrolling workspaces and their raw-touch pan moved to SpaceMuxX.
+`DockSwipeTracker` decides which swipes WinMuxX keeps from the Dock and replays the rest;
+vertical progress follows Natural scrolling, so its sign alone says which way the content
+moves. On macOS 27 the Dock must still receive the physical Ended event (motion
 zeroed), or its gesture state stays open.
 Recognizer policy, the bounded mailbox, native device ownership and the shared
 spring each have separate modules. The overview presentation owns panel-only
-motion; the horizontal controller owns horizontal navigation. Keep new gesture
+motion; the swipe controller owns workspace navigation. Keep new gesture
 behavior out of startup/configuration/observer entry points beyond delegation.
 
 The swipe preview uses `WorkspaceSwipePreviewPhase` to wait for both the animation

@@ -23,18 +23,6 @@ import SwiftUI
     func releaseAll() { while !waiting.isEmpty { waiting.removeFirst().resume() } }
 }
 
-@MainActor private final class InteractiveOverviewPanelSpy: WorkspaceOverviewPresenting {
-    var initialProgress: Double?
-    var updates: [Double] = []
-    var settles: [Double] = []
-    var dismissed = false
-    func present(key: Bool) {}
-    func present(key: Bool, gestureProgress: Double?) { initialProgress = gestureProgress }
-    func updateGesture(progress: Double) { updates.append(progress) }
-    func settleGesture(velocity: Double) { settles.append(velocity) }
-    func dismissOverview() { dismissed = true }
-}
-
 @MainActor
 private final class WeakOverviewModel {
     weak var value: WorkspaceOverviewDisplayModel?
@@ -86,48 +74,6 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertNil(model.accessibilitySelection)
     }
 
-    func testInteractiveOpeningReusesOneModelAndCancelledOpeningReleasesImages() async throws {
-        let panel = InteractiveOverviewPanelSpy()
-        var deps = dependencies(cards: [card()], image: try image())
-        deps.makePanel = { _, _ in panel }
-        let controller = WorkspaceOverviewController(dependencies: deps)
-        XCTAssertTrue(controller.beginGesture(opening: true, progress: 0.2))
-        XCTAssertEqual(panel.initialProgress, 0.2)
-        await drain(controller)
-        let model = try XCTUnwrap(controller.models.first)
-        let bytes = controller.retainedImageBytes
-        for step in 0..<1000 { controller.updateGesture(progress: Double(step % 100) / 100) }
-        XCTAssertTrue(controller.models.first === model)
-        XCTAssertEqual(controller.retainedImageBytes, bytes)
-        XCTAssertGreaterThan(bytes, 0)
-        controller.endGesture(commit: false, velocity: -1)
-        XCTAssertEqual(controller.phase, .closed)
-        XCTAssertTrue(panel.dismissed)
-        XCTAssertTrue(model.images.isEmpty)
-        XCTAssertTrue(controller.models.isEmpty)
-    }
-
-    func testCancelledDownwardGestureKeepsSessionAndCommittedDownwardGestureCloses() async throws {
-        let panel = InteractiveOverviewPanelSpy()
-        var deps = dependencies(cards: [card()], image: try image())
-        deps.makePanel = { _, _ in panel }
-        let controller = WorkspaceOverviewController(dependencies: deps)
-        XCTAssertTrue(controller.show()); await drain(controller)
-        let model = try XCTUnwrap(controller.models.first)
-        XCTAssertTrue(controller.beginGesture(opening: false, progress: 0.2))
-        XCTAssertEqual(panel.updates.last, 0.8)
-        controller.updateGesture(progress: 0.1)
-        XCTAssertEqual(panel.updates.last, 0.9)
-        controller.endGesture(commit: false, velocity: -2)
-        XCTAssertEqual(panel.settles, [2])
-        XCTAssertTrue(controller.isOpen)
-        XCTAssertTrue(controller.models.first === model)
-        XCTAssertTrue(controller.beginGesture(opening: false, progress: 0.7))
-        controller.endGesture(commit: true, velocity: 2)
-        XCTAssertEqual(controller.phase, .closed)
-        controller.endGesture(commit: false, velocity: 0)
-        XCTAssertEqual(controller.phase, .closed)
-    }
     private let identity = NSObject()
     private let monitor = MonitorViewportId(topLeftCorner: .zero)
     private func image(_ width: Int = 64, _ height: Int = 36) throws -> CGImage {
@@ -244,7 +190,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertEqual(controller.retainedImageBytes, 0)
     }
 
-    func testCommandAndConfigParsing() {
+    func testCommandParsing() {
         for (suffix, action) in [("", WorkspaceOverviewCmdArgs.Action.toggle), (" show", .show), (" hide", .hide), (" toggle", .toggle)] {
             let command = parseCommand("workspace-overview" + suffix).cmdOrDie
             XCTAssertTrue(command.isPresentation)
@@ -253,12 +199,6 @@ final class WorkspaceOverviewTest: XCTestCase {
         }
         XCTAssertNotNil(parseCommand("workspace-overview invalid").errorOrNil)
         XCTAssertNotNil(parseCommand("workspace-overview show hide").errorOrNil)
-        XCTAssertFalse(Config().workspaceOverview.threeFingerUp)
-        let parsed = parseConfig("config-version = 2\n[workspace-overview]\nthree-finger-up = true")
-        XCTAssertTrue(parsed.errors.isEmpty)
-        XCTAssertTrue(parsed.config.workspaceOverview.threeFingerUp)
-        XCTAssertFalse(parseConfig("[workspace-overview]\nthree-finger-up = 1").errors.isEmpty)
-        XCTAssertFalse(parseConfig("[workspace-overview]\nunknown = true").errors.isEmpty)
     }
 
     func testEligibilityExcludesEveryUnwantedNativeState() {
@@ -454,7 +394,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertFalse(model.cards.isEmpty, "The reused panel keeps its card views for the next opening")
         XCTAssertNil(model.selectedWindow)
         XCTAssertNil(model.activate)
-        XCTAssertTrue(controller.show(gestureProgress: 0.3))
+        XCTAssertTrue(controller.show())
         XCTAssertEqual(creations, 1)
         XCTAssertTrue(controller.panels.first === panel)
         XCTAssertTrue(panel.contentView === hosting)

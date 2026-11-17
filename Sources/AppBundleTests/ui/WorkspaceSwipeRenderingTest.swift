@@ -34,6 +34,8 @@ final class WorkspaceSwipeRenderingTest: XCTestCase {
             renderer.layer = root
             renderer.bounds = root.bounds
             let animation = WorkspaceSwipePreviewGeometry.settlingAnimation(from: from - 512, to: to - 512, speed: speed, duration: duration)
+            // The preview moves along y; this rig measures the same curve along a row of pixels.
+            animation.keyPath = "transform.translation.x"
             let start = CACurrentMediaTime()
             animation.beginTime = start
             // Keep the final animated value visible to measure the error before removal.

@@ -13,21 +13,11 @@ protocol WorkspaceOverviewPresenting: AnyObject {
     func present(key: Bool)
     func dismissOverview()
     func dismissOverview(animated: Bool, completion: @escaping @MainActor () -> Void)
-    func present(key: Bool, gestureProgress: Double?)
-    func updateGesture(progress: Double)
-    func settleGesture(velocity: Double)
-    func dismissOverview(animated: Bool, velocity: Double, completion: @escaping @MainActor () -> Void)
     func focusOverview()
 }
 
 extension WorkspaceOverviewPresenting {
     func focusOverview() {}
-    func present(key: Bool, gestureProgress: Double?) { present(key: key) }
-    func updateGesture(progress: Double) {}
-    func settleGesture(velocity: Double) {}
-    func dismissOverview(animated: Bool, velocity: Double, completion: @escaping @MainActor () -> Void) {
-        dismissOverview(animated: animated, completion: completion)
-    }
     func dismissOverview(animated: Bool, completion: @escaping @MainActor () -> Void) {
         dismissOverview()
         completion()
@@ -126,7 +116,6 @@ final class WorkspaceOverviewController {
     private var ranksGeneration: Int?
     private var observers: [(NotificationCenter, NSObjectProtocol)] = []
     private var previousApp: NSRunningApplication?
-    var gestureOpening: Bool?
     static let imageBudget = 32 * 1024 * 1024
     var retainedImageBytes: Int {
         models.reduce(0) { $0 + $1.images.values.reduce(0) { $0 + $1.bytesPerRow * $1.height } }
@@ -134,7 +123,7 @@ final class WorkspaceOverviewController {
 
     init(dependencies: WorkspaceOverviewDependencies) { self.dependencies = dependencies }
 
-    @discardableResult func show(gestureProgress: Double? = nil) -> Bool {
+    @discardableResult func show() -> Bool {
         if phase == .closing { finishDismiss() }
         if isOpen { return true }
         guard dependencies.canShow(), selectionTask == nil else { return false }
@@ -181,7 +170,7 @@ final class WorkspaceOverviewController {
         }
         for (index, presentation) in presentations.enumerated() {
             let key = dependencies.nativeIntegration ? presentation.display.id == MonitorViewportId(focus.workspace.workspaceMonitor) : index == 0
-            presentation.panel.present(key: key, gestureProgress: gestureProgress)
+            presentation.panel.present(key: key)
         }
         WorkspaceMotionDiagnostics.record("Overview setup to panel submission", milliseconds: (CACurrentMediaTime() - setupStarted) * 1000)
         phase = .open
@@ -192,11 +181,10 @@ final class WorkspaceOverviewController {
         return true
     }
 
-    func dismiss(animated: Bool = true, restoreFocus: Bool = true, gestureVelocity: Double = 0) {
-        // Any dismissal after a selection was made (hide command, gesture, Mission Control,
-        // palette) supersedes it. select() dismisses before creating its own selection.
+    func dismiss(animated: Bool = true, restoreFocus: Bool = true) {
+        // Any dismissal after a selection was made (hide command, Mission Control, palette)
+        // supersedes it. select() dismisses before creating its own selection.
         cancelPendingSelection()
-        gestureOpening = nil
         guard phase != .closed else { return }
         if phase == .closing {
             if !animated { finishDismiss() }
@@ -225,7 +213,7 @@ final class WorkspaceOverviewController {
         var remaining = panels.count
         if remaining == 0 { finishDismiss(); return }
         for panel in panels {
-            panel.dismissOverview(animated: animated, velocity: gestureVelocity) { [weak self] in
+            panel.dismissOverview(animated: animated) { [weak self] in
                 guard let self, self.phase == .closing, self.generation == closingGeneration else { return }
                 remaining -= 1
                 if remaining == 0 { self.finishDismiss() }

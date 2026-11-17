@@ -616,28 +616,16 @@ The `show` and `hide` arguments are idempotent.
 ```toml
 [mode.main.binding]
     alt-shift-o = 'workspace-overview'
-
-[workspace-overview]
-    three-finger-up = false # opt in after adjusting macOS Mission Control
 ```
 
-The optional three-finger upward gesture opens the overview. With **System Settings →
-Trackpad → More Gestures → Mission Control** on three fingers, macOS recognizes the
-swipe and WinMuxX opens its overview in place of Mission Control, so the gesture starts,
-ignores resting fingers and settles exactly as Mission Control's does. Mission Control
-stays on its keyboard shortcut and its own swipes still work while it is open. Three
-fingers down closes the overview; with the overview closed, down stays with macOS (App
-Exposé when enabled), as does the whole gesture when the overview gesture is off.
-Natural scrolling is read for each swipe. With Mission Control on four fingers or off,
-the swipe up does not open the overview; use `workspace-overview` from a shortcut instead. The overview follows your fingers while swiping
-up or down; reversing a short swipe returns it to its starting state. Release
-settles with your swipe velocity. Hidden overview surfaces are reused between openings;
+Open the overview from a shortcut, the menu or the CLI; three-finger swipes up and down
+move between workspaces instead (see [Workspace swipes](#workspace-swipes)).
+Hidden overview surfaces are reused between openings;
 images and selection state are cleared on dismissal. Opening and closing use a spring
 timed by `animations.duration-ms`. The overview uses the expanded
 sidebar's translucent frosted material; Reduce Transparency supplies an opaque
 background. Reduce Motion and disabled
-animations skip motion. WinMuxX does not change macOS settings. Horizontal workspace swipes
-and the overview gesture can be enabled independently.
+animations skip motion. WinMuxX does not change macOS settings.
 
 Minimized windows, hidden apps, native full-screen windows and popups are excluded.
 Ordinary windows on inactive WinMuxX workspaces remain included. Previews are
@@ -711,32 +699,36 @@ layout; edge drops still split normally.
 ### Workspace swipes
 
 **Settings → Windows → Workspace swipes** enables three-finger
-workspace swipes. It is off by default:
+workspace swipes. Workspaces stack like the sidebar: swiping up brings the workspace
+below into view and swiping down the one above, sliding vertically. It is off by default:
 
 ```toml
 [workspace-swipe]
 enabled = false
 ```
 
-When **System Settings → Trackpad → More Gestures → Swipe between full-screen
-applications** uses three fingers, macOS recognizes the swipe and WinMuxX acts on it,
+When **System Settings → Trackpad → More Gestures → Mission Control** uses three
+fingers, macOS recognizes the swipe and WinMuxX acts on it,
 so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
 as in macOS. WinMuxX keeps the swipe from the Dock only when it switches a workspace:
 with no workspace that way, over a native full-screen app, while Mission Control is
-open or while WinMuxX is not taking swipes, macOS gets the swipe as usual. While a
+open or while WinMuxX is not taking swipes, macOS gets the swipe as usual, so Mission
+Control or App Exposé opens. Mission Control also stays on its keyboard shortcut, and
+three-finger left/right still switches macOS Spaces. While a
 window drag or the workspace overview is in progress, the swipe does nothing, so
-macOS does not switch Spaces underneath. macOS's own release speed decides a flick: a
+macOS does not open Mission Control underneath. macOS's own release speed decides a flick: a
 quick flick switches after a little travel, and flicking back cancels even past
 halfway. Quick swipes chain: a swipe begun while the previous switch is still landing
 waits for it, then continues from the workspace it reached. Natural
-scrolling sets the direction as it does for Spaces. An event tap reads macOS's
+scrolling sets the direction as it does for scrolling: the content follows your
+fingers. An event tap reads macOS's
 private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
 the Accessibility permission WinMuxX already has.
 
-Previews follow your three fingers proportionally after a small horizontal
+Previews follow your three fingers proportionally after a small vertical
 movement, without adding an easing animation to each input update. A short quick flick or a longer drag followed by release
 commits the switch. Pulling back before release reduces progress and can cancel it. Each gesture selects at most one adjacent
-workspace. Window dragging/resizing blocks it. With Swipe between full-screen apps on four
+workspace. Window dragging/resizing blocks it. With Mission Control on four
 fingers or off, WinMuxX does not take the swipe.
 
 Only snapshots move during the gesture; real workspace activation waits for release.

@@ -144,7 +144,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             let preview = WorkspaceSwipePreview(snapshots: snapshots)
             defer { preview.invalidate() }
             let picture = try image()
-            preview.begin(request: request(), front: picture, rect: rect, slidesLeft: true)
+            preview.begin(request: request(), front: picture, rect: rect, incomingFromBelow: true)
             preview.update(0.7)
             await fulfillment(of: [started], timeout: 2)
             XCTAssertTrue(preview.isActive, "Preparation must be cancellable before a panel exists")
@@ -169,7 +169,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         snapshots.cache.insert(picture, for: request().key)
         let preview = WorkspaceSwipePreview(snapshots: snapshots)
         defer { preview.invalidate() }
-        preview.begin(request: request(), front: picture, rect: rect, slidesLeft: true)
+        preview.begin(request: request(), front: picture, rect: rect, incomingFromBelow: true)
         XCTAssertTrue(preview.timings.last?.cacheHit == true)
         XCTAssertNotNil(preview.timings.last?.submissionMs, "Warm start must not await rendering")
         await fulfillment(of: [started], timeout: 2)
@@ -208,7 +208,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         snapshots.cache.insert(oldImage, for: request().key)
         let preview = WorkspaceSwipePreview(snapshots: snapshots)
         defer { preview.invalidate() }
-        preview.begin(request: request(), front: oldImage, rect: rect, slidesLeft: false) {
+        preview.begin(request: request(), front: oldImage, rect: rect, incomingFromBelow: false) {
             delivered.fulfill()
             return true
         }
@@ -237,7 +237,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             if warm { snapshots.cache.insert(picture, for: request().key) }
             let preview = WorkspaceSwipePreview(snapshots: snapshots)
             defer { preview.invalidate() }
-            preview.begin(request: request(), front: picture, rect: rect, slidesLeft: true) {
+            preview.begin(request: request(), front: picture, rect: rect, incomingFromBelow: true) {
                 delivered.fulfill()
                 return true
             }
@@ -258,7 +258,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         defer { preview.invalidate() }
         let picture = try image()
         let valid = OSAllocatedUnfairLock(initialState: true)
-        preview.begin(request: request(), front: picture, rect: rect, slidesLeft: true) {
+        preview.begin(request: request(), front: picture, rect: rect, incomingFromBelow: true) {
             delivered.fulfill()
             return valid.withLock { $0 }
         }
@@ -285,7 +285,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         let capture = WorkspaceSwipeSnapshotRequest(screenKey: request("source").key,
             rect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
         let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
-        preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+        preview.begin(request: request(), capture: capture, rect: rect, incomingFromBelow: true)
         XCTAssertTrue(preview.isActive)
         XCTAssertNil(preview.timings.last?.submissionMs)
         await fulfillment(of: [captured], timeout: 2)
@@ -296,13 +296,13 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         XCTAssertEqual(preview.timings.last?.captureMs, 120)
         let panel = try XCTUnwrap(NSApplication.shared.windows.first { !existing.contains(ObjectIdentifier($0)) && $0.isVisible })
         let layer = try XCTUnwrap(panel.contentView?.layer?.sublayers?.first)
-        XCTAssertEqual(layer.transform.m41, -rect.width * WorkspaceSwipePreviewGeometry.trackingProgress(0.6), accuracy: 0.001)
+        XCTAssertEqual(layer.transform.m42, rect.height * WorkspaceSwipePreviewGeometry.trackingProgress(0.6), accuracy: 0.001)
         preview.cancel()
         XCTAssertFalse(panel.isVisible)
         for layer in panel.contentView?.layer?.sublayers ?? [] {
             XCTAssertNil(layer.contents, "Hidden reusable panels must release old workspace pixels")
             XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
-            XCTAssertEqual(layer.transform.m41, 0)
+            XCTAssertEqual(layer.transform.m42, 0)
         }
         await gate.finish(WorkspaceId("target"), image: picture)
     }
@@ -322,7 +322,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
         await gate.finish(WorkspaceId("source"), image: picture)
         for _ in 0..<100 where !preview.hasTouchdownFront { await Task.yield() }
         XCTAssertTrue(preview.hasTouchdownFront)
-        preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+        preview.begin(request: request(), capture: capture, rect: rect, incomingFromBelow: true)
         XCTAssertNotNil(preview.timings.last?.submissionMs, "The direction shows the preview at once")
         XCTAssertFalse(preview.hasTouchdownFront, "A grab is used once")
         let requests = await gate.requests
@@ -341,7 +341,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             rect: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
         preview.prepareFront(capture)
         await fulfillment(of: [captured], timeout: 2)
-        preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+        preview.begin(request: request(), capture: capture, rect: rect, incomingFromBelow: true)
         XCTAssertTrue(preview.isActive)
         XCTAssertNil(preview.timings.last?.submissionMs)
         preview.update(0.3)
@@ -368,7 +368,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             let preview = WorkspaceSwipePreview(snapshots: snapshots)
             defer { preview.invalidate() }
             let capture = WorkspaceSwipeSnapshotRequest(screenKey: request("source").key, rect: .zero)
-            preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true)
+            preview.begin(request: request(), capture: capture, rect: rect, incomingFromBelow: true)
             await fulfillment(of: [captured], timeout: 2)
             preview.settle(commit: commit)
             snapshots.request(request("drain")) { _ in drained.fulfill() }
@@ -394,7 +394,7 @@ final class WorkspaceSwipeSnapshotsTest: XCTestCase {
             let preview = WorkspaceSwipePreview(snapshots: snapshots)
             defer { preview.invalidate() }
             let capture = WorkspaceSwipeSnapshotRequest(screenKey: request("source").key, rect: .zero)
-            preview.begin(request: request(), capture: capture, rect: rect, slidesLeft: true) {
+            preview.begin(request: request(), capture: capture, rect: rect, incomingFromBelow: true) {
                 validated.fulfill()
                 return !invalid
             }

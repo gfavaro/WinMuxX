@@ -16,7 +16,7 @@ Capture remains asynchronous and does not gate overview panel movement.
 `doctor` includes bounded (128 per stage) callback-to-update, overview setup-to-submission,
 swipe release-to-layout-ready and ordinary selection-to-layout-ready timings. Callback
 receipt uses the app's monotonic clock; private device timestamps are used only for
-velocity deltas. Horizontal callback-to-update includes updates during capture preparation,
+velocity deltas. Swipe callback-to-update includes updates during capture preparation,
 so it does not imply that a panel was visible. Layout readiness marks successful layout
 completion, not WindowServer presentation. No physical latency improvement is claimed
 without a new installed-build measurement.

@@ -43,8 +43,7 @@ final class WorkspaceOverviewPresentation {
         CATransaction.commit()
     }
 
-    func animate(_ panel: NSPanel, opening: Bool, velocity: Double = 0,
-                 completion: @escaping @MainActor () -> Void = {}) {
+    func animate(_ panel: NSPanel, opening: Bool, completion: @escaping @MainActor () -> Void = {}) {
         guard let view = panel.contentView else { completion(); return }
         view.wantsLayer = true
         guard let layer = view.layer else { completion(); return }
@@ -58,7 +57,6 @@ final class WorkspaceOverviewPresentation {
             apply(target, to: layer); completion(); return
         }
         let token = generation
-        let speed = CGFloat(velocity.isFinite ? min(8, max(-8, velocity)) : 0)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         CATransaction.setCompletionBlock { [weak self] in
@@ -67,43 +65,34 @@ final class WorkspaceOverviewPresentation {
                 completion()
             }
         }
-        let values: [(String, CGFloat, CGFloat, CGFloat, String)] = [
-            ("opacity", fromOpacity, target.opacity, speed, "workspaceOverviewOpacity"),
-            ("transform.scale", fromScale, target.scale, -0.035 * speed, "workspaceOverviewScale"),
-            ("transform.translation.y", fromY, target.translation, -view.bounds.height * 0.06 * speed, "workspaceOverviewTranslation"),
+        let values: [(String, CGFloat, CGFloat, String)] = [
+            ("opacity", fromOpacity, target.opacity, "workspaceOverviewOpacity"),
+            ("transform.scale", fromScale, target.scale, "workspaceOverviewScale"),
+            ("transform.translation.y", fromY, target.translation, "workspaceOverviewTranslation"),
         ]
         apply(target, to: layer)
-        for (keyPath, from, to, velocity, key) in values {
+        for (keyPath, from, to, key) in values {
             layer.add(WorkspaceGestureAnimation.settlingAnimation(keyPath: keyPath, from: from, to: to,
-                speed: velocity, duration: duration), forKey: key)
+                speed: 0, duration: duration), forKey: key)
         }
         CATransaction.commit()
     }
 }
 
 extension WorkspaceOverviewPanel: WorkspaceOverviewPresenting {
-    func present(key: Bool) { present(key: key, gestureProgress: nil) }
-
-    func present(key: Bool, gestureProgress: Double?) {
+    func present(key: Bool) {
         alphaValue = 1
         ignoresMouseEvents = false
-        presentation.update(self, progress: gestureProgress ?? 0)
-        if gestureProgress == nil { presentation.animate(self, opening: true) }
+        presentation.update(self, progress: 0)
+        presentation.animate(self, opening: true)
         orderFrontRegardless()
         if key { makeKey() }
     }
 
-    func updateGesture(progress: Double) { presentation.update(self, progress: progress) }
-    func settleGesture(velocity: Double) { presentation.animate(self, opening: true, velocity: velocity) }
-
     func dismissOverview(animated: Bool, completion: @escaping @MainActor () -> Void) {
-        dismissOverview(animated: animated, velocity: 0, completion: completion)
-    }
-
-    func dismissOverview(animated: Bool, velocity: Double, completion: @escaping @MainActor () -> Void) {
         ignoresMouseEvents = true
         resignKey()
-        if animated { presentation.animate(self, opening: false, velocity: velocity, completion: completion) }
+        if animated { presentation.animate(self, opening: false, completion: completion) }
         else { hideForReuse(); completion() }
     }
 

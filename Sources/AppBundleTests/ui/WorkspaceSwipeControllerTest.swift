@@ -12,7 +12,7 @@ private final class SwipePreviewSpy: WorkspaceSwipePreviewing {
     var releases: [Bool] = []
     var validity: (@MainActor () -> Bool)?
 
-    func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
+    func begin(on monitor: Monitor, target: Workspace, incomingFromBelow: Bool,
                isValid: @escaping @MainActor () -> Bool) {
         validity = isValid
         isActive = capturesAvailable
@@ -93,7 +93,7 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
 
     /// A macOS swipe toward the next workspace, most of the way across.
     private func begin(time: Double = 1) {
-        _ = controller.beginDockSwipe(slidesLeft: true, progress: 0.8, timestamp: time + 0.2)
+        _ = controller.beginDockSwipe(incomingFromBelow: true, progress: 0.8, timestamp: time + 0.2)
     }
 
     private func move(_ progress: Double, time: Double) {
@@ -123,10 +123,10 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     }
 
     func testMacOSSwipeSwitchesAndAnEdgeIsLeftToMacOS() async throws {
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: false, progress: 0.1, timestamp: 1), .unavailable,
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: false, progress: 0.1, timestamp: 1), .unavailable,
                        "No previous workspace: the swipe goes back to macOS")
         XCTAssertFalse(preview.isActive)
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         controller.updateDockSwipe(0.6, timestamp: 1.1)
         let started = expectation(description: "Navigation entered session")
         gate.started = started
@@ -149,9 +149,9 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     }
 
     func testAQuickSecondSwipeWaitsForTheFirstSwitchAndContinuesFromThere() async throws {
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         let first = try await startNavigation { controller.endDockSwipe(commit: true, timestamp: 1.2) }
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1.3), .started,
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1.3), .started,
                        "A swipe during the switch is kept, not dropped")
         controller.updateDockSwipe(0.7, timestamp: 1.4)
         controller.endDockSwipe(commit: true, timestamp: 1.45)
@@ -167,9 +167,9 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     }
 
     func testASecondSwipeStillMovingWhenTheFirstLandsFollowsTheFingers() async throws {
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         let first = try await startNavigation { controller.endDockSwipe(commit: true, timestamp: 1.2) }
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1.3), .started)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1.3), .started)
         controller.updateDockSwipe(0.3, timestamp: 1.4)
         await finish(first)
         XCTAssertTrue(preview.isActive, "The preview picks the swipe up once the first switch lands")
@@ -181,17 +181,17 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     }
 
     func testASecondSwipeTakenBackOrPastTheLastWorkspaceDoesNothing() async throws {
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .started)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         var landing = try await startNavigation { controller.endDockSwipe(commit: true, timestamp: 1.2) }
-        _ = controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1.3)
+        _ = controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1.3)
         controller.endDockSwipe(commit: false, timestamp: 1.4)
         await finish(landing)
         XCTAssertNil(controller.pending)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
 
-        _ = controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 2)
+        _ = controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 2)
         landing = try await startNavigation { controller.endDockSwipe(commit: true, timestamp: 2.2) }
-        _ = controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 2.3)
+        _ = controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 2.3)
         controller.endDockSwipe(commit: true, timestamp: 2.4)
         await finish(landing, id: 1)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[3])
@@ -201,10 +201,10 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     func testWhileWinMuxXCannotSwitchADragOrTheOverviewKeepsTheSwipeFromMacOS() {
         navigationAllowed = false
         XCTAssertEqual(controller.dockSwipeMayStart(), .unavailable)
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .unavailable)
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .unavailable)
         keepsSwipe = true
         XCTAssertEqual(controller.dockSwipeMayStart(), .ignored, "Decided at touchdown, before macOS sees any motion")
-        XCTAssertEqual(controller.beginDockSwipe(slidesLeft: true, progress: 0.1, timestamp: 1), .ignored,
+        XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .ignored,
                        "macOS does not switch Spaces under a drag or the overview")
         XCTAssertFalse(preview.isActive)
     }

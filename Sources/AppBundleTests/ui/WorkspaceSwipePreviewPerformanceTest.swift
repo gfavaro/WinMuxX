@@ -22,15 +22,15 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
         defer { preview.invalidate() }
         let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
         for stationary in [false, true] {
-            preview.begin(request: request, front: picture, rect: rect, slidesLeft: true)
+            preview.begin(request: request, front: picture, rect: rect, incomingFromBelow: true)
             let panel = try XCTUnwrap(NSApplication.shared.windows.first {
                 !existing.contains(ObjectIdentifier($0)) && $0.isVisible
             })
             let layer = try XCTUnwrap(panel.contentView?.layer?.sublayers?.first)
             preview.update(0.5, timestamp: 10)
-            XCTAssertEqual(layer.transform.m41, -100)
+            XCTAssertEqual(layer.transform.m42, 50)
             preview.update(0.4, timestamp: 10.05)
-            XCTAssertEqual(layer.transform.m41, -80)
+            XCTAssertEqual(layer.transform.m42, 40)
             XCTAssertTrue(layer.animationKeys()?.isEmpty ?? true)
             if stationary { preview.update(0.4, timestamp: 10.06) }
             preview.settle(commit: false, timestamp: 10.07)
@@ -60,7 +60,7 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
         defer { preview.invalidate() }
         snapshots.cache.insert(picture, for: key)
         for _ in 0..<31 {
-            preview.begin(request: request, front: picture, rect: rect, slidesLeft: true)
+            preview.begin(request: request, front: picture, rect: rect, incomingFromBelow: true)
             XCTAssertTrue(preview.isActive)
             XCTAssertNotNil(preview.timings.last?.panelMs)
             preview.update(0.4)
@@ -90,7 +90,7 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
             let request = WorkspaceSwipeSnapshotRequest(key: WorkspaceSwipeSnapshotKey(
                 workspace: WorkspaceId("target"), display: "synthetic", rect: CGRect(x: -20000, y: -20000, width: width, height: 90)))
             snapshots.cache.insert(picture, for: request.key)
-            preview.begin(request: request, front: picture, rect: rect, slidesLeft: index == 0)
+            preview.begin(request: request, front: picture, rect: rect, incomingFromBelow: index == 0)
             let panels = NSApplication.shared.windows.filter { !existing.contains(ObjectIdentifier($0)) && $0.isVisible }
             XCTAssertEqual(panels.count, 1)
             let panel = try XCTUnwrap(panels.first)
@@ -131,7 +131,7 @@ final class WorkspaceSwipePreviewPerformanceTest: WorkspaceTestCase {
                 defer { preview.invalidate() }
                 let existing = Set(NSApplication.shared.windows.map(ObjectIdentifier.init))
                 for cycle in 0..<50 {
-                    preview.begin(request: request, front: picture, rect: rect, slidesLeft: cycle.isMultiple(of: 2))
+                    preview.begin(request: request, front: picture, rect: rect, incomingFromBelow: cycle.isMultiple(of: 2))
                     let panel = try XCTUnwrap(NSApplication.shared.windows.first {
                         !existing.contains(ObjectIdentifier($0)) && $0.isVisible
                     })

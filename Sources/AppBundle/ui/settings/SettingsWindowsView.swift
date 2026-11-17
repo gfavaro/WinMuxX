@@ -7,7 +7,6 @@ struct ShortcutBehaviorSettingsView: View {
     @ObservedObject var model: ShortcutSettingsModel
     @SettingsDraft("window-tabs.enabled", load: { config.windowTabs.enabled }) private var tabEnabled: Bool
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
-    @SettingsDraft("workspace-overview.three-finger-up", load: { config.workspaceOverview.threeFingerUp }) private var overviewGesture: Bool
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
@@ -78,19 +77,16 @@ struct ShortcutBehaviorSettingsView: View {
 
             }
             SettingsSection("Workspace swipes") {
-                SettingsToggle(.workspaceSwipes, isOn: $workspaceSwipes, help: "Three-finger horizontal swipes switch existing workspaces on the display under the pointer. Stops at either end.") {
+                SettingsToggle(.workspaceSwipes, isOn: $workspaceSwipes, help: "Three-finger swipes up and down move to the workspace below or above, in sidebar order, on the display under the pointer. Stops at either end.") {
                     persistConfig(section: "workspace-swipe", key: "enabled", value: workspaceSwipes ? "true" : "false")
                 }
                 Text(DockWorkspaceSwipeSource.shared.status)
                     .font(.callout).foregroundStyle(.secondary)
-                Text("Needs Swipe between full-screen apps on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it; at the last workspace macOS gets the swipe. Normal two-finger scrolling stays with your apps.")
+                Text("Needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it. At the first or last workspace macOS gets the swipe, so Mission Control or App Exposé opens; Mission Control also stays on its keyboard shortcut. Normal two-finger scrolling stays with your apps.")
                     .font(.callout).foregroundStyle(.secondary)
             }
             SettingsSection("Workspace overview") {
-                SettingsToggle(.overviewGesture, isOn: $overviewGesture, help: "Show the current project's workspaces on each display.") {
-                    persistConfig(section: "workspace-overview", key: "three-finger-up", value: overviewGesture ? "true" : "false")
-                }
-                Text("Use workspace-overview from a shortcut or the CLI. The swipe needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes it and it opens the overview instead; Mission Control stays on its keyboard shortcut. Minimized windows, hidden apps and native full-screen windows are excluded.")
+                Text("Shows the current project's workspaces on each display. Open it with workspace-overview from a shortcut or the CLI. Minimized windows, hidden apps and native full-screen windows are excluded.")
                     .font(.callout).foregroundStyle(.secondary)
             }
 

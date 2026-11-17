@@ -3,9 +3,6 @@ import AppKit
 @MainActor var workspaceSwipeGestureEnabled: Bool {
     config.workspaceSwipe.enabled
 }
-@MainActor var workspaceOverviewGestureEnabled: Bool {
-    config.workspaceOverview.threeFingerUp
-}
 
 /// Composition boundary: input lifetime and arbitration stay outside individual features.
 @MainActor
@@ -13,9 +10,9 @@ final class WorkspaceGestureCoordinator {
     static let shared = WorkspaceGestureCoordinator()
     private var trackpadGestures: [Int] = []
 
-    /// macOS's three-finger gesture settings, which decide whether WinMuxX reads macOS's swipes.
+    /// macOS's three-finger up/down setting, which decides whether WinMuxX reads macOS's swipes.
     private static func readTrackpadGestures() -> [Int] {
-        ["TrackpadThreeFingerHorizSwipeGesture", "TrackpadThreeFingerVertSwipeGesture"].map(macTrackpadGesture)
+        ["TrackpadThreeFingerVertSwipeGesture"].map(macTrackpadGesture)
     }
 
     /// System Settings changes those gestures without telling other apps, so they are read again

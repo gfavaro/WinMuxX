@@ -3,8 +3,7 @@ import XCTest
 
 final class SetupCheckTest: XCTestCase {
     private let healthy = SetupCheckInput(accessibilityGranted: true, otherWindowManagers: [], workspaceSwipe: true,
-                                          overviewThreeFingerUp: false, macThreeFingerHorizontalSwipe: true,
-                                          macThreeFingerVerticalSwipe: false)
+                                          macThreeFingerVerticalSwipe: true)
 
     private func failing(_ input: SetupCheckInput) -> [String] { setupCheckItems(input).filter { !$0.ok }.map(\.id) }
 
@@ -21,27 +20,15 @@ final class SetupCheckTest: XCTestCase {
         XCTAssertNotNil(setupCheckItems(input).first { $0.id == "accessibility" }?.fixURL)
     }
 
-    func testTheSwipeNeedsMacOSThreeFingerSwipeAndPointsToTheSetting() {
+    func testTheSwipeNeedsMissionControlOnThreeFingersAndPointsToTheSetting() {
         var input = healthy
         let item = { setupCheckItems(input).first { $0.id == "three-finger-swipe" } }
         XCTAssertEqual(item()?.ok, true)
         XCTAssertNil(item()?.fixURL)
-        input.macThreeFingerHorizontalSwipe = false
+        input.macThreeFingerVerticalSwipe = false
         XCTAssertEqual(item()?.ok, false)
         XCTAssertNotNil(item()?.fixURL, "Trackpad settings fix it")
         input.workspaceSwipe = false
         XCTAssertNil(item())
-    }
-
-    func testTheSwipeUpNeedsMissionControlOnThreeFingers() {
-        var input = healthy
-        let item = { setupCheckItems(input).first { $0.id == "three-finger-up" } }
-        XCTAssertNil(item())
-        input.overviewThreeFingerUp = true
-        XCTAssertEqual(item()?.ok, false)
-        XCTAssertNotNil(item()?.fixURL)
-        input.macThreeFingerVerticalSwipe = true
-        XCTAssertEqual(item()?.ok, true)
-        XCTAssertNil(item()?.fixURL)
     }
 }

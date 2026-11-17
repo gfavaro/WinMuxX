@@ -5,7 +5,7 @@ import Common
 protocol WorkspaceSwipePreviewing: AnyObject {
     var isActive: Bool { get }
     var isSettling: Bool { get }
-    func begin(on monitor: Monitor, target: Workspace, slidesLeft: Bool,
+    func begin(on monitor: Monitor, target: Workspace, incomingFromBelow: Bool,
                isValid: @escaping @MainActor () -> Bool)
     func update(_ progress: Double, timestamp: Double)
     func settle(commit: Bool, timestamp: Double)
@@ -66,7 +66,7 @@ final class WorkspaceSwipeController {
     /// continues from the workspace that switch reached, as macOS chains quick swipes.
     private struct FollowUp {
         let displayPoint: CGPoint
-        let slidesLeft: Bool
+        let incomingFromBelow: Bool
         var progress: Double
         var timestamp: Double
         /// Set when the fingers lift: whether the swipe completes.
@@ -94,8 +94,6 @@ final class WorkspaceSwipeController {
 
     var canNavigate: Bool { dependencies.canNavigate() }
 
-    /// macOS recognized a three-finger swipe moving toward the next Space (`slidesLeft`) or
-    /// the previous one. With no workspace that way it belongs to macOS.
     /// Whether a macOS swipe may start here, before its direction is known.
     func dockSwipeMayStart() -> DockSwipeStart {
         canNavigate ? .started : dependencies.keepsSwipe() ? .ignored : .unavailable
@@ -109,19 +107,21 @@ final class WorkspaceSwipeController {
         dependencies.preview.prepareFront(on: monitor)
     }
 
-    func beginDockSwipe(slidesLeft: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
+    /// macOS recognized a three-finger swipe toward the workspace below (`incomingFromBelow`) or
+    /// the one above. With no workspace that way it belongs to macOS.
+    func beginDockSwipe(incomingFromBelow: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
         guard canNavigate else { return dockSwipeMayStart() }
         let point = dependencies.pointer()
         guard let monitor = dependencies.monitors().first(where: { $0.rect.contains(point) }) else { return .unavailable }
         if pending != nil {
-            followUps.append(FollowUp(displayPoint: monitor.rect.topLeftCorner, slidesLeft: slidesLeft,
+            followUps.append(FollowUp(displayPoint: monitor.rect.topLeftCorner, incomingFromBelow: incomingFromBelow,
                                       progress: progress, timestamp: timestamp))
             return .started
         }
-        let isNext = slidesLeft != dependencies.reversed()
+        let isNext = incomingFromBelow != dependencies.reversed()
         guard workspaceSwipeTarget(on: monitor, isNext: isNext) != nil else { return .unavailable }
         let request = WorkspaceSwipeRequest(displayPoint: monitor.rect.topLeftCorner, isNext: isNext,
-                                                       progress: progress, slidesLeft: slidesLeft)
+                                                       progress: progress, incomingFromBelow: incomingFromBelow)
         return begin(request, timestamp: timestamp) ? .started : .ignored
     }
 
@@ -151,7 +151,7 @@ final class WorkspaceSwipeController {
             guard next.commit != false, canNavigate,
                   let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == next.displayPoint }) else { continue }
             let request = WorkspaceSwipeRequest(displayPoint: next.displayPoint,
-                isNext: next.slidesLeft != dependencies.reversed(), progress: next.progress, slidesLeft: next.slidesLeft)
+                isNext: next.incomingFromBelow != dependencies.reversed(), progress: next.progress, incomingFromBelow: next.incomingFromBelow)
             guard workspaceSwipeTarget(on: monitor, isNext: request.isNext) != nil,
                   begin(request, timestamp: next.timestamp) else { continue }
             if next.commit == true { finish(commit: true, timestamp: next.timestamp) }
@@ -165,7 +165,7 @@ final class WorkspaceSwipeController {
               let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == request.displayPoint }),
               let target = workspaceSwipeTarget(on: monitor, isNext: request.isNext) else { return false }
         gesture = Gesture(displayPoint: request.displayPoint, source: monitor.activeWorkspace, target: target)
-        dependencies.preview.begin(on: monitor, target: target, slidesLeft: request.slidesLeft) { [weak self] in
+        dependencies.preview.begin(on: monitor, target: target, incomingFromBelow: request.incomingFromBelow) { [weak self] in
             guard let self, let gesture = self.gesture,
                   monitor.activeWorkspace === gesture.source else { return false }
             return self.gestureIsValid(gesture, on: monitor)
@@ -178,7 +178,7 @@ final class WorkspaceSwipeController {
         guard let gesture, let monitor = dependencies.monitors().first(where: { $0.rect.topLeftCorner == gesture.displayPoint }),
               monitor.activeWorkspace === gesture.source else { cancelVisualInteraction(); return }
         dependencies.preview.update(progress, timestamp: timestamp)
-        WorkspaceMotionDiagnostics.record("Horizontal callback to preview update", milliseconds: (CACurrentMediaTime() - receivedAt) * 1000)
+        WorkspaceMotionDiagnostics.record("Swipe callback to preview update", milliseconds: (CACurrentMediaTime() - receivedAt) * 1000)
     }
 
     private func finish(commit: Bool, timestamp: Double) {

@@ -36,7 +36,6 @@
     "display": {"type": "object", "patternProperties": {"^.+$": {"$ref": "#/$defs/windowWidthSettings"}}, "additionalProperties": false},
     "gaps": {"$ref": "#/$defs/gaps"},
     "workspace-swipe": {"$ref": "#/$defs/workspaceSwipe"},
-    "workspace-overview": {"type": "object", "properties": {"three-finger-up": {"type": "boolean"}}, "additionalProperties": false},
     "workspace-sidebar": {"$ref": "#/$defs/workspaceSidebar"},
     "menu-bar": {"type": "object", "properties": {"indicator": {"enum": ["icon", "workspace"]}, "icon-appearance": {"enum": ["color", "monochrome"]}}, "additionalProperties": false},
     "window-tabs": {"type": "object", "properties": {"enabled": {"type": "boolean"}, "height": {"type": "integer", "exclusiveMinimum": 20}, "double-sided-windows": {"type": "boolean"}}, "additionalProperties": false},

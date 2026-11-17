@@ -68,6 +68,7 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
         drag-stack-layout = 'tab-group'
         tab-group-padding = 30
         single-window-alignment = 'right'
+        workspace-overview.three-finger-up = true
         [master]
         ultrawide-mains = 2
         [window-tabs]
@@ -91,11 +92,16 @@ final class ConfigurationSourceTest: WorkspaceTestCase {
         XCTAssertTrue(migrated.contains("# Keep this comment"))
         for key in ["focus-follows-mouse-dwell", "drag-stack-layout", "tab-group-padding", "single-window-alignment",
                     "ultrawide-mains", "style =", "hover-bar", "reverse-direction", "animation-duration-ms",
-                    "hover-open-delay-ms", "menu-bar-reserve-height", "show-status-pills", "project-deletion-action"] {
+                    "hover-open-delay-ms", "menu-bar-reserve-height", "show-status-pills", "project-deletion-action",
+                    "workspace-overview", "three-finger-up"] {
             XCTAssertFalse(migrated.contains(key), "\(key):\n\(migrated)")
         }
         XCTAssertTrue(parseConfig(migrated).errors.isEmpty, "\(parseConfig(migrated).errors)")
         XCTAssertEqual(try removingRetiredConfigKeys(in: migrated), migrated)
+
+        let overviewTable = try removingRetiredConfigKeys(in: "[workspace-overview]\nthree-finger-up = true\n")
+        XCTAssertFalse(overviewTable.contains("workspace-overview"), overviewTable)
+        XCTAssertTrue(parseConfig(overviewTable).errors.isEmpty)
     }
 
     func testLaunchMigrationRemovesRetiredOptionsBeforeConfigLoad() throws {

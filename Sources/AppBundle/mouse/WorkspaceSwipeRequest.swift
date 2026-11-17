@@ -5,5 +5,5 @@ struct WorkspaceSwipeRequest: Equatable {
     let displayPoint: CGPoint
     let isNext: Bool
     let progress: Double
-    let slidesLeft: Bool
+    let incomingFromBelow: Bool
 }

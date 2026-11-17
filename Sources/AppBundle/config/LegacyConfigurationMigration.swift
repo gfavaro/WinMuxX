@@ -61,6 +61,7 @@ func removingRetiredConfigKeys(in text: String) throws -> String {
         ["focus-follows-mouse-dwell"], ["drag-stack-layout"], ["tab-group-padding"],
         ["master", "ultrawide-mains"], ["master", "stack-layout"], ["window-tabs", "style"], ["hover-bar", "enabled"],
         ["workspace-swipe", "reverse-direction"], ["workspace-swipe", "animation-duration-ms"],
+        ["workspace-overview", "three-finger-up"],
         ["workspace-sidebar", "hover-open-delay-ms"], ["workspace-sidebar", "menu-bar-reserve-height"],
         ["workspace-sidebar", "show-status-pills"], ["workspace-sidebar", "project-deletion-action"],
     ]
@@ -71,12 +72,15 @@ func removingRetiredConfigKeys(in text: String) throws -> String {
         result = removeSettingsConfigValue(in: result, section: nil, key: fullyQualifiedKey)
     }
 
-    // The hover bar is fixed on, so its former table is no longer recognized.
-    let lines = result.components(separatedBy: "\n")
-    let statements = settingsTomlStatements(lines)
-    guard !statements.contains(where: { $0.keyPath?.first == "hover-bar" }) else { return result }
-    let headerLines = Set(statements.filter { $0.headerPath == ["hover-bar"] }.map(\.start))
-    result = lines.enumerated().filter { !headerLines.contains($0.offset) }.map(\.element).joined(separator: "\n")
+    // The hover bar is fixed on, and three-finger up/down now switches workspaces instead of
+    // opening the overview, so these former tables are no longer recognized.
+    for table in ["hover-bar", "workspace-overview"] {
+        let lines = result.components(separatedBy: "\n")
+        let statements = settingsTomlStatements(lines)
+        guard !statements.contains(where: { $0.keyPath?.first == table }) else { continue }
+        let headerLines = Set(statements.filter { $0.headerPath == [table] }.map(\.start))
+        result = lines.enumerated().filter { !headerLines.contains($0.offset) }.map(\.element).joined(separator: "\n")
+    }
     return result
 }
 

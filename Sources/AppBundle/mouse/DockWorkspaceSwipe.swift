@@ -1,7 +1,7 @@
 import AppKit
 import Common
 
-// macOS's own three-finger swipes drive workspace swipes and the workspace overview, so
+// macOS's own three-finger up/down swipe drives workspace swipes, so
 // recognition (start distance, resting palms and thumbs, flicks, taking a swipe back) is
 // exactly native. macOS turns each gesture into private Dock swipe events; a session event
 // tap keeps the ones WinMuxX acts on from the Dock and hands the rest back untouched.
@@ -213,7 +213,7 @@ struct DockSwipeSummary: Equatable {
     var outcome = "none"
 }
 
-/// Horizontal swipes switch workspaces on the display under the pointer.
+/// Vertical swipes move between a display's workspaces in sidebar order, under the pointer.
 @MainActor
 final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
     func dockSwipeMayStart() -> DockSwipeStart {
@@ -227,9 +227,13 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
         return .started
     }
 
-    /// Positive progress heads for the next Space, following Natural scrolling already.
+    /// Vertical progress follows Natural scrolling: negative is the content moving up, which
+    /// brings the workspace below into view, with either setting.
+    nonisolated static func incomingFromBelow(positive: Bool) -> Bool { !positive }
+
     func dockSwipeBegan(positive: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
-        WorkspaceSwipeController.shared.beginDockSwipe(slidesLeft: positive, progress: progress, timestamp: timestamp)
+        WorkspaceSwipeController.shared.beginDockSwipe(incomingFromBelow: Self.incomingFromBelow(positive: positive),
+                                                       progress: progress, timestamp: timestamp)
     }
 
     func dockSwipeChanged(_ progress: Double, timestamp: Double) {
@@ -241,93 +245,14 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
     }
 }
 
-/// Vertical swipes open the overview (up) and close it (down) in place of Mission Control.
-@MainActor
-final class DockOverviewSwipeReceiver: DockSwipeReceiver {
-    @MainActor
-    struct Dependencies {
-        var canStart: () -> Bool
-        var enabled: () -> Bool
-        var isOpen: () -> Bool
-        var naturalScrolling: () -> Bool
-        var begin: (_ opening: Bool, _ progress: Double) -> Bool
-        var update: (Double) -> Void
-        var end: (_ commit: Bool, _ velocity: Double) -> Void
-        var show: () -> Void
-        var hide: () -> Void
-
-        static var live: Self {
-            let overview = WorkspaceOverviewController.shared
-            return Self(
-                canStart: {
-                    isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled && !WindowBorderController.shared.isMissionControlActive &&
-                        !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress()
-                },
-                enabled: { workspaceOverviewGestureEnabled }, isOpen: { overview.isOpen },
-                naturalScrolling: naturalScrollingEnabled,
-                begin: { overview.beginGesture(opening: $0, progress: $1) }, update: { overview.updateGesture(progress: $0) },
-                end: { overview.endGesture(commit: $0, velocity: $1) },
-                show: { _ = overview.show() }, hide: { overview.dismiss() })
-        }
-    }
-    private let dependencies: Dependencies
-    private var natural = true
-    private var opens = false
-    private var interactive = false
-
-    init(dependencies: Dependencies = .live) { self.dependencies = dependencies }
-
-    func dockSwipeMayStart() -> DockSwipeStart {
-        guard dependencies.canStart() else { return .unavailable }
-        // Read once per gesture so a changed setting applies without a restart.
-        natural = dependencies.naturalScrolling()
-        return .started
-    }
-
-    /// Vertical progress follows Natural scrolling: with it on, fingers moving up report negative.
-    func dockSwipeBegan(positive: Bool, progress: Double, timestamp: Double) -> DockSwipeStart {
-        let up = natural ? !positive : positive
-        if dependencies.isOpen() {
-            // Further up has nothing to open; Mission Control stays out from over the overview.
-            guard !up else { return .ignored }
-            opens = false
-        } else {
-            // Down (App Exposé) and a disabled overview stay with macOS.
-            guard up, dependencies.enabled() else { return .unavailable }
-            opens = true
-        }
-        interactive = dependencies.begin(opens, progress)
-        return .started
-    }
-
-    func dockSwipeChanged(_ progress: Double, timestamp: Double) {
-        if interactive { dependencies.update(progress) }
-    }
-
-    func dockSwipeEnded(commit: Bool, progress: Double, velocity: Double, timestamp: Double) {
-        // Closing takes less travel than opening.
-        let commits = commit || (!opens && progress >= 0.25)
-        if interactive {
-            interactive = false
-            dependencies.end(commits, velocity)
-        } else if commits {
-            if opens { dependencies.show() } else { dependencies.hide() }
-        }
-    }
-}
-
 @MainActor
 final class DockWorkspaceSwipeSource {
     static let shared = DockWorkspaceSwipeSource()
     private(set) var status = "Disabled"
-    /// macOS's three-finger horizontal swipe switches workspaces.
-    private(set) var readsHorizontal = false
-    /// macOS's three-finger vertical swipe opens and closes the overview.
+    /// macOS's three-finger up/down swipe switches workspaces; left/right stays with macOS.
     private(set) var readsVertical = false
-    private var horizontal = DockSwipeTracker()
     private var vertical = DockSwipeTracker()
     private let workspaces = DockWorkspaceSwipeReceiver()
-    private let overview = DockOverviewSwipeReceiver()
     private var held: [CGEvent] = []
     private var dockTap: (port: CFMachPort, source: CFRunLoopSource)?
     private var envelopeTap: (port: CFMachPort, source: CFRunLoopSource)?
@@ -337,16 +262,14 @@ final class DockWorkspaceSwipeSource {
     /// launch. Each one drops the swipe in progress.
     private(set) var tapTimeouts = 0
 
-    var horizontalSummary: DockSwipeSummary { horizontal.summary }
     var verticalSummary: DockSwipeSummary { vertical.summary }
 
     func syncConfiguration() {
         stop()
         guard !isUnitTest else { return }
-        let wantsHorizontal = workspaceSwipeGestureEnabled && macTrackpadGesture("TrackpadThreeFingerHorizSwipeGesture") == 2
-        let wantsVertical = workspaceOverviewGestureEnabled && macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2
-        guard wantsHorizontal || wantsVertical else {
-            if workspaceSwipeGestureEnabled || workspaceOverviewGestureEnabled { status = "Set macOS trackpad gestures to three fingers to use these swipes" }
+        guard workspaceSwipeGestureEnabled else { return }
+        guard macTrackpadGesture("TrackpadThreeFingerVertSwipeGesture") == 2 else {
+            status = "Set macOS Mission Control to a three-finger swipe up to use workspace swipes"
             return
         }
         let dock = makeTap(type: Self.dockControl)
@@ -358,10 +281,8 @@ final class DockWorkspaceSwipeSource {
         dockTap = dock
         envelopeTap = envelope
         CGEvent.tapEnable(tap: envelope.port, enable: false)
-        readsHorizontal = wantsHorizontal
-        readsVertical = wantsVertical
-        status = "Reading macOS three-finger swipes " + [wantsHorizontal ? "left/right" : nil, wantsVertical ? "up/down" : nil]
-            .compactMap(\.self).joined(separator: " and ")
+        readsVertical = true
+        status = "Reading macOS three-finger swipes up/down"
         for name in [NSWorkspace.didWakeNotification, NSWorkspace.screensDidWakeNotification, NSWorkspace.sessionDidBecomeActiveNotification] {
             wakeObservers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: name, object: nil, queue: .main) { _ in
                 MainActor.assumeIsolated { DockWorkspaceSwipeSource.shared.reviveIfNeeded() }
@@ -375,7 +296,6 @@ final class DockWorkspaceSwipeSource {
         dockTap = nil
         envelopeTap = nil
         envelopeEnabled = false
-        readsHorizontal = false
         readsVertical = false
         wakeObservers.forEach(NSWorkspace.shared.notificationCenter.removeObserver)
         wakeObservers.removeAll()
@@ -383,8 +303,7 @@ final class DockWorkspaceSwipeSource {
     }
 
     private func abandon() {
-        horizontal.abandon(workspaces)
-        vertical.abandon(overview)
+        vertical.abandon(workspaces)
         held.removeAll()
     }
 
@@ -424,16 +343,16 @@ final class DockWorkspaceSwipeSource {
             return false
         }
         defer {
-            setEnvelope(horizontal.ownsGesture || horizontal.isUndecided || vertical.ownsGesture || vertical.isUndecided)
+            setEnvelope(vertical.ownsGesture || vertical.isUndecided)
         }
         let subtype = event.getIntegerValueField(Self.field(Self.eventTypeField))
         if subtype == Self.gesture {
             // Held in order with the swipe, so a swipe handed back reaches the Dock whole.
-            if horizontal.isUndecided || vertical.isUndecided {
+            if vertical.isUndecided {
                 if let copy = event.copy() { held.append(copy) }
                 return true
             }
-            return horizontal.ownsGesture || vertical.ownsGesture
+            return vertical.ownsGesture
         }
         // Physical swipes come from the HID system; another app's synthetic ones are not ours.
         guard subtype == Self.dockControl,
@@ -444,17 +363,9 @@ final class DockWorkspaceSwipeSource {
         let time = Double(event.timestamp) / 1_000_000_000
         // A late event means WinMuxX's main thread was busy: the preview stalls, then jumps.
         WorkspaceMotionDiagnostics.record("macOS swipe event to WinMuxX", milliseconds: (CACurrentMediaTime() - time) * 1000)
-        let verdict: DockSwipeTracker.Verdict
-        switch event.getIntegerValueField(Self.field(Self.swipeMotion)) {
-            case Self.motionHorizontal where readsHorizontal:
-                verdict = horizontal.receive(phase: phase, progress: progress,
-                                             endVelocity: event.getDoubleValueField(Self.field(Self.velocityX)), timestamp: time, to: workspaces)
-            case Self.motionVertical where readsVertical:
-                verdict = vertical.receive(phase: phase, progress: progress,
-                                           endVelocity: event.getDoubleValueField(Self.field(Self.velocityY)), timestamp: time, to: overview)
-            default:
-                return false
-        }
+        guard readsVertical, event.getIntegerValueField(Self.field(Self.swipeMotion)) == Self.motionVertical else { return false }
+        let verdict = vertical.receive(phase: phase, progress: progress,
+                                       endVelocity: event.getDoubleValueField(Self.field(Self.velocityY)), timestamp: time, to: workspaces)
         switch verdict {
             case .pass:
                 held.removeAll()
@@ -487,7 +398,7 @@ final class DockWorkspaceSwipeSource {
     private static let eventTypeField = 55, hidType = 110, swipeMotion = 123, progress = 124
     private static let velocityX = 129, velocityY = 130, phase = 132
     private static let gesture: Int64 = 29, dockControl: Int64 = 30, dockSwipe: Int64 = 23
-    private static let motionHorizontal: Int64 = 1, motionVertical: Int64 = 2
+    private static let motionVertical: Int64 = 2
     private static func field(_ raw: Int) -> CGEventField { CGEventField(rawValue: UInt32(raw))! }
 }
 

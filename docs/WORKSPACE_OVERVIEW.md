@@ -62,19 +62,10 @@ window without saved geometry. Native editors keep composition and editing comma
 modified shortcuts are not treated as plain grid navigation. Arrow keys, Tab and
 Shift-Tab retain the workspace/window navigation behavior.
 
-`workspace-overview [show|hide|toggle]` defaults to toggle. The optional
-`workspace-overview.three-finger-up` setting defaults to false. It uses macOS's
-own three-finger swipe up, so it needs Mission Control on three fingers in Trackpad
-settings. Once recognized, progress remains continuous and can reverse before release.
-With motion enabled, vertical gestures present the overview during the swipe: upward motion reveals it,
-and downward motion withdraws it. Progress updates only existing panel layers;
-there are no per-frame model publications, layouts, screenshots or window writes.
-Release settles from the current presentation using the shared spring, configured
-duration and bounded release velocity. Short reversed/cancelled opening gestures
-dismiss their provisional session; cancelled closing gestures settle the same
-session back open. Reset cancels the interaction rather than triggering a late open. With motion disabled, gestures retain release-only actions. Downward dismissal has a shorter threshold and remains
-available whenever the overview is open, including command-opened sessions with
-upward activation disabled.
+`workspace-overview [show|hide|toggle]` defaults to toggle. Since 2026-11-16 the overview
+has no trackpad gesture: three-finger up/down switches workspaces instead (README,
+Workspace swipes), and the former `workspace-overview.three-finger-up` key is removed
+from existing configuration on load.
 
 Project/display changes, native Mission Control, native Space changes, sleep,
 session deactivation, runtime disablement and activating another app dismiss the
