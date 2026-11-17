@@ -2,6 +2,9 @@ extension Workspace {
     @MainActor func normalizeContainers() {
         if preservesTopLevelGroups {
             rootTilingContainer.removeEmptyArrangementContainers()
+            // Group boundaries stay as they are, but a split left holding a single child marks
+            // none: without this, the one-child wrappers Dwindle leaves behind would pile up.
+            rootTilingContainer.flattenSingleChildWrappers()
             normalizeMasterLayout()
             return
         }
@@ -21,6 +24,28 @@ extension TilingContainer {
             (child as? TilingContainer)?.removeEmptyArrangementContainers()
         }
         if children.isEmpty && !isRootContainer { unbindFromParent() }
+    }
+
+    /// Replaces every split below the root that holds a single child with that child, which takes
+    /// the split's place, share and saved column widths; tab groups stay, being one column of tabs.
+    @MainActor fileprivate func flattenSingleChildWrappers() {
+        for child in children {
+            (child as? TilingContainer)?.flattenSingleChildWrappers()
+        }
+        guard !isRootContainer, layout != .tabGroup, let only = children.singleOrNil(),
+              let parent = parent as? TilingContainer else { return }
+        let ratios = parent.dwindleSplitRatios
+        let siblingRatios = parent.dwindleChildRatios
+        let wasMostRecent = parent.mostRecentChild === self
+        let columnWidth = scrollingColumnWidth, stripWidth = stripColumnWidth
+        only.unbindFromParent()
+        let binding = unbindFromParent()
+        only.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+        if only.scrollingColumnWidth == nil { only.scrollingColumnWidth = columnWidth }
+        if only.stripColumnWidth == nil { only.stripColumnWidth = stripWidth }
+        parent.dwindleSplitRatios = ratios
+        parent.dwindleChildRatios = siblingRatios
+        if wasMostRecent { only.markAsMostRecentChild() }
     }
 
     @MainActor fileprivate func unbindEmptyAndAutoFlatten() {

@@ -103,10 +103,13 @@ final class MasterLayoutTest: WorkspaceTestCase {
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
         root.layout = .tiles
+        // Two windows in each group, so the groups are real splits rather than one-child wrappers.
         let firstGroup = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tiles, index: 0)
         let first = TestWindow.new(id: 74101, parent: firstGroup)
+        _ = TestWindow.new(id: 74103, parent: firstGroup)
         let secondGroup = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tiles, index: 1)
         let second = TestWindow.new(id: 74102, parent: secondGroup)
+        _ = TestWindow.new(id: 74104, parent: secondGroup)
         workspace.arrangement = .master
         workspace.masterGroupIndex = 0
         let promotion = try await run("swap-with-master --window-id \(second.windowId)")
