@@ -53,18 +53,7 @@ func workspaceSiblingInsertionRoot(_ workspace: Workspace, orientation: Orientat
         return root
     }
     guard root.layout == .tabGroup || orientation.map({ root.orientation != $0 }) == true else { return root }
-
-    let previousRoot = root
-    previousRoot.unbindFromParent()
-    _ = TilingContainer(
-        parent: workspace,
-        adaptiveWeight: WEIGHT_AUTO,
-        orientation ?? previousRoot.orientation.opposite,
-        .tiles,
-        index: 0,
-    )
-    previousRoot.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
-    return workspace.rootTilingContainer
+    return workspace.wrapRootTilingContainer(orientation: orientation ?? root.orientation.opposite)
 }
 
 @MainActor

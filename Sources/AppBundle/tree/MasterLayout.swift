@@ -9,7 +9,8 @@ extension Workspace {
         // A strip pan in progress ends with its strip.
         scrollingGestureMotionActive = false
         scrollingGestureSessionID = nil
-        if next != .dwindle { preserveAtomicRootAsArrangementGroup() }
+        // A root tab group is kept whole, as one group of the arrangement.
+        if next != .dwindle { ensureRootSupportsColumns(self) }
         let entering = arrangement != next
         arrangement = next
         if next == .tabbed {
@@ -22,16 +23,6 @@ extension Workspace {
            let index = workspaceLayoutUnits.firstIndex(where: { $0 === focused.topLevelWorkspaceGroup }) {
             masterGroupIndex = index
         }
-    }
-
-    @MainActor
-    private func preserveAtomicRootAsArrangementGroup() {
-        let previousRoot = rootTilingContainer
-        guard previousRoot.layout == .tabGroup else { return }
-        let orientation = previousRoot.orientation
-        previousRoot.unbindFromParent()
-        let outer = TilingContainer(parent: self, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)
-        previousRoot.bind(to: outer, adaptiveWeight: WEIGHT_AUTO, index: 0)
     }
 
     @MainActor

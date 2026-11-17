@@ -146,25 +146,14 @@ private func bindingDataAfterTabGroup(workspace: Workspace, tabGroup: TilingCont
         case .tilingContainer(let parent):
             return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: insertionAnchor.ownIndex.orDie() + 1)
         case .workspace:
-            ensureTabGroupAnchorHasWorkspaceRootContainer(workspace: workspace, insertionAnchor: insertionAnchor, tabGroup: tabGroup)
+            if workspace.rootTilingContainer === insertionAnchor {
+                workspace.wrapRootTilingContainer(orientation: tabGroup.orientation.opposite)
+            }
             return BindingData(parent: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         case .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
              .macosHiddenAppsWindowsContainer, .macosPopupWindowsContainer:
             die("Impossible insertion parent for tiling window")
     }
-}
-
-@MainActor
-private func ensureTabGroupAnchorHasWorkspaceRootContainer(
-    workspace: Workspace,
-    insertionAnchor: TreeNode,
-    tabGroup: TilingContainer,
-) {
-    let previousRoot = workspace.rootTilingContainer
-    guard previousRoot === insertionAnchor else { return }
-    previousRoot.unbindFromParent()
-    _ = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, tabGroup.orientation.opposite, .tiles, index: 0)
-    previousRoot.bind(to: workspace.rootTilingContainer, adaptiveWeight: WEIGHT_AUTO, index: 0)
 }
 
 /// Whether halving a tile of `size` along its longer side, as Dwindle does for a new window,

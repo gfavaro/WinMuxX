@@ -138,18 +138,6 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
 }
 
 @MainActor
-@discardableResult
-func ensureRootSupportsColumns(_ workspace: Workspace) -> TilingContainer {
-    let previousRoot = workspace.rootTilingContainer
-    guard previousRoot.layout == .tabGroup else { return previousRoot }
-    let orientation = previousRoot.orientation
-    previousRoot.unbindFromParent()
-    let root = TilingContainer(parent: workspace, adaptiveWeight: WEIGHT_AUTO, orientation, .tiles, index: 0)
-    previousRoot.bind(to: root, adaptiveWeight: WEIGHT_AUTO, index: 0)
-    return root
-}
-
-@MainActor
 private func swapMasterAware(_ window: Window, _ neighbor: Window, in workspace: Workspace) {
     let mine = window.topLevelWorkspaceGroup
     let theirs = neighbor.topLevelWorkspaceGroup
