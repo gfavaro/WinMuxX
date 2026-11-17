@@ -65,8 +65,8 @@ extension Workspace {
             case .subtract(let value): -CGFloat(value)
         }
         let isPrimary = workspaceLayoutUnits[masterGroupIndex] === frame.node
-        let ratio = masterRatio ?? CGFloat(config.master.size)
-        masterRatio = min(max(ratio + (isPrimary ? delta : -delta) / extent, 0.1), 0.9)
+        let ratio = masterState.ratio ?? CGFloat(config.master.size)
+        masterState.ratio = min(max(ratio + (isPrimary ? delta : -delta) / extent, 0.1), 0.9)
         return true
     }
 

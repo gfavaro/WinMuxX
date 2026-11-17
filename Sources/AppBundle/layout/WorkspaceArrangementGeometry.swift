@@ -39,7 +39,7 @@ extension Workspace {
                 if groups.count == 1 { return [.init(node: groups[primary], physical: rect, virtual: rect, stackingIndex: 0)] }
                 let axis = config.master.side.orientation
                 let stack = groups.indices.filter { $0 != primary }.map { groups[$0] }
-                let ratio = masterRatio.flatMap { $0.isFinite ? min(max($0, 0.1), 0.9) : nil } ?? CGFloat(config.master.size)
+                let ratio = masterState.ratio.flatMap { $0.isFinite ? min(max($0, 0.1), 0.9) : nil } ?? CGFloat(config.master.size)
                 let mainFrames = TileLayoutGeometry.calculate(TileLayoutInput(
                     origin: rect.topLeftCorner, size: rect.size, horizontal: axis == .h,
                     innerGap: CGFloat(gaps.inner.get(axis)), weights: [ratio, 1 - ratio],

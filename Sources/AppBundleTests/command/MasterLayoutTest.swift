@@ -162,7 +162,7 @@ final class MasterLayoutTest: WorkspaceTestCase {
         let restored = try await restoreFrozenWorldIfNeeded(world, newlyDetectedWindow: primary, restoreVisibleWorkspaces: false)
         XCTAssertTrue(restored)
         XCTAssertEqual(workspace.arrangement, .master)
-        XCTAssertEqual(workspace.masterRatio, 0.72)
+        XCTAssertEqual(workspace.masterState.ratio, 0.72)
         XCTAssertEqual(workspace.rootTilingContainer.layout, .dwindle)
         XCTAssertFalse(workspace.rootTilingContainer.children.contains { ($0 as? TilingContainer)?.isMasterStack == true })
         let restoredTabs = try XCTUnwrap(workspace.rootTilingContainer.allTabbedContainersRecursive.first)

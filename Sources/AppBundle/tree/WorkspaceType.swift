@@ -26,24 +26,25 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     }
     /// What the Scrolling arrangement keeps for this workspace.
     var scrollingState = ScrollingWorkspaceState()
-    private var savedMasterGroupIndex = 0
-    private weak var masterGroup: TreeNode?
+    /// What the Master arrangement keeps for this workspace.
+    var masterState = MasterWorkspaceState()
+    /// The main group's place among the groups. The group itself is followed, so the main window
+    /// stays main when groups before it come and go.
     @MainActor var masterGroupIndex: Int {
         get {
             let groups = workspaceLayoutUnits
-            let index = masterGroup.flatMap { selected in groups.firstIndex { $0 === selected } }
-                ?? min(max(savedMasterGroupIndex, 0), max(groups.count - 1, 0))
-            savedMasterGroupIndex = index
-            masterGroup = groups.indices.contains(index) ? groups[index] : nil
+            let index = masterState.mainGroup.flatMap { selected in groups.firstIndex { $0 === selected } }
+                ?? min(max(masterState.savedGroupIndex, 0), max(groups.count - 1, 0))
+            masterState.savedGroupIndex = index
+            masterState.mainGroup = groups.indices.contains(index) ? groups[index] : nil
             return index
         }
         set {
-            savedMasterGroupIndex = newValue
+            masterState.savedGroupIndex = newValue
             let groups = workspaceLayoutUnits
-            masterGroup = groups.indices.contains(newValue) ? groups[newValue] : nil
+            masterState.mainGroup = groups.indices.contains(newValue) ? groups[newValue] : nil
         }
     }
-    var masterRatio: CGFloat?
 
     @MainActor
     private init(_ name: String) {

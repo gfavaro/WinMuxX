@@ -32,7 +32,7 @@ final class WorkspaceArrangementRegressionTest: WorkspaceTestCase {
         let primary = TestWindow.new(id: 94615, parent: root)
         let other = TestWindow.new(id: 94616, parent: root)
         workspace.arrangement = .master
-        workspace.masterRatio = 0.7
+        workspace.masterState.ratio = 0.7
         for (side, direction): (MasterSide, CardinalDirection) in [(.left, .right), (.right, .left), (.top, .down), (.bottom, .up)] {
             config.master.side = side
             _ = primary.focusWindow()
@@ -110,7 +110,7 @@ final class WorkspaceArrangementRegressionTest: WorkspaceTestCase {
         _ = primary.focusWindow()
         try await workspace.layoutWorkspace()
         _ = try await run("resize width +100")
-        let ratio = try XCTUnwrap(workspace.masterRatio)
+        let ratio = try XCTUnwrap(workspace.masterState.ratio)
         workspace.arrangement = .dwindle
         let frozen = try JSONDecoder().decode(FrozenWorkspace.self, from: JSONEncoder().encode(FrozenWorkspace(workspace)))
         let restored = try await restoreFrozenWorldIfNeeded(
@@ -118,7 +118,7 @@ final class WorkspaceArrangementRegressionTest: WorkspaceTestCase {
             newlyDetectedWindow: primary, restoreVisibleWorkspaces: false)
         XCTAssertTrue(restored)
         XCTAssertEqual(workspace.arrangement, .dwindle)
-        XCTAssertEqual(workspace.masterRatio, ratio)
+        XCTAssertEqual(workspace.masterState.ratio, ratio)
         XCTAssertTrue(workspace.preservesTopLevelGroups)
         workspace.normalizeContainers()
         XCTAssertEqual(workspace.rootTilingContainer.children.count, 2)

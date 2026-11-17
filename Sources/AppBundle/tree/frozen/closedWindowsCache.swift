@@ -67,7 +67,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         arrangement = workspace.arrangement
         preservesTopLevelGroups = workspace.preservesTopLevelGroups
         masterGroupIndex = workspace.masterGroupIndex
-        masterRatio = workspace.masterRatio
+        masterRatio = workspace.masterState.ratio
         tabbedLayout = workspace.tabbedState.layout.map(FrozenTabbedLayout.init)
         scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingState.offset : nil
         if let window {
@@ -210,7 +210,7 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
         let workspace = Workspace.get(byName: frozenWorkspace.name)
         workspace.arrangement = frozenWorkspace.arrangement ?? (frozenWorkspace.rootTilingNode.layout == .master ? .master : .dwindle)
         workspace.preservesTopLevelGroups = (frozenWorkspace.preservesTopLevelGroups ?? false) || workspace.arrangement != .dwindle
-        workspace.masterRatio = frozenWorkspace.masterRatio
+        workspace.masterState.ratio = frozenWorkspace.masterRatio
         if let offset = frozenWorkspace.scrollingOffset, offset.isFinite { workspace.scrollingState.offset = offset }
         workspace.assignProject(frozenWorkspace.projectId)
         workspace.restoreNamingStyle(frozenWorkspace.namingStyle)
@@ -342,7 +342,7 @@ func applyFrozenWindowState(_ window: Window, _ frozenWindow: FrozenWindow) {
 func migrateLegacyMasterTree(_ workspace: Workspace) {
     let root = workspace.rootTilingContainer
     guard root.layout == .master else { return }
-    workspace.masterRatio = root.masterRatio
+    workspace.masterState.ratio = root.masterRatio
     let stack = root.children.compactMap { $0 as? TilingContainer }.first(where: \.isMasterStack)
     if let stack {
         let groups = stack.children
