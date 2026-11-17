@@ -20,14 +20,6 @@ struct WindowTabStripScrollFadeMask: View {
     }
 }
 
-struct WindowTabStripScrollContentFramePreferenceKey: PreferenceKey {
-    static let defaultValue: CGRect = .zero
-
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
-
 struct WindowTabGroupHandleView: View {
     @SidebarColors var colors
     let windowId: UInt32?

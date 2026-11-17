@@ -173,12 +173,14 @@ extension WindowTabStripView {
                     }
                 }
                 .padding(.horizontal, windowTabStripContentHorizontalPadding)
-                .background {
-                    GeometryReader { proxy in
-                        Color.clear.preference(
-                            key: WindowTabStripScrollContentFramePreferenceKey.self,
-                            value: proxy.frame(in: .named(context.scrollCoordinateSpaceName)),
-                        )
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named(context.scrollCoordinateSpaceName)) } action: { nextFrame in
+                    if abs(tabScrollContentMinX - nextFrame.minX) > 0.5 {
+                        tabScrollContentMinX = nextFrame.minX
+                    }
+                    // Drops onto a Tabbed workspace's bar land by where its tabs are now.
+                    if strip.isWorkspaceTabs { recordWorkspaceTabBarScroll(strip.id, contentMinX: nextFrame.minX) }
+                    if abs(tabScrollContentMaxX - nextFrame.maxX) > 0.5 {
+                        tabScrollContentMaxX = nextFrame.maxX
                     }
                 }
             }
@@ -187,16 +189,6 @@ extension WindowTabStripView {
             .onChange(of: strip.activeWindowId) { scrollToActiveTab(scroller) }
         }
         .coordinateSpace(name: context.scrollCoordinateSpaceName)
-        .onPreferenceChange(WindowTabStripScrollContentFramePreferenceKey.self) { nextFrame in
-            if abs(tabScrollContentMinX - nextFrame.minX) > 0.5 {
-                tabScrollContentMinX = nextFrame.minX
-            }
-            // Drops onto a Tabbed workspace's bar land by where its tabs are now.
-            if strip.isWorkspaceTabs { recordWorkspaceTabBarScroll(strip.id, contentMinX: nextFrame.minX) }
-            if abs(tabScrollContentMaxX - nextFrame.maxX) > 0.5 {
-                tabScrollContentMaxX = nextFrame.maxX
-            }
-        }
         .mask {
             WindowTabStripScrollFadeMask(
                 leadingFadeWidth: context.leadingFadeWidth(contentMinX: tabScrollContentMinX),

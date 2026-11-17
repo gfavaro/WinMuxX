@@ -35,15 +35,7 @@ struct ManagedDirectionalShortcutsView: View {
                 }
             }
         }
-        .background {
-            GeometryReader { proxy in
-                Color.clear
-                    .preference(key: ManagedDirectionalShortcutsWidthKey.self, value: proxy.size.width)
-            }
-        }
-        .onPreferenceChange(ManagedDirectionalShortcutsWidthKey.self) { width in
-            availableWidth = width
-        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { availableWidth = $0 }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -57,14 +49,6 @@ struct ManagedDirectionalShortcutsView: View {
                 .font(.headline)
             CompassPad(model: model, title: title, prefix: prefix, demo: demo)
         }
-    }
-}
-
-private struct ManagedDirectionalShortcutsWidthKey: PreferenceKey {
-    static let defaultValue: CGFloat = .zero
-
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
     }
 }
 

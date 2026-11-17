@@ -221,7 +221,6 @@ final class WorkspaceSidebarHostingView: NSHostingView<WorkspaceSidebarContainer
 /// The window reserves extra width for project browsing. Only the visible rail
 /// gets material; hosting coordinates remain relative to the full window.
 final class WorkspaceSidebarMaterialContainer: NSView {
-    let effect = NSVisualEffectView()
     let customSurface = NSView()
     let clearSurface = NSView()
     let opaqueSurface = NSView()
@@ -250,15 +249,9 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         glass.wantsLayer = true
         glassSurface = glass
         super.init(frame: frameRect)
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        effect.material = .sidebar
-        effect.isEmphasized = false
-        effect.wantsLayer = true
         customSurface.wantsLayer = true
         clearSurface.wantsLayer = true
         opaqueSurface.wantsLayer = true
-        addSubview(effect)
         addSubview(customSurface)
         addSubview(clearSurface)
         addSubview(opaqueSurface)
@@ -300,7 +293,6 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         if let content = hostedContent, content.superview !== contentParent {
             contentParent.addSubview(content)
         }
-        effect.isHidden = surface !== effect || visibleWidth <= 0
         customSurface.isHidden = surface !== customSurface || visibleWidth <= 0
         clearSurface.isHidden = surface !== clearSurface || visibleWidth <= 0
         opaqueSurface.isHidden = surface !== opaqueSurface || visibleWidth <= 0

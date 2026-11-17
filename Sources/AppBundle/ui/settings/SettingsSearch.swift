@@ -26,14 +26,8 @@ struct SettingsSearchReadyKey: PreferenceKey {
     }
 }
 
-private struct SettingsSearchTargetKey: EnvironmentKey {
-    static let defaultValue: SettingsSearchDestination? = nil
-}
 extension EnvironmentValues {
-    var settingsSearchTarget: SettingsSearchDestination? {
-        get { self[SettingsSearchTargetKey.self] }
-        set { self[SettingsSearchTargetKey.self] = newValue }
-    }
+    @Entry var settingsSearchTarget: SettingsSearchDestination? = nil
 }
 
 /// Shared by the page controls and their direct search results.

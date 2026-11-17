@@ -106,38 +106,16 @@ struct WorkspaceSidebarNativeLabel: NSViewRepresentable {
     }
 }
 
-private struct WorkspaceSidebarAppearanceKey: EnvironmentKey {
-    static let defaultValue: WorkspaceSidebarAppearance = .custom
-}
-
-private struct WorkspaceSidebarWallpaperSampleKey: EnvironmentKey {
-    static let defaultValue: WorkspaceSidebarWallpaperSample? = nil
-}
-
 /// Only deterministic developer previews set these; production uses system preferences.
 struct WorkspaceSidebarPreviewAccessibility: Sendable {
     var reduceTransparency = false
     var increasedContrast = false
 }
 
-private struct WorkspaceSidebarPreviewAccessibilityKey: EnvironmentKey {
-    static let defaultValue = WorkspaceSidebarPreviewAccessibility()
-}
-
 extension EnvironmentValues {
-    var workspaceSidebarWallpaperSample: WorkspaceSidebarWallpaperSample? {
-        get { self[WorkspaceSidebarWallpaperSampleKey.self] }
-        set { self[WorkspaceSidebarWallpaperSampleKey.self] = newValue }
-    }
-    var workspaceSidebarPreviewAccessibility: WorkspaceSidebarPreviewAccessibility {
-        get { self[WorkspaceSidebarPreviewAccessibilityKey.self] }
-        set { self[WorkspaceSidebarPreviewAccessibilityKey.self] = newValue }
-    }
-
-    var workspaceSidebarAppearance: WorkspaceSidebarAppearance {
-        get { self[WorkspaceSidebarAppearanceKey.self] }
-        set { self[WorkspaceSidebarAppearanceKey.self] = newValue }
-    }
+    @Entry var workspaceSidebarWallpaperSample: WorkspaceSidebarWallpaperSample? = nil
+    @Entry var workspaceSidebarPreviewAccessibility = WorkspaceSidebarPreviewAccessibility()
+    @Entry var workspaceSidebarAppearance: WorkspaceSidebarAppearance = .custom
 }
 
 /// Semantic colors shared by sidebar, overlay, and tab chrome descendants.

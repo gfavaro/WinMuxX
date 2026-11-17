@@ -2,15 +2,8 @@ import AppKit
 import Foundation
 import SwiftUI
 
-private struct WorkspaceSidebarClockDateKey: EnvironmentKey {
-    static let defaultValue: Date? = nil
-}
-
 extension EnvironmentValues {
-    var workspaceSidebarClockDate: Date? {
-        get { self[WorkspaceSidebarClockDateKey.self] }
-        set { self[WorkspaceSidebarClockDateKey.self] = newValue }
-    }
+    @Entry var workspaceSidebarClockDate: Date? = nil
 }
 
 struct WorkspaceSidebarStatusView: View {

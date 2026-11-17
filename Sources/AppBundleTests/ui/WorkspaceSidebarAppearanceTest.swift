@@ -88,7 +88,6 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         XCTAssertEqual(colors.count, 2)
         XCTAssertNotEqual(colors.first, colors.last)
         XCTAssertEqual(container.opaqueSurface.frame.width, 44)
-        XCTAssertTrue(container.effect.isHidden)
     }
 
     func testSolidForegroundContrastForPresetsAndCustomColors() {
@@ -234,7 +233,6 @@ final class WorkspaceSidebarAppearanceTest: XCTestCase {
         }
         configuration.appearance = .custom
         container.configure(configuration: configuration, visibleWidth: 44)
-        XCTAssertTrue(container.effect.isHidden)
         XCTAssertTrue(content.superview === container.customSurface)
         XCTAssertFalse(container.customSurface.isHidden)
     }
