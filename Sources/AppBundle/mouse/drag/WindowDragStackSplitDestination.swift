@@ -12,9 +12,9 @@ func stackSplitDestination(
     if shouldSuppressSwapDestination(sourceWindow: sourceWindow, subject: subject) {
         return nil
     }
-    guard case let (sourceNode, targetNode)? = validatedDragNodePair(
+    // No preview means the split cannot be made there.
+    guard case let (_, targetNode)? = validatedDragNodePair(
         sourceWindow: sourceWindow, targetWindow: targetWindow, subject: subject, detachOrigin: detachOrigin),
-          canOfferWindowStackSplit(sourceNode: sourceNode, targetNode: targetNode, position: position),
           let preview = resolvedWindowStackSplitPreview(targetNode: targetNode, position: position),
           let interactionRect = targetNode.stackSplitDropZoneRect(position: position)?
           .expanded(left: subject == .group ? 4 : 10, right: subject == .group ? 4 : 10, top: 0, bottom: 0)

@@ -304,26 +304,10 @@ import XCTest
         let target = TestWindow.new(id: 1, parent: root)
         let source = TestWindow.new(id: 2, parent: root)
 
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .above,
-        ))
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .below,
-        ))
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .left,
-        ))
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .right,
-        ))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .above))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .below))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .left))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .right))
     }
 
     @MainActor
@@ -336,16 +320,8 @@ import XCTest
         let source = TestWindow.new(id: 2, parent: leftStack)
         let target = TestWindow.new(id: 3, parent: root)
 
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .left,
-        ))
-        XCTAssertTrue(canOfferWindowStackSplit(
-            sourceNode: source,
-            targetNode: target,
-            position: .right,
-        ))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .left))
+        XCTAssertNotNil(windowStackSplitContext(targetNode: target, position: .right))
     }
 
     @MainActor

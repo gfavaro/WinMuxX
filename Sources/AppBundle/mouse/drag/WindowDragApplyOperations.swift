@@ -34,15 +34,6 @@ func windowStackSplitContext(
 }
 
 @MainActor
-func canOfferWindowStackSplit(
-    sourceNode: TreeNode,
-    targetNode: TreeNode,
-    position: WindowStackSplitPosition,
-) -> Bool {
-    windowStackSplitContext(targetNode: targetNode, position: position) != nil
-}
-
-@MainActor
 func resolvedWindowStackSplitPreview(targetNode: TreeNode, position: WindowStackSplitPosition) -> WindowStackSplitPreview? {
     guard let splitContext = windowStackSplitContext(targetNode: targetNode, position: position) else { return nil }
     let referenceNode = splitContext.wrapsTargetDirectly ? targetNode : splitContext.anchorNode
@@ -69,7 +60,6 @@ func applyWindowStackSplitDragIntent(
         subject: sourceSubject,
         detachOrigin: getCurrentMouseTabDetachOrigin(),
     ),
-          canOfferWindowStackSplit(sourceNode: sourceNode, targetNode: targetNode, position: position),
           let splitContext = windowStackSplitContext(targetNode: targetNode, position: position)
     else { return false }
 
