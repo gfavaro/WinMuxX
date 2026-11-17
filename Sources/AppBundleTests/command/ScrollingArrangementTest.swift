@@ -192,6 +192,22 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(workspace.scrollingColumns[1] === windows[1])
     }
 
+    func testTheResizePreviewMovesTheOtherColumnsBesideTheNewWidth() async throws {
+        let (workspace, windows) = try await strip(3)
+        try await workspace.layoutWorkspace()
+        let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        let second = try XCTUnwrap(windows[1].lastAppliedLayoutPhysicalRect)
+        let width = windows[0].scrollingColumnWidth, offset = workspace.scrollingOffset
+        let (_, items) = try XCTUnwrap(scrollingResizePreviewItems(windows[0], rect: Rect(
+            topLeftX: shown.minX, topLeftY: shown.minY, width: shown.width + 100, height: shown.height)))
+        let neighbour = try XCTUnwrap(items.first { $0.id == windows[1].windowId })
+        XCTAssertEqual(neighbour.frame.width, second.width, accuracy: 1, "The other columns keep their width")
+        XCTAssertEqual(neighbour.frame.minX - second.toAppKitScreenRect.minX, 100, accuracy: 2, "and move beside the wider one")
+        XCTAssertFalse(items.contains { $0.id == windows[0].windowId })
+        XCTAssertEqual(windows[0].scrollingColumnWidth, width, "Previewing changes nothing")
+        XCTAssertEqual(workspace.scrollingOffset, offset)
+    }
+
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
         workspace.scrollingGestureMotionActive = true

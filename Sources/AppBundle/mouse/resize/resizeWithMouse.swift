@@ -77,6 +77,12 @@ func updateCompositedResizePreview(_ window: Window, rect: Rect) {
                                              presentation: .resizeOverlay)
         return
     }
+    if let (workspace, items) = scrollingResizePreviewItems(window, rect: rect) {
+        WindowResizePreviewPanel.shared.beginStableFrame(workspace.workspaceMonitor.rect.toAppKitScreenRect)
+        beginMouseResizeManipulation(windowId: window.windowId)
+        WindowResizePreviewPanel.shared.show(items, presentation: .resizeOverlay)
+        return
+    }
     guard let workspace = window.nodeWorkspace,
           workspace.isVisible,
           let weightMap = proposedResizeWeightMap(window, rect: rect)
@@ -124,6 +130,44 @@ func proposedTabbedMouseResize(_ window: Window, rect: Rect) -> (Workspace, Tabb
         resize(.v, by: rect.maxY - previous.maxY, againstNext: true)
     }
     return (workspace, layout)
+}
+
+/// The other windows of a Scrolling strip where they would sit with `window`'s column dragged
+/// to `rect`'s width: only that column's width changes, so the others keep their size and move.
+@MainActor
+func scrollingResizePreviewItems(_ window: Window, rect: Rect) -> (Workspace, [WindowResizePreviewItem])? {
+    guard let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, workspace.isVisible,
+          window.parent is TilingContainer, let column = workspace.scrollingColumn(of: window),
+          let previous = window.lastAppliedLayoutPhysicalRect,
+          let range = workspace.scrollingColumnWidthRange(of: column) else { return nil }
+    // Laid out as the release will lay it out, scrolling included, then put back as it was.
+    let saved = (width: column.scrollingColumnWidth, offset: workspace.scrollingOffset,
+                 focus: workspace.lastScrollingFocusWindowId, anchor: workspace.scrollingAnchorWindowId,
+                 position: workspace.scrollingAnchorViewportPosition, area: workspace.scrollingAnchorAreaWidth,
+                 center: workspace.scrollingAnchorLogicalCenter)
+    workspace.setScrollingColumnWidth(of: column, to: range.width + rect.width - previous.width)
+    workspace.scrollToFocusedColumnIfNeeded()
+    let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
+    let frames = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace), gaps: gaps)
+    column.scrollingColumnWidth = saved.width
+    workspace.scrollingOffset = saved.offset
+    workspace.lastScrollingFocusWindowId = saved.focus
+    workspace.scrollingAnchorWindowId = saved.anchor
+    workspace.scrollingAnchorViewportPosition = saved.position
+    workspace.scrollingAnchorAreaWidth = saved.area
+    workspace.scrollingAnchorLogicalCenter = saved.center
+    let items = frames.filter { $0.node !== column }.flatMap { frame -> [WindowResizePreviewItem] in
+        let shift = frame.physical.minX - (frame.node.lastAppliedLayoutPhysicalRect?.minX ?? frame.physical.minX)
+        if let group = frame.node as? TilingContainer, group.layout == .tabGroup {
+            return [WindowResizePreviewItem(tabGroup: group, rect: frame.physical)]
+        }
+        return frame.node.allLeafWindowsRecursive.compactMap { leaf in
+            guard let shown = leaf.lastAppliedLayoutPhysicalRect else { return nil }
+            return WindowResizePreviewItem(window: leaf, rect: Rect(topLeftX: shown.minX + shift, topLeftY: shown.minY,
+                                                                   width: shown.width, height: shown.height))
+        }
+    }
+    return (workspace, items)
 }
 
 /// Each other tab group of the proposed layout, drawn as its shown window over the group's area.
