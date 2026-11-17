@@ -5,15 +5,18 @@ Settings → Configuration validates before applying changes.
 
 ## Keep one window centered on an ultrawide
 
-In Settings → Windows choose the single-window ratio and alignment, or set:
+A lone tiled window takes `fullscreen-width` of the display, centered. To narrow
+it only on an ultrawide, set the width in that display's table (Settings →
+Windows edits the global value):
 
 ```toml
-single-window-aspect-ratio = 1.5
-single-window-alignment = 'center'
+[display.'LG ULTRAWIDE']
+fullscreen-width = 0.6
 ```
 
-Set the ratio to `0` to disable this behavior. See the
-[full explanation](../README.md#single-window-on-ultrawide).
+The table name matches the display's name. Leave `fullscreen-width` out, or set
+it to `1.0`, for the full width. See the
+[full explanation](../README.md#lone-windows-and-fullscreen-width).
 
 ## Choose a layout for a workspace on a display
 
