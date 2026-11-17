@@ -18,7 +18,7 @@ func windowSurfaceDestination(
         subject: subject,
         detachOrigin: detachOrigin,
     )
-    if let reentryDestination = selfTabGroupTabReentryDestination(
+    if let reentryDestination = ownTabGroupReturnDestination(
         sourceWindow: sourceWindow,
         targetWindow: targetWindow,
         mouseLocation: mouseLocation,

@@ -18,47 +18,54 @@ func tabStackDestination(targetWindow: Window, mouseLocation: CGPoint? = nil) ->
     )
 }
 
+/// A tab dragged out of its own tab group and dropped back on that group. Over the group's tab
+/// strip it goes where the pointer is among the tabs; anywhere else on the group (`resolution`, a
+/// drop zone of its window) it goes back where it was. One rule for both, so the hint and the
+/// result always agree.
 @MainActor
-func selfTabGroupTabReentryDestination(
+func ownTabGroupReturnDestination(
     sourceWindow: Window,
     targetWindow: Window,
     mouseLocation: CGPoint,
     subject: WindowDragSubject,
     detachOrigin: TabDetachOrigin,
+    resolution: WindowDropIntentResolution? = nil,
 ) -> WindowDragIntentDestination? {
     guard subject == .window,
           detachOrigin == .tabStrip,
           config.windowTabs.enabled,
           let sourceParent = sourceWindow.parent as? TilingContainer,
           sourceParent.layout == .tabGroup,
-          let targetFrame = sourceParent.windowDragVisibleRect,
-          targetWindow.parent === sourceParent,
-          let previewRect = sourceParent.windowTabDropZoneRect,
-          let interactionRect = sourceParent.windowTabDropInteractionRect,
-          interactionRect.contains(mouseLocation)
+          targetWindow.parent === sourceParent
     else { return nil }
     let sourceIndex = sourceWindow.ownIndex ?? 0
-    let targetIndex = tabReentryTargetIndex(
-        mouseLocation: mouseLocation,
-        tabStripRect: previewRect,
-        tabCount: sourceParent.children.count,
-        sourceIndex: sourceIndex
-    )
+    if let targetFrame = sourceParent.windowDragVisibleRect,
+       let stripRect = sourceParent.windowTabDropZoneRect,
+       let stripInteraction = sourceParent.windowTabDropInteractionRect,
+       stripInteraction.contains(mouseLocation) {
+        let targetIndex = tabReentryTargetIndex(mouseLocation: mouseLocation, tabStripRect: stripRect,
+                                                tabCount: sourceParent.children.count, sourceIndex: sourceIndex)
+        return ownTabGroupReturn(sourceWindow, targetIndex: targetIndex, previewRect: stripRect,
+            interactionRect: stripInteraction,
+            overlay: WindowDropIntentOverlayModel(targetFrame: targetFrame, activeZone: .tab, cornerRadius: nil))
+    }
+    guard let resolution else { return nil }
+    return ownTabGroupReturn(sourceWindow, targetIndex: sourceIndex,
+        previewRect: windowDropIntentActivePreviewRect(for: resolution), interactionRect: resolution.targetFrame, overlay: nil)
+}
 
-    return WindowDragIntentDestination(
+private func ownTabGroupReturn(_ sourceWindow: Window, targetIndex: Int, previewRect: Rect, interactionRect: Rect,
+                               overlay: WindowDropIntentOverlayModel?) -> WindowDragIntentDestination {
+    WindowDragIntentDestination(
         kind: .reorderTab(windowId: sourceWindow.windowId, targetIndex: targetIndex),
         previewRect: previewRect,
         interactionRect: interactionRect,
         title: "Return To Tabs",
-        subtitle: "Drop to cancel the detach and put this tab back in the group",
+        subtitle: "Drop to put this tab back in its group",
         previewStyle: .tabInsert,
         previewGeometry: .tabStrip,
         isGroup: false,
-        dropIntentOverlay: WindowDropIntentOverlayModel(
-            targetFrame: targetFrame,
-            activeZone: .tab,
-            cornerRadius: nil,
-        ),
+        dropIntentOverlay: overlay,
     )
 }
 

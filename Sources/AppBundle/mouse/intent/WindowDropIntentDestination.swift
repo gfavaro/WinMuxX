@@ -33,12 +33,13 @@ func destinationFromWindowDropIntent(
     }
     switch resolution.intent.zone {
         case .tab:
-            if let destination = sameTabGroupReturnDestination(
-                resolution: resolution,
+            if let destination = ownTabGroupReturnDestination(
                 sourceWindow: sourceWindow,
                 targetWindow: targetWindow,
+                mouseLocation: mouseLocation,
                 subject: subject,
-                detachOrigin: detachOrigin
+                detachOrigin: detachOrigin,
+                resolution: resolution,
             ) {
                 return intentOverlayDestination(destination)
             }
@@ -61,12 +62,13 @@ func destinationFromWindowDropIntent(
                 isGroup: false,
             ))
         case .middle:
-            if let destination = sameTabGroupReturnDestination(
-                resolution: resolution,
+            if let destination = ownTabGroupReturnDestination(
                 sourceWindow: sourceWindow,
                 targetWindow: targetWindow,
+                mouseLocation: mouseLocation,
                 subject: subject,
-                detachOrigin: detachOrigin
+                detachOrigin: detachOrigin,
+                resolution: resolution,
             ) {
                 return intentOverlayDestination(destination)
             }
@@ -140,33 +142,6 @@ private func tabbedGroupDropDestination(
         dropIntentOverlay: WindowDropIntentOverlayModel(targetFrame: resolution.targetFrame, activeZone: resolution.intent.zone,
                                                         cornerRadius: nil, unavailableZones: Array(blockers.keys),
                                                         unavailableReason: blockers[resolution.intent.zone]),
-    )
-}
-
-@MainActor
-private func sameTabGroupReturnDestination(
-    resolution: WindowDropIntentResolution,
-    sourceWindow: Window,
-    targetWindow: Window,
-    subject: WindowDragSubject,
-    detachOrigin: TabDetachOrigin,
-) -> WindowDragIntentDestination? {
-    guard subject == .window,
-          detachOrigin == .tabStrip,
-          config.windowTabs.enabled,
-          let sourceParent = sourceWindow.parent as? TilingContainer,
-          sourceParent.layout == .tabGroup,
-          targetWindow.parent === sourceParent
-    else { return nil }
-    return WindowDragIntentDestination(
-        kind: .reorderTab(windowId: sourceWindow.windowId, targetIndex: sourceWindow.ownIndex ?? 0),
-        previewRect: windowDropIntentActivePreviewRect(for: resolution),
-        interactionRect: resolution.targetFrame,
-        title: "Return To Tabs",
-        subtitle: "Drop to keep this tab in the current group",
-        previewStyle: .tabInsert,
-        previewGeometry: .tabStrip,
-        isGroup: false,
     )
 }
 

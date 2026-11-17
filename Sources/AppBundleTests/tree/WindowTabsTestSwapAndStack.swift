@@ -19,7 +19,7 @@ import XCTest
         target.lastAppliedLayoutPhysicalRect = Rect(topLeftX: 0, topLeftY: 34, width: 420, height: 246)
 
         let mouseLocation = tabGroup.windowTabDropInteractionRect.orDie().center
-        let destination = selfTabGroupTabReentryDestination(
+        let destination = ownTabGroupReturnDestination(
             sourceWindow: source,
             targetWindow: target,
             mouseLocation: mouseLocation,
