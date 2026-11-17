@@ -139,22 +139,13 @@ func scrollingResizePreviewItems(_ window: Window, rect: Rect) -> (Workspace, [W
     guard let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, workspace.isVisible,
           window.parent is TilingContainer, let column = workspace.scrollingColumn(of: window),
           let previous = window.lastAppliedLayoutPhysicalRect else { return nil }
-    // Laid out as the release will lay it out, scrolling included, then put back as it was.
     // Laid out as the release will lay it out, then put back as it was.
-    let saved = (width: column.scrollingColumnWidth, offset: workspace.scrollingOffset,
-                 focus: workspace.lastScrollingFocusWindowId, anchor: workspace.scrollingAnchorWindowId,
-                 position: workspace.scrollingAnchorViewportPosition, area: workspace.scrollingAnchorAreaWidth,
-                 center: workspace.scrollingAnchorLogicalCenter)
+    let savedWidth = column.scrollingColumnWidth, savedView = workspace.scrollingViewState
     workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect)
     let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor)
     let frames = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace), gaps: gaps)
-    column.scrollingColumnWidth = saved.width
-    workspace.scrollingOffset = saved.offset
-    workspace.lastScrollingFocusWindowId = saved.focus
-    workspace.scrollingAnchorWindowId = saved.anchor
-    workspace.scrollingAnchorViewportPosition = saved.position
-    workspace.scrollingAnchorAreaWidth = saved.area
-    workspace.scrollingAnchorLogicalCenter = saved.center
+    column.scrollingColumnWidth = savedWidth
+    workspace.scrollingViewState = savedView
     let items = frames.filter { $0.node !== column }.flatMap { frame -> [WindowResizePreviewItem] in
         let shift = frame.physical.minX - (frame.node.lastAppliedLayoutPhysicalRect?.minX ?? frame.physical.minX)
         if let group = frame.node as? TilingContainer, group.layout == .tabGroup {
@@ -198,9 +189,8 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
     // In a Scrolling workspace dragging a window's side edge sets its column's width; columns
     // are always full height.
     if let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, window.parent is TilingContainer {
-        if let previous = window.lastAppliedLayoutPhysicalRect, abs(rect.width - previous.width) > 1,
-           let group = workspace.scrollingColumn(of: window) {
-            workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect)
+        if let previous = window.lastAppliedLayoutPhysicalRect,
+           let group = workspace.resizeScrollingColumnWithMouse(window, from: previous, to: rect) {
             lastScrollingMouseResize = "window \(window.windowId) width \(Int(previous.width)) -> \(Int(rect.width)), share \(group.scrollingColumnWidth.map { String(format: "%.3f", $0) } ?? "default")"
         } else {
             lastScrollingMouseResize = "window \(window.windowId) released without a width change (laid out \(window.lastAppliedLayoutPhysicalRect.map { "\(Int($0.width))" } ?? "never"), dropped at \(Int(rect.width)))"

@@ -532,14 +532,16 @@ extension Workspace {
 
     /// A mouse resize of `window`'s column from `previous` to `rect`: the width follows the dragged
     /// edge and the strip scrolls so the other edge stays where it was on screen.
+    /// Returns the column it resized, or nil when nothing changed.
     @MainActor
-    func resizeScrollingColumnWithMouse(_ window: Window, from previous: Rect, to rect: Rect) {
+    @discardableResult
+    func resizeScrollingColumnWithMouse(_ window: Window, from previous: Rect, to rect: Rect) -> TreeNode? {
         guard let group = scrollingColumn(of: window), abs(rect.width - previous.width) > 1,
               let before = scrollingMetrics.columns.first(where: { $0.node === group }),
-              let range = scrollingColumnWidthRange(of: group) else { return }
+              let range = scrollingColumnWidthRange(of: group) else { return nil }
         let offset = scrollingOffset
         guard setScrollingColumnWidth(of: group, to: range.width + rect.width - previous.width),
-              let after = scrollingMetrics.columns.first(where: { $0.node === group }) else { return }
+              let after = scrollingMetrics.columns.first(where: { $0.node === group }) else { return nil }
         let leftEdgeDragged = abs(rect.minX - previous.minX) > 1
         scrollingOffset = leftEdgeDragged
             ? after.start + after.width - (before.start + before.width - offset)
@@ -547,6 +549,35 @@ extension Workspace {
         // The strip stays where the mouse left it: neither focus nor the anchor scrolls it back.
         lastScrollingFocusWindowId = window.windowId
         captureScrollingViewportAnchor(preferredWindow: window)
+        return group
+    }
+
+    /// Where the strip is looking and what keeps it there: saved before a preview lays the strip
+    /// out as it would be, and put back after, so nothing of the preview reaches the real layout.
+    struct ScrollingViewState {
+        fileprivate let offset: CGFloat
+        fileprivate let lastFocusWindowId: UInt32?
+        fileprivate let anchorWindowId: UInt32?
+        fileprivate let anchorViewportPosition: CGFloat?
+        fileprivate let anchorAreaWidth: CGFloat?
+        fileprivate let anchorLogicalCenter: CGFloat?
+    }
+
+    @MainActor
+    var scrollingViewState: ScrollingViewState {
+        get {
+            ScrollingViewState(offset: scrollingOffset, lastFocusWindowId: lastScrollingFocusWindowId,
+                               anchorWindowId: scrollingAnchorWindowId, anchorViewportPosition: scrollingAnchorViewportPosition,
+                               anchorAreaWidth: scrollingAnchorAreaWidth, anchorLogicalCenter: scrollingAnchorLogicalCenter)
+        }
+        set {
+            scrollingOffset = newValue.offset
+            lastScrollingFocusWindowId = newValue.lastFocusWindowId
+            scrollingAnchorWindowId = newValue.anchorWindowId
+            scrollingAnchorViewportPosition = newValue.anchorViewportPosition
+            scrollingAnchorAreaWidth = newValue.anchorAreaWidth
+            scrollingAnchorLogicalCenter = newValue.anchorLogicalCenter
+        }
     }
 
     @MainActor
