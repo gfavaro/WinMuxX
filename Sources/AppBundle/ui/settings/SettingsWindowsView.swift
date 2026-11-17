@@ -226,7 +226,7 @@ struct ShortcutBehaviorSettingsView: View {
                 persistConfig(section: "scrolling", key: "column-width", value: String(Double(scrollingColumnWidth) / 100))
             }
             SettingsTextField("Width presets", id: "scrolling.width-presets", text: $scrollingWidthPresets,
-                help: "Ascending shares from 0.1 to 1 that Next and Previous Column Width step through, for example 0.3333, 0.5, 0.6667, 1.") {
+                help: "Ascending shares from 0.1 to 1 that Next and Previous Column Width step through, for example 0.33, 0.5, 0.7, 1. Next wraps from the last back to the first.") {
                 persistConfig(section: "scrolling", key: "width-presets", value: "[" + scrollingWidthPresets.split(separator: ",")
                     .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: ", ") + "]")
             }

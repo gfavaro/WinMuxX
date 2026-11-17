@@ -88,9 +88,13 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
     func testWidthCommandStepsThroughThePresets() async throws {
         let (_, windows) = try await strip(2)
         try await succeed("scrolling-width next")
-        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.6667, accuracy: 0.001)
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.7, accuracy: 0.001)
+        try await succeed("scrolling-width next")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 1, accuracy: 0.001)
+        try await succeed("scrolling-width next")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.33, accuracy: 0.001, "Next wraps around to the first preset")
         try await succeed("scrolling-width previous")
-        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.5, accuracy: 0.001)
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 1, accuracy: 0.001, "Previous wraps around to the last preset")
         try await succeed("scrolling-width full")
         XCTAssertEqual(windows[0].scrollingColumnWidth, 1)
         try await succeed("scrolling-width 0.4")
@@ -117,6 +121,18 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertGreaterThan(workspace.scrollingOffset, 0, "A layout after a pan does not scroll back to the focus")
         try await succeed("scrolling-pan focus")
         XCTAssertEqual(workspace.scrollingOffset, 0, accuracy: 0.5)
+    }
+
+    func testDraggingAWindowEdgeSetsItsColumnWidth() async throws {
+        let (workspace, windows) = try await strip(3)
+        try await workspace.layoutWorkspace()
+        let before = try XCTUnwrap(workspace.scrollingColumnWidthRange(of: windows[0])).width
+        let shown = try XCTUnwrap(windows[0].lastAppliedLayoutPhysicalRect)
+        applyResizeWithMouse(windows[0], rect: Rect(topLeftX: shown.minX, topLeftY: shown.minY,
+                                                   width: shown.width + 120, height: shown.height - 50))
+        cancelManipulatedWithMouseState()
+        XCTAssertEqual(try XCTUnwrap(workspace.scrollingColumnWidthRange(of: windows[0])).width, before + 120, accuracy: 2)
+        XCTAssertEqual(windows[0].parent === workspace.rootTilingContainer, true, "The window stays tiled")
     }
 
     func testChangingLayoutEndsAStripPan() async throws {

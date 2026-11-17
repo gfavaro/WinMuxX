@@ -146,6 +146,18 @@ func applyResizeWithMouse(_ window: Window, rect: Rect) {
         clearPendingWindowDragIntent()
         return
     }
+    // In a Scrolling workspace dragging a window's side edge sets its column's width; columns
+    // are always full height.
+    if let workspace = window.nodeWorkspace, workspace.arrangement == .scrolling, window.parent is TilingContainer {
+        if let previous = window.lastAppliedLayoutPhysicalRect, abs(rect.width - previous.width) > 1 {
+            let group = window.topLevelWorkspaceGroup
+            let current = workspace.scrollingColumnWidthRange(of: group)?.width ?? previous.width
+            workspace.setScrollingColumnWidth(of: group, to: current + rect.width - previous.width)
+        }
+        beginMouseResizeManipulation(windowId: window.windowId)
+        clearPendingWindowDragIntent()
+        return
+    }
     if floatSingleWindowAfterHeightResize(window, rect: rect) {
         beginMouseResizeManipulation(windowId: window.windowId)
         clearPendingWindowDragIntent()

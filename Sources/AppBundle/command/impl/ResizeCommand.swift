@@ -121,25 +121,20 @@ struct ResizeCommand: Command {
 @MainActor
 private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units, workspace: Workspace, io: CmdIo) -> Bool {
     let group = window.topLevelWorkspaceGroup
-    let metrics = workspace.scrollingMetrics
-    guard let column = metrics.columns.first(where: { $0.node === group }) else { return io.err("The focused window has no scrolling column") }
-    let lower = column.node.minimumLayoutExtent(along: .h, rect: workspaceTilingRect(workspace))
+    guard let range = workspace.scrollingColumnWidthRange(of: group) else { return io.err("The focused window has no scrolling column") }
     let requested: CGFloat = switch units {
         case .set(let value): CGFloat(value)
-        case .add(let value): column.width + CGFloat(value)
-        case .subtract(let value): column.width - CGFloat(value)
+        case .add(let value): range.width + CGFloat(value)
+        case .subtract(let value): range.width - CGFloat(value)
     }
-    let maximum = max(metrics.areaWidth - column.frameStartInset - column.frameEndInset, lower)
-    let actual = min(max(requested, lower), maximum)
-    if requested + 1 < lower, let blocked = group.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }).first(where: { $0.minimumLayoutSize.width > 0 }) {
+    if requested + 1 < range.minimum, let blocked = group.allLeafWindowsRecursive.compactMap({ $0 as? MacWindow }).first(where: { $0.minimumLayoutSize.width > 0 }) {
         NoticePanel.shared.showMinimumSize(appName: blocked.macApp.name ?? blocked.macApp.rawAppBundleId ?? "Application",
                                            dimension: "width", minimum: blocked.minimumLayoutSize)
     }
-    if abs(actual - column.width) < 0.5 {
+    guard workspace.setScrollingColumnWidth(of: group, to: requested) else {
         io.out("resize: nothing to do")
         return true
     }
-    group.scrollingColumnWidth = min(max((actual + column.frameStartInset + column.frameEndInset) / max(metrics.areaWidth, 1), 0.1), 1)
     scheduleRefreshSession(.globalObserver("resizeScrollingColumn"))
     return true
 }

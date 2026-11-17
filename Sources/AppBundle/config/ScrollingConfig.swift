@@ -18,7 +18,7 @@ struct ScrollingConfig: ConvenienceCopyable, Equatable {
     /// How much of an offscreen column remains visible at the display edge.
     var edgePreview = 14
     /// The widths `scrolling-width next` and `previous` step through.
-    var widthPresets = [0.3333, 0.5, 0.6667, 1.0]
+    var widthPresets = [0.33, 0.5, 0.7, 1.0]
     var centerFocusedColumn = ScrollingCenterMode.never
     /// The map of the strip shown while it is panned, and by `scrolling-minimap`.
     var minimapEnabled = true

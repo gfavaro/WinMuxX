@@ -108,7 +108,7 @@ restart.
 ```toml
 [scrolling]
 column-width = 0.5                 # A new column's share of the display
-width-presets = [0.3333, 0.5, 0.6667, 1.0]
+width-presets = [0.33, 0.5, 0.7, 1.0]  # scrolling-width next/previous cycle through these
 edge-preview = 14                  # Points of an offscreen column left showing
 center-focused-column = 'never'    # never, on-overflow or always
 minimap-enabled = true             # The strip map while scrolling and on scrolling-minimap

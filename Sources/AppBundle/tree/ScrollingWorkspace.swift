@@ -430,6 +430,35 @@ extension Workspace {
         scrollingAnchorLogicalCenter = center
     }
 
+    /// The column `group` is, with its current window width and the most it can take.
+    @MainActor
+    func scrollingColumnWidthRange(of group: TreeNode) -> (width: CGFloat, minimum: CGFloat, maximum: CGFloat, insets: CGFloat, area: CGFloat)? {
+        let rect = workspaceTilingRect(self)
+        let minimum = group.minimumLayoutExtent(along: .h, rect: rect)
+        if group === pinnedScrollingColumn {
+            let width = group.lastAppliedLayoutPhysicalRect?.width ?? rect.width * (group.scrollingColumnWidth ?? config.scrolling.columnWidth)
+            return (width, minimum, max(rect.width * 0.8, minimum), 0, rect.width)
+        }
+        let metrics = scrollingMetrics
+        guard let column = metrics.columns.first(where: { $0.node === group }) else { return nil }
+        let insets = column.frameStartInset + column.frameEndInset
+        return (column.width, minimum, max(metrics.areaWidth - insets, minimum), insets, metrics.areaWidth)
+    }
+
+    /// Sets a column's window width in points, kept between its app's minimum and the display,
+    /// and stores it as the share of the display the column takes. False when nothing changed.
+    @MainActor
+    @discardableResult
+    func setScrollingColumnWidth(of group: TreeNode, to requested: CGFloat) -> Bool {
+        guard let range = scrollingColumnWidthRange(of: group), requested.isFinite else { return false }
+        let actual = min(max(requested, range.minimum), range.maximum)
+        guard abs(actual - range.width) >= 0.5 else { return false }
+        group.scrollingColumnWidth = min(max((actual + range.insets) / max(range.area, 1), 0.1), 1)
+        // The resized column is scrolled into view again.
+        lastScrollingFocusWindowId = nil
+        return true
+    }
+
     @MainActor
     func centerFocusedScrollingColumn() {
         guard let window = focus.windowOrNil, window.nodeWorkspace === self else { return }
