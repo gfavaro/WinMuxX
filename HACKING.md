@@ -9,7 +9,7 @@ native Spaces backend moved to the separate SpaceMuxX project on 2026-11-06.
 
 WinMuxX is a personal fork of WinMux. Read [fork maintenance](docs/FORK.md) for
 bundle identity, configuration ownership, upstream integration and signing policy.
-Current user-facing options are described in [README.md](README.md). Historical
+Current user-facing options are described in the [guides](docs/README.md). Historical
 investigations and reviews are listed in the [documentation index](docs/README.md).
 
 ## Build and check

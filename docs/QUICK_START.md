@@ -1,20 +1,37 @@
 # Quick start
 
-Install WinMuxX from the [releases page](https://github.com/gfavaro/WinMuxX/releases)
-using the steps in [HACKING.md](../HACKING.md#build-and-check), then open
-WinMuxX and grant Accessibility access when macOS asks. WinMuxX uses that access
-to read and position app windows. It never asks for Screen Recording.
+Five minutes from download to a tiled desktop.
 
-Open two ordinary windows. WinMuxX places them in the current workspace. Use the
-sidebar to switch workspaces or projects, and open Settings from the WinMuxX
-menu to adjust layouts, appearance and shortcuts. The current commands and
-configuration are in the [CLI help](COMMANDS.md) and
-[configuration guide](CONFIGURATION.md).
+## 1. Install
 
-Settings › General has a **Setup check** for Accessibility, other window managers
-and trackpad gestures that clash with WinMuxX (in native mode, Spaces settings
-instead); it opens once on first launch if something needs attention. Run `winmuxx doctor` in Terminal to see the config path, permissions, displays
-and other window managers. For a guided overview, read
-[concepts](CONCEPTS.md), then [layouts](LAYOUTS.md) and
-[recipes](RECIPES.md). See [recovery](RELIABILITY.md) if an interrupted session
-left windows out of place.
+Download WinMuxX from the [releases page](https://github.com/gfavaro/WinMuxX/releases)
+and move it to `/Applications`, or build it as described in
+[HACKING.md](../HACKING.md#build-and-check).
+
+## 2. Grant access
+
+Open WinMuxX and allow **Accessibility** when macOS asks. WinMuxX uses it to read
+and position app windows. It never asks for Screen Recording.
+
+## 3. Try it
+
+1. Open two ordinary windows. WinMuxX tiles them in the current workspace.
+2. Click a workspace or project in the sidebar to switch.
+3. Open **Settings** from the WinMuxX menu to adjust layouts, appearance and
+   shortcuts.
+
+## 4. If something looks wrong
+
+- Settings → General → **Setup check** looks for missing Accessibility access,
+  other window managers and trackpad gestures that clash with WinMuxX (in native
+  mode, Spaces settings instead). It opens once on first launch if something needs
+  attention.
+- `winmuxx doctor` prints the config path, permissions, displays and conflicting
+  window managers.
+- After an interrupted session, see [recovery](MENU_BAR.md#recovery) and
+  [reliability](RELIABILITY.md).
+
+## Next
+
+[Concepts](CONCEPTS.md), then [layouts](LAYOUTS.md) and [recipes](RECIPES.md).
+Keep the [command guide](COMMANDS.md) and [configuration](CONFIGURATION.md) nearby.
