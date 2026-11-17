@@ -2,8 +2,8 @@ import AppKit
 import Common
 
 /// The Tabbed arrangement's drag stages. Its drops resolve from the tab groups on screen,
-/// never from the tree kept beneath them. The show and apply stages still live in their old
-/// places until they move here.
+/// never from the tree kept beneath them. The apply stage still lives in its old place until
+/// it moves here.
 @MainActor
 final class TabbedWindowDragArrangement: WindowDragArrangement {
     static let shared = TabbedWindowDragArrangement()
@@ -51,7 +51,37 @@ final class TabbedWindowDragArrangement: WindowDragArrangement {
     }
 
     func updateBarDropPreview(sourceWindowId: UInt32, destination: WindowDragIntentDestination) -> Bool {
-        updateTabbedBarDropPreview(sourceWindowId: sourceWindowId, destination: destination)
+        let preview = WindowTabReentryPreviewModel.shared
+        let mouse = MousePointerTracker.shared.currentSample.point
+        switch destination.kind {
+            case .insertTab(let targetWindowId, let index):
+                guard let workspace = Window.get(byId: targetWindowId)?.nodeWorkspace,
+                      let host = workspace.tabbedGroup(containing: targetWindowId)?.barGroup else { return false }
+                preview.set(nil)
+                preview.setIncoming(WindowTabIncomingDrop(stripId: ObjectIdentifier(host), targetIndex: index,
+                                                          orderBeforeDrop: host.barWindowIds))
+                return true
+            case .reorderTab(let windowId, let targetIndex):
+                guard windowId == sourceWindowId, let workspace = Window.get(byId: windowId)?.nodeWorkspace,
+                      workspace.arrangement == .tabbed, let host = workspace.tabbedGroup(containing: windowId)?.barGroup,
+                      let area = host.lastFrame else { return false }
+                let bar = host.barWindowIds
+                guard let sourceIndex = bar.firstIndex(of: windowId) else { return false }
+                preview.setIncoming(nil)
+                preview.set(WindowTabPendingReorderDrop(
+                    stripId: ObjectIdentifier(host),
+                    windowId: windowId,
+                    sourceIndex: sourceIndex,
+                    targetIndex: max(0, min(targetIndex, bar.count - 1)),
+                    orderBeforeDrop: bar,
+                    sourceVisualOffset: tabReentrySourceVisualOffset(mouseLocation: mouse, tabStripRect: tabbedBarTabsRect(area: area, host: host),
+                                                                     tabCount: bar.count, sourceIndex: sourceIndex,
+                                                                     minimumTabWidth: workspaceTabStripMinimumTabWidth),
+                ))
+                return true
+            default:
+                return false
+        }
     }
 
     func applyDrop(kind: WindowDragIntentKind, sourceWindow: Window, subject: WindowDragSubject) -> Bool? {
