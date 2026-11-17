@@ -56,15 +56,6 @@ struct ScrollingWorkspaceGeometryInput {
     var focusedColumnIndex: Int? = nil
     /// Where an open sheet needs the strip, even past either end; the range stretches to it.
     var sheetOffset: CGFloat? = nil
-    /// Edges no column may be cut at, such as one beside a see-through sidebar: macOS hides a
-    /// window only past the display's edge, so the part of a cut column would show there.
-    var alignedEdges: ScrollingAlignedEdges = []
-}
-
-struct ScrollingAlignedEdges: OptionSet {
-    let rawValue: Int
-    static let left = ScrollingAlignedEdges(rawValue: 1)
-    static let right = ScrollingAlignedEdges(rawValue: 2)
 }
 
 /// Pure strip geometry. It only describes logical and physical frames; it does
@@ -76,8 +67,7 @@ func calculateScrollingWorkspaceGeometry(_ input: ScrollingWorkspaceGeometryInpu
     let spans = scrollingColumnSpans(input, area: area, gap: gap)
     let range = scrollingOffsetRange(input, spans: spans, area: area)
     let requested = input.offset.isFinite ? input.offset : 0
-    let offset = scrollingAlignedOffset(min(max(requested, range.lowerBound), range.upperBound), input: input,
-                                        spans: spans, area: area, range: range)
+    let offset = min(max(requested, range.lowerBound), range.upperBound)
     let geometries = spans.enumerated().map { index, span in
         scrollingColumnGeometry(index: index, span: span, input: input, area: area, offset: offset, preview: preview)
     }
@@ -143,27 +133,6 @@ private func scrollingOffsetRange(_ input: ScrollingWorkspaceGeometryInput, span
     }
     let sheet = input.sheetOffset.flatMap { $0.isFinite ? $0 : nil }
     return min(stripLower, sheet ?? stripLower)...max(stripUpper, sheet ?? stripUpper)
-}
-
-/// Moves the strip off any column cut at an aligned edge: past it, so the next column starts at
-/// the edge, or else onto it, whichever keeps the focused column whole and stays in range.
-private func scrollingAlignedOffset(_ offset: CGFloat, input: ScrollingWorkspaceGeometryInput, spans: [ScrollingSpan],
-                                    area: CGRect, range: ClosedRange<CGFloat>) -> CGFloat {
-    func isCut(_ span: ScrollingSpan, at edge: CGFloat) -> Bool { span.start < edge - 0.5 && span.start + span.width > edge + 0.5 }
-    func keepsFocusWhole(_ candidate: CGFloat) -> Bool {
-        guard range.contains(candidate) else { return false }
-        guard let index = input.focusedColumnIndex, spans.indices.contains(index) else { return true }
-        let span = spans[index]
-        return span.start >= candidate - 0.5 && span.start + span.width <= candidate + area.width + 0.5
-    }
-    var result = offset
-    if input.alignedEdges.contains(.left), let cut = spans.first(where: { isCut($0, at: result) }) {
-        result = [cut.start + cut.width, cut.start].first(where: keepsFocusWhole) ?? result
-    }
-    if input.alignedEdges.contains(.right), let cut = spans.first(where: { isCut($0, at: result + area.width) }) {
-        result = [cut.start - area.width, cut.start + cut.width - area.width].first(where: keepsFocusWhole) ?? result
-    }
-    return result
 }
 
 /// Where one column sits on the strip and where it is actually placed on the display: columns
@@ -423,9 +392,7 @@ extension Workspace {
     }
 
     @MainActor
-    /// `aligning` also moves the strip off a column cut at the sidebar; only the strip's own
-    /// scrolling asks for it, so a resize keeps the edge it was not dragged by.
-    func scrollingGeometry(in rect: Rect? = nil, gaps: ResolvedGaps? = nil, aligning: Bool = false) -> ScrollingWorkspaceGeometry {
+    func scrollingGeometry(in rect: Rect? = nil, gaps: ResolvedGaps? = nil) -> ScrollingWorkspaceGeometry {
         let fullRect = rect ?? workspaceTilingRect(self)
         let gaps = gaps ?? ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor)
         let pin = scrollingPinSplit(in: fullRect, gaps: gaps)
@@ -454,15 +421,7 @@ extension Workspace {
             horizontalGap: CGFloat(gaps.inner.horizontal),
             outerLeft: CGFloat(gaps.outer.left), outerRight: CGFloat(gaps.outer.right),
             leftWall: leftWall, rightWall: rightWall, preview: effectiveEdgePreview(config.scrolling.edgePreview),
-            focusedColumnIndex: focusedIndex, alignedEdges: aligning ? scrollingAlignedEdges : []))
-    }
-
-    /// The sidebar's side, unless a pinned column already holds it.
-    @MainActor private var scrollingAlignedEdges: ScrollingAlignedEdges {
-        guard let sidebar = workspaceMonitor.workspaceSidebarEdge else { return [] }
-        let side: ScrollingAlignedEdges = if case .left = sidebar { .left } else { .right }
-        let pinnedSide: ScrollingAlignedEdges? = pinnedScrollingColumn == nil ? nil : (scrollingState.pinSide == .left ? .left : .right)
-        return side == pinnedSide ? [] : side
+            focusedColumnIndex: focusedIndex))
     }
 
     @MainActor
@@ -494,7 +453,6 @@ extension Workspace {
                 metrics.columns.first(where: { $0.node === scrollingColumn(of: window) })
             }
             scrollingState.offset = metrics.focusedOffset(for: column, current: scrollingState.offset, previous: previous)
-            scrollingState.offset = scrollingGeometry(aligning: true).clampedOffset
             scrollingState.lastFocusWindowId = focused.windowId
         }
         scrollingState.offset = metrics.clampedOffset(scrollingState.offset)
