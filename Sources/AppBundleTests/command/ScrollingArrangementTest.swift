@@ -242,6 +242,21 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(neighbour.toAppKitScreenRect.minX, previewed.frame.minX, accuracy: 2, "The release lands where the preview showed")
     }
 
+    func testReorderingKeepsTheSplitSharesAnotherLayoutUses() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let wide = TestWindow.new(id: 76400, parent: root, adaptiveWeight: 3)
+        let narrow = TestWindow.new(id: 76401, parent: root, adaptiveWeight: 1)
+        _ = wide.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        try await succeed("move right")
+        XCTAssertTrue(workspace.scrollingColumns.first === narrow)
+        try await succeed("workspace-layout dwindle")
+        XCTAssertEqual(wide.getWeight(root.orientation), 3, "The moved column keeps its share")
+        XCTAssertEqual(narrow.getWeight(root.orientation), 1)
+    }
+
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
         workspace.scrollingGestureMotionActive = true

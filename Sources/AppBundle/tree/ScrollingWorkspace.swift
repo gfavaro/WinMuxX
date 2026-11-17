@@ -293,12 +293,12 @@ extension Workspace {
         guard column !== target, let parent = target.parent as? TilingContainer else { return }
         let binding = column.unbindFromParent()
         guard let index = parent.children.firstIndex(where: { $0 === target }) else {
-            if let previous = binding.parent as? TilingContainer {
-                column.bind(to: previous, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
-            }
+            column.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
             return
         }
-        column.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: index + (after ? 1 : 0))
+        // Within its own split the column keeps its share there, so another layout finds it as it was.
+        column.bind(to: parent, adaptiveWeight: binding.parent === parent ? binding.adaptiveWeight : WEIGHT_AUTO,
+                    index: index + (after ? 1 : 0))
         normalizeContainers()
     }
 
@@ -307,7 +307,7 @@ extension Workspace {
     @MainActor
     func stackScrollingWindow(_ window: Window, onto target: TreeNode) {
         guard window !== target, let parent = target.parent as? TilingContainer else { return }
-        window.unbindFromParent()
+        let binding = window.unbindFromParent()
         if let stack = target as? TilingContainer, stack.layout != .tabGroup, stack.orientation == .v {
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
         } else if let index = parent.children.firstIndex(where: { $0 === target }) {
@@ -318,6 +318,10 @@ extension Workspace {
             target.scrollingColumnWidth = nil
             target.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: 0)
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        } else {
+            // The target left the tree: the window stays where it was.
+            window.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            return
         }
         window.scrollingColumnWidth = nil
         lastScrollingFocusWindowId = nil
