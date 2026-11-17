@@ -84,4 +84,47 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(root.children, children)
         XCTAssertTrue(root.allLeafWindowsRecursive.elementsEqual(windows, by: ===))
     }
+
+    func testWidthCommandStepsThroughThePresets() async throws {
+        let (_, windows) = try await strip(2)
+        try await succeed("scrolling-width next")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.6667, accuracy: 0.001)
+        try await succeed("scrolling-width previous")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.5, accuracy: 0.001)
+        try await succeed("scrolling-width full")
+        XCTAssertEqual(windows[0].scrollingColumnWidth, 1)
+        try await succeed("scrolling-width 0.4")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.4, accuracy: 0.001)
+    }
+
+    func testFocusAndMoveByPlace() async throws {
+        let (workspace, windows) = try await strip(4)
+        try await succeed("scrolling-focus last")
+        XCTAssertTrue(focus.windowOrNil === windows[3])
+        try await succeed("scrolling-move first")
+        XCTAssertTrue(workspace.workspaceLayoutUnits.first === windows[3])
+        try await succeed("scrolling-focus 2")
+        XCTAssertTrue(focus.windowOrNil === windows[0])
+    }
+
+    func testPanScrollsWithoutMovingFocusAndFocusBringsItBack() async throws {
+        let (workspace, windows) = try await strip(4)
+        workspace.scrollToFocusedColumnIfNeeded()
+        try await succeed("scrolling-pan right")
+        XCTAssertGreaterThan(workspace.scrollingOffset, 0)
+        XCTAssertTrue(focus.windowOrNil === windows[0])
+        workspace.scrollToFocusedColumnIfNeeded()
+        XCTAssertGreaterThan(workspace.scrollingOffset, 0, "A layout after a pan does not scroll back to the focus")
+        try await succeed("scrolling-pan focus")
+        XCTAssertEqual(workspace.scrollingOffset, 0, accuracy: 0.5)
+    }
+
+    func testCommandsRefuseOtherLayouts() async throws {
+        let workspace = focus.workspace
+        _ = TestWindow.new(id: 76100, parent: workspace.rootTilingContainer).focusWindow()
+        for command in ["scrolling-width next", "scrolling-center", "scrolling-pan left", "scrolling-focus 1", "scrolling-move last"] {
+            let result = try await run(command)
+            XCTAssertNotEqual(result.exitCode, 0, command)
+        }
+    }
 }

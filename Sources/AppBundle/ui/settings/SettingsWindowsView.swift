@@ -9,6 +9,10 @@ struct ShortcutBehaviorSettingsView: View {
     @SettingsDraft("window-tabs.height", load: { config.windowTabs.height }) private var tabHeight: Int
     @SettingsDraft("workspace-swipe.enabled", load: { config.workspaceSwipe.enabled }) private var workspaceSwipes: Bool
     @SettingsDraft("master.size", load: { Int((config.master.size * 100).rounded()) }) private var masterSize: Int
+    @SettingsDraft("scrolling.column-width", load: { Int((config.scrolling.columnWidth * 100).rounded()) }) private var scrollingColumnWidth: Int
+    @SettingsDraft("scrolling.width-presets", load: { config.scrolling.widthPresets.map { String(format: "%g", $0) }.joined(separator: ", ") }) private var scrollingWidthPresets: String
+    @SettingsDraft("scrolling.edge-preview", load: { config.scrolling.edgePreview }) private var scrollingEdgePreview: Int
+    @SettingsDraft("scrolling.center-focused-column", load: { config.scrolling.centerFocusedColumn }) private var scrollingCenter: ScrollingCenterMode
     @SettingsDraft("master.side", load: { config.master.side }) private var masterSide: MasterSide
     @SettingsDraft("follow-app-activation.enabled", load: { config.followAppActivation.enabled }) private var followAppActivation: Bool
     @SettingsDraft("follow-app-activation.exclude-apps", load: { config.followAppActivation.excludeApps.joined(separator: ", ") }) private var followAppActivationExcluded: String
@@ -91,6 +95,7 @@ struct ShortcutBehaviorSettingsView: View {
             }
 
             masterSettingsSection
+            scrollingSettingsSection
             SettingsSection("Pointer focus") {
                 SettingsToggle(.focusFollowsMouse, isOn: $focusFollowsMouse, help: "Focus the tiled window after the pointer rests over it.") {
                     persistRootBool("focus-follows-mouse", focusFollowsMouse)
@@ -210,6 +215,30 @@ struct ShortcutBehaviorSettingsView: View {
 
     private func refreshFitDiagnostics() {
         fitIssues = workspaceFitIssues(in: orderedWorkspacesForPresentation())
+    }
+
+    private var scrollingSettingsSection: some View {
+        SettingsSection("Scrolling workspaces") {
+            SettingsStepper("New column width", id: "scrolling.column-width", value: $scrollingColumnWidth, range: 10...100,
+                help: "Share of the display a new column takes on the strip.", unit: "%") {
+                persistConfig(section: "scrolling", key: "column-width", value: String(Double(scrollingColumnWidth) / 100))
+            }
+            SettingsTextField("Width presets", id: "scrolling.width-presets", text: $scrollingWidthPresets,
+                help: "Ascending shares from 0.1 to 1 that Next and Previous Column Width step through, for example 0.3333, 0.5, 0.6667, 1.") {
+                persistConfig(section: "scrolling", key: "width-presets", value: "[" + scrollingWidthPresets.split(separator: ",")
+                    .map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: ", ") + "]")
+            }
+            SettingsStepper("Edge preview", id: "scrolling.edge-preview", value: $scrollingEdgePreview, range: 0...40,
+                help: "How much of a column off the display stays visible at its edge.", unit: "pt") {
+                persistConfig(section: "scrolling", key: "edge-preview", value: "\(scrollingEdgePreview)")
+            }
+            SettingsPicker("Scroll to focus", id: "scrolling.center-focused-column", selection: $scrollingCenter,
+                help: "How the strip scrolls when focus moves to a column: just far enough, centring it when it would be cut off, or always centring it.") {
+                Text("Just enough").tag(ScrollingCenterMode.never)
+                Text("Center when cut off").tag(ScrollingCenterMode.onOverflow)
+                Text("Always center").tag(ScrollingCenterMode.always)
+            } onChange: { persistConfig(section: "scrolling", key: "center-focused-column", value: "'\(scrollingCenter.rawValue)'") }
+        }
     }
 
     private var masterSettingsSection: some View {

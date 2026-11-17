@@ -86,6 +86,12 @@ Focus left and right steps through the columns and scrolls the strip to show the
 one; up and down move within its column. `move left` and `right` move the column along the
 strip, and a window in a stack leaves it as a column of its own. `resize width` changes the
 column's share of the display. New windows open as a column right of the focused one.
+`scrolling-width next`, `previous` and `full` (or a share such as `0.4`) set the focused
+column's width, `scrolling-center` centres it, `scrolling-pan left`, `right` and `focus`
+scroll the strip half a display without moving focus or back to it, and
+`scrolling-focus` and `scrolling-move` take `1` to `9`, `first` or `last` (9 is the last
+column). Settings → Shortcuts lists them under Scrolling, and Settings → Windows →
+Scrolling workspaces edits the table below.
 Columns off the display wait at its edge, showing `scrolling.edge-preview` points, or behind
 it where another display sits beside it. Column widths and the strip's position survive a
 restart.
