@@ -162,6 +162,23 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertLessThan(topRect.minY, bottomRect.minY)
     }
 
+    func testAContainerWithOneChildIsNotAColumnOfItsOwn() async throws {
+        // As Dwindle leaves it: a vertical container wrapping a single side-by-side split.
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let finder = TestWindow.new(id: 76300, parent: root)
+        let wrapper = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        let row = TilingContainer(parent: wrapper, adaptiveWeight: 1, .h, .tiles, index: 0)
+        let terminal = TestWindow.new(id: 76301, parent: row)
+        let browser = TestWindow.new(id: 76302, parent: row)
+        _ = finder.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        XCTAssertEqual(workspace.scrollingColumns.map { ($0 as? Window)?.windowId }, [76300, 76301, 76302])
+        XCTAssertTrue(workspace.scrollingColumn(of: browser) === browser)
+        XCTAssertTrue(workspace.scrollingColumn(of: terminal) === terminal)
+    }
+
     func testJoinStacksIntoTheNeighbourAndMoveTakesItOutAgain() async throws {
         let (workspace, windows) = try await strip(3)
         _ = windows[1].focusWindow()
