@@ -107,23 +107,13 @@ struct FocusCommand: Command {
                 }
                 return windowToFocus.focusWindow()
             case .dfsRelative(let nextPrev):
-                let windows = target.workspace.rootTilingContainer.allLeafWindowsRecursive
-                guard let currentIndex = windows.firstIndex(where: { $0 == target.windowOrNil }) else {
-                    return false
+                if case .wrapAroundAllMonitors = args.boundariesAction { return dieT("Must be discarded by args parser") }
+                switch treeOrderNeighbor(of: target.windowOrNil, in: target.workspace, nextPrev,
+                                         wrap: args.boundariesAction == .wrapAroundTheWorkspace) {
+                    case .window(let window): return window.focusWindow()
+                    case .pastEnd: return args.boundariesAction == .stop
+                    case nil: return false
                 }
-                var targetIndex = switch nextPrev {
-                    case .dfsNext: currentIndex + 1
-                    case .dfsPrev: currentIndex - 1
-                }
-                if !(0 ..< windows.count).contains(targetIndex) {
-                    switch args.boundariesAction {
-                        case .stop: return true
-                        case .fail: return false
-                        case .wrapAroundTheWorkspace: targetIndex = (targetIndex + windows.count) % windows.count
-                        case .wrapAroundAllMonitors: return dieT("Must be discarded by args parser")
-                    }
-                }
-                return windows[targetIndex].focusWindow()
             case .tabRelative(let nextPrev):
                 if target.workspace.arrangement == .tabbed {
                     target.workspace.syncTabbedGroups()
@@ -355,4 +345,17 @@ private func focusRelativeInWorkspaceTabs(
         }
     }
     return Window.get(byId: tabs[index])?.focusWindow() ?? false
+}
+
+enum TreeOrderNeighbor { case window(Window), pastEnd }
+
+/// The tiled window after or before `window` in its workspace's tree order. Past either end it
+/// is the window at the other end when `wrap`, else `.pastEnd`; nil when `window` is not tiled.
+@MainActor
+func treeOrderNeighbor(of window: Window?, in workspace: Workspace, _ nextPrev: DfsNextPrev, wrap: Bool) -> TreeOrderNeighbor? {
+    let windows = workspace.rootTilingContainer.allLeafWindowsRecursive
+    guard let window, let current = windows.firstIndex(where: { $0 == window }) else { return nil }
+    let index = current + (nextPrev == .dfsNext ? 1 : -1)
+    if windows.indices.contains(index) { return .window(windows[index]) }
+    return wrap ? .window(windows[(index + windows.count) % windows.count]) : .pastEnd
 }
