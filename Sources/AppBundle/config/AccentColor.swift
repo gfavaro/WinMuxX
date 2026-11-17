@@ -1,7 +1,7 @@
 import AppKit
 
 /// The accent WinMuxX draws focus and selection in: borders set to `accent`, tab pills, the hover
-/// bar, the workspace overview and mode indicators. Root `accent-color` sets it, so a theme can
+/// bar, drop previews and mode indicators. Root `accent-color` sets it, so a theme can
 /// match it exactly; otherwise it is the system accent, with blue for Graphite, which has no hue.
 @MainActor
 var winMuxAccentColor: NSColor {

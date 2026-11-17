@@ -77,7 +77,7 @@ final class WorkspaceTabBarController {
         for panel in panels.values { panel.updateMousePolicy() }
     }
 
-    /// Mission Control hides the panels itself; the swipe preview and overview draw above them.
+    /// Mission Control hides the panels itself.
     func update(_ models: [WorkspaceTabBarModel]) {
         let ids = Set(models.map(\.id))
         for (id, panel) in panels where !ids.contains(id) {

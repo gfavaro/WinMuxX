@@ -14,7 +14,6 @@
 - [Configuration reload](CONFIG_RELOAD.md): file watching, debounce and what a failed reload keeps.
 - [Accessory windows](ACCESSORY_WINDOWS.md): how menu-bar apps' windows are classified and floated.
 - [Displays and window rules](SETTINGS_DISPLAYS_AND_RULES.md): live placement, startup assignments and rule editing.
-- [Workspace overview](WORKSPACE_OVERVIEW.md): behavior, resource limits and validation.
 - [Dinky 0.22 width and alignment](DINKY_022_ADOPTION.md): width percentages, display/workspace overrides and legacy configuration migration.
 - [Dinky 0.21 command migration](DINKY_021_ADOPTION.md): workspace/container commands and format output.
 - [HACKING](../HACKING.md): architecture, development, checks, builds and installation.

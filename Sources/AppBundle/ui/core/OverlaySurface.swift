@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Palette and overview use the expanded sidebar's chrome and accessibility colors.
+/// The palette uses the expanded sidebar's chrome and accessibility colors.
 struct OverlaySurface: View {
     var cornerRadius: CGFloat = 0
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency

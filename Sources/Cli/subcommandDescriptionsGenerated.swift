@@ -60,5 +60,4 @@ let subcommandDescriptions = [
     ["  workspace-back-and-forth", "Switch between the focused workspace and previously focused workspace back and forth"],
     ["  workspace", "Focus the specified workspace"],
     ["  workspace-layout", "Arrange workspace groups using dwindle, master, tabbed or scrolling"],
-    ["  workspace-overview", "Show, hide, or toggle the spatial workspace overview"],
 ]

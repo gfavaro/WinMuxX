@@ -31,7 +31,6 @@ final class MonitorConfigurationObserver {
 
     func handleScreenParametersChanged() {
         runtime.displays.displayHookPending = false
-        WorkspaceOverviewController.shared.invalidate()
         WindowMotion.shared.screensChanged()
         // A vanished display's workspace must not stay "visible" on it: selection would then
         // target it and be refused. Retiring creates no fallback workspace.

@@ -11,7 +11,7 @@ struct WorkspaceSwipeDependencies {
     let navigate: (@escaping @MainActor () -> Bool) async throws -> Bool
     let navigationFailed: (any Error) -> Void
     /// While WinMuxX cannot switch, whether a macOS swipe is still WinMuxX's to keep
-    /// (a drag, the overview) rather than macOS's to act on.
+    /// (a drag) rather than macOS's to act on.
     var keepsSwipe: () -> Bool = { false }
 
     static var live: Self {
@@ -19,7 +19,7 @@ struct WorkspaceSwipeDependencies {
              canNavigate: {
                  workspaceSwipeGestureEnabled && isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
                      !WindowBorderController.shared.isMissionControlActive &&
-                     !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress() && !WorkspaceOverviewController.shared.isOpen
+                     !isMouseManipulationActive && !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress()
              }, reversed: { false }, navigate: { activate in
                  guard let token: RunSessionGuard = .isServerEnabled else { return false }
                  return try await runLightSession(.globalObserver("workspaceSwipe"), token, shouldSchedulePostRefresh: false, body: activate)
@@ -28,7 +28,7 @@ struct WorkspaceSwipeDependencies {
                  if !(error is CancellationError) { debugLog(.focus, "workspaceSwipe navigation failed: \(error)") }
              }, keepsSwipe: {
                  isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled && !WindowBorderController.shared.isMissionControlActive &&
-                     (isMouseManipulationActive || isLeftMouseButtonDown || isWorkspaceSidebarDragInProgress() || WorkspaceOverviewController.shared.isOpen)
+                     (isMouseManipulationActive || isLeftMouseButtonDown || isWorkspaceSidebarDragInProgress())
              })
     }
 }

@@ -173,7 +173,7 @@ Before broader release, validate physical gestures, multi-display ownership and
 hotplug, sleep/wake, rapid native Mission Control interruption,
 and matched app/WindowServer energy traces. Passing synthetic tests does not
 replace those desktop checks. Native overview implementation and resource policy
-are documented in [Workspace overview](WORKSPACE_OVERVIEW.md).
+are documented in [Workspace overview](archive/WORKSPACE_OVERVIEW.md).
 
 The build 87 installation checksum check observed one concurrently added
 `single-window-aspect-ratio` setting. Removing that single added line reproduces

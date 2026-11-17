@@ -37,7 +37,7 @@ final class FollowAppActivationTest: XCTestCase {
         XCTAssertFalse(ignoresCrossWorkspaceActivation(local))
         XCTAssertTrue(ignoresCrossWorkspaceActivation(other))
         for event in [RefreshSessionEvent.socketServer(parseCommand("focus right").cmdOrDie.args), .hotkeyBinding, .menuBarButton,
-                      .globalObserver("workspaceSwipe"), .globalObserver("workspaceOverviewSelection")] {
+                      .globalObserver("workspaceSwipe")] {
             $refreshSessionEvent.withValue(event) {
                 XCTAssertTrue(shouldSyncFocusBackToMacOs(nativeFocused: other, frontmostActivationPolicy: .regular))
             }

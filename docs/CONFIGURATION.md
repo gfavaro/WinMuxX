@@ -126,7 +126,7 @@ appearance = 'system' # system, light, or dark
 ```
 
 The same value appears in Settings → Appearance → Theme. It applies to WinMuxX
-windows, the expanded sidebar, palette, workspace overview, and tab chrome.
+windows, the expanded sidebar, palette and tab chrome.
 System follows macOS Light/Dark appearance and updates when macOS changes it.
 Light and Dark override the system for WinMuxX. Wallpaper and decorative tint do
 not select the theme of expanded surfaces. The compact rail can still adapt to
@@ -141,8 +141,8 @@ To use another color, set the root-level `accent-color`:
 accent-color = '#7AA2F7' # #RRGGBB; omit it to follow macOS
 ```
 
-It colors borders set to `'accent'`, tab pills, the hover bar, the workspace
-overview's selection and mode indicators without their own `indicator-color`.
+It colors borders set to `'accent'`, tab pills, the hover bar and mode indicators
+without their own `indicator-color`.
 A theme tool can write it to match WinMuxX to the rest of the desktop.
 
 ## Dimming inactive windows

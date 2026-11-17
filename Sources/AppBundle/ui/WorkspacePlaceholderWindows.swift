@@ -1,7 +1,7 @@
 import AppKit
 
-// The overview and the window flip draw each window as a card with its app's icon: WinMuxX
-// does not ask for Screen Recording, so it never reads another app's window contents.
+// The window flip draws each window as a card with its app's icon: WinMuxX does not ask for
+// Screen Recording, so it never reads another app's window contents.
 
 @MainActor private var placeholderIconsByPid: [pid_t: CGImage] = [:]
 

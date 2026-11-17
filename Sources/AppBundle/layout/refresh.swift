@@ -102,7 +102,7 @@ func shouldSyncFocusBackToMacOs(
     if ignoresCrossWorkspaceActivation(nativeFocused) {
         switch refreshSessionEvent {
             case .socketServer, .hotkeyBinding, .menuBarButton: break
-            case .globalObserver(let name) where name == "workspaceSwipe" || name == "workspaceOverviewSelection": break
+            case .globalObserver(let name) where name == "workspaceSwipe": break
             default: return false
         }
     }
@@ -552,7 +552,6 @@ func refreshModel() {
     checkOnFocusChangedCallbacks()
     normalizeContainers()
     if !isUnitTest { WorkspaceScrollingMinimap.shared.modelDidChange() }
-    if !isUnitTest { WorkspaceOverviewController.shared.modelDidChange() }
 }
 
 @MainActor

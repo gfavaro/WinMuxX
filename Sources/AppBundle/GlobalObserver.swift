@@ -132,7 +132,7 @@ enum GlobalObserver {
 
     @MainActor
     private static func scheduleFocusFollowsMouse(point: CGPoint, timestamp: TimeInterval) {
-        guard !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
+        guard TrayMenuModel.shared.isEnabled, config.focusFollowsMouse, !isLeftMouseButtonDown,
               !isMouseManipulationActive,
               let window = pointerFocusCandidate(at: point),
               window.participatesInWorkspaceFocus else {
@@ -148,14 +148,14 @@ enum GlobalObserver {
         focusFollowsMouseTask = Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(dwell))
             guard !Task.isCancelled,
-                  !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+                  TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive,
                   !isLeftMouseButtonDown,
                   let ready = FocusFollowsMouseController.shared.isReady(dwell: Double(dwell) / 1000, timestamp: ProcessInfo.processInfo.systemUptime),
                   ready == window.windowId else { return }
             let id = await PointerFocusNativeHitTester.shared.windowId(at: point)
             guard !Task.isCancelled,
-                  !WorkspaceOverviewController.shared.isOpen, TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
+                  TrayMenuModel.shared.isEnabled, config.focusFollowsMouse,
                   !isMouseManipulationActive, !isLeftMouseButtonDown,
                   let target = pointerFocusTarget(at: point, frontmostWindowId: id),
                   target != focus.windowOrNil else { return }

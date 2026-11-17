@@ -144,15 +144,14 @@ not read raw touches; scrolling workspaces and their raw-touch pan moved to Spac
 vertical progress follows Natural scrolling, so its sign alone says which way the content
 moves. On macOS 27 the Dock must still receive the physical Ended event (motion
 zeroed), or its gesture state stays open.
-Recognizer policy, the bounded mailbox, native device ownership and the shared
-spring each have separate modules. The overview presentation owns panel-only
-motion; the swipe controller owns workspace navigation. Keep new gesture
+Recognizer policy, the bounded mailbox and native device ownership each have
+separate modules; the swipe controller owns workspace navigation. Keep new gesture
 behavior out of startup/configuration/observer entry points beyond delegation.
 
 A swipe shows nothing while the fingers move; it switches workspace on release.
 Async completions must check their generation before affecting a newer interaction.
-WinMuxX never reads other apps' window contents: the overview and the window flip
-draw each window as a card with its app's icon (`WorkspacePlaceholderWindows.swift`).
+WinMuxX never reads other apps' window contents: the window flip draws each window
+as a card with its app's icon (`WorkspacePlaceholderWindows.swift`).
 
 Settings navigation lives in `ui/settings/ShortcutSettingsView.swift`. Each config
 pane has a `Settings*View.swift` file; controls and TOML persistence are shared in

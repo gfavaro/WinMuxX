@@ -174,7 +174,6 @@ final class WindowBorderController {
             bundleIdentifierForPID: bundleIdentifier)
         let transition = missionControlState.update(active: active)
         if transition == true {
-            WorkspaceOverviewController.shared.dismiss(restoreFocus: false)
             WindowMotion.shared.finishAll()
             clear()
         } else if !active, transition != nil || refreshBorders {

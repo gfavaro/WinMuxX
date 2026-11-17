@@ -31,7 +31,7 @@ struct ShortcutAppearanceSettingsView: View {
         SettingsScrollView {
             SettingsSection("Shared style") {
                 SettingsPicker(.appearance, selection: $appearance,
-                               help: "Apply System, Light or Dark to WinMuxX windows, the sidebar, palette, workspace overview and tab groups.") {
+                               help: "Apply System, Light or Dark to WinMuxX windows, the sidebar, palette and tab groups.") {
                     Text("System").tag(AppAppearance.system)
                     Text("Light").tag(AppAppearance.light)
                     Text("Dark").tag(AppAppearance.dark)

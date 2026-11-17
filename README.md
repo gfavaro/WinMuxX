@@ -444,6 +444,9 @@ is not ready within 80 ms, the window switches without a delayed animation.
 
 <a id="managed-tiling-mode"></a>
 
+Dragging a window onto another creates a tab group. Existing tab groups keep their
+layout; edge drops still split normally.
+
 ### Stacked layouts
 
 Stacked windows have two variants: **Tabbed** shows one window at a time, with a
@@ -522,179 +525,6 @@ workspaces. Each secondary display then shows its assigned workspace, if any;
 can run existing `move-workspace-to-monitor` commands for optional startup placement.
 The toggle only affects launch, not configuration reloads or normal switching.
 
-### Multiple monitors
-
-All monitors share the project and workspace list. Each display has its own
-sidebar and selects its own workspace. Two displays can use the same project,
-but each must show a different workspace.
-
-### Launching apps
-
-WinMux supports single-modifier keybindings, such as triggering an action when
-you press `⌘`.
-
-A shortcut that opens a new window helps you launch an app into the current
-workspace instead of returning to a window on another workspace. These examples
-use separate Chrome profiles and scripts for cmux and Finder:
-
-```toml
-[mode.main.binding-tap]
-    left-alt = 'exec-and-forget /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --profile-directory="Default"'
-    right-cmd = 'exec-and-forget /Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --profile-directory="Profile 1"'
-
-[mode.main.binding]
-    # Disable the native "Hide App" shortcut.
-    cmd-h = []
-
-    cmd-d = 'exec-and-forget osascript ~/Documents/scripts/launchTerminalWindow.scpt'
-    cmd-e = 'exec-and-forget osascript ~/Documents/scripts/launchFinderWindow.scpt'
-```
-
-### Shortcut modifier sides
-
-Settings → Shortcuts → Modifier keys chooses Both, Left or Right independently
-for Option, Command, Control and Shift. The default is Both. For example:
-
-```toml
-[modifiers]
-alt = 'left'
-cmd = 'both'
-ctrl = 'both'
-shift = 'both'
-```
-
-Left Option then runs Option shortcuts; right Option remains available for typing.
-Pressing both sides of a restricted modifier passes through too. Modifier-only tap
-bindings keep their explicitly configured sides. Accessibility access is required.
-
-Confirmed application minimum sizes persist across restarts. Settings → Windows
-lists each app and its known width and height; unknown axes are shown explicitly.
-Forget an app there, or use **Forget All…** to clear saved and current observations. When an explicit resize reaches a
-confirmed app minimum, WinMuxX shows a brief nonactivating notice.
-
-### Window search palette
-
-The window search palette lists windows across workspaces and projects. Filter
-the list by typing, then select a window to focus it. Open it with a normal
-shortcut or a tap-only shortcut:
-
-```toml
-[mode.main.binding]
-    alt-o = 'palette'
-
-[mode.main.binding-tap]
-    right-cmd = 'palette'
-```
-
-The right Command tap opens the palette when it is closed and closes it when
-it is open. Press `Escape` to close it. A modifier tap does not run when you
-use that modifier as part of another shortcut.
-
-Use `winmuxx palette --group-by-workspace` (or bind
-`palette --group-by-workspace`) to group matches under workspace headings.
-The palette's **Group by workspace** button switches between grouped and flat
-results for the current opening. Groups keep the opening workspace order, with
-the focused workspace first; matches keep fuzzy ranking within each group.
-Headings show workspace display labels and project names. Up/Down, Return and
-⌘1–⌘9 count window rows only. Bare `palette` retains the flat list.
-Search uses a native macOS search field, including its clear button and standard
-text-editing commands. Input-method composition keeps priority over navigation
-and quick-select shortcuts. Results use standard selectable rows and adaptive
-system colors; glass follows system appearance, while opaque custom chrome
-keeps its configured color with a contrasting light or dark appearance.
-
-### Workspace overview
-
-`winmuxx workspace-overview` toggles a spatial overview of the current project.
-Each display shows its own workspace cards, preserving saved window positions,
-sizes and overlap. Click a card to switch workspaces or a window to focus it.
-Arrow keys select cards, Tab selects windows, Return activates, and Escape closes.
-Page Up/Down or Previous/Next navigate more than twelve cards on a display.
-The `show` and `hide` arguments are idempotent.
-
-```toml
-[mode.main.binding]
-    alt-shift-o = 'workspace-overview'
-```
-
-Open the overview from a shortcut, the menu or the CLI; three-finger swipes up and down
-move between workspaces instead (see [Workspace swipes](#workspace-swipes)).
-Hidden overview surfaces are reused between openings;
-images and selection state are cleared on dismissal. Opening and closing use a spring
-timed by `animations.duration-ms`. The overview uses the expanded
-sidebar's translucent frosted material; Reduce Transparency supplies an opaque
-background. Reduce Motion and disabled
-animations skip motion. WinMuxX does not change macOS settings.
-
-Minimized windows, hidden apps, native full-screen windows and popups are excluded.
-Ordinary windows on inactive WinMuxX workspaces remain included. Previews are
-captured on demand and stay static. Missing permission or unavailable contents
-fall back to app icons and saved outlines. Windows without saved geometry appear
-in a menu beneath their card. There is no dragging or continuous live capture.
-See [overview implementation and validation](docs/WORKSPACE_OVERVIEW.md).
-
-### Example launch scripts
-
-```applescript
-# ~/Documents/scripts/launchTerminalWindow.scpt
-tell application "cmux"
-    if it is running
-        tell application "System Events" to tell process "cmux"
-            click menu item "New Window" of menu "File" of menu bar 1
-        end tell
-    else
-        activate
-    end if
-end tell
-
-# ~/Documents/scripts/launchFinderWindow.scpt
-tell application "Finder"
-    if it is running
-        tell application "System Events" to tell process "Finder"
-            click menu item "New Finder Window" of menu "File" of menu bar 1
-        end tell
-    else
-        activate
-    end if
-end tell
-
-```
-
-## Installation
-
-Download a ZIP from [WinMuxX releases](https://github.com/gfavaro/WinMuxX/releases)
-and extract `WinMuxX.app`, or build this fork with
-`make fork-build BUILD_NUMBER=<new-number>`, then install
-`.release/WinMuxX.app` as described in [HACKING.md](HACKING.md). Fork builds retain
-the configured local signing identity, are not notarized, and have automatic
-upstream updates disabled. The upstream Homebrew cask installs WinMux, not WinMuxX.
-
-The `winmuxx` command can be linked into your PATH after installation:
-
-```sh
-ln -s /Applications/WinMuxX.app/Contents/MacOS/winmuxx-cli /opt/homebrew/bin/winmuxx
-```
-
-The link follows future app updates. Choose another existing directory in PATH
-if Homebrew is not installed.
-
-## Migrating
-
-The fork owns `${XDG_CONFIG_HOME:-~/.config}/winmuxx/winmux.toml`. On first launch
-it copies the previous `winmux-gf/winmux.toml`, or an original WinMux config if no
-previous fork config exists, without modifying the source. If no original
-config is found, AeroSpace import remains available; otherwise it generates a
-starter config. `--config-path` selects an explicit file. See
-[fork configuration ownership](docs/FORK.md#app-isolation) for details.
-
-## Credits
-
-WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
-build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
-
-Dragging a window onto another creates a tab group. Existing tab groups keep their
-layout; edge drops still split normally.
-
 ### Workspace swipes
 
 **Settings → Windows → Workspace swipes** enables three-finger
@@ -716,7 +546,7 @@ the swipe as usual. Mission Control stays on its keyboard shortcut. In a Scrolli
 workspace, three-finger left/right scrolls its strip: the columns follow your fingers,
 and on release focus goes to the column nearest the middle (with Swipe between
 full-screen apps on three fingers). Elsewhere left/right still switches macOS Spaces. While a
-window drag or the workspace overview is in progress, the swipe does nothing, so
+window drag is in progress, the swipe does nothing, so
 macOS does not open Mission Control underneath. macOS's own release speed decides a flick: a
 quick flick switches after a little travel, and flicking back cancels even past
 halfway. Quick swipes chain: a swipe begun while the previous switch is still landing
@@ -733,84 +563,6 @@ Control on four fingers or off, WinMuxX does not take the swipe.
 
 <a id="managed-tiling-mode"></a>
 
-### Stacked layouts
-
-Stacked windows have two variants: **Tabbed** shows one window at a time, with a
-pill per window on the group's top edge; **Strip** (`layout strip`) shows them side
-by side as columns that scroll within the group, see
-[layouts](docs/LAYOUTS.md#container-modes-and-tabs). Choose Tabbed in Settings →
-Windows for new roots, or use `winmuxx layout tabbed strip` to toggle the focused
-container. `layout tab-group` remains supported. The accordion layout was removed;
-`accordion` and `stacked` in configuration and commands now give a tab group, as an
-imported AeroSpace configuration already did.
-
-### Tiling and floating
-
-With `default-root-container-layout = 'dwindle'`, existing tiled windows also use dwindle at startup,
-including tiled roots restored from older saved state. Switching the default to dwindle while WinMux
-is running updates existing tiled roots on config reload. Floating windows and tab groups are preserved;
-manual layout choices made afterward remain active during ordinary refreshes and unrelated config edits.
-
-WinMux tiles newly discovered windows by default. To keep their existing macOS size and position while still using WinMux's sidebar, workspaces, and manual layout commands, disable automatic tiling:
-
-```toml
-automatically-tile-new-windows = false
-```
-
-This applies to windows discovered when WinMux starts and windows opened later. You can still tile an individual floating window with `winmux layout tiling` or the configured `layout floating tiling` shortcut.
-
-The WinMuxX menu's **Always Float “App”…** (hold Option for **Float Windows by Title…**) saves an ordered `on-window-detected` rule in your configuration. Window rules run in file order; if an earlier stopping rule may match, WinMuxX opens the configuration for review instead of silently changing its behavior. Restored windows keep their saved placement.
-
-While dragging a window by its title bar, shake it horizontally to toggle between floating and tiling. The gesture requires several deliberate direction changes in quick succession, and does not activate during resize, sidebar, tab-strip, or tab-group drags. Disable it with:
-
-```toml
-enable-shake-to-toggle-tiling = false
-```
-
-### Workspace navigation
-
-Empty workspaces are collected when no longer needed. Explicit persistent names,
-a visible temporary blank and active display/project requirements keep the
-workspaces that still need to exist. Numeric workspace arguments are display positions; use `workspace --name <name>` to
-select an internal workspace name directly.
-
-Workspace activation can target a monitor explicitly:
-
-```shell
-winmux workspace 2 --monitor secondary
-winmux workspace --name 9
-```
-
-Workspace commands resolve navigation and new slots on the focused monitor unless
-`--monitor` specifies another display. Existing workspaces retain their owning display.
-Selecting a workspace focuses it on its owning display, whether visible or hidden,
-without relocating it. Use `move-workspace-to-monitor` or `summon-workspace` explicitly
-to move it; subsequent switches remember that display. New, unassigned workspaces
-use the focused display or an explicit `--monitor` target.
-`workspace next` and `workspace prev` skip workspaces owned by other displays; numbering stays
-project-wide. `workspace-back-and-forth` and `--auto-back-and-forth` use each display's own history.
-Clicking a workspace assigned to another display in a sidebar offers Override / Cancel,
-whether the workspace is visible or hidden. Override brings it to that sidebar’s display;
-Cancel changes nothing.
-For a workspace on another display, its sidebar context menu offers **Bring Here**:
-bring it to the display containing that sidebar. On a secondary display, the previous
-workspace returns to main, hidden and reachable by shortcuts or swipes. Main can own
-multiple workspaces; each secondary is replaced by the explicitly brought workspace.
-Reconciliation also returns hidden secondary assignments to main after restoration
-or display changes, keeping only the visible workspace on each secondary.
-The source gets a local fallback or empty workspace; other displays keep their current
-workspace. Forced assignments (`workspace-to-monitor-force-assignment`) work as in
-AeroSpace: while its display is connected, an assigned workspace shows only there,
-selecting it from any display shows it there, and moving it elsewhere is refused.
-
-At launch, display ownership is restored by default, and assignments do not override it. Enable **Settings → General →
-Startup → Start workspaces on main display** (`start-workspaces-on-main-monitor = true`)
-to start existing workspaces on main instead. Secondary displays receive empty
-workspaces. Each secondary display then shows its assigned workspace, if any;
-**Automation → After startup**
-can run existing `move-workspace-to-monitor` commands for optional startup placement.
-The toggle only affects launch, not configuration reloads or normal switching.
-
 ### Multiple monitors
 
 All monitors share the project and workspace list. Each display has its own
@@ -892,36 +644,6 @@ and quick-select shortcuts. Results use standard selectable rows and adaptive
 system colors; glass follows system appearance, while opaque custom chrome
 keeps its configured color with a contrasting light or dark appearance.
 
-### Workspace overview
-
-`winmuxx workspace-overview` toggles a spatial overview of the current project.
-Each display shows its own workspace cards, preserving saved window positions,
-sizes and overlap. Click a card to switch workspaces or a window to focus it.
-Arrow keys select cards, Tab selects windows, Return activates, and Escape closes.
-Page Up/Down or Previous/Next navigate more than twelve cards on a display.
-The `show` and `hide` arguments are idempotent.
-
-```toml
-[mode.main.binding]
-    alt-shift-o = 'workspace-overview'
-```
-
-Open the overview from a shortcut, the menu or the CLI; three-finger swipes up and down
-move between workspaces instead (see [Workspace swipes](#workspace-swipes)).
-Hidden overview surfaces are reused between openings;
-images and selection state are cleared on dismissal. Opening and closing use a spring
-timed by `animations.duration-ms`. The overview uses the expanded
-sidebar's translucent frosted material; Reduce Transparency supplies an opaque
-background. Reduce Motion and disabled
-animations skip motion. WinMuxX does not change macOS settings.
-
-Minimized windows, hidden apps, native full-screen windows and popups are excluded.
-Ordinary windows on inactive WinMuxX workspaces remain included. Previews are
-captured on demand and stay static. Missing permission or unavailable contents
-fall back to app icons and saved outlines. Windows without saved geometry appear
-in a menu beneath their card. There is no dragging or continuous live capture.
-See [overview implementation and validation](docs/WORKSPACE_OVERVIEW.md).
-
 ### Example launch scripts
 
 ```applescript
@@ -980,62 +702,3 @@ starter config. `--config-path` selects an explicit file. See
 
 WinMuxX is based on ZimengXiong/WinMux. Configuration and command support also
 build on [Aerospace](https://github.com/nikitabobko/AeroSpace).
-
-Dragging a window onto another creates a tab group. Existing tab groups keep their
-layout; edge drops still split normally.
-
-### Workspace swipes
-
-**Settings → Windows → Workspace swipes** enables three-finger
-workspace swipes. Workspaces stack like the sidebar: swiping up brings the workspace
-below into view and swiping down the one above, sliding vertically. It is off by default:
-
-```toml
-[workspace-swipe]
-enabled = false
-```
-
-When **System Settings → Trackpad → More Gestures → Mission Control** uses three
-fingers, macOS recognizes the swipe and WinMuxX acts on it,
-so starting, resting thumbs and palms, flicks and taking a swipe back behave exactly
-as in macOS. WinMuxX keeps the swipe from the Dock;
-past the first or last workspace the swipe does nothing. Over a native full-screen
-app, while Mission Control is open or while WinMuxX is not taking swipes, macOS gets
-the swipe as usual. Mission Control stays on its keyboard shortcut. In a Scrolling
-workspace, three-finger left/right scrolls its strip: the columns follow your fingers,
-and on release focus goes to the column nearest the middle (with Swipe between
-full-screen apps on three fingers). Elsewhere left/right still switches macOS Spaces. While a
-window drag or the workspace overview is in progress, the swipe does nothing, so
-macOS does not open Mission Control underneath. macOS's own release speed decides a flick: a
-quick flick switches after a little travel, and flicking back cancels even past
-halfway. Quick swipes chain: a swipe begun while the previous switch is still landing
-waits for it, then continues from the workspace it reached. Natural
-scrolling sets the direction as it does for scrolling: the content follows your
-fingers. An event tap reads macOS's
-private Dock swipe events (the approach of InstantSpaceSwitcher and iss); it needs
-the Accessibility permission WinMuxX already has.
-
-Previews follow your three fingers proportionally after a small vertical
-movement, without adding an easing animation to each input update. A short quick flick or a longer drag followed by release
-commits the switch. Pulling back before release reduces progress and can cancel it. Each gesture selects at most one adjacent
-workspace. Window dragging/resizing blocks it. With Mission Control on four
-fingers or off, WinMuxX does not take the swipe.
-
-Only snapshots move during the gesture; real workspace activation waits for release.
-The preview is clipped to the target display and leaves its sidebar fixed. Snapshot
-images are cached in memory (up to four images / 64 MiB), while fresh incoming
-images are prepared off the main thread. A slide keeps the incoming image it started
-with; a fresh one is cached for the next swipe. A cold preview appears only if ready
-before release; otherwise navigation proceeds without a delayed animation. Incoming
-previews use windows' last visible positions. After release the slide carries on at
-your fingers' speed and slows to a stop, taking at most 220 ms scaled by the remaining
-distance (never less than 120 ms), then fades over 80 ms into the real windows. Global animations,
-Reduce Motion or a zero settle duration disable the
-visual preview while retaining release-to-switch navigation. Without Screen Recording
-access the preview draws each window as a card with its app icon on the wallpaper, so
-macOS shows no recording indicator; the overview's thumbnails do the same. Keyboard/mouse actions,
-disabling, sleep and display changes clear the preview. No screen images are saved.
-
-WinMuxX does not change system preferences. Settings shows whether it is reading
-macOS's swipes; `winmuxx doctor` also reports the last macOS swipe's progress,
-velocity and outcome.

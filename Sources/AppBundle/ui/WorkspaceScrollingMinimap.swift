@@ -25,7 +25,7 @@ final class WorkspaceScrollingMinimap: NSObject {
     func show(_ workspace: Workspace, duringGesture: Bool = false, explicitly: Bool = false) -> Bool {
         guard config.scrolling.minimapEnabled, workspace.arrangement == .scrolling,
               workspace.isVisible, !workspace.scrollingColumns.isEmpty,
-              TrayMenuModel.shared.isEnabled, !WorkspaceOverviewController.shared.isOpen,
+              TrayMenuModel.shared.isEnabled,
               !WindowBorderController.shared.isMissionControlActive, !isMouseManipulationActive else { return false }
         guard focus.windowOrNil?.isFullscreen != true,
               focus.windowOrNil?.lastKnownNativeFullscreen != true else { dismiss(); return false }
@@ -61,7 +61,6 @@ final class WorkspaceScrollingMinimap: NSObject {
         guard panel?.isVisible == true else { return }
         guard let workspace, workspace.arrangement == .scrolling, workspace.isVisible, !workspace.scrollingColumns.isEmpty,
               config.scrolling.minimapEnabled, TrayMenuModel.shared.isEnabled,
-              !WorkspaceOverviewController.shared.isOpen,
               !WindowBorderController.shared.isMissionControlActive,
               focus.windowOrNil?.isFullscreen != true,
               focus.windowOrNil?.lastKnownNativeFullscreen != true else { dismiss(); return }

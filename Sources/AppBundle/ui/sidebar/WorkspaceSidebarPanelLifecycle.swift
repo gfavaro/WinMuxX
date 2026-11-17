@@ -12,11 +12,6 @@ extension WorkspaceSidebarPanel {
         guard !isRetired else { return }
         syncContentLoading()
         defer { requestPublicStateUpdate() }
-        guard !WorkspaceOverviewController.shared.isOpen else {
-            cancelExpansionWork()
-            resetHiddenSidebarState()
-            return
-        }
         guard let layout = currentSidebarPanelLayout(on: monitor) else {
             cancelExpansionWork()
             resetHiddenSidebarState()

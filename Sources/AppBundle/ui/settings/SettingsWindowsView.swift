@@ -91,11 +91,6 @@ struct ShortcutBehaviorSettingsView: View {
                 Text("Needs Mission Control on three fingers in macOS Trackpad settings: macOS recognizes the swipe and WinMuxX switches workspaces with it. At the first or last workspace the swipe does nothing; Mission Control stays on its keyboard shortcut. Normal two-finger scrolling stays with your apps.")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            SettingsSection("Workspace overview") {
-                Text("Shows the current project's workspaces on each display. Open it with workspace-overview from a shortcut or the CLI. Minimized windows, hidden apps and native full-screen windows are excluded.")
-                    .font(.callout).foregroundStyle(.secondary)
-            }
-
             masterSettingsSection
             scrollingSettingsSection
             SettingsSection("Pointer focus") {
@@ -302,8 +297,8 @@ func windowMouseGestures(shakeEnabled: Bool, doubleSided: Bool) -> [(gesture: St
         ("Drag a tiled window's edge", "Resize it and its neighbours"),
         ("Drag a window onto a sidebar workspace", "Move it to that workspace"),
         ("Rest the pointer on a tab group's top edge", "Open the hover bar"),
-        ("Three-finger swipe left or right", "Switch workspace, when Workspace swipes is on"),
-        ("Three-finger swipe up", "Open the workspace overview, with Mission Control on three fingers"),
+        ("Three-finger swipe up or down", "Switch workspace, when Workspace swipes is on"),
+        ("Three-finger swipe left or right", "Scroll a Scrolling workspace's strip"),
     ]
     if doubleSided { gestures.insert(("Option-click a two-window group", "Flip to the other window"), at: 6) }
     if shakeEnabled { gestures.insert(("Shake a window while dragging it", "Toggle floating and tiling"), at: 6) }

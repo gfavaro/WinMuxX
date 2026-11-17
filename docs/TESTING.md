@@ -141,18 +141,6 @@ release navigation gates before destroying the fixture. Session gates deliberate
 allow cancelled native work to return, so stale success and error paths are tested.
 All waits have bounded XCTest expectations; no timing sleeps are used.
 
-## Workspace overview regression boundary
-
-`WorkspaceOverviewDependencies` injects model snapshots, display/project context,
-ordering/capture, panel creation and navigation. Controller tests exercise real
-queue/lifetime logic with synthetic images and cancellation-ignoring captures.
-`WorkspaceOverviewModelTest` uses `WorkspaceNavigationFixture` to check inactive
-workspace geometry and ownership without native AX traffic. Gesture integration
-tests inject action callbacks into the shared axis router and cover independent
-feature flags. Synthetic view rendering and native panel allocation/teardown are
-separate from real desktop and physical trackpad validation. See
-[overview documentation](WORKSPACE_OVERVIEW.md) for the resource budgets.
-
 ## Validation history
 
 Build-by-build results, test counts and native checks up to build 100 are in the

@@ -122,7 +122,6 @@ final class SwitcherPalettePanel: NSPanelHud {
         guard !isPaletteActive else { return }
         pendingRelease?.cancel()
         pendingRelease = nil
-        if nativePresentation { WorkspaceOverviewController.shared.dismiss(restoreFocus: false) }
         presentationGeneration &+= 1
         let generation = presentationGeneration
         isPaletteActive = true

@@ -58,7 +58,6 @@ public enum CmdKind: String, CaseIterable, Equatable, Sendable {
     case workspace
     case workspaceBackAndForth = "workspace-back-and-forth"
     case workspaceLayout = "workspace-layout"
-    case workspaceOverview = "workspace-overview"
 }
 
 func initSubcommands() -> [String: any SubCommandParserProtocol] {
@@ -181,8 +180,6 @@ func initSubcommands() -> [String: any SubCommandParserProtocol] {
                 result[kind.rawValue] = SubCommandParser(ScrollingWidthCmdArgs.init)
             case .noPeek:
                 result[kind.rawValue] = SubCommandParser(NoPeekCmdArgs.init)
-            case .workspaceOverview:
-                result[kind.rawValue] = SubCommandParser(WorkspaceOverviewCmdArgs.init)
             case .workspaceBackAndForth:
                 result[kind.rawValue] = SubCommandParser(WorkspaceBackAndForthCmdArgs.init)
         }

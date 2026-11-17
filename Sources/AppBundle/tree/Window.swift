@@ -39,7 +39,6 @@ open class Window: TreeNode, Hashable {
 
     @MainActor
     func invalidateLastKnownNativeState() {
-        if !isUnitTest { WorkspaceOverviewController.shared.nativeWindowChanged(windowId) }
         lastKnownNativeStateGeneration += 1
         lastKnownActualRect = nil
         lastKnownNativeFullscreen = nil

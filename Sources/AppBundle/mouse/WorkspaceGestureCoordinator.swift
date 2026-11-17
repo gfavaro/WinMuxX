@@ -32,6 +32,5 @@ final class WorkspaceGestureCoordinator {
     }
     private func cancelInteractions() {
         WorkspaceSwipeController.shared.reset()
-        WorkspaceOverviewController.shared.invalidate()
     }
 }

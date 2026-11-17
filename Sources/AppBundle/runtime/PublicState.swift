@@ -48,7 +48,6 @@ struct PublicStateEnvelope: Codable, Equatable, Sendable {
     var structuralState: [String: StateValue]?
     // UI controllers report state without constructing panels in read-only queries.
     var paletteVisible = false
-    var overviewVisible = false
     func changed() { revision &+= 1 }
     isolated deinit { publicationTask?.cancel() }
 }
@@ -91,7 +90,7 @@ func stateColorHex(_ color: NSColor) -> String {
         "ui": .object([
             "sidebarExpanded": .bool(WorkspaceSidebarPanel.visiblePanels.contains { $0.state.isExpanded }),
             "sidebarEnabled": .bool(config.workspaceSidebar.enabled),
-            "paletteVisible": .bool(store.paletteVisible), "overviewVisible": .bool(store.overviewVisible),
+            "paletteVisible": .bool(store.paletteVisible),
             "sidebarPanels": .array(isUnitTest ? [] : WorkspaceSidebarPanel.visiblePanels.sorted { $0.monitorScopeId < $1.monitorScopeId }.map {
                 .object(["scopeId": .string($0.monitorScopeId), "expanded": .bool($0.state.isExpanded)])
             }),
