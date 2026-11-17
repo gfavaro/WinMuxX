@@ -36,6 +36,10 @@ final class Workspace: TreeNode, NonLeafTreeNodeObject, Hashable, Comparable {
     @MainActor var scrollingAnchorViewportPosition: CGFloat?
     @MainActor var scrollingAnchorAreaWidth: CGFloat?
     @MainActor var scrollingAnchorLogicalCenter: CGFloat?
+    /// While fingers pan the strip, layouts write each step straight to the windows instead of
+    /// gliding to it, so the columns keep up with the fingers.
+    @MainActor var scrollingGestureMotionActive = false
+    @MainActor var scrollingGestureSessionID: UUID?
     private var savedMasterGroupIndex = 0
     private weak var masterGroup: TreeNode?
     @MainActor var masterGroupIndex: Int {

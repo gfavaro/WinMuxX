@@ -38,6 +38,8 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
         let metrics = workspace.scrollingMetrics
         startingColumn = nearestScrollingColumn(in: metrics, offset: workspace.scrollingOffset, direction: 0)
             .map { ObjectIdentifier($0.node) }
+        workspace.scrollingGestureSessionID = UUID()
+        workspace.scrollingGestureMotionActive = true
         dockSwipeChanged(progress, timestamp: timestamp)
         return .started
     }
@@ -60,7 +62,13 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
 
     func dockSwipeEnded(commit: Bool, progress: Double, velocity: Double, timestamp: Double) {
         defer { workspace = nil; startingColumn = nil }
-        guard commit, let workspace, workspace.isVisible, workspace.arrangement == .scrolling else { return }
+        // The settle after the fingers lift glides as any layout does.
+        workspace?.scrollingGestureMotionActive = false
+        workspace?.scrollingGestureSessionID = nil
+        guard commit, let workspace, workspace.isVisible, workspace.arrangement == .scrolling else {
+            scheduleRefreshSession(.globalObserver("scrollingSwipeCancelled"))
+            return
+        }
         let metrics = workspace.scrollingMetrics
         guard let column = settledDockSwipeColumn(in: metrics, offset: workspace.scrollingOffset, direction: direction,
                                                   startingColumnID: startingColumn, advanceIfStuck: true),

@@ -119,6 +119,15 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(workspace.scrollingOffset, 0, accuracy: 0.5)
     }
 
+    func testChangingLayoutEndsAStripPan() async throws {
+        let (workspace, _) = try await strip(2)
+        workspace.scrollingGestureMotionActive = true
+        workspace.scrollingGestureSessionID = UUID()
+        try await succeed("workspace-layout dwindle")
+        XCTAssertFalse(workspace.scrollingGestureMotionActive)
+        XCTAssertNil(workspace.scrollingGestureSessionID)
+    }
+
     func testCommandsRefuseOtherLayouts() async throws {
         let workspace = focus.workspace
         _ = TestWindow.new(id: 76100, parent: workspace.rootTilingContainer).focusWindow()

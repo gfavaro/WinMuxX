@@ -462,8 +462,23 @@ final class MacWindow: Window {
         try await macApp.getAxSize(windowId)
     }
 
+    /// One step of a strip pan: no glide, readback or minimum-size learning.
+    @MainActor
+    func setScrollingGestureFrame(_ frame: CGRect) {
+        guard let workspace = nodeWorkspace, workspace.scrollingGestureMotionActive,
+              let session = workspace.scrollingGestureSessionID else { return }
+        suspendMinimumObservationForMotion()
+        guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
+        WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
+        macApp.setAnimatedAxFrame(windowId, frame, session: session)
+    }
+
     @MainActor
     override func setAxFrame(_ topLeft: CGPoint?, _ size: CGSize?) {
+        if nodeWorkspace?.scrollingGestureMotionActive == true, let topLeft, let size {
+            setScrollingGestureFrame(CGRect(origin: topLeft, size: size))
+            return
+        }
         WindowMotion.shared.cancel(windowId)
         guard !WindowRecoveryController.shared.suppressAutomaticFrameWrites else { return }
         WindowRecoveryController.shared.recordBeforeMutation(self, originalRect: lastKnownActualRect)
@@ -515,7 +530,8 @@ final class MacWindow: Window {
     private func canObserveMinimum(_ generation: UInt64) -> Bool {
         !Task.isCancelled && frameRequestGeneration == generation &&
             MacWindow.allWindowsMap[windowId] === self && parent is TilingContainer &&
-            !isFullscreen && !isConcealedByScrolling && !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
+            !isFullscreen && !isConcealedByScrolling && nodeWorkspace?.scrollingGestureMotionActive != true &&
+            !WindowMotion.shared.isAnimating(windowId) && TrayMenuModel.shared.isEnabled &&
             !WindowMotion.shared.screensChanging &&
             !WindowRecoveryController.shared.isRecovering &&
             !WindowRecoveryController.shared.suppressAutomaticFrameWrites

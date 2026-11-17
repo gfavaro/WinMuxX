@@ -6,6 +6,9 @@ import Common
 extension Workspace {
     @MainActor
     func transitionArrangement(to next: WorkspaceLayoutName, focused: Window? = nil) {
+        // A strip pan in progress ends with its strip.
+        scrollingGestureMotionActive = false
+        scrollingGestureSessionID = nil
         if next != .dwindle { preserveAtomicRootAsArrangementGroup() }
         let entering = arrangement != next
         arrangement = next
