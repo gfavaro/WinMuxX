@@ -117,25 +117,28 @@ final class ScrollingStripFeaturesTest: XCTestCase {
         XCTAssertNil(workspace.pinnedScrollingColumn, "The same command unpins")
     }
 
-    func testColumnsNeverReachUnderTheSidebar() async throws {
+    func testNoColumnIsCutAtTheSidebar() async throws {
         config.workspaceSidebar.enabled = true
         config.workspaceSidebar.position = .left
         let (workspace, windows) = try await strip()
         let edge = try XCTUnwrap(workspace.workspaceMonitor.workspaceSidebarEdge)
         guard case .left(let x) = edge else { return XCTFail("Expected a left sidebar") }
-        // Scroll by half a column: the first column is cut by the sidebar's edge.
+        // Half a column's scroll would cut the first column at the sidebar: when the strip
+        // scrolls itself, it goes on past it.
         _ = windows[2].focusWindow()
         workspace.scrollingState.lastFocusWindowId = windows[2].windowId
-        workspace.scrollingState.offset = workspace.scrollingMetrics.columns[0].width / 2
-        try await workspace.layoutWorkspace()
-        for window in windows {
-            if let rect = window.lastAppliedLayoutPhysicalRect {
-                XCTAssertGreaterThanOrEqual(rect.minX, x - 1, "\(window.windowId) is laid out under the sidebar")
-            }
-        }
-        XCTAssertNil(windows[0].lastAppliedLayoutPhysicalRect, "The cut column waits hidden")
-        XCTAssertTrue(windows[0].isConcealedByScrolling)
-        XCTAssertNotNil(windows[2].lastAppliedLayoutPhysicalRect)
+        let first = workspace.scrollingMetrics.columns[0]
+        workspace.scrollingState.offset = first.width / 2
+        let aligned = workspace.scrollingGeometry(aligning: true)
+        XCTAssertGreaterThanOrEqual(aligned.clampedOffset, first.width - 1, "Past the cut column")
+        let second = aligned.columns[1].physicalFrame
+        XCTAssertGreaterThanOrEqual(second.minX, x, "Not under the sidebar")
+        XCTAssertEqual(second.minX, aligned.area.minX, accuracy: 10, "The next column starts where the strip does")
+        // Other layouts, such as after a resize, leave the strip where it is.
+        XCTAssertEqual(workspace.scrollingGeometry().clampedOffset, first.width / 2, accuracy: 0.5)
+        // With the cut column focused, the strip shows it whole instead.
+        workspace.scrollingState.lastFocusWindowId = windows[0].windowId
+        XCTAssertEqual(workspace.scrollingGeometry(aligning: true).clampedOffset, 0, accuracy: 0.5)
     }
 
     func testMinimapDragReordersStripColumns() async throws {

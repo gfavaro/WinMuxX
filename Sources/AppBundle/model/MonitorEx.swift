@@ -40,12 +40,4 @@ extension Monitor {
 
 enum WorkspaceSidebarEdge: Equatable {
     case left(CGFloat), right(CGFloat)
-
-    /// Whether `rect` reaches into the sidebar's area, past a point of rounding.
-    func overlaps(_ rect: Rect) -> Bool {
-        switch self {
-            case .left(let edge): rect.minX < edge - 1
-            case .right(let edge): rect.maxX > edge + 1
-        }
-    }
 }
