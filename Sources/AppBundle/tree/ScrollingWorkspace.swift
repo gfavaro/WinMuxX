@@ -309,22 +309,31 @@ extension Workspace {
     /// keeps the column's place and width.
     @MainActor
     func stackScrollingWindow(_ window: Window, onto target: TreeNode) {
-        guard window !== target, let parent = target.parent as? TilingContainer else { return }
-        let binding = window.unbindFromParent()
+        guard window !== target else { return }
         if let stack = target as? TilingContainer, stack.layout != .tabGroup, stack.orientation == .v {
+            window.unbindFromParent()
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        } else if let index = parent.children.firstIndex(where: { $0 === target }) {
-            let width = target.scrollingColumnWidth
-            let binding = target.unbindFromParent()
-            let stack = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight, .v, .tiles, index: index)
+        } else {
+            // The stack takes the column's place in the side-by-side split, past any one-child
+            // wrappers Dwindle left around it: inside a vertical wrapper, normalization would turn
+            // a vertical stack sideways.
+            var slot: TreeNode = target
+            while let wrapper = slot.parent as? TilingContainer, wrapper !== rootTilingContainer,
+                  wrapper.layout != .tabGroup, wrapper.children.count == 1 { slot = wrapper }
+            guard let row = slot.parent as? TilingContainer else { return }
+            let windowBinding = window.unbindFromParent()
+            guard let index = row.children.firstIndex(where: { $0 === slot }) else {
+                window.bind(to: windowBinding.parent, adaptiveWeight: windowBinding.adaptiveWeight, index: windowBinding.index)
+                return
+            }
+            let width = target.scrollingColumnWidth ?? slot.scrollingColumnWidth
+            let slotBinding = slot.unbindFromParent()
+            if slot !== target { target.unbindFromParent() }
+            let stack = TilingContainer(parent: row, adaptiveWeight: slotBinding.adaptiveWeight, .v, .tiles, index: index)
             stack.scrollingColumnWidth = width
             target.scrollingColumnWidth = nil
             target.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: 0)
             window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
-        } else {
-            // The target left the tree: the window stays where it was.
-            window.bind(to: binding.parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
-            return
         }
         window.scrollingColumnWidth = nil
         lastScrollingFocusWindowId = nil

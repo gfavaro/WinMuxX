@@ -179,6 +179,65 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(workspace.scrollingColumn(of: terminal) === terminal)
     }
 
+    func testUnstackingWorksUnderADwindleRoot() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        let windows = (0..<3).map { TestWindow.new(id: UInt32(76600 + $0), parent: root) }
+        _ = windows[1].focusWindow()
+        try await succeed("workspace-layout scrolling")
+        try await succeed("join-with left")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2)
+        try await succeed("move right")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3, "\(root.children.map { type(of: $0) })")
+    }
+
+    func testUnstackingFromAStackWhoseTopIsWrapped() async throws {
+        // As the helper had it: an explicit Dwindle root, and a stack whose first window sits in a
+        // split of its own.
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        let stack = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        let wrapper = TilingContainer(parent: stack, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        _ = TestWindow.new(id: 76700, parent: wrapper)
+        let lower = TestWindow.new(id: 76701, parent: stack)
+        _ = TestWindow.new(id: 76702, parent: root)
+        root.dwindleChildRatios = [1, 1]
+        _ = lower.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2)
+        try await succeed("move right")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3)
+        XCTAssertTrue(workspace.scrollingColumn(of: lower) === lower)
+    }
+
+    func testJoiningAWindowWrappedInAVerticalSplitStillStacks() async throws {
+        // Dwindle leaves windows wrapped in one-child splits; a stack made inside a vertical one
+        // was turned sideways by normalization.
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .dwindle
+        root.dwindleOrientation = .h
+        let wrapper = TilingContainer(parent: root, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        let inner = TilingContainer(parent: wrapper, adaptiveWeight: 1, .v, .tiles, index: 0)
+        let wrapped = TestWindow.new(id: 76800, parent: inner)
+        let joining = TestWindow.new(id: 76801, parent: root)
+        _ = TestWindow.new(id: 76802, parent: root)
+        _ = joining.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3)
+        try await succeed("join-with left")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2, "The two windows share a column")
+        let stack = try XCTUnwrap(workspace.scrollingColumn(of: joining) as? TilingContainer)
+        XCTAssertTrue(workspace.scrollingColumn(of: wrapped) === stack)
+        XCTAssertEqual(stack.orientation, .v)
+        try await succeed("move right")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3, "and moving sideways takes it out again")
+    }
+
     func testAWideDwindleStackStaysOneColumn() async throws {
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer
