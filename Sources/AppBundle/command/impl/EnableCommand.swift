@@ -31,7 +31,6 @@ struct EnableCommand: Command {
             MacApp.cancelPendingFocus()
             runtime.displays.displayChangeTask?.cancel()
             WindowMotion.shared.cancelAll()
-            DoubleSidedWindowController.shared.cancelPreparation()
             MacApp.registrationRetries.cancelAll()
             WindowDetectionOperations.shared.cancelAll()
             WorkspaceGestureCoordinator.shared.reset()

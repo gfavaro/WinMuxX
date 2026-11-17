@@ -1,17 +1,15 @@
 import AppKit
 import QuartzCore
 
-/// Animates snapshots because another app's window cannot host our Core Animation layers.
+/// Animates cards of the two windows because another app's window cannot host our Core
+/// Animation layers.
 @MainActor
 final class DoubleSidedWindowController {
     static let shared = DoubleSidedWindowController()
     private var animationPanel: NSPanel?
     private let backdropPadding: CGFloat = 64
-    private let preparation = WindowFlipPreparation()
 
-    var isAnimating: Bool { animationPanel != nil || preparation.isBusy }
-
-    func cancelPreparation() { preparation.cancel() }
+    var isAnimating: Bool { animationPanel != nil }
 
     func flip(_ window: Window) {
         guard !isAnimating, TrayMenuModel.shared.isEnabled,
@@ -26,25 +24,11 @@ final class DoubleSidedWindowController {
             focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
             return
         }
-        let frontId = window.windowId, backId = other.windowId
-        let bounds = CGRect(x: rect.topLeftX, y: rect.topLeftY, width: rect.width, height: rect.height)
-        let padding = backdropPadding
-        // Without Screen Recording the faces are placeholder cards, drawn here at once.
-        let placeholders = CGPreflightScreenCaptureAccess() ? nil
-            : placeholderWindowFlipImages(front: frontId, back: backId, rect: rect, padding: padding, monitor: window.nodeMonitor ?? mainMonitor)
-        preparation.begin(capture: {
-            if let placeholders { return placeholders }
-            return try await captureWindowFlipImages(front: frontId, back: backId, rect: bounds, padding: padding)
-        }) { [weak self, weak window, weak other, weak group] images in
-            guard let self, let window, let other, let group, TrayMenuModel.shared.isEnabled,
-                  group.usesDoubleSidedWindows, group.tabActiveWindow === window,
-                  other.nearestWindowTabGroup === group, window.nodeWorkspace?.isVisible == true else { return }
-            if let images, window.lastAppliedLayoutPhysicalRect == rect,
-               config.animations.enabled, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-                self.animate(front: images.front, back: images.back, background: images.background, rect: rect)
-            }
-            focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
+        if let images = placeholderWindowFlipImages(front: window.windowId, back: other.windowId, rect: rect,
+                                                    padding: backdropPadding, monitor: window.nodeMonitor ?? mainMonitor) {
+            animate(front: images.front, back: images.back, background: images.background, rect: rect)
         }
+        focusWindowFromTabStrip(other.windowId, fallbackWorkspace: focus.workspace.name)
     }
 
     private func animate(front: CGImage, back: CGImage, background: CGImage, rect: Rect) {

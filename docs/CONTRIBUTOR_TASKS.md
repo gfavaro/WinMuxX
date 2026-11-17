@@ -24,7 +24,7 @@ Run a relevant filter with `swift test --no-parallel --filter <Filter>`. Read
 
 The `resources/`, `script/`, `project.yml` and `makefile` paths are repository-root
 paths. For schema work, `parseConfig.swift` is the source of truth; `testSchemaListsExactlyTheParserRootKeys` keeps the schema in step.
-For gestures, read [swipe performance](SWIPE_PERFORMANCE.md). For build changes, read
+For build changes, read
 [fork maintenance](FORK.md) and [HACKING](../HACKING.md). The table is a starting map,
 not an exhaustive catalog: use `rg --files` and `rg` when a file or symbol has moved.
 

@@ -422,7 +422,7 @@ private func performLightSession<T>(
     if case .globalObserver("workspaceSwipe") = event {
         // The swipe's own commit keeps its preview until the real layout is ready.
     } else {
-        WorkspaceSwipeController.shared.cancelVisualInteraction()
+        WorkspaceSwipeController.shared.cancelGesture()
     }
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }

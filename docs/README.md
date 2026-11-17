@@ -26,7 +26,6 @@
 - [Release validation](RELEASE_VALIDATION.md): completed checks, long observation and remaining native/energy gaps.
 - [Testing](TESTING.md): test design, isolation, asynchronous coordination and CI reports.
 - [Atlas GUI testing](ATLAS.md): build identification, helper setup and isolated GUI checks.
-- [Swipe performance](SWIPE_PERFORMANCE.md): stage timings, local surface benchmarks and physical validation requirements.
 - [Runtime state cleanup](archive/RUNTIME_STATE_CLEANUP_PLAN.md): scope, ownership decisions and acceptance results.
 - [Fork maintenance](FORK.md): identity, upstream workflow, configuration ownership and signing.
 - [Roadmap](ROADMAP.md): progress, deferred work and manual validation.

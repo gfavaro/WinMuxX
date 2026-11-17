@@ -47,7 +47,7 @@ private actor OverviewCaptureGate {
     var started: XCTestExpectation?
     var requests = 0
     func prepare(_ expectation: XCTestExpectation) { started = expectation }
-    func render(_ request: WorkspaceSwipeSnapshotRequest) async throws -> CGImage {
+    func render(_ request: WorkspaceSnapshotRequest) async throws -> CGImage {
         requests += 1
         return try await withCheckedThrowingContinuation {
             continuation = $0; started?.fulfill(); started = nil
@@ -92,7 +92,7 @@ final class WorkspaceOverviewTest: XCTestCase {
         let monitors = Array(Set(cards.map(\.monitor)))
         return .init(project: { .defaultProject }, displays: { monitors.map {
             .init(id: $0, name: "Test display", frame: CGRect(x: 0, y: 0, width: 1920, height: 1080))
-        } }, cards: { _ in cards }, canShow: { true }, ranks: { _ in [:] }, render: { _ in image },
+        } }, cards: { _ in cards }, canShow: { true }, ranks: { [:] }, render: { _ in image },
             makePanel: { _, _ in OverviewPanelSpy() }, activate: { _, _, _ in true })
     }
     private func drain(_ controller: WorkspaceOverviewController) async {
@@ -592,19 +592,18 @@ final class WorkspaceOverviewTest: XCTestCase {
         XCTAssertLessThanOrEqual(3 * (regular.cardHeight + 48) + 2 * 18, 850 - 164)
     }
 
-    func testRendererDownsamplesWithoutScreenCapture() async throws {
-        let key = WorkspaceSwipeSnapshotKey(workspace: WorkspaceId("synthetic"), display: "test", rect: CGRect(x: 0, y: 0, width: 5120, height: 2880))
-        var request = WorkspaceSwipeSnapshotRequest(key: key, windows: [.init(id: 0, frame: CGRect(x: 0, y: 0, width: 5120, height: 2880))])
+    func testRendererDownsamplesLargeDisplays() throws {
+        let key = WorkspaceSnapshotKey(workspace: WorkspaceId("synthetic"), display: "test", rect: CGRect(x: 0, y: 0, width: 5120, height: 2880))
+        var request = WorkspaceSnapshotRequest(key: key, windows: [.init(id: 0, frame: CGRect(x: 0, y: 0, width: 5120, height: 2880))])
         request.maximumPixelSize = CGSize(width: 640, height: 360)
-        request.windowsAreBackToFront = true; request.allowCapture = false
-        let result = try await WorkspaceSwipeSnapshotRenderer.shared.render(request)
-        XCTAssertEqual(result.image.width, 640); XCTAssertEqual(result.image.height, 360)
-        XCTAssertFalse(result.renderedOnMainThread)
+        request.windowsAreBackToFront = true
+        let image = try renderWorkspaceSnapshot(request)
+        XCTAssertEqual(image.width, 640); XCTAssertEqual(image.height, 360)
     }
 }
 
 private actor OverviewRequestRecorder {
-    private var requests: [WorkspaceSwipeSnapshotRequest] = []
-    func record(_ request: WorkspaceSwipeSnapshotRequest) { requests.append(request) }
+    private var requests: [WorkspaceSnapshotRequest] = []
+    func record(_ request: WorkspaceSnapshotRequest) { requests.append(request) }
     func count() -> Int { requests.count }
 }

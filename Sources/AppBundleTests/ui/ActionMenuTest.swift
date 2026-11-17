@@ -413,7 +413,6 @@ final class ActionMenuTest: XCTestCase {
     func testDiagnosticsReportWhatTheInstallerChecks() async {
         let report = await buildDiagnosticsReport()
         XCTAssertTrue(report.contains("  accessibility: "))
-        XCTAssertTrue(report.contains("  screen capture: "))
         XCTAssertTrue(report.contains("loaded: \(configUrl.path)"))
     }
 

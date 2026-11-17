@@ -30,13 +30,12 @@ struct WorkspaceOverviewDependencies {
     var displays: () -> [WorkspaceOverviewDisplay]
     var cards: (WorkspaceProjectId) -> [WorkspaceOverviewCard]
     var canShow: () -> Bool
-    var ranks: @Sendable (UUID) async -> [UInt32: Int]
-    var render: @Sendable (WorkspaceSwipeSnapshotRequest) async throws -> CGImage
+    var ranks: @Sendable () async -> [UInt32: Int]
+    var render: @Sendable (WorkspaceSnapshotRequest) async throws -> CGImage
     var makePanel: (WorkspaceOverviewDisplayModel, WorkspaceOverviewDisplay) -> any WorkspaceOverviewPresenting
     /// `isCurrent` turns false when the selection is superseded or the desktop context changes
     /// (another app, Space, sleep, display change); check it immediately before activating.
     var activate: (WorkspaceOverviewCard, WorkspaceOverviewWindow?, _ isCurrent: @escaping @MainActor () -> Bool) async -> Bool
-    var releaseCaptureSession: @Sendable (UUID) async -> Void = { _ in }
     var nativeIntegration = false
 
     static var live: Self {
@@ -50,8 +49,8 @@ struct WorkspaceOverviewDependencies {
             isWinMuxRuntimeReady && TrayMenuModel.shared.isEnabled &&
                 !WindowBorderController.shared.isMissionControlActive && !isMouseManipulationActive &&
                 !isLeftMouseButtonDown && !isWorkspaceSidebarDragInProgress()
-        }, ranks: { await WorkspaceSwipeSnapshotRenderer.shared.prepareOverview($0) }, render: { request in
-            try await WorkspaceSwipeSnapshotRenderer.shared.renderOverview(request)
+        }, ranks: { workspaceWindowRanks() }, render: { request in
+            try await Task.detached(priority: .userInitiated) { try renderWorkspaceSnapshot(request) }.value
         }, makePanel: { model, display in
             WorkspaceOverviewPanel(model: model, monitorName: display.name, frame: display.frame)
         }, activate: { card, selection, isCurrent in
@@ -83,7 +82,7 @@ struct WorkspaceOverviewDependencies {
                     return activateWorkspaceForUser(workspace, on: monitor)
                 }
             } catch { return false }
-        }, releaseCaptureSession: { await WorkspaceSwipeSnapshotRenderer.shared.endOverview($0) }, nativeIntegration: true)
+        }, nativeIntegration: true)
     }
 }
 
@@ -105,7 +104,6 @@ final class WorkspaceOverviewController {
     private var reusablePanels: [MonitorViewportId: WorkspaceOverviewPanel] = [:]
     private var project: WorkspaceProjectId?
     private var generation = 0
-    private var captureSession = UUID()
     private(set) var task: Task<Void, Never>?
     private var selectionTask: Task<Void, Never>?
     private var selectionGeneration = 0
@@ -134,7 +132,7 @@ final class WorkspaceOverviewController {
             reusablePanels.removeValue(forKey: id)?.dismissOverview()
         }
         guard !displays.isEmpty else { return false }
-        generation += 1; captureSession = UUID(); phase = .opening
+        generation += 1; phase = .opening
         runtime.publicState.overviewVisible = true
         requestPublicStateUpdate()
         project = dependencies.project()
@@ -142,7 +140,7 @@ final class WorkspaceOverviewController {
         if dependencies.nativeIntegration {
             WorkspaceSidebarPanel.refreshAll()
             GlobalObserver.cancelFocusFollowsMouse()
-            WorkspaceSwipeController.shared.cancelVisualInteraction()
+            WorkspaceSwipeController.shared.cancelGesture()
             SwitcherPalettePanel.shared.dismiss()
             previousApp = NSWorkspace.shared.frontmostApplication
             if previousApp?.processIdentifier == myPid { previousApp = (focus.windowOrNil?.app as? any WindowApplication)?.nativeApplication }
@@ -195,8 +193,6 @@ final class WorkspaceOverviewController {
         requestPublicStateUpdate()
         let closingGeneration = generation
         task?.cancel()
-        let release = dependencies.releaseCaptureSession, session = captureSession
-        Task(priority: .utility) { await release(session) }
         for (center, token) in observers { center.removeObserver(token) }
         observers.removeAll()
         for model in models {
@@ -312,27 +308,23 @@ final class WorkspaceOverviewController {
         }
     }
 
-    private func nextCapture() -> (Int, WorkspaceOverviewCard, WorkspaceSwipeSnapshotRequest)? {
+    private func nextCapture() -> (Int, WorkspaceOverviewCard, WorkspaceSnapshotRequest)? {
         guard isOpen else { return nil }
         let candidates = models.compactMap(\.selectedCard) + models.flatMap(\.visibleCards)
         for card in candidates where !attempted.contains(card.id) && !invalidated.contains(card.id) {
                 attempted.insert(card.id)
-                let allowCapture = !dependencies.nativeIntegration || CGPreflightScreenCaptureAccess()
-                var key = WorkspaceSwipeSnapshotKey(workspace: card.id, display: card.monitor.description,
+                let key = WorkspaceSnapshotKey(workspace: card.id, display: card.monitor.description,
                     rect: CGRect(origin: .zero, size: card.desktopSize))
-                key.placeholder = !allowCapture
-                let windows = card.windows.compactMap { window -> WorkspaceSwipeSnapshotRequest.Window? in
+                let windows = card.windows.compactMap { window -> WorkspaceSnapshotRequest.Window? in
                     guard let rect = window.frame else { return nil }
                     return .init(id: window.id, frame: CGRect(x: rect.minX * card.desktopSize.width,
                         y: (1 - rect.maxY) * card.desktopSize.height,
                         width: rect.width * card.desktopSize.width, height: rect.height * card.desktopSize.height),
-                        icon: allowCapture ? nil : placeholderAppIcon(forWindowId: window.id))
+                        icon: dependencies.nativeIntegration ? placeholderAppIcon(forWindowId: window.id) : nil)
                 }
-                var request = WorkspaceSwipeSnapshotRequest(key: key, windows: windows)
-                request.overviewSession = captureSession
+                var request = WorkspaceSnapshotRequest(key: key, windows: windows)
                 request.maximumPixelSize = CGSize(width: 640, height: 360)
                 request.windowsAreBackToFront = true
-                request.allowCapture = allowCapture
                 guard !windows.isEmpty else { continue }
                 return (generation, card, request)
         }
@@ -344,9 +336,9 @@ final class WorkspaceOverviewController {
         guard isOpen, task == nil else { return }
         // Record the session's generation now: a task that only starts running after a
         // dismiss/reopen must recognise itself as stale and restart for the new session.
-        let ranks = dependencies.ranks, render = dependencies.render, session = captureSession, generation = generation
+        let ranks = dependencies.ranks, render = dependencies.render, generation = generation
         task = Task(priority: .utility) { @MainActor [weak self] in
-            let ordering = self?.ranksGeneration == generation ? (self?.ranks ?? [:]) : await ranks(session)
+            let ordering = self?.ranksGeneration == generation ? (self?.ranks ?? [:]) : await ranks()
             if let self, self.isOpen, self.generation == generation {
                 self.ranks = ordering
                 self.ranksGeneration = self.generation

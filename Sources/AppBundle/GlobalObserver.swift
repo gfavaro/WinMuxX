@@ -83,8 +83,7 @@ enum GlobalObserver {
 
     private static func onKeyDown(_ event: NSEvent) {
         runOnMainActor {
-            WorkspaceSwipeController.shared.cancelVisualInteraction()
-            DoubleSidedWindowController.shared.cancelPreparation()
+            WorkspaceSwipeController.shared.cancelGesture()
             noteTapBindingKeyDown()
         }
     }
@@ -107,9 +106,8 @@ enum GlobalObserver {
         let point = normalizeAppKitScreenPoint(screenPoint)
         runOnMainActor {
             if isClick {
-                WorkspaceSwipeController.shared.cancelVisualInteraction()
-                DoubleSidedWindowController.shared.cancelPreparation()
-            }
+                WorkspaceSwipeController.shared.cancelGesture()
+                }
             MousePointerTracker.shared.note(point: point, timestamp: timestamp)
             WindowHoverBar.shared.pointerMoved(point)
             scheduleFocusFollowsMouse(point: point, timestamp: timestamp)

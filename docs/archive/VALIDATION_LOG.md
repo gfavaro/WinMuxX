@@ -266,7 +266,7 @@ manual UI/gesture/hotplug validation or remote CI result is inferred.
 
 ## Swipe preparation performance (build 77)
 
-See [SWIPE_PERFORMANCE.md](../SWIPE_PERFORMANCE.md) for before/after surface timings,
+See [SWIPE_PERFORMANCE.md](SWIPE_PERFORMANCE.md) for before/after surface timings,
 the live build-76 baseline, stage definitions and the outstanding physical run.
 Outgoing screen capture now uses the same bounded actor worker as incoming rendering.
 Cancellation before capture completes must prevent both cache publication and a late

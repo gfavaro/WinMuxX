@@ -222,9 +222,7 @@ final class DockWorkspaceSwipeReceiver: DockSwipeReceiver {
         if let monitor = sortedMonitors.first(where: { $0.rect.contains(pointer) }),
            shouldSuppressChromeForFullscreenContent(on: monitor) { return .unavailable }
         let start = WorkspaceSwipeController.shared.dockSwipeMayStart()
-        guard start == .started else { return start }
-        WorkspaceSwipeController.shared.dockSwipeTouchedDown()
-        return .started
+        return start
     }
 
     /// Vertical progress follows Natural scrolling: negative is the content moving up, which

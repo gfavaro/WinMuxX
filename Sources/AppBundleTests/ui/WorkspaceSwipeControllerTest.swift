@@ -2,29 +2,6 @@
 import AppKit
 import XCTest
 
-@MainActor
-private final class SwipePreviewSpy: WorkspaceSwipePreviewing {
-    var isActive = false
-    var isSettling = false
-    var capturesAvailable = true
-    var reveals = 0
-    var cancels = 0
-    var releases: [Bool] = []
-    var validity: (@MainActor () -> Bool)?
-
-    func begin(on monitor: Monitor, target: Workspace, incomingFromBelow: Bool,
-               isValid: @escaping @MainActor () -> Bool) {
-        validity = isValid
-        isActive = capturesAvailable
-    }
-    func update(_ progress: Double, timestamp: Double) {}
-    func settle(commit: Bool, timestamp: Double) { releases.append(commit) }
-    func revealWorkspace() { reveals += 1; isActive = false }
-    func prepareFront(on monitor: Monitor) {}
-    func cancel() { cancels += 1; isActive = false; validity = nil }
-    func invalidate() { cancel() }
-}
-
 /// Holds navigation at the session boundary, including when its task is cancelled.
 /// Tests can model native work that returns after reset without relying on delays.
 @MainActor
@@ -56,7 +33,6 @@ private final class SwipeNavigationGate {
 @MainActor
 final class WorkspaceSwipeControllerTest: XCTestCase {
     private var world: WorkspaceNavigationFixture!
-    private var preview: SwipePreviewSpy!
     private var gate: SwipeNavigationGate!
     private var controller: WorkspaceSwipeController!
     private var failures = 0
@@ -67,13 +43,12 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         world = WorkspaceNavigationFixture()
         world.spaces[2].seedMonitorIfNeeded(world.displays[0])
         world.spaces[3].seedMonitorIfNeeded(world.displays[0])
-        preview = SwipePreviewSpy()
         gate = SwipeNavigationGate()
         failures = 0
         navigationAllowed = true
         keepsSwipe = false
         controller = WorkspaceSwipeController(dependencies: WorkspaceSwipeDependencies(
-            preview: preview, monitors: { [unowned self] in self.world.displays },
+            monitors: { [unowned self] in self.world.displays },
             pointer: { CGPoint(x: 100, y: 100) },
             canNavigate: { [unowned self] in self.navigationAllowed }, reversed: { false },
             navigate: { [gate] activate in try await gate!.run(activate) },
@@ -85,7 +60,6 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         controller.reset()
         gate.cleanUp()
         controller = nil
-        preview = nil
         gate = nil
         world.cleanUp()
         world = nil
@@ -125,7 +99,6 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
     func testMacOSSwipeSwitchesAndAnEdgeDoesNothing() async throws {
         XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: false, progress: 0.1, timestamp: 1), .ignored,
                        "No previous workspace: the swipe is kept, so Mission Control does not open")
-        XCTAssertFalse(preview.isActive)
         XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .started)
         controller.updateDockSwipe(0.6, timestamp: 1.1)
         let started = expectation(description: "Navigation entered session")
@@ -135,7 +108,6 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         await fulfillment(of: [started], timeout: 2)
         await finish(task)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
-        XCTAssertEqual(preview.releases, [true])
     }
 
     private func startNavigation(_ action: () -> Void) async throws -> Task<Void, Never> {
@@ -163,7 +135,6 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         let second = try XCTUnwrap(controller.pending)
         await finish(second, id: 1)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[3], "Both swipes switched")
-        XCTAssertEqual(preview.releases, [true, true])
     }
 
     func testASecondSwipeStillMovingWhenTheFirstLandsFollowsTheFingers() async throws {
@@ -172,11 +143,9 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1.3), .started)
         controller.updateDockSwipe(0.3, timestamp: 1.4)
         await finish(first)
-        XCTAssertTrue(preview.isActive, "The preview picks the swipe up once the first switch lands")
         controller.updateDockSwipe(0.2, timestamp: 1.5)
         controller.endDockSwipe(commit: false, timestamp: 1.6)
         XCTAssertNil(controller.pending)
-        XCTAssertEqual(preview.releases, [true, false])
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
     }
 
@@ -206,18 +175,14 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         XCTAssertEqual(controller.dockSwipeMayStart(), .ignored, "Decided at touchdown, before macOS sees any motion")
         XCTAssertEqual(controller.beginDockSwipe(incomingFromBelow: true, progress: 0.1, timestamp: 1), .ignored,
                        "macOS does not switch Spaces under a drag or the overview")
-        XCTAssertFalse(preview.isActive)
     }
 
-    func testResetDuringNavigationCannotActivateOrRevealOldWorkspace() async throws {
+    func testResetDuringNavigationCannotActivateOldWorkspace() async throws {
         begin()
         let task = try await commit()
         controller.reset()
-        let cancellations = preview.cancels
         await finish(task)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
-        XCTAssertEqual(preview.reveals, 0)
-        XCTAssertEqual(preview.cancels, cancellations)
         XCTAssertNil(controller.pending)
     }
 
@@ -227,50 +192,38 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         controller.reset()
         begin(time: 3)
         let current = try await commit(time: 3)
-        let cancellations = preview.cancels
         await finish(old)
-        XCTAssertTrue(preview.isActive)
         XCTAssertNotNil(controller.pending)
-        XCTAssertEqual(preview.cancels, cancellations)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
         await finish(current, id: 1)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
-        XCTAssertEqual(preview.reveals, 1)
         XCTAssertEqual(world.displays[1].activeWorkspace, world.spaces[1])
         XCTAssertEqual(world.displays[2].activeWorkspace, world.spaces[4])
     }
 
-    func testOldFailureCannotCancelNewPreviewOrScheduleRecovery() async throws {
+    func testOldFailureCannotCancelNewGestureOrScheduleRecovery() async throws {
         begin()
         let old = try await commit()
         controller.reset()
         begin(time: 3)
         gate.fail = true
-        let cancellations = preview.cancels
         await finish(old)
-        XCTAssertTrue(preview.isActive)
-        XCTAssertEqual(preview.cancels, cancellations)
         XCTAssertEqual(failures, 0)
     }
 
     func testSourceSwitchDuringGestureRejectsRelease() {
         begin()
         XCTAssertTrue(activateWorkspaceForUser(world.spaces[3], on: world.displays[0]))
-        XCTAssertTrue(preview.validity?() == false)
         release(time: 1.3)
         XCTAssertNil(controller.pending)
-        XCTAssertEqual(preview.releases, [false])
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[3])
     }
 
     func testOwnershipChangeDuringGestureRejectsRelease() {
         begin()
-        XCTAssertTrue(preview.validity?() == true)
         XCTAssertTrue(activateWorkspaceOnMonitorPreservingSourceViewport(world.spaces[2], targetMonitor: world.displays[1]))
-        XCTAssertTrue(preview.validity?() == false)
         release(time: 1.3)
         XCTAssertNil(controller.pending)
-        XCTAssertEqual(preview.releases, [false])
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
     }
 
@@ -281,15 +234,13 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         await finish(task)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
         XCTAssertEqual(world.displays[1].activeWorkspace, world.spaces[2])
-        XCTAssertEqual(preview.reveals, 0)
     }
 
-    func testRuntimeBecomingUnavailableDuringGestureCancelsPreview() {
+    func testRuntimeBecomingUnavailableDuringGestureCancelsIt() {
         begin()
         navigationAllowed = false
         move(1, time: 1.25)
         release(time: 1.3)
-        XCTAssertFalse(preview.isActive)
         XCTAssertNil(controller.pending)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
     }
@@ -299,29 +250,14 @@ final class WorkspaceSwipeControllerTest: XCTestCase {
         let task = try await commit()
         navigationAllowed = false
         await finish(task)
-        XCTAssertFalse(preview.isActive)
-        XCTAssertEqual(preview.reveals, 0)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
     }
 
-    func testMissingCaptureDoesNotBlockNavigation() async throws {
-        preview.capturesAvailable = false
-        begin()
-        XCTAssertFalse(preview.isActive)
-        let task = try await commit()
-        await finish(task)
-        XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[2])
-        XCTAssertEqual(preview.releases, [true])
-        XCTAssertEqual(failures, 0)
-    }
-
-    func testNavigationFailureCancelsPreviewAndReportsRecovery() async throws {
+    func testNavigationFailureReportsRecovery() async throws {
         gate.fail = true
         begin()
         let task = try await commit()
         await finish(task)
-        XCTAssertFalse(preview.isActive)
-        XCTAssertEqual(preview.reveals, 0)
         XCTAssertEqual(failures, 1)
         XCTAssertEqual(world.displays[0].activeWorkspace, world.spaces[0])
     }

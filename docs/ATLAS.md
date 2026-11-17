@@ -71,7 +71,7 @@ settings and disposable TextEdit documents. The WinMuxX startup code can
 import configuration and run startup hooks. Keep personal config, recovery
 files, launch agents and login state out of the helper.
 
-Grant the WinMuxX build's Accessibility and any requested Screen Recording
+Grant the WinMuxX build's Accessibility
 permission only in the helper, via the operator and the normal macOS prompt.
 A new ad hoc build can need fresh approval. If the permissions or helper
 state require recovery, stop the test and recheck identity before continuing.

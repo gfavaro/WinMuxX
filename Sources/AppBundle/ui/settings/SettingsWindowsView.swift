@@ -129,12 +129,10 @@ struct ShortcutBehaviorSettingsView: View {
 
                 SettingsToggle("Double-sided windows", id: "window-tabs.double-sided-windows", isOn: $doubleSidedWindows, help: "Replace two-window tab strips with two sides. Option-click anywhere in the window or press Option-Tab to flip.") {
                     persistSettingsConfig(section: "window-tabs", key: "double-sided-windows",
-                        renderedValue: doubleSidedWindows ? "true" : "false", model: model) {
-                        if config.windowTabs.doubleSidedWindows { requestScreenRecordingPermissionsIfNeeded() }
-                    }
+                        renderedValue: doubleSidedWindows ? "true" : "false", model: model)
                 }
                 .disabled(!tabEnabled)
-                Text("Option-click anywhere in the window or press Option-Tab to flip between two windows. Three or more windows use tabs. Show tab strips must be enabled. When it is off, groups use overlapping windows with offsets. Rotation uses Screen Recording access and respects Reduce Motion.")
+                Text("Option-click anywhere in the window or press Option-Tab to flip between two windows. Three or more windows use tabs. Show tab strips must be enabled. When it is off, groups use overlapping windows with offsets. The flip shows each window as a card with its app's icon and respects Reduce Motion.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

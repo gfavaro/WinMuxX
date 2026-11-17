@@ -149,15 +149,10 @@ spring each have separate modules. The overview presentation owns panel-only
 motion; the swipe controller owns workspace navigation. Keep new gesture
 behavior out of startup/configuration/observer entry points beyond delegation.
 
-The swipe preview uses `WorkspaceSwipePreviewPhase` to wait for both the animation
-and workspace layout before removing its overlay. Async completions must check their
-generation before affecting a newer interaction. Outgoing screen capture and incoming
-composition share the bounded actor worker. Without Screen Recording both sides are
-compositions of placeholder cards (`WorkspacePlaceholderWindows.swift`), cached under a
-separate key, and the overlay fades in because it no longer matches the real windows. The preview reuses one native surface;
-ordinary cancellation must hide it and clear images/animations, while invalidation
-releases it. See [swipe performance](docs/SWIPE_PERFORMANCE.md) for timing boundaries
-and the distinction between synthetic surface tests and physical gesture latency.
+A swipe shows nothing while the fingers move; it switches workspace on release.
+Async completions must check their generation before affecting a newer interaction.
+WinMuxX never reads other apps' window contents: the overview and the window flip
+draw each window as a card with its app's icon (`WorkspacePlaceholderWindows.swift`).
 
 Settings navigation lives in `ui/settings/ShortcutSettingsView.swift`. Each config
 pane has a `Settings*View.swift` file; controls and TOML persistence are shared in

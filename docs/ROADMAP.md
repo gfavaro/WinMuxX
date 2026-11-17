@@ -28,7 +28,6 @@ are needed with the expanded diagnostics; the latency goal remains open.
 
 | Priority | Work | Completion criteria |
 | --- | --- | --- |
-| 1 | Swipe latency | Capture runs off-main and the surface is reused; collect 30+ warm physical gestures, compare stage timings and pursue <=16.7 ms submission p95. See [performance record](SWIPE_PERFORMANCE.md). Target is not yet established. |
 | 2 | Display topology | Real dock/undock/reconnection and three-display tests preserve explicit ownership and one secondary workspace per display; ordinary navigation never relocates workspaces. |
 | 3 | Recovery and sizing | Exercise crash recovery with real windows, delayed restoration, learned minima, nested dwindle and tab groups and overflow. Algorithms and automated regressions already exist. |
 | 4 | Native Settings and sidebar | Manual keyboard/accessibility, save/conflict, compact-layout, appearance and Bring Here checks. Offscreen geometry and persistence tests do not certify interaction or appearance. |

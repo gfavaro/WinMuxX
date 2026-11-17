@@ -78,52 +78,6 @@ final class NativeEfficiencyTest: XCTestCase {
         XCTAssertEqual(writer.bufferedBytes, 0)
     }
 
-    func testFlipTimeoutNavigatesOnceAndRejectsLateCapture() async throws {
-        let captureGate = EfficiencyGate()
-        let timeoutGate = EfficiencyGate()
-        let preparation = WindowFlipPreparation(sleep: { await timeoutGate.wait() })
-        let fallback = expectation(description: "deadline finishes navigation")
-        let image = try makeImage(width: 2, height: 2)
-        let images = WindowFlipImages(front: image, back: image, background: image)
-        var completions = 0
-        XCTAssertTrue(preparation.begin(capture: {
-            await captureGate.wait() // Deliberately ignores cancellation, like native capture.
-            return images
-        }, completion: { result in
-            completions += 1
-            XCTAssertNil(result)
-            fallback.fulfill()
-        }))
-        await timeoutGate.open()
-        await fulfillment(of: [fallback], timeout: 2)
-        XCTAssertTrue(preparation.isBusy)
-        XCTAssertFalse(preparation.begin(capture: { images }, completion: { _ in XCTFail("Overlapping capture") }))
-        await captureGate.open()
-        await preparation.waitUntilIdle()
-        XCTAssertFalse(preparation.isBusy)
-        XCTAssertEqual(completions, 1)
-    }
-
-    func testFlipCancellationCannotPublishAfterNewInput() async throws {
-        let gate = EfficiencyGate()
-        let preparation = WindowFlipPreparation()
-        let image = try makeImage(width: 2, height: 2)
-        preparation.begin(capture: {
-            await gate.wait()
-            return WindowFlipImages(front: image, back: image, background: image)
-        }, completion: { _ in XCTFail("Cancelled interaction published") })
-        preparation.cancel()
-        await gate.open()
-        await preparation.waitUntilIdle()
-        XCTAssertFalse(preparation.isBusy)
-    }
-
-    func testFlipImagesHaveBoundedRetainedResolution() throws {
-        let reduced = try boundedWindowFlipImage(makeImage(width: 4000, height: 2000))
-        XCTAssertLessThanOrEqual(reduced.width, 2048)
-        XCTAssertLessThanOrEqual(reduced.width * reduced.height, 2_000_000)
-    }
-
     private func makeImage(width: Int, height: Int) throws -> CGImage {
         let context = try XCTUnwrap(CGContext(data: nil, width: width, height: height,
             bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),

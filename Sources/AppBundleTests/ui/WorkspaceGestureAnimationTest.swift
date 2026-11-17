@@ -30,29 +30,6 @@ final class WorkspaceGestureAnimationTest: XCTestCase {
         XCTAssertLessThan(overview.duration, 5)
     }
 
-    func testReleaseCarriesOnAtTheFingersSpeedWithoutALurch() throws {
-        // 1200 pt left, the finger moving 5500 pt/s toward the target.
-        let release = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 5500, duration: 0.22)
-        let duration = release.duration
-        XCTAssertEqual(duration, 1200 / 5500, accuracy: 0.001, "Ends when the finger's speed would have")
-        let timing = try XCTUnwrap(release.timingFunction)
-        func point(_ index: Int) -> (Double, Double) {
-            var values: [Float] = [0, 0]
-            timing.getControlPoint(at: index, values: &values)
-            return (Double(values[0]), Double(values[1]))
-        }
-        let (x1, y1) = point(1), (_, y2) = point(2)
-        XCTAssertEqual(y1 / x1 * 1200 / duration, 5500, accuracy: 1, "Starts at the finger's speed")
-        XCTAssertEqual(y2, 1, "Comes to rest at the end")
-
-        let slow = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 300, duration: 0.22)
-        XCTAssertEqual(slow.duration, 0.22, "A slow finger takes the configured time")
-        let away = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: -3000, duration: 0.22)
-        XCTAssertEqual(away.duration, 0.22)
-        let quick = WorkspaceSwipePreviewGeometry.settlingAnimation(from: 0, to: 1200, speed: 50000, duration: 0.22)
-        XCTAssertEqual(quick.duration, 0.12, "Never shorter than 120 ms")
-    }
-
     func testConfiguredDurationAndAccessibilityDisableMotion() {
         XCTAssertEqual(WorkspaceGestureAnimation.duration(milliseconds: 350, enabled: true, reduceMotion: false), 0.35)
         XCTAssertNil(WorkspaceGestureAnimation.duration(milliseconds: 0, enabled: true, reduceMotion: false))

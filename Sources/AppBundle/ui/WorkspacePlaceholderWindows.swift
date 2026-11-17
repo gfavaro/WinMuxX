@@ -1,7 +1,7 @@
 import AppKit
 
-// Without Screen Recording, previews and animations draw each window as a card with its
-// app's icon: macOS does not let WinMuxX read another app's window contents.
+// The overview and the window flip draw each window as a card with its app's icon: WinMuxX
+// does not ask for Screen Recording, so it never reads another app's window contents.
 
 @MainActor private var placeholderIconsByPid: [pid_t: CGImage] = [:]
 
@@ -42,6 +42,13 @@ func drawWindowPlaceholder(_ frame: CGRect, icon: CGImage?, in context: CGContex
 }
 
 /// A tab flip's faces and backdrop without capture: two cards over the display's wallpaper.
+/// The two faces of a window flip and what shows behind them.
+struct WindowFlipImages: Sendable {
+    let front: CGImage
+    let back: CGImage
+    let background: CGImage
+}
+
 @MainActor
 func placeholderWindowFlipImages(front: UInt32, back: UInt32, rect: Rect, padding: CGFloat, monitor: Monitor) -> WindowFlipImages? {
     let size = CGSize(width: rect.width, height: rect.height)

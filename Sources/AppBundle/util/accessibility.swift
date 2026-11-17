@@ -11,11 +11,6 @@ func checkAccessibilityPermissions() {
     }
 }
 
-func requestScreenRecordingPermissionsIfNeeded() {
-    guard !CGPreflightScreenCaptureAccess() else { return }
-    _ = CGRequestScreenCaptureAccess()
-}
-
 private func resetAccessibility() {
     _ = try? Process.run(URL(filePath: "/usr/bin/tccutil"), arguments: ["reset", "Accessibility", winMuxAppId])
 }

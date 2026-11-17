@@ -43,7 +43,6 @@ import Foundation
     MonitorConfigurationObserver.shared.prepareForStartup()
 
     checkAccessibilityPermissions()
-    requestScreenRecordingPermissionsIfNeeded()
     startUnixSocketServer()
     GlobalObserver.initObserver()
     MonitorConfigurationObserver.shared.startObserving()

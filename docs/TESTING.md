@@ -55,10 +55,7 @@ parallel execution solely to obtain XML.
 - Test pure policy and geometry with deterministic inputs and observable results.
 - Test command behavior through parsing and execution when command routing matters.
   Also assert that unrelated displays and workspaces remain unchanged.
-- Keep native rendering and filesystem integration tests identifiable. The
-  `WorkspaceSwipeRenderingTest` uses offscreen Metal rendering, with no desktop
-  capture or interaction. It explicitly skips when Metal is unavailable; rendering
-  failures on supported hardware fail the test.
+- Keep native rendering and filesystem integration tests identifiable.
 - Use isolated manual validation for physical trackpad feel, native Spaces
   conflicts, real application Accessibility behavior, permission changes, and
   display hot-plugging. Mocked monitors and rendered curves do not prove those
