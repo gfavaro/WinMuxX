@@ -20,7 +20,7 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
               let monitor = sortedMonitors.first(where: { $0.rect.contains(mouseLocation) }),
               !shouldSuppressChromeForFullscreenContent(on: monitor) else { return nil }
         let workspace = monitor.activeWorkspace
-        guard workspace.arrangement == .scrolling, workspace.workspaceLayoutUnits.count > 1 else { return nil }
+        guard workspace.arrangement == .scrolling, workspace.scrollingColumns.count > 1 else { return nil }
         return workspace
     }
 

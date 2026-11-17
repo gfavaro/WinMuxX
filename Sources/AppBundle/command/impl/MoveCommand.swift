@@ -95,12 +95,12 @@ struct MoveCommand: Command {
 /// in a stack leaves it as a column of its own. Up and down move it within its stack.
 @MainActor
 private func moveScrollingNode(_ window: Window, direction: CardinalDirection, workspace: Workspace) -> Bool {
-    let groups = workspace.workspaceLayoutUnits
-    let column = window.topLevelWorkspaceGroup
-    guard let index = groups.firstIndex(where: { $0 === column }) else { return false }
+    let columns = workspace.scrollingColumns
+    guard let column = workspace.scrollingColumn(of: window),
+          let index = columns.firstIndex(where: { $0 === column }) else { return false }
     if direction.orientation == .v {
         var node = window.moveNode
-        while let parent = node.parent as? TilingContainer, parent !== column.parent {
+        while node !== column, let parent = node.parent as? TilingContainer {
             if parent.navigationOrientation == direction.orientation, let ownIndex = node.ownIndex {
                 let target = ownIndex + direction.focusOffset
                 if parent.children.indices.contains(target) {
@@ -122,28 +122,17 @@ private func moveScrollingNode(_ window: Window, direction: CardinalDirection, w
         }
         return false
     }
-    // Positions are taken from the tree, next to the neighbouring column.
-    if column.allLeafWindowsRecursive.count <= 1 {
-        guard let parent = column.parent as? TilingContainer, parent === workspace.arrangementGroupParent,
-              groups.indices.contains(index + direction.focusOffset) else { return false }
-        let neighbor = groups[index + direction.focusOffset]
-        let binding = column.unbindFromParent()
-        guard let neighborIndex = parent.children.firstIndex(where: { $0 === neighbor }) else {
-            column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
-            return false
-        }
-        column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: neighborIndex + (direction.isPositive ? 1 : 0))
+    if window.moveNode === column || column.allLeafWindowsRecursive.count <= 1 || (column as? TilingContainer)?.layout == .tabGroup {
+        // The whole column moves past its neighbour.
+        guard let neighbor = columns.getOrNil(atIndex: index + direction.focusOffset) else { return false }
+        workspace.placeScrollingColumn(column, beside: neighbor, after: direction.isPositive)
     } else {
+        // The window leaves its stack and becomes a column beside it, as wide as the stack was.
         let width = column.scrollingColumnWidth
-        window.unbindFromParent()
-        let parent = workspace.arrangementGroupParent !== workspace.rootTilingContainer
-            ? workspace.arrangementGroupParent : ensureRootSupportsColumns(workspace)
-        let at = parent.children.firstIndex(where: { $0 === column }) ?? index
-        let insertion = min(max(at + (direction.isPositive ? 1 : 0), 0), parent.children.count)
-        window.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: insertion)
+        workspace.placeScrollingColumn(window, beside: column, after: direction.isPositive)
         window.scrollingColumnWidth = width
-        workspace.normalizeContainers()
     }
+    workspace.lastScrollingFocusWindowId = nil
     scheduleRefreshSession(.globalObserver("moveScrollingColumn"))
     return true
 }

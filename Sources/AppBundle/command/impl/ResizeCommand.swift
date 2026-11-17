@@ -120,8 +120,8 @@ struct ResizeCommand: Command {
 /// Width resizes the column on the strip: the share of the display it takes.
 @MainActor
 private func resizeScrollingColumn(_ window: Window, units: ResizeCmdArgs.Units, workspace: Workspace, io: CmdIo) -> Bool {
-    let group = window.topLevelWorkspaceGroup
-    guard let range = workspace.scrollingColumnWidthRange(of: group) else { return io.err("The focused window has no scrolling column") }
+    guard let group = workspace.scrollingColumn(of: window),
+          let range = workspace.scrollingColumnWidthRange(of: group) else { return io.err("The focused window has no scrolling column") }
     let requested: CGFloat = switch units {
         case .set(let value): CGFloat(value)
         case .add(let value): range.width + CGFloat(value)

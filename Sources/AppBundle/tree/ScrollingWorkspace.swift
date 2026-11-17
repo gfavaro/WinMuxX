@@ -253,20 +253,87 @@ struct ScrollingWorkspaceMetrics {
     }
 }
 
+/// A node's Scrolling columns: a window, a vertical stack and a tab group are each one column;
+/// a side-by-side split opens up into its children's columns.
+@MainActor
+private func scrollingColumnUnits(_ node: TreeNode) -> [TreeNode] {
+    guard let container = node as? TilingContainer, container.layout != .tabGroup,
+          container.children.count > 1, container.navigationOrientation == .h else { return [node] }
+    return container.children.flatMap(scrollingColumnUnits)
+}
+
 extension Workspace {
+    /// The strip's columns, left to right. They come from the tree without changing it, so
+    /// another layout finds its splits as they were.
+    @MainActor
+    var scrollingColumns: [TreeNode] {
+        let root = rootTilingContainer
+        if root.layout == .tabGroup { return [root] }
+        return root.children.flatMap(scrollingColumnUnits)
+    }
+
+    /// The column `node` is in, or nil when it is not tiled in this workspace.
+    @MainActor
+    func scrollingColumn(of node: TreeNode) -> TreeNode? {
+        let columns = scrollingColumns
+        var current: TreeNode? = node
+        while let candidate = current {
+            if columns.contains(where: { $0 === candidate }) { return candidate }
+            current = candidate.parent as? TreeNode
+        }
+        return nil
+    }
+
+    /// Puts `column` beside `target` on the strip, before or after it, in `target`'s split.
+    @MainActor
+    func placeScrollingColumn(_ column: TreeNode, beside target: TreeNode, after: Bool) {
+        guard column !== target, let parent = target.parent as? TilingContainer else { return }
+        let binding = column.unbindFromParent()
+        guard let index = parent.children.firstIndex(where: { $0 === target }) else {
+            if let previous = binding.parent as? TilingContainer {
+                column.bind(to: previous, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
+            }
+            return
+        }
+        column.bind(to: parent, adaptiveWeight: WEIGHT_AUTO, index: index + (after ? 1 : 0))
+        normalizeContainers()
+    }
+
+    /// Puts `window` at the bottom of `target`'s column, which becomes a vertical stack that
+    /// keeps the column's place and width.
+    @MainActor
+    func stackScrollingWindow(_ window: Window, onto target: TreeNode) {
+        guard window !== target, let parent = target.parent as? TilingContainer else { return }
+        window.unbindFromParent()
+        if let stack = target as? TilingContainer, stack.layout != .tabGroup, stack.orientation == .v {
+            window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        } else if let index = parent.children.firstIndex(where: { $0 === target }) {
+            let width = target.scrollingColumnWidth
+            let binding = target.unbindFromParent()
+            let stack = TilingContainer(parent: parent, adaptiveWeight: binding.adaptiveWeight, .v, .tiles, index: index)
+            stack.scrollingColumnWidth = width
+            target.scrollingColumnWidth = nil
+            target.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: 0)
+            window.bind(to: stack, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+        }
+        window.scrollingColumnWidth = nil
+        lastScrollingFocusWindowId = nil
+        normalizeContainers()
+    }
+
     /// The pinned column while it is still a column of this strip and others remain.
     @MainActor
     var pinnedScrollingColumn: TreeNode? {
-        guard let node = scrollingPinnedNode, workspaceLayoutUnits.count > 1,
-              workspaceLayoutUnits.contains(where: { $0 === node }) else { return nil }
+        let columns = scrollingColumns
+        guard let node = scrollingPinnedNode, columns.count > 1, columns.contains(where: { $0 === node }) else { return nil }
         return node
     }
 
-    /// The columns that scroll: every layout unit except a pinned one.
+    /// The columns that scroll: every column except a pinned one.
     @MainActor
     var scrollingStripUnits: [TreeNode] {
         let pinned = pinnedScrollingColumn
-        return workspaceLayoutUnits.filter { $0 !== pinned }
+        return scrollingColumns.filter { $0 !== pinned }
     }
 
     /// The pinned column's frame at its screen edge, and the rect left for the strip.
@@ -289,12 +356,9 @@ extension Workspace {
     @MainActor
     func moveScrollingColumn(_ id: ObjectIdentifier, toStripIndex index: Int) {
         let units = scrollingStripUnits
-        let parent = arrangementGroupParent
-        guard let column = units.first(where: { ObjectIdentifier($0) == id }), units.indices.contains(index),
-              column.parent === parent, units[index] !== column,
-              let target = parent.children.firstIndex(where: { $0 === units[index] }) else { return }
-        let binding = column.unbindFromParent()
-        column.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: target)
+        guard let from = units.firstIndex(where: { ObjectIdentifier($0) == id }), units.indices.contains(index),
+              from != index else { return }
+        placeScrollingColumn(units[from], beside: units[index], after: index > from)
         lastScrollingFocusWindowId = nil
         scheduleRefreshSession(.globalObserver("scrollingMove"))
     }
@@ -337,7 +401,7 @@ extension Workspace {
         let units = scrollingStripUnits
         let focused = lastScrollingFocusWindowId.flatMap(Window.get(byId:))
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
-        let focusedIndex = focused.flatMap { focused in units.firstIndex(where: { $0 === focused.topLevelWorkspaceGroup }) }
+        let focusedIndex = focused.flatMap(scrollingColumn(of:)).flatMap { column in units.firstIndex(where: { $0 === column }) }
         return calculateScrollingWorkspaceGeometry(.init(
             bounds: bounds, parkingBounds: parking, offset: scrollingOffset,
             columns: units.map { node in
@@ -373,10 +437,10 @@ extension Workspace {
         let metrics = scrollingMetrics
         if let focused = focus.windowOrNil, focused.nodeWorkspace === self,
            lastScrollingFocusWindowId != focused.windowId,
-           let column = metrics.columns.first(where: { $0.node === focused.topLevelWorkspaceGroup })
+           let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: focused) })
         {
             let previous = lastScrollingFocusWindowId.flatMap(Window.get(byId:)).flatMap { window in
-                metrics.columns.first(where: { $0.node === window.topLevelWorkspaceGroup })
+                metrics.columns.first(where: { $0.node === scrollingColumn(of: window) })
             }
             scrollingOffset = metrics.focusedOffset(for: column, current: scrollingOffset, previous: previous)
             lastScrollingFocusWindowId = focused.windowId
@@ -394,7 +458,7 @@ extension Workspace {
             ?? scrollingAnchorWindowId.flatMap(Window.get(byId:))
             ?? mostRecentWorkspaceFocusableWindowRecursive
         guard let anchor, anchor.nodeWorkspace === self,
-              let column = metrics.columns.first(where: { $0.node === anchor.topLevelWorkspaceGroup }) else { return }
+              let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: anchor) }) else { return }
         scrollingAnchorWindowId = anchor.windowId
         let center = column.start + column.width / 2
         scrollingAnchorViewportPosition = (center - scrollingOffset) / metrics.areaWidth
@@ -416,7 +480,7 @@ extension Workspace {
             ?? mostRecentWorkspaceFocusableWindowRecursive
         guard let anchor, anchor.nodeWorkspace === self,
               let position = scrollingAnchorViewportPosition, position.isFinite,
-              let column = metrics.columns.first(where: { $0.node === anchor.topLevelWorkspaceGroup }) else {
+              let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: anchor) }) else {
             // A removed anchor is never allowed to impose an old offset on
             // a different window. Establish the new reference after layout.
             scrollingAnchorAreaWidth = nil
@@ -463,7 +527,7 @@ extension Workspace {
     func centerFocusedScrollingColumn() {
         guard let window = focus.windowOrNil, window.nodeWorkspace === self else { return }
         let metrics = scrollingMetrics
-        guard let column = metrics.columns.first(where: { $0.node === window.topLevelWorkspaceGroup }) else { return }
+        guard let column = metrics.columns.first(where: { $0.node === scrollingColumn(of: window) }) else { return }
         scrollingOffset = metrics.centeredOffset(for: column)
         lastScrollingFocusWindowId = window.windowId
     }

@@ -43,8 +43,17 @@ func bindingDataForNewTilingWindow(_ workspace: Workspace, window: Window?, newl
         return tabGroupBinding
     }
     // A Scrolling strip is never full: a new window is a new column right of the focused one.
-    if workspace.arrangement == .master || workspace.arrangement == .scrolling {
-        if workspace.arrangement == .master, let newBundleId = newlyOpenedBundleId,
+    if workspace.arrangement == .scrolling {
+        if let focused = focus.windowOrNil, focused.nodeWorkspace === workspace,
+           let column = workspace.scrollingColumn(of: focused), let parent = column.parent as? TilingContainer,
+           parent.layout != .tabGroup, let index = parent.children.firstIndex(where: { $0 === column }) {
+            return BindingData(parent: parent, adaptiveWeight: WEIGHT_AUTO, index: index + 1)
+        }
+        let root = ensureRootSupportsColumns(workspace)
+        return BindingData(parent: root, adaptiveWeight: WEIGHT_AUTO, index: INDEX_BIND_LAST)
+    }
+    if workspace.arrangement == .master {
+        if let newBundleId = newlyOpenedBundleId,
            let joined = masterTabGroupBindingInsteadOfCrowdingStack(workspace: workspace, newBundleId: newBundleId) {
             return joined
         }

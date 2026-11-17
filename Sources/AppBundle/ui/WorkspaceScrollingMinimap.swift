@@ -24,7 +24,7 @@ final class WorkspaceScrollingMinimap: NSObject {
     @discardableResult
     func show(_ workspace: Workspace, duringGesture: Bool = false, explicitly: Bool = false) -> Bool {
         guard config.scrolling.minimapEnabled, workspace.arrangement == .scrolling,
-              workspace.isVisible, !workspace.workspaceLayoutUnits.isEmpty,
+              workspace.isVisible, !workspace.scrollingColumns.isEmpty,
               TrayMenuModel.shared.isEnabled, !WorkspaceOverviewController.shared.isOpen,
               !WindowBorderController.shared.isMissionControlActive, !isMouseManipulationActive else { return false }
         guard focus.windowOrNil?.isFullscreen != true,
@@ -59,7 +59,7 @@ final class WorkspaceScrollingMinimap: NSObject {
 
     func modelDidChange() {
         guard panel?.isVisible == true else { return }
-        guard let workspace, workspace.arrangement == .scrolling, workspace.isVisible, !workspace.workspaceLayoutUnits.isEmpty,
+        guard let workspace, workspace.arrangement == .scrolling, workspace.isVisible, !workspace.scrollingColumns.isEmpty,
               config.scrolling.minimapEnabled, TrayMenuModel.shared.isEnabled,
               !WorkspaceOverviewController.shared.isOpen,
               !WindowBorderController.shared.isMissionControlActive,
@@ -165,7 +165,7 @@ final class WorkspaceScrollingMinimap: NSObject {
         pinned?.pinned = workspace.scrollingPinSide
         view.update(workspaceName: workspaceDisplayName(workspace.name), models: models, pinned: pinned, icons: icons,
                     metrics: workspace.scrollingMetrics, offset: workspace.scrollingOffset,
-                    focused: focus.windowOrNil.flatMap { $0.nodeWorkspace === workspace ? ObjectIdentifier($0.topLevelWorkspaceGroup) : nil })
+                    focused: focus.windowOrNil.flatMap { $0.nodeWorkspace === workspace ? workspace.scrollingColumn(of: $0).map(ObjectIdentifier.init) : nil })
         refreshTitles(representatives, in: workspace)
     }
 

@@ -24,6 +24,19 @@ struct JoinWithCommand: Command {
             }
             return true
         }
+        // In a Scrolling workspace left and right stack the window into the column on that side.
+        if target.workspace.arrangement == .scrolling, direction.orientation == .h {
+            let workspace = target.workspace
+            let columns = workspace.scrollingColumns
+            guard let own = workspace.scrollingColumn(of: currentWindow),
+                  let index = columns.firstIndex(where: { $0 === own }),
+                  let neighbor = columns.getOrNil(atIndex: index + direction.focusOffset) else {
+                io.out("join-with: nothing to do")
+                return true
+            }
+            workspace.stackScrollingWindow(currentWindow, onto: neighbor)
+            return true
+        }
         guard let (parent, ownIndex) = currentWindow.closestParent(hasChildrenInDirection: direction, withLayout: nil) else {
             io.out("join-with: nothing to do")
             return true

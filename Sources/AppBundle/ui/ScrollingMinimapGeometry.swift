@@ -71,7 +71,7 @@ struct ScrollingMinimapLifetime {
 @MainActor
 func focusScrollingMinimapGroup(_ id: ObjectIdentifier, in workspace: Workspace) -> Bool {
     guard workspace.arrangement == .scrolling,
-          let group = workspace.workspaceLayoutUnits.first(where: { ObjectIdentifier($0) == id }),
+          let group = workspace.scrollingColumns.first(where: { ObjectIdentifier($0) == id }),
           let window = group.mostRecentWindowRecursive, window.focusWindow() else { return false }
     if let column = workspace.scrollingMetrics.columns.first(where: { $0.node === group }) {
         workspace.scrollingOffset = workspace.scrollingMetrics.focusedOffset(for: column, current: workspace.scrollingOffset)

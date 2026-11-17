@@ -40,14 +40,15 @@ struct FocusCommand: Command {
                 // A Scrolling workspace steps left and right through its columns, scrolling hidden
                 // ones in, and up and down within the focused column.
                 if target.workspace.arrangement == .scrolling, let window {
-                    let groups = target.workspace.workspaceLayoutUnits
-                    if direction.orientation == .h, let index = groups.firstIndex(where: { $0 === window.topLevelWorkspaceGroup }) {
+                    let groups = target.workspace.scrollingColumns
+                    let own = target.workspace.scrollingColumn(of: window)
+                    if direction.orientation == .h, let index = groups.firstIndex(where: { $0 === own }) {
                         if let destination = groups.getOrNil(atIndex: index + direction.focusOffset)?.mostRecentWindowRecursive {
                             return destination.focusWindow()
                         }
                         return hitWorkspaceBoundaries(target, io, args, direction)
                     }
-                    let column = window.topLevelWorkspaceGroup.allLeafWindowsRecursive
+                    let column = own?.allLeafWindowsRecursive ?? [window]
                     if let neighbor = dwindleDirectionalFocusTarget(from: window, direction: direction, candidates: column) {
                         return neighbor.focusWindow()
                     }

@@ -135,6 +135,46 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         XCTAssertEqual(windows[0].parent === workspace.rootTilingContainer, true, "The window stays tiled")
     }
 
+    func testASideBySideSplitOpensUpIntoColumnsAndAStackStaysOne() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        root.layout = .tiles
+        let browser = TestWindow.new(id: 76200, parent: root)
+        let row = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tiles, index: INDEX_BIND_LAST)
+        let editor = TestWindow.new(id: 76201, parent: row)
+        let stack = TilingContainer(parent: row, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
+        let top = TestWindow.new(id: 76202, parent: stack)
+        let bottom = TestWindow.new(id: 76203, parent: stack)
+        _ = editor.focusWindow()
+        try await succeed("workspace-layout scrolling")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3, "browser, editor, and the stack")
+        XCTAssertTrue(workspace.scrollingColumns[0] === browser)
+        XCTAssertTrue(workspace.scrollingColumns[1] === editor)
+        XCTAssertTrue(workspace.scrollingColumns[2] === stack)
+        XCTAssertTrue(workspace.scrollingColumn(of: bottom) === stack)
+        XCTAssertTrue(root.children.contains { $0 === row }, "The tree is untouched")
+        let frames = workspace.arrangementGroupFrames(in: workspaceTilingRect(workspace),
+                                                      gaps: ResolvedGaps(gaps: config.gaps, monitor: workspace.workspaceMonitor))
+        XCTAssertEqual(frames.count, 3)
+        try await workspace.layoutWorkspace()
+        let topRect = try XCTUnwrap(top.lastAppliedLayoutPhysicalRect), bottomRect = try XCTUnwrap(bottom.lastAppliedLayoutPhysicalRect)
+        XCTAssertEqual(topRect.minX, bottomRect.minX, accuracy: 1, "A stack is one column")
+        XCTAssertLessThan(topRect.minY, bottomRect.minY)
+    }
+
+    func testJoinStacksIntoTheNeighbourAndMoveTakesItOutAgain() async throws {
+        let (workspace, windows) = try await strip(3)
+        _ = windows[1].focusWindow()
+        try await succeed("join-with right")
+        XCTAssertEqual(workspace.scrollingColumns.count, 2)
+        let stack = try XCTUnwrap(workspace.scrollingColumn(of: windows[1]))
+        XCTAssertTrue(stack === workspace.scrollingColumn(of: windows[2]), "Both windows share a column")
+        XCTAssertEqual((stack as? TilingContainer)?.orientation, .v)
+        try await succeed("move left")
+        XCTAssertEqual(workspace.scrollingColumns.count, 3, "Moving sideways out of a stack makes a column again")
+        XCTAssertTrue(workspace.scrollingColumns[1] === windows[1])
+    }
+
     func testChangingLayoutEndsAStripPan() async throws {
         let (workspace, _) = try await strip(2)
         workspace.scrollingGestureMotionActive = true
