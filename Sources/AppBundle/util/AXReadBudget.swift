@@ -1,6 +1,7 @@
 import AppKit
 import Common
 import Foundation
+import Synchronization
 
 struct AXReadFailure: Error, LocalizedError, Sendable {
     let code: AXError
@@ -8,10 +9,10 @@ struct AXReadFailure: Error, LocalizedError, Sendable {
 }
 
 /// Shared by one refresh and its app-thread jobs, never reused by the next refresh.
-final class AXReadBudget: @unchecked Sendable {
+final class AXReadBudget: Sendable {
     @TaskLocal static var current: AXReadBudget?
-    private let lock = NSLock()
-    private var unavailable = Set<Int32>()
+    /// Apps that stopped answering this refresh.
+    private let unavailable = Mutex(Set<Int32>())
 
     func read<T>(pid: Int32, _ operation: () -> Result<T, AXReadFailure>) -> Result<T, AXReadFailure> {
         guard permits(pid) else { return .failure(AXReadFailure(code: .cannotComplete)) }
@@ -21,14 +22,12 @@ final class AXReadBudget: @unchecked Sendable {
     }
 
     func permits(_ pid: Int32) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        return !unavailable.contains(pid)
+        unavailable.withLock { !$0.contains(pid) }
     }
 
     func record(_ error: AXError, pid: Int32) {
         guard error == .cannotComplete else { return }
-        lock.lock(); defer { lock.unlock() }
-        unavailable.insert(pid)
+        _ = unavailable.withLock { $0.insert(pid) }
     }
 }
 
