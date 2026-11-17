@@ -37,22 +37,17 @@ func cgWindowBounds(windowNumber: Int) -> CGRect? {
 
 final class WindowTabsTest: XCTestCase {
     @MainActor
-    func testDragStackMakesATabGroupAndKeepsAnExistingGroupLayout() throws {
-        for existing: Layout in [.tabGroup] {
-            setUpWorkspacesForTests()
-            let root = Workspace.get(byName: "drag-stack").rootTilingContainer
-            let target = TestWindow.new(id: 1, parent: root)
-            let source = TestWindow.new(id: 2, parent: root)
-            XCTAssertEqual(dragStackLayout(for: target), .tabGroup)
-            createOrAppendWindowTabStack(sourceWindow: source, onto: target, newGroupLayout: .tabGroup)
-            let group = try XCTUnwrap(target.parent as? TilingContainer)
-            group.layout = existing
-            let third = TestWindow.new(id: 3, parent: root)
-            XCTAssertEqual(dragStackLayout(for: target), existing)
-            createOrAppendWindowTabStack(sourceWindow: third, onto: target, newGroupLayout: .tabGroup)
-            XCTAssertTrue(third.parent === group)
-            XCTAssertEqual(group.layout, existing)
-        }
+    func testDragStackMakesATabGroupAndJoinsAnExistingOne() throws {
+        setUpWorkspacesForTests()
+        let root = Workspace.get(byName: "drag-stack").rootTilingContainer
+        let target = TestWindow.new(id: 1, parent: root)
+        let source = TestWindow.new(id: 2, parent: root)
+        createOrAppendWindowTabStack(sourceWindow: source, onto: target)
+        let group = try XCTUnwrap(target.parent as? TilingContainer)
+        XCTAssertEqual(group.layout, .tabGroup)
+        let third = TestWindow.new(id: 3, parent: root)
+        createOrAppendWindowTabStack(sourceWindow: third, onto: target)
+        XCTAssertTrue(third.parent === group)
     }
 
     @MainActor

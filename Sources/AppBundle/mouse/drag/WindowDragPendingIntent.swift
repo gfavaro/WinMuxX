@@ -211,7 +211,7 @@ func applyPendingWindowDragIntentIfPossible() -> Bool {
             guard let targetWindow = Window.get(byId: targetWindowId),
                   sourceWindow != targetWindow
             else { return false }
-            createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow, newGroupLayout: .tabGroup)
+            createOrAppendWindowTabStack(sourceWindow: sourceWindow, onto: targetWindow)
             return true
         case .detachTab(let windowId):
             guard sourceWindow.windowId == windowId else { return false }

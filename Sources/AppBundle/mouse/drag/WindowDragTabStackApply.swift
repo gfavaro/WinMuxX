@@ -1,20 +1,10 @@
 import Common
 
+/// Puts `sourceWindow` in a tab group with `targetWindow`: the one it is in, or a new one in its place.
 @MainActor
-func dragStackLayout(for targetWindow: Window, defaultLayout: Layout? = nil) -> Layout {
-    if let parent = targetWindow.parent as? TilingContainer,
-       parent.layout == .tabGroup {
-        return parent.layout
-    }
-    return defaultLayout ?? .tabGroup
-}
-
-@MainActor
-func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Window, newGroupLayout: Layout = .tabGroup) {
+func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Window) {
     guard sourceWindow != targetWindow else { return }
-    let layout = dragStackLayout(for: targetWindow, defaultLayout: newGroupLayout)
-    let targetRect = layout == .tabGroup
-        ? normalizeTabStackSourceWindowFrame(sourceWindow: sourceWindow, targetWindow: targetWindow) : nil
+    let targetRect: Rect? = normalizeTabStackSourceWindowFrame(sourceWindow: sourceWindow, targetWindow: targetWindow)
     if let targetParent = targetWindow.parent as? TilingContainer,
        targetParent.layout == .tabGroup
     {
@@ -33,7 +23,7 @@ func createOrAppendWindowTabStack(sourceWindow: Window, onto targetWindow: Windo
         parent: targetBinding.parent,
         adaptiveWeight: targetBinding.adaptiveWeight,
         newOrientation,
-        layout,
+        .tabGroup,
         index: targetBinding.index,
     )
     sourceWindow.unbindFromParent()
