@@ -20,6 +20,12 @@ identity and recovery data. See [fork maintenance](docs/FORK.md) for
 submission and installation, and [marketing images](docs/MARKETING.md) for
 generating project visuals.
 
+## Architecture and engineering governance
+
+Read [architecture overview](docs/architecture/OVERVIEW.md), [governance](docs/architecture/GOVERNANCE.md) and the documents relevant to the task before nontrivial engineering work. The repository is the authoritative architecture record; external memory supplements it. Distinguish observed behavior, inference, proposals and unknowns. Identify affected invariants and explain the approach and regression risks; update affected architecture documentation and report actual verification.
+
+Do not silently change domain ownership, workspace or window identity, layout contracts, persistence schemas, major event processing, public architectural interfaces or fundamental dependency directions. Before implementing such a change, explain the problem, simplest viable solution, alternatives, trade-offs, migration and compatibility in plain English, prepare a proposed ADR, and obtain Product Manager approval. Make ordinary implementation choices autonomously within existing contracts. An independent reviewing agent is preferred for significant changes when available; trivial changes do not require multiple agents. End substantial work with what changed, why, architectural impact, verification, risks, documentation and commit IDs (or explicitly state none).
+
 <!-- ai-memory:start -->
 ## Long-term memory (ai-memory)
 

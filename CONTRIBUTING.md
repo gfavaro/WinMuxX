@@ -38,8 +38,9 @@ and license obligations before adapting the implementation.
 For a bounded task, write down the trigger, expected result, affected subsystem and
 one observable acceptance case. Add rejection/cancellation cases only where they
 change behavior. If the request changes an existing contract, state the before/after
-explicitly and update its tests and current docs together. This can be a few sentences
-in your working notes; it does not require another planning document or approval.
+explicitly and update its tests and current docs together. This can be a few
+sentences in your working notes. Significant architectural changes follow the
+approval and ADR process in [governance](docs/architecture/GOVERNANCE.md).
 
 Follow [Testing](docs/TESTING.md): use focused tests during development and run
 `make check` before submitting a change. Explain any check you could not run.
