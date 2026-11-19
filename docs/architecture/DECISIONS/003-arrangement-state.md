@@ -16,10 +16,10 @@ Observed code retains arrangement-specific state across in-memory switches. Hist
 Unknown historically. A common layout interface or persisting all per-mode state is conceivable but has not been accepted here.
 
 ## Consequences
-Modes can retain distinct behavior, but transitions and shared commands must reconcile with a common tree; in-memory retention does not imply restart persistence.
+Modes can retain distinct behavior, but transitions and shared commands must reconcile with a common tree. Retention in memory does not imply persistence across restart.
 
 ## Risks
-Cross-mode regressions and conditional offset persistence deserve focused tests and product clarification.
+Cross-mode regressions and conditional offset persistence deserve focused tests. The product behavior also needs clarification.
 
 ## Source references
 [Workspace](../../../Sources/AppBundle/tree/WorkspaceType.swift), [transition](../../../Sources/AppBundle/tree/MasterLayout.swift), [snapshot](../../../Sources/AppBundle/tree/frozen/closedWindowsCache.swift).

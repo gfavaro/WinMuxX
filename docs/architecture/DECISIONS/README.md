@@ -1,6 +1,6 @@
 # Architecture decision records
 
-These records document observed implementation, not a retrospective claim that a particular meeting approved every detail. New changes use Proposed until the Product Manager explicitly accepts them. Use a stable numbered filename; describe context, decision, rationale, alternatives, consequences, risks, evidence and date. Superseded records link their replacements.
+These records document observed implementation. They do not claim that a particular meeting approved every detail. New changes use Proposed until the Product Manager explicitly accepts them. Use a stable numbered filename. Describe context, decision, rationale, alternatives, consequences, risks, evidence and date. Superseded records link their replacements.
 
 - [ADR-001: Virtual workspaces and display ownership](001-virtual-workspaces.md)
 - [ADR-002: Conservative restart identity](002-restart-identity.md)

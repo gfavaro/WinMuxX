@@ -2,7 +2,7 @@
 
 ## Plain English overview
 
-An invariant is a property worth protecting across implementation changes. “Partially enforced” means there are guards or tests, not that every interleaving is proven. Proposed invariants are targets, not claims about current behavior. Severity describes potential user impact, not evidence of an existing defect.
+An invariant is a property worth protecting across implementation changes. “Partially enforced” means guards or tests exist. It does not mean every event ordering is proven. Proposed invariants are targets, not claims about current behavior. Severity describes potential user impact, not evidence of an existing defect.
 
 ## Architectural rules
 
@@ -25,7 +25,7 @@ Existing project rules: workspace selection MUST preserve display ownership and 
 
 ## Failure modes
 
-A failed invariant may appear as a missing window, incorrect display, wrong tab or repeated movement. First distinguish a model error from native AX refusal; diagnostics and tests do not by themselves repair the model.
+A failed invariant may appear as a missing window, incorrect display, wrong tab or repeated movement. First distinguish a model error from a native AX refusal. Diagnostics and tests do not repair the model by themselves.
 
 ## Open questions
 

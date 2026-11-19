@@ -2,11 +2,11 @@
 
 ## Plain English overview
 
-WinMuxX is a coordinator between your organization of work and windows controlled by macOS and other applications. It creates its own workspaces and groups them into projects. Each display shows one workspace; other workspaces keep their windows out of view until needed. Selecting a workspace respects the display it belongs to, while an explicit move brings the whole workspace, including its organization, to another display.
+WinMuxX coordinates your workspaces with windows controlled by macOS and other applications. It creates its own workspaces and groups them into projects. Each display shows one workspace. Other workspaces keep their windows out of view until needed. Selecting a workspace respects the display it belongs to. An explicit move brings the whole workspace, including its organization, to another display.
 
-Inside each workspace a tree records windows and nested groups. A chosen arrangement calculates how to display them: Dwindle divides space, Tabbed shows selected windows within groups, Scrolling arranges columns in a strip that can be panned with a trackpad, and Master emphasizes one group. The app listens for window, application, input and display changes, updates its model and asks apps to move windows. Applications can refuse, respond slowly, or disappear, so the app must reconcile rather than assume it controls everything.
+Inside each workspace a tree records windows and nested groups. The selected arrangement calculates how to display them. Dwindle divides space. Tabbed shows selected windows within groups. Scrolling arranges columns in a strip that you can move with a trackpad. Master emphasizes one group. The app listens for window, application, input and display changes, updates its model and asks apps to move windows. Applications can refuse, respond slowly, or disappear. WinMuxX must reconcile its model with what it observes.
 
-WinMuxX saves workspace organization for restart and separately keeps information for recovering original window positions. When an application reopens, it tries to recognize windows using the evidence available. It intentionally avoids forcing some ambiguous matches. Preferences live in the configuration file; recovery data is not the same thing as preferences. Existing product behavior is described in [principles](../PRINCIPLES.md) and [workspace examples](../WORKSPACE_BEHAVIOR.md).
+WinMuxX saves workspace organization for restart and separately keeps information for recovering original window positions. When an application reopens, it tries to recognize windows using the evidence available. It intentionally avoids forcing some ambiguous matches. Preferences live in the configuration file. Recovery data is stored separately from preferences. Existing product behavior is described in [principles](../PRINCIPLES.md) and [workspace examples](../WORKSPACE_BEHAVIOR.md).
 
 ## Architectural rules
 
@@ -42,7 +42,7 @@ Strengths: explicit selection versus movement policy, bounded retries and safegu
 ### Proposed improvements
 
 1. **Test switching between all arrangements.** This protects windows and groups when changing presentation. It is the smallest useful step because it checks current behavior before redesigning it. Tests can reveal differences in intended behavior; doing nothing leaves future layout changes harder to assess.
-2. **Exercise recovery with ambiguous and late windows, and display changes.** This makes uncertain restoration visible and tests safety. The risk is treating assumptions in fixtures as promises macOS cannot meet. Doing nothing leaves rare restart and monitor problems harder to diagnose.
+2. **Exercise recovery with ambiguous and late windows, and display changes.** This makes uncertain restoration visible and tests safety. The risk is treating assumptions in fixtures as promises macOS cannot meet. Doing nothing leaves rare restart and display problems harder to diagnose.
 3. **Decide how long a Scrolling position should be remembered.** The saved position can be absent if another arrangement is active at restart. A targeted persistence change would be simpler than redesigning layouts, but could restore a stale position or require compatibility handling. Doing nothing keeps today's documented behavior.
 
 ### Decisions requiring Product Manager approval
@@ -55,7 +55,7 @@ Is returning to the previous Scrolling position after switching layouts and rest
 
 ## Failure modes
 
-An app can be slow, disappear, or refuse a requested frame; a saved window can be ambiguous. The result may be a misplaced or unrecovered window even when the internal model is healthy. The audit separates evidence from potential impact; automated tests do not certify physical operation.
+An app can be slow, disappear, or refuse a requested frame. The identity of a saved window can be ambiguous. The result may be a misplaced or unrecovered window even when the internal model is healthy. The audit separates evidence from potential impact; automated tests do not certify physical operation.
 
 ## Open questions
 

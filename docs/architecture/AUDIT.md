@@ -2,7 +2,7 @@
 
 ## Plain English overview
 
-This is an independent critical examination of the reconstructed design by the implementing agent, not an independent agent review. Findings distinguish demonstrated implementation properties from hypothetical failures. No P0 or confirmed P1 defect was established in this documentation review. Priorities describe investigation value; a risk is not proof of a user-visible bug.
+The implementing agent examined the reconstructed design critically. A separate agent did not perform this review. Findings distinguish demonstrated implementation properties from hypothetical failures. This documentation review did not establish a P0 or confirmed P1 defect. Priorities describe the value of investigation. A risk is not proof of a user-visible bug.
 
 ## Architectural rules
 
@@ -22,7 +22,7 @@ Existing: preserve working behavior and recovery data. Proposed: prioritize conf
 
 ## Backlog
 
-All tasks are **Proposed** and unapproved; no production change is part of this baseline.
+All tasks are **Proposed** and unapproved. This baseline includes no production change.
 
 | Phase / task | Plain English outcome; contracts and prerequisites | Measurable acceptance, complexity and regression risk |
 | --- | --- | --- |
@@ -35,7 +35,7 @@ All tasks are **Proposed** and unapproved; no production change is part of this 
 
 ## Failure modes
 
-Prioritization can overstate hypothetical risk or hide an actual defect. Promote a finding only with reproduction and impact; retain evidence and do not “fix” data loss by deleting user state.
+Prioritization can overstate hypothetical risk or hide an actual defect. Promote a finding only with reproduction and impact. Retain evidence. Do not “fix” data loss by deleting user state.
 
 ## Open questions
 
