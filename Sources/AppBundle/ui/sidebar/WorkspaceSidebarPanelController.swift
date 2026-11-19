@@ -230,6 +230,10 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     private var configuration = WorkspaceSidebarConfiguration.empty
     private var visibleWidth: CGFloat = 0
     private let clippingLayer = CAShapeLayer()
+    /// The solid sidebar color continued over the outer gap and flared around the windows' corners. The
+    /// other surfaces keep to the rail, so this is the only layer that follows the windows.
+    private let edgeSurface = NSView()
+    private let edgeMask = CAShapeLayer()
     private var wallpaperTone: WorkspaceSidebarWallpaperTone?
     private let reduceTransparency: () -> Bool
 
@@ -249,6 +253,9 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         glass.wantsLayer = true
         glassSurface = glass
         super.init(frame: frameRect)
+        edgeSurface.wantsLayer = true
+        edgeSurface.isHidden = true
+        addSubview(edgeSurface)
         customSurface.wantsLayer = true
         clearSurface.wantsLayer = true
         opaqueSurface.wantsLayer = true
@@ -334,6 +341,7 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         updateOpaqueBackground()
+        updateEdgeSurface()
     }
 
     private func updateOpaqueBackground() {
@@ -344,20 +352,49 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     }
 
     private func updateGeometry() {
-        let windowEdge = (window as? WorkspaceSidebarPanel)?.windowEdge(visibleWidth: visibleWidth)
-        let rect = workspaceSidebarSurfaceFrame(panel: bounds, width: visibleWidth, position: configuration.position,
-                                                windowEdge: windowEdge)
+        let rect = workspaceSidebarVisibleFrame(panel: bounds, width: visibleWidth, position: configuration.position)
         let surface = activeSurface
         surface.frame = rect
         if surface === glassSurface { glassContent.frame = CGRect(origin: .zero, size: rect.size) }
         hostedContent?.frame = CGRect(x: -rect.minX, y: 0, width: bounds.width, height: bounds.height)
-        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth, windowEdge: windowEdge)
+        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth)
             .path(in: CGRect(origin: .zero, size: rect.size)).cgPath
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         clippingLayer.frame = CGRect(origin: .zero, size: rect.size)
         clippingLayer.path = path
         surface.layer?.mask = clippingLayer
+        CATransaction.commit()
+        updateEdgeSurface()
+    }
+
+    /// Only a flat color can be continued beside the windows without a seam; glass and the
+    /// transparent rail are left to the rail itself.
+    private var edgeColor: NSColor? {
+        if configuration.chromeStyle == .solid { return NSColor(configuration.resolvedSolidChromeColor) }
+        guard configuration.appearance == .system, reduceTransparency() else { return nil }
+        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+        return workspaceSidebarOpaqueColor(dark: dark)
+    }
+
+    private func updateEdgeSurface() {
+        guard visibleWidth > 0, let color = edgeColor,
+              let edge = (window as? WorkspaceSidebarPanel)?.windowEdge(visibleWidth: visibleWidth) else {
+            edgeSurface.isHidden = true
+            return
+        }
+        let rect = workspaceSidebarSurfaceFrame(panel: bounds, width: visibleWidth, position: configuration.position,
+                                                windowEdge: edge)
+        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth, windowEdge: edge)
+            .path(in: CGRect(origin: .zero, size: rect.size)).cgPath
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        edgeSurface.isHidden = false
+        edgeSurface.frame = rect
+        edgeSurface.layer?.backgroundColor = color.cgColor
+        edgeMask.frame = CGRect(origin: .zero, size: rect.size)
+        edgeMask.path = path
+        edgeSurface.layer?.mask = edgeMask
         CATransaction.commit()
     }
 }
