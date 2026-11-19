@@ -21,7 +21,10 @@ GUIDES = (
 )
 
 
-def check(root, guides=GUIDES):
+def check(root, guides=None):
+    if guides is None:
+        architecture = sorted(str(path.relative_to(root)) for path in (root / "docs/architecture").rglob("*.md"))
+        guides = (*GUIDES, *architecture)
     errors = []
     test_sources = list((root / "Sources/AppBundleTests").rglob("*.swift"))
     symbols = set()
@@ -54,4 +57,4 @@ if __name__ == "__main__":
     if problems:
         print("\n".join(problems), file=sys.stderr)
         sys.exit(1)
-    print(f"Contributor guidance: {len(GUIDES)} files checked; local links, source paths and XCTest symbols resolve.")
+    print("Contributor guidance and architecture: local links, source paths and XCTest symbols resolve.")

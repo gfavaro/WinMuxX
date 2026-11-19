@@ -38,6 +38,17 @@ class ContributorGuidanceTest(unittest.TestCase):
         self.assertTrue(any("missing source path" in error for error in errors))
         self.assertTrue(any("missing XCTest symbol" in error for error in errors))
 
+    def test_default_checks_architecture_documents(self):
+        from script.check_contributor_guidance import GUIDES
+        for name in GUIDES:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        architecture = self.root / "docs/architecture/DECISIONS"
+        architecture.mkdir(parents=True)
+        (architecture / "decision.md").write_text("[broken](missing.md)")
+        self.assertTrue(any("missing local link" in error for error in check(self.root)))
+
     def test_missing_guide_fails_instead_of_silently_skipping(self):
         self.assertEqual(check(self.root, ("absent.md",)), ["absent.md: guide missing"])
 
