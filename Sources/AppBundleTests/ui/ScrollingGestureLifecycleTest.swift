@@ -2,7 +2,7 @@
 import XCTest
 
 @MainActor
-private final class ScrollingLifecycleReceiver: DockSwipeReceiver {
+private final class TrackerLifecycleReceiverSpy: DockSwipeReceiver {
     var progress: [Double] = []
     var endings: [Bool] = []
     var starts = 0
@@ -17,10 +17,10 @@ private final class ScrollingLifecycleReceiver: DockSwipeReceiver {
 }
 
 @MainActor
-final class ScrollingGestureLifecycleTest: XCTestCase {
+final class DockSwipeTrackerLifecycleTest: XCTestCase {
     func testAbandonCancelsOnceAndLateEventsDoNotReachReceiver() {
         var tracker = DockSwipeTracker(dockNeedsEnd: true)
-        let receiver = ScrollingLifecycleReceiver()
+        let receiver = TrackerLifecycleReceiverSpy()
         _ = tracker.receive(phase: 1, progress: 0, endVelocity: 0, timestamp: 0, to: receiver)
         _ = tracker.receive(phase: 2, progress: 0.2, endVelocity: 0, timestamp: 0.1, to: receiver)
         _ = tracker.receive(phase: 2, progress: 0.4, endVelocity: 0, timestamp: 0.2, to: receiver)
@@ -37,7 +37,7 @@ final class ScrollingGestureLifecycleTest: XCTestCase {
 
     func testNewGestureAfterAbandonCanComplete() {
         var tracker = DockSwipeTracker(dockNeedsEnd: true)
-        let receiver = ScrollingLifecycleReceiver()
+        let receiver = TrackerLifecycleReceiverSpy()
         _ = tracker.receive(phase: 1, progress: 0, endVelocity: 0, timestamp: 0, to: receiver)
         _ = tracker.receive(phase: 2, progress: 0.2, endVelocity: 0, timestamp: 0.1, to: receiver)
         tracker.abandon(receiver)

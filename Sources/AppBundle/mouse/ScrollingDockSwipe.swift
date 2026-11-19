@@ -6,6 +6,11 @@ import Common
 /// Anywhere else the swipe stays with macOS.
 @MainActor
 final class DockScrollingSwipeReceiver: DockSwipeReceiver {
+    private let targetOverride: (@MainActor () -> Workspace?)?
+
+    init(targetOverride: (@MainActor () -> Workspace?)? = nil) {
+        self.targetOverride = targetOverride
+    }
     private weak var workspace: Workspace?
     private var sign: CGFloat = 1
     private var progress = 0.0
@@ -14,6 +19,7 @@ final class DockScrollingSwipeReceiver: DockSwipeReceiver {
 
     /// The Scrolling workspace under the pointer, when there is a strip to pan.
     private func target() -> Workspace? {
+        if let targetOverride { return targetOverride() }
         guard workspaceSwipeGestureEnabled, isWinMuxRuntimeReady, TrayMenuModel.shared.isEnabled,
               !WindowBorderController.shared.isMissionControlActive,
               !isMouseManipulationActive, !isLeftMouseButtonDown,
