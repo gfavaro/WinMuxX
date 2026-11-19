@@ -29,7 +29,7 @@ Logical focus is WinMuxX's selected window and workspace. Native focus is contro
 
 | Principle | Assessment | Evidence and recommended test |
 | --- | --- | --- |
-| Switch does not silently change membership | Partially enforced: transition preserves tree intent but can wrap/sync; no proof across all cases. Test live reachable windows before/after all pairwise transitions, including floating and minimized. |
+| Switch does not silently change membership | Partially enforced: all 12 ordered pairs and their return keep membership, tab groups and focus in [ArrangementTransitionMatrixTest](../../Sources/AppBundleTests/tree/ArrangementTransitionMatrixTest.swift). Not tested under concurrent native events. |
 | Layout does not own persistent identity | Partially enforced: shared restart matching owns identity, but Tabbed/Scrolling retain window IDs as hints. Test ID reuse and missing windows. |
 | One focus authority | Partially enforced: logical/native focus reconciled with arrangement-specific hints. Test delayed native focus and group selection across transitions. |
 | Recoverable state on transition | Partially enforced: runtime state retained; snapshot persists selected subset. Test restart from each mode after visiting others. |
