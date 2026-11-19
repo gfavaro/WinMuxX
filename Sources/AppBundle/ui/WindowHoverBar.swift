@@ -68,18 +68,6 @@ final class WindowHoverBar {
         return bindings.bindings(for: command).first.map(shortcutHintText)
     }
 
-    /// The tabs of the group a tabbed window belongs to, from the published tab models.
-    static func tabs(for window: Window) -> [HoverBarTab] {
-        // A tab strip already shows the tabs; only pills leave them to the bar.
-        guard let group = window.nearestWindowTabGroup, group.showsWindowTabs,
-              let strip = TrayMenuModel.shared.windowTabStrips.first(where: { $0.id == ObjectIdentifier(group) })
-        else { return [] }
-        return strip.tabs.map { tab in
-            HoverBarTab(windowId: tab.windowId, title: tab.title.isEmpty ? tab.appName : tab.title,
-                appBundlePath: tab.appBundlePath, isActive: tab.isActive)
-        }
-    }
-
     /// The managed window whose top-edge zone holds the point, from cached frames.
     /// Floating windows and a focused one cover the tiles beneath them, so they come first.
     static func candidate(at point: CGPoint) -> Window? {
@@ -127,7 +115,7 @@ final class WindowHoverBar {
         guard let frame = Self.frame(of: window) else { return }
         let id = window.windowId
         let actions = Self.actions(for: window)
-        let size = panel.configure(actions, hints: actions.map(Self.shortcutHint), tabs: Self.tabs(for: window)) { [weak self] command in
+        let size = panel.configure(actions, hints: actions.map(Self.shortcutHint)) { [weak self] command in
             self?.hide()
             // Act as a click on the window would: focus (and raise) it first, so a window
             // floated from the bar is not left behind the tiles it came from.

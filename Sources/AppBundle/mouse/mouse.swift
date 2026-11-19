@@ -231,6 +231,9 @@ func beginWindowMoveWithMouseSessionIfNeeded(
 
     currentMouseManipulation = move
     setDraggedWindowAnchorRect(anchorRect, for: windowId)
+    WindowTabStripPanelController.shared.setIgnoresMouseEvents(
+        shouldIgnoreWindowTabStripMouseEventsDuringDrag(detachOrigin: detachOrigin)
+    )
     if refreshActualRects {
         refreshVisibleWindowActualRectsForCurrentDrag(sourceWindowId: windowId)
     } else {
@@ -246,6 +249,7 @@ func cancelManipulatedWithMouseState() {
     clearDraggedWindowAnchorRect(for: currentlyManipulatedWithMouseWindowId)
     WindowDragFrameGate.shared.resetAll()
     currentMouseManipulation = .none
+    WindowTabStripPanelController.shared.setIgnoresMouseEvents(false)
     for workspace in Workspace.all {
         workspace.resetResizeWeightBeforeResizeRecursive()
     }

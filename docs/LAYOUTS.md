@@ -126,16 +126,8 @@ The strip geometry adapts Dinky's Scrolling layout (MIT; see
 `layout tiles` places the focused container's children beside one another, and
 `layout tabbed` keeps them together as a tab group showing one at a time; see the
 [tab group diagram](assets/layouts/tabs.svg). Run `layout tiles tabbed` to cycle
-these choices. The accordion layout was removed: `layout accordion` and
-`layout stacked` now give a tab group, so existing bindings keep working.
-
-`layout strip` shows a tab group as a strip instead: its windows sit side by side as
-columns inside the group's tile, in Dwindle or Master. Each column takes just under half
-the group (gaps included, so two show at once) unless it was resized, and the
-columns that fit fill the tile. The others wait hidden; focus left or right steps through
-the columns and scrolls hidden ones in, leaving the strip at either end. `layout tab-group`
-shows the same group as tabs again. The choice is saved with the layout. Make a group with
-`stack-with` or by dragging a window onto another, then choose Arrange Windows → Columns in the menu or bind Window Group: Columns in Settings → Shortcuts.
+these choices. The accordion and strip layouts were removed: `layout accordion`,
+`layout stacked` and `layout strip` now give a tab group, so existing bindings keep working.
 
 `layout floating` and `layout tiling` change the selected window's state. These
 commands target the focused window and do not select a workspace layout.

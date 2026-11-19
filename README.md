@@ -33,7 +33,7 @@ compositor: it moves ordinary windows through the Accessibility API.
   color. See [sidebar](docs/SIDEBAR.md).
 - **Persistent workspaces** with the names and order you pick, per project and
   display. See [workspaces](docs/WORKSPACES.md).
-- **Tab groups** that share one tile, with pill tabs and a hover bar.
+- **Tab groups** that share one tile, with a tab bar above them.
 - **Window search palette**, tap-only shortcuts and per-side modifiers. See
   [shortcuts](docs/SHORTCUTS.md).
 - **Recovery.** Windows return to their saved layout after a restart, and the menu

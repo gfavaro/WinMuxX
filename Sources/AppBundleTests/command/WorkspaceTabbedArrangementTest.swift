@@ -71,24 +71,6 @@ final class WorkspaceTabbedArrangementTest: WorkspaceTestCase {
         XCTAssertTrue(focus.windowOrNil === windows[2])
     }
 
-    func testANestedStripDoesNotSkipTabs() async throws {
-        let workspace = focus.workspace
-        let root = workspace.rootTilingContainer
-        root.layout = .tiles
-        let strip = TilingContainer(parent: root, adaptiveWeight: WEIGHT_AUTO, .h, .tabGroup, index: INDEX_BIND_LAST)
-        strip.presentsAsStrip = true
-        let column = TilingContainer(parent: strip, adaptiveWeight: WEIGHT_AUTO, .v, .tiles, index: INDEX_BIND_LAST)
-        let top = TestWindow.new(id: 29100, parent: column)
-        let bottom = TestWindow.new(id: 29101, parent: column)
-        let next = TestWindow.new(id: 29102, parent: strip)
-        _ = top.focusWindow()
-        _ = try await run("workspace-layout tabbed")
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === bottom, "Right goes to the next tab, not the strip's next column")
-        _ = try await run("focus right")
-        XCTAssertTrue(focus.windowOrNil === next)
-    }
-
     func testFullscreenHidesTheBarAndTakesTheWholeArea() async throws {
         let (workspace, windows, _) = makeNestedWorkspace()
         _ = windows[0].focusWindow()

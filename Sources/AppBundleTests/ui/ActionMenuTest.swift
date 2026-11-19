@@ -120,7 +120,7 @@ final class ActionMenuTest: XCTestCase {
             XCTAssertNotNil(menu.items.first { $0.title == title }?.submenu, title)
         }
         let arrange = try submenu("Arrange Windows", in: menu)
-        for title in ["Dwindle", "Master", "Balance Sizes", "Tabs", "Columns", "Horizontal", "Vertical", "Join With", "Resize"] {
+        for title in ["Dwindle", "Master", "Balance Sizes", "Tabs", "Horizontal", "Vertical", "Join With", "Resize"] {
             XCTAssertTrue(arrange.items.contains { $0.title == title }, title)
         }
         XCTAssertFalse(arrange.items.contains { $0.title == "Accordion" }, "The accordion layout was removed")

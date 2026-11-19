@@ -36,12 +36,11 @@ extension TilingContainer {
               let parent = parent as? TilingContainer else { return }
         let siblingRatios = parent.dwindleChildRatios
         let wasMostRecent = parent.mostRecentChild === self
-        let columnWidth = scrollingColumnWidth, stripWidth = stripColumnWidth
+        let columnWidth = scrollingColumnWidth
         only.unbindFromParent()
         let binding = unbindFromParent()
         only.bind(to: parent, adaptiveWeight: binding.adaptiveWeight, index: binding.index)
         if only.scrollingColumnWidth == nil { only.scrollingColumnWidth = columnWidth }
-        if only.stripColumnWidth == nil { only.stripColumnWidth = stripWidth }
         parent.dwindleChildRatios = siblingRatios
         if wasMostRecent { only.markAsMostRecentChild() }
     }

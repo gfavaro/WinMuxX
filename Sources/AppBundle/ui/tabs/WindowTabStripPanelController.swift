@@ -14,16 +14,16 @@ final class WindowTabStripPanelController {
     var transientResizeTabGroupStrip: WindowTabStripViewModel? = nil
     var mouseInteractionChromeMode: MouseInteractionChromeMode? = nil
     var hiddenPassiveTabGroupChromeIds: Set<ObjectIdentifier> = []
-    /// One small panel of pills per group, straddling its top edge.
-    var pillPanels: [ObjectIdentifier: WindowTabPillPanel] = [:]
+    /// One always-visible tab bar per group, above its windows.
+    var stripPanels: [ObjectIdentifier: WindowTabStripPanel] = [:]
 
     private init() {}
 }
 
 extension WindowTabStripPanelController {
-    func pillPanel(for id: ObjectIdentifier) -> WindowTabPillPanel {
-        let panel = pillPanels[id] ?? WindowTabPillPanel(id: id)
-        pillPanels[id] = panel
+    func stripPanel(for id: ObjectIdentifier) -> WindowTabStripPanel {
+        let panel = stripPanels[id] ?? WindowTabStripPanel(id: id)
+        stripPanels[id] = panel
         return panel
     }
 }
@@ -37,14 +37,14 @@ extension WindowTabStripPanelController {
 
     func orderOutPanels(id: ObjectIdentifier) {
         orderOutIfVisible(visualPanels[id])
-        orderOutIfVisible(pillPanels[id])
+        orderOutIfVisible(stripPanels[id])
     }
 
     func removeStalePanels(activeIds: Set<ObjectIdentifier>) {
         removeStaleVisualPanels(activeIds: activeIds)
-        for staleId in pillPanels.keys where !activeIds.contains(staleId) {
-            orderOutIfVisible(pillPanels[staleId])
-            pillPanels.removeValue(forKey: staleId)
+        for staleId in stripPanels.keys where !activeIds.contains(staleId) {
+            orderOutIfVisible(stripPanels[staleId])
+            stripPanels.removeValue(forKey: staleId)
         }
     }
 
@@ -86,7 +86,7 @@ extension WindowTabStripPanelController {
         }
     }
 
-    /// A group shows its outline and pills; its tabs open in the hover bar.
+    /// A group shows its outline and its tab bar.
     func refreshInteractiveChrome(strips: [WindowTabStripViewModel], activeIds: Set<ObjectIdentifier>) {
         for strip in strips {
             guard !hiddenPassiveTabGroupChromeIds.contains(strip.id) else {
@@ -94,7 +94,7 @@ extension WindowTabStripPanelController {
                 continue
             }
             visualPanel(for: strip.id).update(with: strip)
-            pillPanel(for: strip.id).update(with: strip)
+            stripPanel(for: strip.id).update(with: strip)
         }
         removeStalePanels(activeIds: activeIds)
     }
@@ -119,7 +119,7 @@ extension WindowTabStripPanelController {
                 continue
             }
             visualPanel(for: strip.id).update(with: strip)
-            pillPanel(for: strip.id).update(with: strip)
+            orderOutIfVisible(stripPanels[strip.id])
         }
         removeStalePanels(activeIds: activeIds)
     }
@@ -181,10 +181,10 @@ extension WindowTabStripPanelController {
                 visualPanels.removeValue(forKey: id)
             }
         }
-        for id in Array(pillPanels.keys) {
-            orderOutIfVisible(pillPanels[id])
+        for id in Array(stripPanels.keys) {
+            orderOutIfVisible(stripPanels[id])
             if !activeIds.contains(id) {
-                pillPanels.removeValue(forKey: id)
+                stripPanels.removeValue(forKey: id)
             }
         }
     }
@@ -220,11 +220,16 @@ extension WindowTabStripPanelController {
         for panel in visualPanels.values {
             panel.orderOut(nil)
         }
-        for panel in pillPanels.values {
+        for panel in stripPanels.values {
             panel.orderOut(nil)
         }
         visualPanels.removeAll()
-        pillPanels.removeAll()
+        stripPanels.removeAll()
     }
 
+    func setIgnoresMouseEvents(_ ignoresMouseEvents: Bool) {
+        for panel in stripPanels.values {
+            panel.setExternalIgnoresMouseEvents(ignoresMouseEvents)
+        }
+    }
 }

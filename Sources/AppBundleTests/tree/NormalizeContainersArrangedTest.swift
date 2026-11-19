@@ -19,7 +19,6 @@ final class NormalizeContainersArrangedTest: WorkspaceTestCase {
         let left = TestWindow.new(id: 77000, parent: root, adaptiveWeight: 1)
         let outer = TilingContainer(parent: root, adaptiveWeight: 3, .v, .tiles, index: INDEX_BIND_LAST)
         outer.scrollingColumnWidth = 0.7
-        outer.stripColumnWidth = 0.4
         let inner = TilingContainer(parent: outer, adaptiveWeight: 1, .v, .tiles, index: 0)
         let wrapped = TestWindow.new(id: 77001, parent: inner)
         let tabs = TilingContainer(parent: root, adaptiveWeight: 1, .h, .tabGroup, index: INDEX_BIND_LAST)
@@ -30,7 +29,6 @@ final class NormalizeContainersArrangedTest: WorkspaceTestCase {
         XCTAssertTrue(root.children[1] === wrapped, "The window takes the wrappers' place")
         XCTAssertEqual(wrapped.getWeight(root.orientation), 3, "and their share")
         XCTAssertEqual(wrapped.scrollingColumnWidth, 0.7)
-        XCTAssertEqual(wrapped.stripColumnWidth, 0.4)
         XCTAssertTrue(tab.parent === tabs, "A tab group of one tab stays a tab group")
         XCTAssertTrue(root.parent === workspace)
     }

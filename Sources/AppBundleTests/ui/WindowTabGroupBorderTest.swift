@@ -22,9 +22,9 @@ final class WindowTabGroupBorderTest: WorkspaceTestCase {
         for frame in [CGRect(x: 103, y: 242, width: 800, height: 600),
                       CGRect(x: -900, y: -700, width: 1200, height: 850)] {
             let target = try XCTUnwrap(windowBorderTarget(for: active, nativeFrame: frame))
-            // A group reserves no header: the border hugs the window; its pills sit in the gap above.
-            XCTAssertEqual(target.frame, CGRect(x: frame.minX - 3, y: frame.minY,
-                width: frame.width + 6, height: frame.height + 3))
+            // The border encloses the window and the 42-point tab bar above it.
+            XCTAssertEqual(target.frame, CGRect(x: frame.minX - 3, y: frame.minY - 42,
+                width: frame.width + 6, height: frame.height + 3 + 42))
             XCTAssertEqual(target.corners.top, windowTabStripCornerRadius)
             XCTAssertEqual(target.corners.bottom,
                 windowTabGroupAppCornerRadius(activeWindowId: active.windowId) + 3)

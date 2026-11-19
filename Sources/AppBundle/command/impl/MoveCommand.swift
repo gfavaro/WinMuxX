@@ -28,13 +28,6 @@ struct MoveCommand: Command {
             }
             return hitWorkspaceBoundaries(currentNode, target.workspace, io, args, direction, env)
         }
-        // Inside a strip, left and right reorder its columns; at either end the whole strip moves.
-        if direction.orientation == .h, let strip = currentWindow.nearestWindowTabGroup, strip.isWindowStrip,
-           let column = currentWindow.directChild(in: strip), let index = column.ownIndex,
-           let neighbor = strip.children.getOrNil(atIndex: index + direction.focusOffset) {
-            swapNodes(column, neighbor)
-            return true
-        }
         if target.workspace.arrangement == .scrolling {
             return moveScrollingNode(currentWindow, direction: direction, workspace: target.workspace)
         }

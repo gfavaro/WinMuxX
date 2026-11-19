@@ -70,7 +70,7 @@ func settingsBorderPreviewCaption(enabled: Bool, width: Double, order: WindowBor
     return "\(points)-point border \(placement).\(dimming)"
 }
 
-/// A tab group as it appears at rest: pills on its top edge, the front window's longest.
+/// A tab group as it appears: a tab bar above its windows, the front window's tab highlighted.
 struct SettingsTabGroupPreview: View {
     let enabled: Bool
 
@@ -84,14 +84,17 @@ struct SettingsTabGroupPreview: View {
                     .frame(width: 200, height: 64)
                     .padding(.top, 5)
                 if enabled {
-                    HStack(spacing: windowTabPillSpacing) {
-                        ForEach(0..<3) { index in
-                            Capsule()
-                                .fill(index == 0 ? Color(nsColor: winMuxAccentColor) : Color(nsColor: .systemGray).opacity(0.7))
-                                .frame(width: windowTabPillWidth(isActive: index == 0, isShown: false), height: windowTabPillHeight)
+                    HStack(spacing: 2) {
+                        ForEach(["Notes", "Mail", "Safari"], id: \.self) { title in
+                            Text(title)
+                                .font(.system(size: 10, weight: title == "Notes" ? .semibold : .regular))
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, minHeight: 18)
+                                .background(RoundedRectangle(cornerRadius: 5)
+                                    .fill(title == "Notes" ? Color(nsColor: winMuxAccentColor).opacity(0.25) : Color.primary.opacity(0.06)))
                         }
                     }
-                    .padding(.top, 2)
+                    .frame(width: 200)
                 }
             }
             .padding(14)
@@ -99,7 +102,7 @@ struct SettingsTabGroupPreview: View {
             .background(RoundedRectangle(cornerRadius: 8).fill(Color(nsColor: .windowBackgroundColor)))
             .accessibilityHidden(true)
             SettingsDescription(enabled
-                ? "Three windows in one group. The long accent pill is the window in front; rest the pointer on the top edge to see the tabs and switch."
+                ? "Three windows in one group. The tab bar above them shows every window; the highlighted tab is in front. Click a tab to switch."
                 : "Tab strips are off: a group's windows overlap with small offsets instead.")
         }
     }

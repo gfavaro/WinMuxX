@@ -23,6 +23,10 @@ struct WindowTabStripViewModel: Identifiable, Equatable {
     /// Whether the Tabbed workspace has groups besides this bar's, for Merge All Groups.
     var hasOtherTabGroups = false
 
+    var tabStripIsOccludedByFloatingWindow: Bool {
+        occludingFloatingWindowFrames.contains { $0.intersects(frame) }
+    }
+
     var groupFrameIsOccludedByFloatingWindow: Bool {
         occludingFloatingWindowFrames.contains { $0.intersects(groupFrame) }
     }

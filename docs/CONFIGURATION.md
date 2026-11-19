@@ -74,8 +74,7 @@ icon-appearance = 'color'  # color or monochrome
 
 [window-tabs]
 enabled = true
-style = 'pills'             # pills (on the top edge, tabs in the hover bar) or tabs (a strip above the group)
-height = 36                 # the tab strip's height, and the drop zone for adding a window to a group
+height = 36                 # the tab bar's height above a group, and the drop zone for adding a window
 double-sided-windows = false
 ```
 
@@ -141,7 +140,7 @@ To use another color, set the root-level `accent-color`:
 accent-color = '#7AA2F7' # #RRGGBB; omit it to follow macOS
 ```
 
-It colors borders set to `'accent'`, tab pills, the hover bar and mode indicators
+It colors borders set to `'accent'`, the active tab, the hover bar and mode indicators
 without their own `indicator-color`.
 A theme tool can write it to match WinMuxX to the rest of the desktop.
 

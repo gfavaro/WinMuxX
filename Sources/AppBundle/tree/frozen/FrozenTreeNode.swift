@@ -17,9 +17,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
     let dwindleSplitRatios: [CGFloat]?
     let dwindleOrientation: Orientation?
     let dwindleChildRatios: [CGFloat]?
-    let stripColumnWidth: CGFloat?
     var scrollingColumnWidth: CGFloat? = nil
-    let presentsAsStrip: Bool?
     /// Read only from state saved by build 322, whose side-by-side tabs become tab groups.
     var isTabbedSplit: Bool? = nil
 
@@ -74,9 +72,7 @@ struct FrozenContainer: Codable, Equatable, Sendable {
         self.dwindleSplitRatios = dwindleSplitRatios
         self.dwindleOrientation = dwindleOrientation
         self.dwindleChildRatios = dwindleChildRatios
-        stripColumnWidth = container.stripColumnWidth
         scrollingColumnWidth = container.scrollingColumnWidth
-        presentsAsStrip = container.presentsAsStrip ? true : nil
     }
 }
 
@@ -95,7 +91,6 @@ struct FrozenWindow: Codable, Equatable, Sendable {
     let lastFloatingSize: CGSize?
     let singleWindowManualWidth: CGFloat?
     let workspacePreviewFrame: CGRect?
-    let stripColumnWidth: CGFloat?
     let scrollingColumnWidth: CGFloat?
 
     @MainActor init(_ window: Window) {
@@ -108,7 +103,6 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         lastFloatingSize = window.parent is Workspace && !window.isFullscreen
             ? window.lastKnownActualRect?.size ?? window.lastFloatingSize : window.lastFloatingSize
         singleWindowManualWidth = window.singleWindowManualWidth
-        stripColumnWidth = window.stripColumnWidth
         scrollingColumnWidth = window.scrollingColumnWidth
         if window.nodeWorkspace?.isVisible == true, !window.isHiddenInCorner,
            let rect = window.lastKnownActualRect ?? window.lastAppliedLayoutPhysicalRect,
@@ -143,7 +137,6 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         case lastFloatingSize
         case singleWindowManualWidth
         case workspacePreviewFrame
-        case stripColumnWidth
         case scrollingColumnWidth
     }
 
@@ -165,7 +158,6 @@ struct FrozenWindow: Codable, Equatable, Sendable {
         lastFloatingSize = try container.decodeIfPresent(CGSize.self, forKey: .lastFloatingSize)
         singleWindowManualWidth = try container.decodeIfPresent(CGFloat.self, forKey: .singleWindowManualWidth)
         workspacePreviewFrame = try container.decodeIfPresent(CGRect.self, forKey: .workspacePreviewFrame)
-        stripColumnWidth = try container.decodeIfPresent(CGFloat.self, forKey: .stripColumnWidth)
         scrollingColumnWidth = try container.decodeIfPresent(CGFloat.self, forKey: .scrollingColumnWidth)
     }
 }

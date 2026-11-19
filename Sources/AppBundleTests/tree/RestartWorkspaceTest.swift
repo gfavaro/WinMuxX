@@ -842,18 +842,13 @@ final class RestartWorkspaceTest: XCTestCase {
         let group = TilingContainer(parent: workspace.rootTilingContainer, adaptiveWeight: 1, .v, .tiles, index: INDEX_BIND_LAST)
         let window = TestWindow.new(id: 1, parent: group)
         _ = TestWindow.new(id: 2, parent: group)
-        window.stripColumnWidth = 0.4
         window.scrollingColumnWidth = 0.6
-        group.stripColumnWidth = 0.3
         group.scrollingColumnWidth = 0.7
         let frozenWindow = try JSONDecoder().decode(FrozenWindow.self, from: JSONEncoder().encode(FrozenWindow(window)))
         let frozenGroup = try JSONDecoder().decode(FrozenContainer.self, from: JSONEncoder().encode(FrozenContainer(group)))
-        window.stripColumnWidth = nil
         window.scrollingColumnWidth = nil
         applyFrozenWindowState(window, frozenWindow)
-        XCTAssertEqual(window.stripColumnWidth, 0.4)
         XCTAssertEqual(window.scrollingColumnWidth, 0.6)
-        XCTAssertEqual(frozenGroup.stripColumnWidth, 0.3)
         XCTAssertEqual(frozenGroup.scrollingColumnWidth, 0.7)
         XCTAssertNil(validColumnShare(.nan))
         XCTAssertNil(validColumnShare(-1))

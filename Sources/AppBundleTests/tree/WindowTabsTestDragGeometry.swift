@@ -61,13 +61,13 @@ import XCTest
         let groupFrame = windowTabGroupFrameRect(forActiveWindowContentRect: activeContentFrame)
         let tabBarFrame = windowTabBarRect(forGroupFrameRect: groupFrame)
 
-        // The group reserves no header above the window; its 36-point drop zone starts at the same top.
+        // The group reserves its 36-point tab bar above the window.
         XCTAssertEqual(groupFrame.topLeftX, 40)
-        XCTAssertEqual(groupFrame.topLeftY, 96)
+        XCTAssertEqual(groupFrame.topLeftY, 60)
         XCTAssertEqual(groupFrame.width, 500)
-        XCTAssertEqual(groupFrame.height, 264)
+        XCTAssertEqual(groupFrame.height, 300)
         XCTAssertEqual(tabBarFrame.topLeftX, 40)
-        XCTAssertEqual(tabBarFrame.topLeftY, 96)
+        XCTAssertEqual(tabBarFrame.topLeftY, 60)
         XCTAssertEqual(tabBarFrame.width, 500)
         XCTAssertEqual(tabBarFrame.height, 36)
     }
@@ -90,7 +90,7 @@ import XCTest
         ])
     }
 
-    func testWindowTabStripViewModelTracksFloatingWindowOcclusionForGroupFrame() {
+    func testWindowTabStripViewModelTracksFloatingWindowOcclusionSeparatelyForStripAndFrame() {
         let owner = NSObject()
         let model = WindowTabStripViewModel(
             id: ObjectIdentifier(owner),
@@ -105,6 +105,7 @@ import XCTest
             ],
         )
 
+        XCTAssertFalse(model.tabStripIsOccludedByFloatingWindow)
         XCTAssertTrue(model.groupFrameIsOccludedByFloatingWindow)
     }
 

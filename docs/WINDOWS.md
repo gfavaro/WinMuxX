@@ -75,12 +75,9 @@ absolute keybindings to navigate the group.
 Drag a tab into another window's [intent zone](#managed-tiling-mode) or move it to
 another workspace through the sidebar.
 
-A tab group reserves no space above its windows. Its pills sit in the gap, centred on the
-group's top edge, one per tab: the active window's is longest and uses the accent colour,
-and in a strip the other columns on screen are lighter. Resting the pointer on that edge
-opens the hover bar with a row of tabs (icon and title; click one to switch) above the
-window's actions, each with its configured shortcut. The pill rail remains visible
-independently of quick actions.
+A tab group shows a tab bar above its windows, `window-tabs.height` points tall, with
+one tab per window: icon and title, the active one highlighted in the accent colour.
+The bar's height comes out of the tile, like a tab bar in any app.
 
 Settings → Windows → Show tab strips controls the visible tab bar. Turning it off
 keeps the group as overlapping windows with offsets. Set `window-tabs.double-sided-windows = true` to replace
@@ -100,13 +97,11 @@ layout; edge drops still split normally.
 
 ## Stacked layouts
 
-Stacked windows have two variants: **Tabbed** shows one window at a time, with a
-pill per window on the group's top edge; **Strip** (`layout strip`) shows them side
-by side as columns that scroll within the group, see
-[layouts](LAYOUTS.md#container-modes-and-tabs). Choose Tabbed in Settings →
-Windows for new roots, or use `winmuxx layout tabbed strip` to toggle the focused
-container. `layout tab-group` remains supported. The accordion layout was removed;
-`accordion` and `stacked` in configuration and commands now give a tab group.
+A tab group shows one window at a time, with a tab bar above it; see
+[layouts](LAYOUTS.md#container-modes-and-tabs). Choose Tabbed in Settings → Windows for
+new roots, or use `winmuxx layout tiles tabbed` to toggle the focused container.
+`layout tab-group` remains supported. The accordion and strip layouts were removed;
+`accordion`, `stacked` and `strip` in configuration and commands now give a tab group.
 
 ## Tiling and floating
 

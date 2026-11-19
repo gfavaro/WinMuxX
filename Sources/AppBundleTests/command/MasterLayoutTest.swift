@@ -126,7 +126,7 @@ final class MasterLayoutTest: WorkspaceTestCase {
         root.layout = .tiles
         let one = TestWindow.new(id: 74401, parent: root)
         TestWindow.new(id: 74402, parent: root)
-        one.stripColumnWidth = 0.3333
+        one.scrollingColumnWidth = 0.3333
         workspace.arrangement = .master
         let snapshot = FrozenWorkspace(workspace)
         let decoded = try JSONDecoder().decode(FrozenWorkspace.self, from: JSONEncoder().encode(snapshot))
@@ -134,7 +134,7 @@ final class MasterLayoutTest: WorkspaceTestCase {
         guard case .window(let saved) = try XCTUnwrap(decoded.rootTilingNode.children.first) else {
             return XCTFail("Expected a saved top-level window")
         }
-        XCTAssertEqual(saved.stripColumnWidth, 0.3333)
+        XCTAssertEqual(saved.scrollingColumnWidth, 0.3333)
     }
 
     func testScrollingOffsetSurvivesRestartWhileAnotherArrangementIsActive() async throws {

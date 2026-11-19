@@ -20,7 +20,6 @@ open class TreeNode: Equatable, WinMuxAny {
     // - drag window with mouse
     // - move-mouse command
     var lastAppliedLayoutPhysicalRect: Rect? = nil // with real inner gaps
-    var stripColumnWidth: CGFloat? = nil
     /// The share of the display this node takes as a Scrolling column; nil uses `scrolling.column-width`.
     var scrollingColumnWidth: CGFloat? = nil
     final var unboundStacktrace: String? = nil

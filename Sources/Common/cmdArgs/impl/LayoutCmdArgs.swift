@@ -24,7 +24,6 @@ public struct LayoutCmdArgs: CmdArgs {
 
     public enum LayoutDescription: String, CaseIterable, Equatable, Sendable {
         case tabGroup = "tab-group"
-        case strip
         case tiles
         case horizontal, vertical, auto
         case hTabGroup = "h_tab_group"
@@ -66,7 +65,7 @@ func parseLayoutCmdArgs(_ args: StrArrSlice) -> ParsedCmd<LayoutCmdArgs> {
 
 extension String {
     fileprivate func parseLayoutDescription() -> LayoutCmdArgs.LayoutDescription? {
-        // `accordion` and `stacked` name the removed accordion layout; they now give a tab group.
-        LayoutCmdArgs.LayoutDescription(rawValue: ["tabbed", "accordion", "stacked"].contains(self) ? "tab-group" : self)
+        // `accordion`, `stacked` and `strip` name removed layouts; they now give a tab group.
+        LayoutCmdArgs.LayoutDescription(rawValue: ["tabbed", "accordion", "stacked", "strip"].contains(self) ? "tab-group" : self)
     }
 }
