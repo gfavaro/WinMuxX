@@ -1,34 +1,34 @@
 import Foundation
 
+/// `winmux-marketing-renderer <directory>` writes one PNG per scene and the sidebar looks;
+/// `--scene <name> <file>` writes a single scene.
 @main
 struct MarketingRendererCommand {
     @MainActor
     static func main() async throws {
-        let arguments = CommandLine.arguments.dropFirst()
-        let isSafariProof = arguments.contains("--safari-proof")
-        let isAppsProof = arguments.contains("--apps-proof")
-        let isSafariPlasticityProof = arguments.contains("--safari-plasticity-proof")
-        let isSidebarAppearanceProof = arguments.contains("--sidebar-appearance-proof")
-        let outputPath = arguments.first(where: { !$0.hasPrefix("--") })
-            ?? (isSidebarAppearanceProof ? ".release/sidebar-appearance-previews" : "resources/marketing/winmux-card-collage-swiftui.png")
-        let outputURL = URL(fileURLWithPath: outputPath, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-            .standardizedFileURL
-
-        try FileManager.default.createDirectory(
-            at: outputURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        if isSidebarAppearanceProof {
-            try await renderWinMuxSidebarAppearanceProofs(to: outputURL)
-        } else if isSafariPlasticityProof {
-            try await renderWinMuxSafariPlasticityProofImage(to: outputURL)
-        } else if isAppsProof {
-            try await renderWinMuxAppsProofImage(to: outputURL)
-        } else if isSafariProof {
-            try await renderWinMuxSafariProofImage(to: outputURL)
-        } else {
-            try await renderWinMuxMarketingImage(to: outputURL)
+        var arguments = Array(CommandLine.arguments.dropFirst())
+        let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        if let index = arguments.firstIndex(of: "--scene") {
+            guard arguments.indices.contains(index + 2), let scene = MarketingScene(rawValue: arguments[index + 1]) else {
+                let names = MarketingScene.allCases.map(\.rawValue).joined(separator: ", ")
+                FileHandle.standardError.write(Data("usage: --scene <\(names)> <file.png>\n".utf8))
+                exit(2)
+            }
+            let output = URL(fileURLWithPath: arguments[index + 2], relativeTo: root).standardizedFileURL
+            try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try await renderMarketingScene(scene, to: output)
+            print(output.path)
+            return
         }
-        print(outputURL.path)
+        arguments.removeAll { $0.hasPrefix("--") }
+        let directory = URL(fileURLWithPath: arguments.first ?? ".release/marketing", relativeTo: root).standardizedFileURL
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        for scene in MarketingScene.allCases {
+            let output = directory.appendingPathComponent("\(scene.rawValue).png")
+            try await renderMarketingScene(scene, to: output)
+            print(output.path)
+        }
+        try await renderWinMuxSidebarAppearanceProofs(to: directory.appendingPathComponent("sidebar"))
+        print(directory.appendingPathComponent("sidebar").path)
     }
 }
