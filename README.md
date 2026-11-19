@@ -16,6 +16,10 @@
 
 https://github.com/user-attachments/assets/51983568-a168-494f-8ae3-5f50ca1efce1
 
+<p align="center">
+  <img src="site/assets/overview.jpg" width="900" alt="WinMuxX sidebar with projects and workspaces beside tiled, tabbed windows">
+</p>
+
 WinMuxX tiles your windows, groups them into projects and workspaces, and keeps
 them one glance away in a sidebar. It is a personal fork by gfavaro, based on
 [ZimengXiong/WinMux](https://github.com/ZimengXiong/WinMux). It is not a
