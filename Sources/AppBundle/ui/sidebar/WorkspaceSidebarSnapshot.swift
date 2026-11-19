@@ -50,6 +50,12 @@ struct WorkspaceSidebarConfiguration: Equatable {
     var solidChromeColor: ChromeSolidColor
     var solidChromeCustomColor: String
 
+    /// A flat rail, solid or made opaque by Reduce Transparency, can continue into the windows beside it
+    /// without a seam; glass and the transparent rail cannot.
+    func isFlat(reduceTransparency: Bool) -> Bool {
+        chromeStyle == .solid || (appearance == .system && reduceTransparency)
+    }
+
     func transparentExpansionProgress(visibleWidth: CGFloat) -> CGFloat {
         max(0, min(1, (visibleWidth - collapsedWidth) / max(1, expandedWidth - collapsedWidth)))
     }

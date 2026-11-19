@@ -368,11 +368,10 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         updateEdgeSurface()
     }
 
-    /// Only a flat color can be continued beside the windows without a seam; glass and the
-    /// transparent rail are left to the rail itself.
+    /// The flat sidebar color; glass and the transparent rail are left to the rail itself.
     private var edgeColor: NSColor? {
+        guard configuration.isFlat(reduceTransparency: reduceTransparency()) else { return nil }
         if configuration.chromeStyle == .solid { return NSColor(configuration.resolvedSolidChromeColor) }
-        guard configuration.appearance == .system, reduceTransparency() else { return nil }
         let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
         return workspaceSidebarOpaqueColor(dark: dark)
     }

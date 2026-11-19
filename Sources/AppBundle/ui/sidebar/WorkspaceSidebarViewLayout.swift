@@ -110,8 +110,8 @@ extension WorkspaceSidebarView {
                 }
         }
         .overlay(alignment: snapshot.configuration.position == .left ? .trailing : .leading) {
-            // A resting solid rail continues into the windows' edge, so it has no edge to mark.
-            if !restingSolidRailJoinsWindows {
+            // A resting flat rail continues into the windows' edge, so it has no edge to mark.
+            if !restingFlatRailJoinsWindows {
                 Rectangle()
                     .fill(sidebarColors.separator)
                     .frame(width: 0.5)

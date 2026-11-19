@@ -7,11 +7,12 @@ extension WorkspaceSidebarView {
         workspaceSidebarPanelShape(configuration: snapshot.configuration, visibleWidth: snapshot.visibleWidth)
     }
 
-    /// Matches when the panel draws the solid fill over the gap to the windows.
-    var restingSolidRailJoinsWindows: Bool {
+    /// Matches when the panel draws its flat fill over the gap to the windows.
+    var restingFlatRailJoinsWindows: Bool {
         let configuration = snapshot.configuration
         let expanded = !configuration.alwaysExpanded && snapshot.visibleWidth > configuration.collapsedWidth + 8
-        return configuration.chromeStyle == .solid && configuration.heightMode != .centered && !expanded
+        return configuration.isFlat(reduceTransparency: NSWorkspace.shared.accessibilityDisplayShouldReduceTransparency)
+            && configuration.heightMode != .centered && !expanded
     }
 
     @ViewBuilder
