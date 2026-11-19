@@ -389,22 +389,28 @@ extension WorkspaceSidebarPanel {
     /// Set while a resting rail sits beside tiled windows (not centered, not an expanded overlay), so the
     /// sidebar can continue over the outer gap and around the windows' rounded corners.
     func windowEdge(visibleWidth: CGFloat) -> WorkspaceSidebarWindowEdge? {
-        let sidebar = config.workspaceSidebar
-        let resting = workspaceSidebarRestingWidth(sidebar)
-        guard #available(macOS 27, *), sidebar.heightMode != .centered, resting > 0,
-              abs(visibleWidth - resting) < 1,
+        guard abs(visibleWidth - workspaceSidebarRestingWidth(config.workspaceSidebar)) < 1,
               let monitor = workspaceSidebarMonitor(forScopeId: monitorScopeId) else { return nil }
-        let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
-        return WorkspaceSidebarWindowEdge(
-            gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),
-            radius: systemWindowCornerRadius(),
-            topInset: CGFloat(outer.top), bottomInset: CGFloat(outer.bottom))
+        return workspaceSidebarWindowEdge(on: monitor)
     }
 
     func cancelCollapse() {
         pendingCollapseWork?.cancel()
         pendingCollapseWork = nil
     }
+}
+
+/// Where tiled windows begin beside this display's resting sidebar, if it has one (macOS 27, not centered).
+@MainActor
+func workspaceSidebarWindowEdge(on monitor: Monitor) -> WorkspaceSidebarWindowEdge? {
+    let sidebar = config.workspaceSidebar
+    guard #available(macOS 27, *), sidebar.heightMode != .centered,
+          workspaceSidebarRestingWidth(sidebar) > 0 else { return nil }
+    let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
+    return WorkspaceSidebarWindowEdge(
+        gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),
+        radius: systemWindowCornerRadius(),
+        topInset: CGFloat(outer.top), bottomInset: CGFloat(outer.bottom))
 }
 
 /// Whether the Scrolling workspace shown on `monitor` has a window laid out under its sidebar.

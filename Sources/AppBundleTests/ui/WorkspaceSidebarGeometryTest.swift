@@ -22,6 +22,15 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         }
     }
 
+    func testIdleBackingLeavesRoomForTheReachBeyondTheRail() {
+        var config = WorkspaceSidebarConfig()
+        config.collapsedWidth = 44
+        let rail = workspaceSidebarBackingWidth(config: config, visibleWidth: 44, isExpanded: false, isAnimating: false)
+        let reached = workspaceSidebarBackingWidth(config: config, visibleWidth: 44, isExpanded: false, isAnimating: false,
+                                                   windowReach: 18)
+        XCTAssertEqual(reached, rail + 18)
+    }
+
     func testSurfaceReachesTheWindowsOnlyWhenTheyAreBeside() {
         let panel = CGRect(x: 0, y: 0, width: 400, height: 900)
         let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16, topInset: 0, bottomInset: 0)

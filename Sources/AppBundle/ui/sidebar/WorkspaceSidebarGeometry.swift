@@ -87,7 +87,8 @@ extension WorkspaceSidebarPanel {
                     config: sidebarConfig,
                     visibleWidth: state.visibleWidth,
                     isExpanded: state.isExpanded,
-                    isAnimating: pendingBackingResize != nil
+                    isAnimating: pendingBackingResize != nil,
+                    windowReach: workspaceSidebarWindowEdge(on: monitor)?.reach ?? 0
                 )
             ),
             expandedWidth: expandedWidth,
@@ -151,12 +152,14 @@ private enum WorkspaceSidebarMenuBarGeometry {
     }
 }
 
-/// Keep the browsing canvas during transitions; idle rails need only their hit region.
+/// Keep the browsing canvas during transitions; idle rails need only their hit region,
+/// plus the reach toward the windows beside them so the surface can continue outward.
 func workspaceSidebarBackingWidth(
-    config: WorkspaceSidebarConfig, visibleWidth: CGFloat, isExpanded: Bool, isAnimating: Bool
+    config: WorkspaceSidebarConfig, visibleWidth: CGFloat, isExpanded: Bool, isAnimating: Bool,
+    windowReach: CGFloat = 0
 ) -> CGFloat {
     if config.alwaysExpanded || isExpanded || isAnimating || visibleWidth > workspaceSidebarRestingWidth(config) + 0.5 {
         return CGFloat(config.width) * 2
     }
-    return max(1, workspaceSidebarHoverActivationWidth(config), workspaceSidebarRestingWidth(config))
+    return max(1, workspaceSidebarHoverActivationWidth(config), workspaceSidebarRestingWidth(config)) + windowReach
 }
