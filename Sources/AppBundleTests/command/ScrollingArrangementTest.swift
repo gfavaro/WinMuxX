@@ -92,13 +92,25 @@ final class ScrollingArrangementTest: WorkspaceTestCase {
         try await succeed("scrolling-width next")
         XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 1, accuracy: 0.001)
         try await succeed("scrolling-width next")
-        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.33, accuracy: 0.001, "Next wraps around to the first preset")
+        XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 1.0 / 3.0, accuracy: 0.000001, "Next wraps around to the first preset")
         try await succeed("scrolling-width previous")
         XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 1, accuracy: 0.001, "Previous wraps around to the last preset")
         try await succeed("scrolling-width full")
         XCTAssertEqual(windows[0].scrollingColumnWidth, 1)
         try await succeed("scrolling-width 0.4")
         XCTAssertEqual(windows[0].scrollingColumnWidth ?? 0, 0.4, accuracy: 0.001)
+    }
+
+    func testBalanceSizesFitsTheStripAndResizeOverridesOneColumn() async throws {
+        let (workspace, windows) = try await strip(3)
+        try await succeed("scrolling-width full")
+        XCTAssertGreaterThan(workspace.scrollingMetrics.offsetRange.upperBound, 0)
+        try await succeed("balance-sizes")
+        XCTAssertEqual(workspace.scrollingMetrics.offsetRange, 0...0)
+        XCTAssertEqual(windows.compactMap(\.scrollingColumnWidth), Array(repeating: 1.0 / 3.0, count: 3))
+        try await succeed("resize width +100")
+        XCTAssertGreaterThan(windows[0].scrollingColumnWidth ?? 0, 1.0 / 3.0)
+        XCTAssertEqual(windows[1].scrollingColumnWidth, 1.0 / 3.0)
     }
 
     func testFocusAndMoveByPlace() async throws {

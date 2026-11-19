@@ -87,7 +87,7 @@ per window. The tree is untouched, so returning to Dwindle, Master or Tabbed res
 windows, and the stack keeps that column's place and width. Focus left and right steps through the columns and scrolls the strip to show the focused
 one; up and down move within its column. `move left` and `right` move the column along the
 strip, and a window in a stack leaves it as a column of its own. `resize width` changes the
-column's share of the display. New windows open as a column right of the focused one.
+column's share of the usable strip width. New windows open as a column right of the focused one.
 `scrolling-width next`, `previous` and `full` (or a share such as `0.4`) set the focused
 column's width, `scrolling-center` centres it, `scrolling-pan left`, `right` and `focus`
 scroll the strip half a display without moving focus or back to it, and
@@ -102,14 +102,17 @@ Scrolling workspaces edits the table below.
 With workspace swipes on and Swipe between full-screen apps on three fingers, three-finger
 left/right scrolls the strip with your fingers and focuses the column nearest the middle
 when you lift them.
-Columns off the display wait at its edge, showing `scrolling.edge-preview` points, or behind
-it where another display sits beside it. Column widths and the strip's position survive a
-restart.
+Columns off the display preview up to `scrolling.edge-preview` points at an open edge.
+A partially visible column takes priority over the preview. At an edge with a neighboring
+display, columns are parked behind the visible windows. Widths account for the resting sidebar and configured window gaps. Two half-width columns
+or three one-third columns fit side by side when their minimum widths allow it.
+`balance-sizes` gives the scrollable columns equal shares, leaving any pinned column in
+place. Column widths and the strip's position survive a restart.
 
 ```toml
 [scrolling]
 column-width = 0.5                 # A new column's share of the display
-width-presets = [0.33, 0.5, 0.7, 1.0]  # scrolling-width next/previous cycle through these
+width-presets = [0.3333333333333333, 0.5, 0.7, 1.0]  # scrolling-width next/previous cycle through these
 edge-preview = 14                  # Points of an offscreen column left showing
 center-focused-column = 'never'    # never, on-overflow or always
 minimap-enabled = true             # The strip map while scrolling and on scrolling-minimap

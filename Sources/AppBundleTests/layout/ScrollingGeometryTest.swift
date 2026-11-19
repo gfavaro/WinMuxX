@@ -36,16 +36,16 @@ final class ScrollingGeometryTest: XCTestCase {
         let first = calculateScrollingWorkspaceGeometry(makeInput())
         XCTAssertEqual(first.area.minX, 25)
         XCTAssertEqual(first.area.width, 950)
-        XCTAssertEqual(first.columns.map(\.spanWidth), [475, 475, 475])
+        XCTAssertEqual(first.columns.map(\.spanWidth), [500, 500, 500])
         XCTAssertEqual(first.offsetRange.lowerBound, 0)
-        XCTAssertEqual(first.offsetRange.upperBound, 475)
+        XCTAssertEqual(first.offsetRange.upperBound, 550)
         XCTAssertEqual(first.columns[2].visibility, .rightPreview)
-        XCTAssertEqual(first.columns[2].physicalFrame.minX, 975)
+        XCTAssertEqual(first.columns[2].physicalFrame.minX, 999, "The partial column already occupies the right edge")
 
         let last = calculateScrollingWorkspaceGeometry(makeInput(offset: 10_000))
-        XCTAssertEqual(last.clampedOffset, 475)
+        XCTAssertEqual(last.clampedOffset, 550)
         XCTAssertEqual(last.columns[0].visibility, .leftPreview)
-        XCTAssertEqual(last.columns[0].physicalFrame.maxX, 25)
+        XCTAssertEqual(last.columns[0].physicalFrame.maxX, 1, "The partial column already occupies the left edge")
         XCTAssertEqual(last.columns[2].visibility, .visible)
     }
 
@@ -57,10 +57,34 @@ final class ScrollingGeometryTest: XCTestCase {
     }
 
     func testNarrowStripCentersWithoutScrolling() {
-        let result = calculateScrollingWorkspaceGeometry(makeInput(offset: 100, widths: [0.3]))
+        let result = calculateScrollingWorkspaceGeometry(makeInput(offset: 100, widths: [1]))
         XCTAssertEqual(result.columns.count, 1)
         XCTAssertEqual(result.clampedOffset, 0)
         XCTAssertEqual(result.columns[0].logicalFrame.width, result.area.width)
+    }
+
+    func testFractionsFillUsableWidthOnEitherSideOfSidebar() {
+        for sidebarOnLeft in [true, false] {
+            for count in [2, 3] {
+                let bounds = CGRect(x: sidebarOnLeft ? 240 : 0, y: 0, width: 1201, height: 700)
+                let geometry = calculateScrollingWorkspaceGeometry(.init(
+                    bounds: bounds, parkingBounds: CGRect(x: 0, y: 0, width: 1441, height: 700),
+                    offset: 0, columns: Array(repeating: .init(preferredWidth: 1 / CGFloat(count), minimumWidth: 0), count: count),
+                    horizontalGap: 8, outerLeft: sidebarOnLeft ? 240 : 0, outerRight: sidebarOnLeft ? 0 : 240,
+                    leftWall: false, rightWall: false, preview: 14))
+                let frames = geometry.columns.map(\.physicalFrame)
+                XCTAssertEqual(geometry.area, bounds)
+                XCTAssertEqual(geometry.offsetRange, 0...0)
+                XCTAssertEqual(frames.first?.minX, bounds.minX)
+                XCTAssertEqual(frames.last?.maxX, bounds.maxX)
+                for frame in frames {
+                    XCTAssertEqual(frame.width, (1201 - 8 * CGFloat(count - 1)) / CGFloat(count), accuracy: 1)
+                }
+                for (left, right) in zip(frames, frames.dropFirst()) {
+                    XCTAssertEqual(right.minX - left.maxX, 8)
+                }
+            }
+        }
     }
 
     func testMinimumWindowWidthOverridesPreferredShare() {
@@ -124,14 +148,13 @@ final class ScrollingGeometryTest: XCTestCase {
         XCTAssertEqual(wide.area.minX, 29)
         XCTAssertEqual(compact.area.minX, 18)
         XCTAssertGreaterThan(compact.area.width, wide.area.width)
-        XCTAssertGreaterThan(compact.columns[0].physicalFrame.width, wide.columns[0].physicalFrame.width,
-                             "Percent column widths follow the recovered viewport width")
+        XCTAssertEqual(compact.columns[0].physicalFrame.width, wide.columns[0].physicalFrame.width,
+                       "Preview gutters change the viewport without shrinking columns")
         XCTAssertEqual(compact.columns[1].logicalFrame.minX - compact.columns[0].logicalFrame.maxX, 8)
-        // The fourth column lies wholly right of the viewport: only the preview shows.
+        // The fourth column can use only the open space beyond the partially visible column.
         XCTAssertEqual(compact.columns[3].visibility, .rightPreview)
-        XCTAssertEqual(compact.columns[3].physicalFrame.minX, 986,
-                       "The right edge preview shows exactly 14 points")
-        XCTAssertEqual(wide.columns[3].physicalFrame.minX, 975, "and 25 with the wider preview")
+        XCTAssertEqual(compact.columns[3].physicalFrame.minX, 986)
+        XCTAssertEqual(wide.columns[3].physicalFrame.minX, wide.columns[1].physicalFrame.maxX)
     }
 
     func testNoPreviewKeepsParkedColumnsAtScreenEdgeWithoutChangingInterColumnGap() {
@@ -156,7 +179,7 @@ final class ScrollingGeometryTest: XCTestCase {
         XCTAssertEqual(settled.clampedOffset, 0)
     }
 
-    func testFiftyColumnsKeepOrderGapsAndExactPreviewsAtEveryOffset() {
+    func testFiftyColumnsKeepOrderGapsAndBoundPreviewsAtEveryOffset() {
         let widths: [CGFloat] = (0..<50).map { [0.25, 0.3333, 0.5, 0.6667, 1.0][$0 % 5] }
         for offset in stride(from: CGFloat(-500), through: 30_000, by: 1_250) {
             let geometry = calculateScrollingWorkspaceGeometry(.init(
@@ -175,14 +198,20 @@ final class ScrollingGeometryTest: XCTestCase {
             for column in geometry.columns {
                 switch column.visibility {
                     case .rightPreview where column.logicalFrame.minX >= geometry.area.maxX:
-                        XCTAssertEqual(column.physicalFrame.minX, 1920 - 14)
+                        XCTAssertTrue((1920 - 14...1919).contains(column.physicalFrame.minX))
                     case .leftPreview where column.logicalFrame.maxX <= geometry.area.minX:
-                        XCTAssertEqual(column.physicalFrame.maxX, 14)
+                        XCTAssertTrue((1...14).contains(column.physicalFrame.maxX))
                     default: break
                 }
             }
             XCTAssertEqual(Set(geometry.stackingOrder).count, 50, "Every column appears once in the stacking order")
         }
+    }
+
+    func testUnoccupiedEdgeKeepsFullPreview() {
+        let geometry = calculateScrollingWorkspaceGeometry(makeInput(widths: [0.95, 0.5]))
+        XCTAssertEqual(geometry.columns[0].physicalFrame.maxX, geometry.area.maxX)
+        XCTAssertEqual(geometry.columns[1].physicalFrame.minX, 975)
     }
 
     func testAZeroPreviewStillLeavesOnePointSoMacOSDoesNotPullTheWindowBack() {

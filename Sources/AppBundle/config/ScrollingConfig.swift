@@ -13,12 +13,12 @@ enum ScrollingCenterMode: String, CaseIterable {
 
 /// The Scrolling arrangement's strip, as StripMuxX has it.
 struct ScrollingConfig: ConvenienceCopyable, Equatable {
-    /// A new column's width, as a share of the display.
+    /// A new column's width, as a share of the usable strip width.
     var columnWidth = 0.5
     /// How much of an offscreen column remains visible at the display edge.
     var edgePreview = 14
     /// The widths `scrolling-width next` and `previous` step through.
-    var widthPresets = [0.33, 0.5, 0.7, 1.0]
+    var widthPresets = [1.0 / 3.0, 0.5, 0.7, 1.0]
     var centerFocusedColumn = ScrollingCenterMode.never
     /// The map of the strip shown while it is panned, and by `scrolling-minimap`.
     var minimapEnabled = true

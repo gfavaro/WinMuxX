@@ -77,7 +77,7 @@ public struct ScrollingWidthCmdArgs: CmdArgs {
     public static let parser: CmdParser<Self> = .init(
         kind: .scrollingWidth,
         allowInConfig: true,
-        help: "USAGE: winmuxx scrolling-width (next|previous|full|<share>)\nSet the focused column's width on the Scrolling strip: the next or previous of scrolling.width-presets, the whole display, or a share from 0.1 to 1.",
+        help: "USAGE: winmuxx scrolling-width (next|previous|full|<share>)\nSet the focused column's width on the Scrolling strip: the next or previous of scrolling.width-presets, the full usable strip width, or a share from 0.1 to 1. The sidebar and window gaps are accounted for.",
         flags: [:], posArgs: [newMandatoryPosArgParser(\.target, parseWidthTarget, placeholder: "(next|previous|full|<share>)")],
     )
     public var target: Lateinit<Target> = .uninitialized

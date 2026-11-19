@@ -63,13 +63,16 @@ struct ScrollingWorkspaceGeometryInput {
 func calculateScrollingWorkspaceGeometry(_ input: ScrollingWorkspaceGeometryInput) -> ScrollingWorkspaceGeometry {
     let gap = max(0, input.horizontalGap.isFinite ? input.horizontalGap : 0)
     let preview = max(0, input.preview.isFinite ? input.preview : 0)
-    let area = scrollingViewportArea(input, gap: gap, preview: preview)
-    let spans = scrollingColumnSpans(input, area: area, gap: gap)
+    let spans = scrollingColumnSpans(input, gap: gap)
+    let area = scrollingViewportArea(input, spans: spans, gap: gap, preview: preview)
     let range = scrollingOffsetRange(input, spans: spans, area: area)
     let requested = input.offset.isFinite ? input.offset : 0
     let offset = min(max(requested, range.lowerBound), range.upperBound)
-    let geometries = spans.enumerated().map { index, span in
-        scrollingColumnGeometry(index: index, span: span, input: input, area: area, offset: offset, preview: preview)
+    let logicalFrames = spans.map { scrollingColumnLogicalFrame($0, area: area, offset: offset) }
+    let edgePreviews = scrollingUnoccupiedEdgePreviews(logicalFrames, area: area, parking: input.parkingBounds, preview: preview)
+    let geometries = spans.indices.map { index in
+        scrollingColumnGeometry(index: index, span: spans[index], logical: logicalFrames[index], input: input,
+                                area: area, preview: preview, edgePreviews: edgePreviews)
     }
     return ScrollingWorkspaceGeometry(area: area, clampedOffset: offset, offsetRange: range, columns: geometries,
                                       stackingOrder: scrollingStackingOrder(geometries, area: area, focused: input.focusedColumnIndex))
@@ -85,32 +88,41 @@ private struct ScrollingSpan {
 
 /// The part of the display columns are laid out in, narrowed by the gutters that keep
 /// neighbouring columns' previews visible where no wall stops them.
-private func scrollingViewportArea(_ input: ScrollingWorkspaceGeometryInput, gap: CGFloat, preview: CGFloat) -> CGRect {
+private func scrollingViewportArea(_ input: ScrollingWorkspaceGeometryInput, spans: [ScrollingSpan],
+                                   gap: CGFloat, preview: CGFloat) -> CGRect {
     let bounds = input.bounds
-    let hasMultiple = input.columns.count > 1
-    let leftGutter = hasMultiple && !input.leftWall ? max(0, preview + gap / 2 - max(0, input.outerLeft)) : 0
-    let rightGutter = hasMultiple && !input.rightWall ? max(0, preview + gap / 2 - max(0, input.outerRight)) : 0
-    return CGRect(x: bounds.minX + leftGutter, y: bounds.minY,
-                  width: max(1, bounds.width - leftGutter - rightGutter), height: bounds.height)
+    guard let last = spans.last, last.start + last.width > bounds.width + 0.000001, spans.count > 1 else { return bounds }
+    let leftGutter = !input.leftWall ? max(0, preview + gap / 2 - max(0, input.outerLeft)) : 0
+    let rightGutter = !input.rightWall ? max(0, preview + gap / 2 - max(0, input.outerRight)) : 0
+    let width = max(1, bounds.width - leftGutter - rightGutter)
+    let widestColumn = spans.map { $0.width - $0.lead - $0.trail }.max() ?? 0
+    guard widestColumn <= width else { return bounds }
+    return CGRect(x: bounds.minX + leftGutter, y: bounds.minY, width: width, height: bounds.height)
 }
 
-private func scrollingColumnSpans(_ input: ScrollingWorkspaceGeometryInput, area: CGRect, gap: CGFloat) -> [ScrollingSpan] {
+private func scrollingColumnSpans(_ input: ScrollingWorkspaceGeometryInput, gap: CGFloat) -> [ScrollingSpan] {
     var spans: [ScrollingSpan] = []
     var cursor: CGFloat = 0
     for (index, column) in input.columns.enumerated() {
         let lead = index > 0 ? gap / 2 : 0
         let trail = index < input.columns.count - 1 ? gap / 2 : 0
         let preferred = column.preferredWidth.isFinite ? column.preferredWidth : 0.49
-        let share = min(max(preferred, 0.1), 1)
+        let share = preferred > 0 ? min(preferred, 1) : 0.49
         let minimum = max(0, column.minimumWidth.isFinite ? column.minimumWidth : 0)
         let fixed = column.fixedWidth.flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
         // A fixed width is the window's own width; the gaps around it come on top.
-        let desired = fixed.map { $0 + lead + trail } ?? (input.columns.count == 1 ? area.width : (area.width * share).rounded())
-        let width = max(desired.rounded(), minimum + lead + trail)
+        let desired = fixed ?? scrollingWidth(forShare: share, usableWidth: input.bounds.width, gap: gap)
+        let width = max(desired, minimum.rounded(.up), 1) + lead + trail
         spans.append(ScrollingSpan(start: cursor, width: width, lead: lead, trail: trail))
         cursor += width
     }
     return spans
+}
+
+// A full-width column leaves no gap. Splitting that width into shares budgets
+// one gap for each additional column, independent of the total strip length.
+private func scrollingWidth(forShare share: CGFloat, usableWidth: CGFloat, gap: CGFloat) -> CGFloat {
+    (usableWidth + gap) * share - gap
 }
 
 /// When the strip fits, a negative offset centres it. Overflowing strips start at zero and
@@ -124,8 +136,8 @@ private func scrollingOffsetRange(_ input: ScrollingWorkspaceGeometryInput, span
     if input.columns.isEmpty {
         stripLower = 0
         stripUpper = 0
-    } else if total <= area.width {
-        stripLower = (total - area.width) / 2
+    } else if total <= area.width + 0.000001 {
+        stripLower = min(0, (total - area.width) / 2)
         stripUpper = stripLower
     } else {
         stripLower = 0
@@ -135,14 +147,34 @@ private func scrollingOffsetRange(_ input: ScrollingWorkspaceGeometryInput, span
     return min(stripLower, sheet ?? stripLower)...max(stripUpper, sheet ?? stripUpper)
 }
 
-/// Where one column sits on the strip and where it is actually placed on the display: columns
-/// off the viewport are parked at a wall or left showing only a preview sliver.
-private func scrollingColumnGeometry(index: Int, span: ScrollingSpan, input: ScrollingWorkspaceGeometryInput,
-                                     area: CGRect, offset: CGFloat, preview: CGFloat) -> ScrollingColumnGeometry {
-    let viewport = area
+private func scrollingColumnLogicalFrame(_ span: ScrollingSpan, area: CGRect, offset: CGFloat) -> CGRect {
     let logicalX = area.minX + span.start - offset + span.lead
     let width = max(1, span.width - span.lead - span.trail)
-    let logical = CGRect(x: logicalX.rounded(), y: area.minY, width: width.rounded(), height: area.height)
+    // Round shared boundaries, so fractional shares cannot accumulate extra points.
+    let roundedX = logicalX.rounded()
+    return CGRect(x: roundedX, y: area.minY, width: max(1, (logicalX + width).rounded() - roundedX),
+                  height: area.height)
+}
+
+/// A column already crossing the viewport edge is the preview on that side.
+/// Limit forced previews to open space beyond it, with one point for native parking.
+private func scrollingUnoccupiedEdgePreviews(_ frames: [CGRect], area: CGRect, parking: CGRect,
+                                             preview: CGFloat) -> (left: CGFloat, right: CGFloat) {
+    guard preview > 1 else { return (preview, preview) }
+    var left = preview
+    var right = preview
+    for frame in frames where frame.minX < area.maxX && frame.maxX > area.minX {
+        left = min(left, max(1, frame.minX - parking.minX))
+        right = min(right, max(1, parking.maxX - frame.maxX))
+    }
+    return (left, right)
+}
+
+/// Place columns wholly outside the viewport at a wall or expose an edge preview.
+private func scrollingColumnGeometry(index: Int, span: ScrollingSpan, logical: CGRect,
+                                     input: ScrollingWorkspaceGeometryInput, area: CGRect, preview: CGFloat,
+                                     edgePreviews: (left: CGFloat, right: CGFloat)) -> ScrollingColumnGeometry {
+    let viewport = area
     var physicalX = logical.minX
     let whollyLeft = logical.maxX <= viewport.minX
     let whollyRight = logical.minX >= viewport.maxX
@@ -152,9 +184,9 @@ private func scrollingColumnGeometry(index: Int, span: ScrollingSpan, input: Scr
         // containment is impossible. Center the focused oversized column.
         physicalX = parking.midX - logical.width / 2
     } else if whollyLeft {
-        physicalX = input.leftWall ? parking.minX : parking.minX + preview - logical.width
+        physicalX = input.leftWall ? parking.minX : parking.minX + edgePreviews.left - logical.width
     } else if whollyRight {
-        physicalX = input.rightWall ? parking.maxX - logical.width : parking.maxX - preview
+        physicalX = input.rightWall ? parking.maxX - logical.width : parking.maxX - edgePreviews.right
     } else {
         physicalX = min(max(physicalX, input.leftWall ? parking.minX : parking.minX + preview - logical.width),
                        input.rightWall ? parking.maxX - logical.width : parking.maxX - preview)
@@ -412,14 +444,16 @@ extension Workspace {
         let focused = scrollingState.lastFocusWindowId.flatMap(Window.get(byId:))
             ?? (focus.workspace === self ? focus.windowOrNil : nil)
         let focusedIndex = focused.flatMap(scrollingColumn(of:)).flatMap { column in units.firstIndex(where: { $0 === column }) }
+        let sidebar = workspaceMonitor.workspaceSidebarInset
         return calculateScrollingWorkspaceGeometry(.init(
             bounds: bounds, parkingBounds: parking, offset: scrollingState.offset,
             columns: units.map { node in
-                .init(preferredWidth: node.scrollingColumnWidth ?? config.scrolling.columnWidth,
+                .init(preferredWidth: node.scrollingColumnWidth ?? (units.count == 1 ? 1 : config.scrolling.columnWidth),
                       minimumWidth: node.minimumLayoutExtent(along: .h, gaps: gaps))
             },
             horizontalGap: CGFloat(gaps.inner.horizontal),
-            outerLeft: CGFloat(gaps.outer.left), outerRight: CGFloat(gaps.outer.right),
+            outerLeft: CGFloat(gaps.outer.left) + (config.workspaceSidebar.position == .left ? sidebar : 0),
+            outerRight: CGFloat(gaps.outer.right) + (config.workspaceSidebar.position == .right ? sidebar : 0),
             leftWall: leftWall, rightWall: rightWall, preview: effectiveEdgePreview(config.scrolling.edgePreview),
             focusedColumnIndex: focusedIndex))
     }
@@ -431,7 +465,7 @@ extension Workspace {
         let columns = zip(units, geometry.columns).map { node, frame in
             ScrollingColumnMetric(node: node,
                 start: frame.spanStart + frame.leadInset,
-                width: max(1, frame.spanWidth - frame.leadInset - frame.trailInset),
+                width: frame.logicalFrame.width,
                 frameStartInset: frame.leadInset, frameEndInset: frame.trailInset)
         }
         let total = geometry.columns.last.map { $0.spanStart + $0.spanWidth } ?? 0
@@ -504,9 +538,20 @@ extension Workspace {
         scrollingState.anchorLogicalCenter = center
     }
 
+    @MainActor
+    func balanceScrollingColumnWidths() {
+        let units = scrollingStripUnits
+        guard !units.isEmpty else { return }
+        let share = 1 / CGFloat(units.count)
+        for unit in units {
+            unit.scrollingColumnWidth = share
+        }
+        scrollingState.lastFocusWindowId = nil
+    }
+
     /// The column `group` is, with its current window width and the most it can take.
     @MainActor
-    func scrollingColumnWidthRange(of group: TreeNode) -> (width: CGFloat, minimum: CGFloat, maximum: CGFloat, insets: CGFloat, area: CGFloat)? {
+    func scrollingColumnWidthRange(of group: TreeNode) -> (width: CGFloat, minimum: CGFloat, maximum: CGFloat, gap: CGFloat, area: CGFloat)? {
         let rect = workspaceTilingRect(self)
         let minimum = group.minimumLayoutExtent(along: .h, rect: rect)
         if group === pinnedScrollingColumn {
@@ -515,8 +560,9 @@ extension Workspace {
         }
         let metrics = scrollingMetrics
         guard let column = metrics.columns.first(where: { $0.node === group }) else { return nil }
-        let insets = column.frameStartInset + column.frameEndInset
-        return (column.width, minimum, max(metrics.areaWidth - insets, minimum), insets, metrics.areaWidth)
+        let gaps = ResolvedGaps(gaps: config.gaps, monitor: workspaceMonitor)
+        let width = scrollingPinSplit(in: rect, gaps: gaps)?.strip.width ?? rect.width
+        return (column.width, minimum, max(width, minimum), CGFloat(gaps.inner.horizontal), width)
     }
 
     /// Sets a column's window width in points, kept between its app's minimum and the display,
@@ -527,7 +573,7 @@ extension Workspace {
         guard let range = scrollingColumnWidthRange(of: group), requested.isFinite else { return false }
         let actual = min(max(requested, range.minimum), range.maximum)
         guard abs(actual - range.width) >= 0.5 else { return false }
-        group.scrollingColumnWidth = min(max((actual + range.insets) / max(range.area, 1), 0.1), 1)
+        group.scrollingColumnWidth = min(max((actual + range.gap) / max(range.area + range.gap, 1), .leastNonzeroMagnitude), 1)
         // The resized column is scrolled into view again.
         scrollingState.lastFocusWindowId = nil
         return true
