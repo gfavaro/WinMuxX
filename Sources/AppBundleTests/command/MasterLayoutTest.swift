@@ -137,6 +137,23 @@ final class MasterLayoutTest: WorkspaceTestCase {
         XCTAssertEqual(saved.stripColumnWidth, 0.3333)
     }
 
+    func testScrollingOffsetSurvivesRestartWhileAnotherArrangementIsActive() async throws {
+        let workspace = focus.workspace
+        let root = workspace.rootTilingContainer
+        let windows = (0..<3).map { TestWindow.new(id: UInt32(74420 + $0), parent: root) }
+        workspace.arrangement = .scrolling
+        workspace.scrollingState.offset = 640
+        workspace.arrangement = .dwindle
+        let frozen = try JSONDecoder().decode(FrozenWorkspace.self, from: JSONEncoder().encode(FrozenWorkspace(workspace)))
+        XCTAssertEqual(frozen.scrollingOffset, 640)
+        workspace.scrollingState.offset = 0
+        let world = FrozenWorld(workspaces: [frozen], monitors: [], windowIds: Set(windows.map(\.windowId)))
+        let restored = try await restoreFrozenWorldIfNeeded(world, newlyDetectedWindow: windows[0], restoreVisibleWorkspaces: false)
+        XCTAssertTrue(restored)
+        XCTAssertEqual(workspace.arrangement, .dwindle)
+        XCTAssertEqual(workspace.scrollingState.offset, 640)
+    }
+
     func testLegacyMasterSnapshotUnwrapsGeneratedStackAndRetainsGroups() async throws {
         let workspace = focus.workspace
         let root = workspace.rootTilingContainer

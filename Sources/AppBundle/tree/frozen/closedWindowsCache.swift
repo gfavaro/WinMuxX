@@ -69,7 +69,7 @@ struct FrozenWorkspace: Codable, Equatable, Sendable {
         masterGroupIndex = workspace.masterGroupIndex
         masterRatio = workspace.masterState.ratio
         tabbedLayout = workspace.tabbedState.layout.map(FrozenTabbedLayout.init)
-        scrollingOffset = workspace.arrangement == .scrolling ? workspace.scrollingState.offset : nil
+        scrollingOffset = workspace.scrollingState.offset
         if let window {
             let frozen = FrozenWindow(window)
             let floating = window.parent is Workspace

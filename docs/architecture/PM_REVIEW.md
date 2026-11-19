@@ -47,6 +47,8 @@ Strengths: explicit selection versus movement policy, bounded retries and safegu
 
 ### Decisions requiring Product Manager approval
 
+**Resolved 2026-11-19:** the Product Manager chose to remember the Scrolling position across restarts in every arrangement ([ADR-004](DECISIONS/004-scrolling-offset-persistence.md)). The text below is the original record.
+
 No architecture change is requested for implementation now. If you want a persistence change, the meaningful decision is: **Should a workspace remember its last Scrolling position across a restart even when it was using another arrangement at shutdown?** Recommended: first run the documented reproduction and confirm the experience; if the position is important, preserve it with a compatible proposed design. Alternative: keep current behavior. Trade-offs are more predictable return versus extra saved state and potential stale offsets. An agent should prepare a concrete ADR and compatibility plan before approval; this document does not approve a change.
 
 ### Questions for the Product Manager

@@ -17,7 +17,7 @@ Existing: preferences belong to TOML; state snapshots and recovery data are sepa
 | Geometry | Layout computes desired frames; window keeps last applied/actual values; native app/WindowServer owns actual result. Floating geometry and original frames have separate paths. | Values may be stale or write rejected; not a single authoritative physical frame. |
 | Restart | Application Support `window-state.json` versioned `PersistedFrozenWorldEnvelope`, backup and pending snapshots; writer coalesces saves and avoids identical rewrites. | Primary then backup are decoded; unsupported/corrupt data may yield no snapshot. Save errors logged. |
 | Window identity | Live WindowServer ID plus restart metadata; same ID is trusted only with verified process launch, otherwise matching must be unique. | Titles change; document/AX ID may be absent; sole relaunched window can match absent contradictions. Ambiguous matches are intentionally not forced. |
-| Layout | Tree, arrangement, Tabbed frozen structure and widths saved; Scrolling offset saved only when arrangement is Scrolling. Gesture session, anchors and runtime focus hints have separate lifetimes. | Switching away then restarting does not establish preservation of the prior strip offset. |
+| Layout | Tree, arrangement, Tabbed frozen structure and widths saved; Scrolling offset always saved, whatever the active arrangement ([ADR-004](DECISIONS/004-scrolling-offset-persistence.md)). Gesture session, anchors and runtime focus hints have separate lifetimes. | Switching away then restarting does not establish preservation of the prior strip offset. |
 | Original frame recovery | `WindowRecoveryController` journal records before native mutation and handles restoration separately from frozen workspace snapshots. | Crash timing and external app behavior constrain recovery. |
 | Config/cache | TOML through config owner; some session/cache data and learned minimums use UserDefaults. | Do not equate cache with product preference. |
 
@@ -56,4 +56,4 @@ Silent-seeming loss of placement can follow ambiguous metadata, a missing snapsh
 
 ## Open questions
 
-Unknown: end-to-end crash consistency at each write boundary, all combinations of restoration and simultaneous manual moves, and whether conditional Scrolling offset persistence matches product expectations. These are audit items, not established bugs.
+Unknown: end-to-end crash consistency at each write boundary and all combinations of restoration and simultaneous manual moves. These are audit items, not established bugs.
