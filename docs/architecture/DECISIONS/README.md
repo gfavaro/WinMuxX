@@ -6,3 +6,4 @@ These records document observed implementation. They do not claim that a particu
 - [ADR-002: Conservative restart identity](002-restart-identity.md)
 - [ADR-003: Workspace arrangement state](003-arrangement-state.md)
 - [ADR-004: Remember the Scrolling position across restarts](004-scrolling-offset-persistence.md)
+- [ADR-005: Refresh scheduling rules live in RefreshCoordinator](005-refresh-scheduling-owner.md)

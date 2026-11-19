@@ -76,22 +76,6 @@ func recordRefreshActivation(workspaceName: String, pid: Int32) {
 @MainActor
 func pendingRefreshActivationForTests() -> RefreshActivationContext? { pendingActivation }
 
-private func isAxGeometryRefreshEvent(_ event: RefreshSessionEvent) -> Bool {
-    guard case .ax(let notif) = event else { return false }
-    return notif == kAXMovedNotification as String || notif == kAXResizedNotification as String
-}
-
-private func shouldDropScheduledRefresh(_ newEvent: RefreshSessionEvent, activeEvent: RefreshSessionEvent?) -> Bool {
-    guard isAxGeometryRefreshEvent(newEvent), let activeEvent else { return false }
-    if isAxGeometryRefreshEvent(activeEvent) {
-        return true
-    }
-    if case .resetManipulatedWithMouse = activeEvent {
-        return true
-    }
-    return false
-}
-
 @MainActor
 func shouldSyncFocusBackToMacOs(
     nativeFocused: Window?,
@@ -123,38 +107,6 @@ func shouldSyncFocusBackToMacOs(
 }
 
 @MainActor
-private var pendingRefreshRequest: RefreshRequest? {
-    get { runtime.refresh.pendingRefreshRequest }
-    set { runtime.refresh.pendingRefreshRequest = newValue }
-}
-
-/// Adds an event to the follow-up owed, keeping the most demanding of them.
-@MainActor
-private func queueRefreshFollowUp(_ event: RefreshSessionEvent, optimisticallyPreLayoutWorkspaces: Bool) {
-    pendingRefreshRequest = pendingRefreshRequest.map {
-        RefreshRequest(event: mergeRefreshEvents($0.event, event),
-                       optimisticallyPreLayoutWorkspaces: $0.optimisticallyPreLayoutWorkspaces || optimisticallyPreLayoutWorkspaces)
-    } ?? RefreshRequest(event: event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
-}
-
-/// When two refresh requests coalesce, keep the event whose session does more work, so the
-/// follow-up session covers the requirements of every event that arrived while one was running.
-private func mergeRefreshEvents(_ old: RefreshSessionEvent, _ new: RefreshSessionEvent) -> RefreshSessionEvent {
-    // Parking repair is a placement-only pass. Never let it replace a pending
-    // focus/tab/activation reconciliation, including one with the same cost score.
-    if case .onWindowParkingDrift = new { return old }
-    if case .onWindowParkingDrift = old { return new }
-    func score(_ e: RefreshSessionEvent) -> Int {
-        // Re-parking hidden windows after a wake has no other trigger, and it used to tie
-        // with (and lose to) the Space and mouse events that arrive right after a wake.
-        // From WinMux PR #30 by Ilya Kudravets.
-        (e.requiresHiddenWindowsReassertion ? 4 : 0) +
-            (e.requiresWindowRefreshBarrier ? 2 : 0) + (e.canReuseLastAppliedWindowFrames ? 0 : 1)
-    }
-    return score(new) >= score(old) ? new : old
-}
-
-@MainActor
 func scheduleRefreshSession(
     _ event: RefreshSessionEvent,
     optimisticallyPreLayoutWorkspaces: Bool = false,
@@ -169,27 +121,19 @@ func scheduleRefreshSession(
        let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
         recordRefreshActivation(workspaceName: focus.workspace.name, pid: pid)
     }
-    if shouldDropScheduledRefresh(event, activeEvent: activeScheduledRefreshEvent) ||
-        shouldDropScheduledRefresh(event, activeEvent: pendingRefreshRequest?.event)
-    {
-        debugLog(.focus, "scheduleRefreshSession dropped event=\(event) active=\(activeScheduledRefreshEvent?.description ?? "nil") pending=\(pendingRefreshRequest?.event.description ?? "nil")")
-        return
+    let request: RefreshRequest
+    let generation: UInt64
+    switch runtime.refresh.admit(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces) {
+        case .dropped:
+            debugLog(.focus, "scheduleRefreshSession dropped event=\(event) active=\(activeScheduledRefreshEvent?.description ?? "nil") pending=\(runtime.refresh.pendingRefreshRequest?.event.description ?? "nil")")
+            return
+        case .coalesced:
+            runtime.events.record(.refreshCoalesced, source: .refresh, generation: activeScheduledRefreshGeneration)
+            return
+        case .start(let event, let optimistic, let started):
+            request = RefreshRequest(event: event, optimisticallyPreLayoutWorkspaces: optimistic)
+            generation = started
     }
-    // Coalesce instead of cancel-and-restart: cancelling the in-flight session on every event
-    // meant that during event bursts (app launch, window storms) the refresh kept restarting
-    // and never completed until the burst quieted down. Let the active session finish, then
-    // run a single follow-up session on behalf of all events that arrived in the meantime.
-    if activeRefreshTask != nil {
-        runtime.events.record(.refreshCoalesced, source: .refresh, generation: activeScheduledRefreshGeneration)
-        queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
-        return
-    }
-    // A light session may cancel the active task while leaving a heavier request pending.
-    queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: optimisticallyPreLayoutWorkspaces)
-    let request = pendingRefreshRequest!
-    pendingRefreshRequest = nil
-    activeScheduledRefreshGeneration += 1
-    let generation = activeScheduledRefreshGeneration
     let override = scheduledRefreshOverrideForTests
     let task = runtime.throwingTask {
         // Capture only during explicit diagnostic collection; no steady-state clock work.
@@ -203,15 +147,9 @@ func scheduleRefreshSession(
                                generation: metricsGeneration)
         }
         defer {
-            // Generation mismatch means someone took over (light session, test setup); they are
-            // responsible for the next refresh, so don't drain the pending request from here.
-            if activeScheduledRefreshGeneration == generation {
-                runtime.refresh.active = nil
-                if let pending = pendingRefreshRequest {
-                    pendingRefreshRequest = nil
-                    scheduleRefreshSession(pending.event, optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
-                                           recordsActivation: false)
-                }
+            if let pending = runtime.refresh.finishScheduled(generation: generation) {
+                scheduleRefreshSession(pending.event, optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
+                                       recordsActivation: false)
             }
         }
         do {
@@ -426,22 +364,14 @@ private func performLightSession<T>(
     }
     let state = signposter.beginInterval(#function, "event: \(event) axTaskLocalAppThreadToken: \(axTaskLocalAppThreadToken?.idForDebug)")
     defer { signposter.endInterval(#function, state) }
-    // Keep work that a native event already requested. A cheap command/swipe may
-    // skip its own follow-up, but must not lose an interrupted creation/wake pass.
-    if let event = activeScheduledRefreshEvent {
-        queueRefreshFollowUp(event, optimisticallyPreLayoutWorkspaces: false)
-    }
-    // Give priority to runSession. Taking the generation keeps the cancelled task's completion
-    // from spawning a coalesced follow-up session in the middle of this light session. The
-    // post-refresh scheduled at the end of the light session (or any later event) picks the
-    // pending request up instead.
-    runtime.refresh.stopActive()
-    let generation = activeScheduledRefreshGeneration
+    // Keep work that a native event already requested, and take priority over the running
+    // session. A cheap command/swipe may skip its own follow-up, but must not lose an
+    // interrupted creation/wake pass.
+    let generation = runtime.refresh.beginLight()
     // Errors and cancellation must also drain interrupted native work. A newer
     // session owns its own completion and must not be disturbed by this one.
     defer {
-        if activeScheduledRefreshGeneration == generation, activeRefreshTask == nil,
-           let pending = pendingRefreshRequest {
+        if let pending = runtime.refresh.owedAfterLight(generation: generation) {
             scheduleRefreshSession(pending.event,
                 optimisticallyPreLayoutWorkspaces: pending.optimisticallyPreLayoutWorkspaces,
                 recordsActivation: false)
@@ -472,7 +402,7 @@ private func performLightSession<T>(
                 await updateWorkspaceSidebarModel()
                 await updateWindowTabModel()
                 schedulePersistedFrozenWorldSave()
-                if shouldSchedulePostRefresh || pendingRefreshRequest != nil {
+                if shouldSchedulePostRefresh || runtime.refresh.pendingRefreshRequest != nil {
                     scheduleRefreshSession(event)
                 }
                 debugLog(.focus, "runLightSession end event=\(event) nativeFocused=\(nativeFocused?.windowId.description ?? "nil") focusBefore=\(focusBefore?.windowId.description ?? "nil") focusAfter=\(focusAfter?.windowId.description ?? "nil") logicalFocus=\(debugDescribe(focus))")
@@ -487,7 +417,7 @@ func setScheduledRefreshOverrideForTests(
     _ override: (@MainActor @Sendable (RefreshSessionEvent, Bool) async throws -> Void)?
 ) {
     runtime.refresh.stopActive()
-    pendingRefreshRequest = nil
+    runtime.refresh.pendingRefreshRequest = nil
     pendingActivation = nil
     scheduledRefreshOverrideForTests = override
 }
@@ -498,7 +428,7 @@ func setBlockingRefreshOverridesForTests(
     normalizeLayoutReason: (@MainActor @Sendable () async throws -> Void)? = nil,
 ) {
     runtime.refresh.stopActive()
-    pendingRefreshRequest = nil
+    runtime.refresh.pendingRefreshRequest = nil
     pendingActivation = nil
     refreshOverrideForTests = refresh
     normalizeLayoutReasonOverrideForTests = normalizeLayoutReason
