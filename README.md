@@ -15,7 +15,8 @@
 </p>
 
 <p align="center">
-  <img src="site/assets/overview.jpg" width="900" alt="WinMuxX sidebar with projects and workspaces beside tiled, tabbed windows">
+  <img src="site/assets/overview.jpg" width="49%" alt="WinMuxX expanded sidebar with projects and workspaces beside tiled, tabbed windows">
+  <img src="site/assets/compact.jpg" width="49%" alt="The same windows beside the collapsed sidebar rail">
 </p>
 
 WinMuxX tiles your windows, groups them into projects and workspaces, and keeps
