@@ -64,6 +64,6 @@ the given bundle ID.
   to `main` deploys GitHub Pages (`.github/workflows/pages.yml`). Keep the hero at
   `assets/overview.jpg` because `og:image` points to it. Bump a `?v=` query when
   replacing a cached file.
-- **README:** pictures live in `resources/screenshots/`.
+- **README:** the top picture is the site hero, `site/assets/overview.jpg`.
 - Remove superseded variants instead of adding numbered copies; keep
   `resources/marketing/` limited to captures and current outputs.

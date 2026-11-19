@@ -65,7 +65,7 @@ Only one `floating` or `tiling` argument is allowed, without `--window-id`.
 
 ## Tab groups
 
-![Tab groups](../resources/screenshots/tab-groups.png)
+![Tab groups](assets/layouts/tabs.svg)
 
 Several windows can share one tile, with a tab bar for choosing which window to
 view. This works well for reference windows beside an editor or separate browser
