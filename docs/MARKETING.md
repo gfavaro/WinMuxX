@@ -18,6 +18,7 @@ The target builds `winmux-marketing-renderer` and writes one 3200×1800 PNG per 
 | Output | Content | Typical use |
 |---|---|---|
 | `overview.png` | Expanded sidebar beside a Dwindle workspace: an editor tab group with its tab bar, a browser and notes | Site hero `site/assets/overview.jpg` (resize to 1920×1080, JPEG), README, social preview |
+| `compact.png` | The same workspace beside the collapsed sidebar rail | Pictures of the everyday, collapsed sidebar |
 | `dwindle.png` | Four windows split by Dwindle beside the collapsed sidebar | Layout pictures |
 | `tabbed.png` | A Tabbed workspace: its bar of window tabs above one window | Tabbed pictures |
 | `scrolling.png` | A Scrolling workspace whose columns run past both display edges | Scrolling pictures |

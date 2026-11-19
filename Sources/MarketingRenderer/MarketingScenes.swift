@@ -5,6 +5,8 @@ import SwiftUI
 enum MarketingScene: String, CaseIterable {
     /// The sidebar beside a Dwindle workspace with a tab group: the README and site hero.
     case overview
+    /// The same workspace beside the collapsed sidebar rail.
+    case compact
     /// Dwindle tiling: each new window splits the focused one.
     case dwindle
     /// A Tabbed workspace: one window at a time, every window a tab.
@@ -20,7 +22,8 @@ enum MarketingScene: String, CaseIterable {
 
     @MainActor var view: AnyView {
         switch self {
-            case .overview: AnyView(OverviewScene())
+            case .overview: AnyView(OverviewScene(sidebarWidth: 260))
+            case .compact: AnyView(OverviewScene(sidebarWidth: 44))
             case .dwindle: AnyView(DwindleScene())
             case .tabbed: AnyView(TabbedScene())
             case .scrolling: AnyView(ScrollingScene())
@@ -67,13 +70,15 @@ private extension View {
 }
 
 private struct OverviewScene: View {
+    let sidebarWidth: CGFloat
+
     var body: some View {
-        let area = Screen.area(sidebar: 260, height: 900)
+        let area = Screen.area(sidebar: sidebarWidth, height: 900)
         let left = CGRect(x: area.minX, y: area.minY, width: area.width * 0.57, height: area.height)
         let right = CGRect(x: left.maxX + Screen.gap, y: area.minY, width: area.maxX - left.maxX - Screen.gap, height: area.height)
         let top = CGRect(x: right.minX, y: right.minY, width: right.width, height: right.height * 0.58)
         let bottom = CGRect(x: right.minX, y: top.maxY + Screen.gap, width: right.width, height: right.maxY - top.maxY - Screen.gap)
-        return Desktop(sidebarWidth: 260) {
+        return Desktop(sidebarWidth: sidebarWidth) {
             MarketingTabGroupWindow(strip: MarketingFixtures.editorTabs, kind: .editor, title: "Layout.swift")
                 .marketingWindow(focused: true).place(left)
             MarketingAppWindow(kind: .browser, title: "Field Notes").marketingWindow().place(top)
