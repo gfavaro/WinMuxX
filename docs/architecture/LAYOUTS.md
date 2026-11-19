@@ -21,6 +21,10 @@ Depending on the mode, inputs include a workspace tree, usable display rectangle
 
 `transitionArrangement` cancels strip gesture state, can wrap the root to support columns, and synchronizes Tabbed groups; it sets the most recent tab when entering and preserves per-workspace state in memory. `preservesTopLevelGroups` changes later Dwindle interpretation. This combines preservation and reconstruction. It is not a byte-for-byte reversible transform. Saved state includes arrangement, tree, Tabbed structure and conditional Scrolling offset ([transition](../../Sources/AppBundle/tree/MasterLayout.swift), [snapshot](../../Sources/AppBundle/tree/frozen/closedWindowsCache.swift)). Restore depends on identity matching. Failures and missing applications can result in incomplete reconstruction. Unknown: exact preservation for every combination of floating, minimized and nested groups; add targeted round-trip tests before changing it.
 
+A workspace arrangement selects the workspace-wide policy. Each nested container still has its own mode. The recursive dispatcher handles tiles and Dwindle separately. Changing an arrangement does not imply that every nested container becomes Dwindle. See [dispatcher](../../Sources/AppBundle/layout/layoutRecursive.swift).
+
+Logical focus is WinMuxX's selected window and workspace. Native focus is controlled by macOS and external apps, and refresh reconciles the two. Tabbed and Scrolling keep local focus hints for their presentation. These hints do not independently replace the logical or native focus. See [refresh](../../Sources/AppBundle/layout/refresh.swift), [Tabbed state](../../Sources/AppBundle/tree/TabbedWorkspaceState.swift), and [Scrolling state](../../Sources/AppBundle/tree/ScrollingWorkspaceState.swift).
+
 ### Candidate contract assessment
 
 | Principle | Assessment | Evidence and recommended test |

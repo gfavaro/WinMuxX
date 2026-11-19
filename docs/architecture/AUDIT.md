@@ -20,6 +20,12 @@ Existing: preserve working behavior and recovery data. Proposed: prioritize conf
 | AUD-006 / P3 / High | Observed: private AX/WindowServer symbols and Dock event taps depend on platform behavior. [private header](../../Sources/PrivateApi/include/private.h), [border](../../Sources/PrivateApi/border.m), [Dock](../../Sources/AppBundle/mouse/DockWorkspaceSwipe.swift). | OS updates can affect window identification, borders or gesture input. Maintain capability diagnostics and fallback tests; do not claim private API guarantees. | Test unavailable symbols and gesture tap recovery; real macOS matrix; Medium. |
 | AUD-007 / P3 / Medium | Observed: settled-model invariant checker is explicit and read-only, not a global enforcement gate. [checker](../../Sources/AppBundle/runtime/ModelInvariantChecker.swift). | Some corruption may be diagnosed late; model/diagnostics. Use it at selected test boundaries before considering runtime invocation. | Assert no violations after representative commands and restore, including special containers; Small. |
 
+### Existing coverage and remaining gaps
+
+[NormalizeContainersArrangedTest](../../Sources/AppBundleTests/tree/NormalizeContainersArrangedTest.swift) covers Dwindle round trips through Master, Tabbed and Scrolling. [WorkspaceTabbedArrangementTest](../../Sources/AppBundleTests/command/WorkspaceTabbedArrangementTest.swift) covers saved tab selection and a return to Dwindle. [RestartWorkspaceTest](../../Sources/AppBundleTests/tree/RestartWorkspaceTest.swift) covers ambiguous titles, reused IDs, delayed windows and later metadata. [MonitorWorkspaceNavigationTest](../../Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift) covers selection, explicit movement, assignment and model disconnect/reconnect. [OverlappingRuntimeEventsTest](../../Sources/AppBundleTests/runtime/OverlappingRuntimeEventsTest.swift) holds observations across workspace changes and display topology changes.
+
+These tests do not establish all directed arrangement pairs with live membership, focus and nested-group assertions. They do not establish the horizontal receiver's behavior after every workspace or display change, or physical disconnect and gesture delivery. Extend these fixtures for a specific missing case rather than repeat an existing scenario.
+
 ## Backlog
 
 All tasks are **Proposed** and unapproved. This baseline includes no production change.

@@ -6,6 +6,8 @@ Observed: WinMuxX maintains its own virtual workspaces for real application wind
 
 The app observes macOS and accepts commands. It reconciles its model with observations, computes window frames, and asks other apps to move or resize their windows. The operating system and those apps can refuse or change that state. The workspace model and native desktop consequently cannot be treated as a single transaction. Configuration uses TOML. Restart snapshots and frame recovery use separate stores.
 
+A connected forced display assignment takes precedence over ordinary selection and rejects incompatible explicit moves. A move can replace the destination workspace. The policy chooses a source fallback and reconciles displaced secondary assignments. The [workspace examples](../WORKSPACE_BEHAVIOR.md) describe these cases.
+
 ## Architectural rules
 
 Existing project rule: selection MUST preserve display ownership; explicit moves MUST preserve workspace organization. Existing: TOML owns user preferences. Proposed: changes SHOULD isolate policy and geometry from native effects, and MUST NOT represent failed AX writes as applied.

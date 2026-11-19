@@ -52,6 +52,14 @@ sequenceDiagram
   R->>OS: Park hidden windows and reveal/place active ones
 ```
 
+### Horizontal Scrolling gesture lifetime
+
+`DockWorkspaceSwipeSource` owns the horizontal `DockSwipeTracker` and `DockScrollingSwipeReceiver`. The tracker claims, completes, or abandons a gesture. Abandonment sends a cancelled end to a claimed receiver. Reconfiguration stops the source and abandons its trackers. The coordinator resets the separate vertical workspace swipe controller when configuration changes. See [Dock source](../../Sources/AppBundle/mouse/DockWorkspaceSwipe.swift) and [coordinator](../../Sources/AppBundle/mouse/WorkspaceGestureCoordinator.swift).
+
+At start, the horizontal receiver stores a weak workspace reference and creates a gesture session ID. Updates require that workspace to be visible and use Scrolling. An update changes its offset and focus hint without changing focus. A committed end selects a column and focuses its most recent window. An end clears the motion flag, session ID and receiver reference. A cancelled end does not select a column. See [receiver](../../Sources/AppBundle/mouse/ScrollingDockSwipe.swift).
+
+An arrangement transition clears motion and session state. Arrangement and preferred display changes increment `sessionEpoch`. The minimap checks that epoch for deferred work. The horizontal receiver does not capture or compare the epoch or session ID on its callbacks. It retains the workspace reference until end. A workspace switch makes updates ineligible while the workspace is hidden. A move or a switch away and back can leave the original workspace visible and eligible again. Whether a delayed callback reaches this receiver after those actions is not established as a physical event sequence. Gesture frame writes use the session ID, which is a separate safeguard. See [workspace state](../../Sources/AppBundle/tree/WorkspaceType.swift), [transition](../../Sources/AppBundle/tree/MasterLayout.swift), [minimap](../../Sources/AppBundle/ui/WorkspaceScrollingMinimap.swift), and [native frame write](../../Sources/AppBundle/tree/MacWindow.swift).
+
 ## Failure modes
 
 Out-of-order AX events, process ID reuse, an unresponsive app, event tap loss and display churn may leave model and desktop temporarily divergent. Existing focused tests include [refresh failure recovery](../../Sources/AppBundleTests/model/RefreshFailureRecoveryTest.swift), [frame budget](../../Sources/AppBundleTests/runtime/FrameRecoveryBudgetTest.swift) and [focus sync](../../Sources/AppBundleTests/RefreshFocusSyncTest.swift); physical delivery is not certified.

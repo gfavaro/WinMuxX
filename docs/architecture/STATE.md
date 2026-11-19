@@ -23,6 +23,14 @@ Existing: preferences belong to TOML; state snapshots and recovery data are sepa
 
 Sources: [runtime](../../Sources/AppBundle/runtime/WinMuxRuntime.swift), [registry](../../Sources/AppBundle/tree/WinMuxWorkspaceState.swift), [snapshot](../../Sources/AppBundle/tree/frozen/persistedFrozenWorld.swift), [frozen workspace](../../Sources/AppBundle/tree/frozen/closedWindowsCache.swift), [identity](../../Sources/AppBundle/tree/frozen/RestartWindowIdentity.swift), [frame recovery](../../Sources/AppBundle/recovery/WindowRecoveryController.swift), [learned minimums](../../Sources/AppBundle/tree/PersistedAppMinimums.swift). Ownership overlaps appear in live, last-applied and native geometry, and in global and per-layout focus. These are distinct representations and are not automatically defects. Their synchronization and lifetime deserve tests.
 
+### Three recovery paths
+
+At startup, automatic tiling enables snapshot loading. Discovered windows are matched to saved identities and the saved tree is reconstructed as matches become available. Floating restoration applies the saved size, clamped to the display, with no saved position in that operation. A workspace preview frame is separate from that size and from original-frame recovery. See [startup](../../Sources/AppBundle/initAppBundle.swift) and [floating restoration](../../Sources/AppBundle/tree/frozen/closedWindowsCache.swift).
+
+Normal shutdown saves the workspace snapshot and attempts to restore managed windows using the recovery controller. Failed restorations can remain pending. See [termination](../../Sources/AppBundle/util/appBundleUtil.swift) and [controller](../../Sources/AppBundle/recovery/WindowRecoveryController.swift).
+
+After an unexpected termination, original-frame recovery is an explicit menu action. It pauses tiling before attempting matched original positions and sizes. It checks identity, display intersection, Accessibility reachability, fullscreen and minimized state, then reads the result back. An unavailable display, unresponsive application, rejected frame, or changed identity can prevent restoration. The action reports failures. See [menu](../../Sources/AppBundle/ui/menubar/NativeActionMenu.swift) and [crash recovery](../../Sources/AppBundle/recovery/WindowRecoveryController.swift).
+
 ### Scenarios
 
 | Scenario | Observed behavior / limitation / regression risk |
