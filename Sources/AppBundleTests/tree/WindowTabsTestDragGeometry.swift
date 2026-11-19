@@ -55,6 +55,15 @@ import XCTest
     }
 
     @MainActor
+    func testTabBarHeightFollowsConfigDownToItsFloor() {
+        config.windowTabs.height = 28
+        XCTAssertEqual(resolvedWindowTabBarHeight(), 28)
+        XCTAssertEqual(resolvedWindowTabReservedHeight(), 28)
+        config.windowTabs.height = 24
+        XCTAssertEqual(resolvedWindowTabBarHeight(), 28, "The bar never gets shorter than its controls")
+    }
+
+    @MainActor
     func testTabGroupResizeChromeFrameDerivesFromActiveWindowContentFrame() {
         config.windowTabs.height = 36
         let activeContentFrame = Rect(topLeftX: 43, topLeftY: 96, width: 494, height: 261)

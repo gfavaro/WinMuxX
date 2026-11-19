@@ -118,7 +118,7 @@ struct ShortcutBehaviorSettingsView: View {
                 SettingsTabGroupPreview(enabled: tabEnabled)
                 if !tabEnabled { Text("Tab strip height is available when Show tab strips is enabled.").font(.callout).foregroundStyle(.secondary) }
                 SettingsToggle(.tabEnabled, isOn: $tabEnabled, help: "Display browser-like tabs for stacked windows.") { persistConfig(section: "window-tabs", key: "enabled", value: tabEnabled ? "true" : "false") }
-                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 36...80, help: "Height of the tab strip, and of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
+                SettingsStepper("Tab strip height", id: "window-tabs.height", value: $tabHeight, range: 28...80, help: "Height of the tab bar, in tab groups and Tabbed workspaces, and of the zone at the top of a tab group that accepts a dragged window as a new tab.") { persistConfig(section: "window-tabs", key: "height", value: "\(tabHeight)") }
                 .disabled(!tabEnabled)
 
 
