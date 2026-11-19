@@ -10,7 +10,7 @@ A connected forced display assignment takes precedence over ordinary selection a
 
 ## Architectural rules
 
-Existing project rule: selection MUST preserve display ownership; explicit moves MUST preserve workspace organization. Existing: TOML owns user preferences. Proposed: changes SHOULD isolate policy and geometry from native effects, and MUST NOT represent failed AX writes as applied.
+Existing project rule: selection MUST preserve display ownership; explicit moves MUST preserve workspace organization. Existing: TOML owns user preferences. Proposed: changes SHOULD isolate policy and geometry from native effects, and SHOULD NOT represent failed AX writes as applied.
 
 ## Technical reference
 

@@ -6,7 +6,7 @@ Observed: each workspace selects an arrangement. Nested containers can also have
 
 ## Architectural rules
 
-Existing project rule: workspace moves MUST retain nested organization. Proposed: switching arrangements MUST preserve membership and recoverable state where practical, and repeated calculation SHOULD be stable for unchanged inputs. These are desired contracts, not proof that all paths enforce them.
+Existing project rule: workspace moves MUST retain nested organization. Proposed: switching arrangements SHOULD preserve membership and recoverable state where practical, and repeated calculation SHOULD be stable for unchanged inputs. These are desired contracts, not proof that all paths enforce them.
 
 ## Technical reference
 

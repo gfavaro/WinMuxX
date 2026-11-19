@@ -24,7 +24,7 @@ Existing: preserve working behavior and recovery data. Proposed: prioritize conf
 
 [NormalizeContainersArrangedTest](../../Sources/AppBundleTests/tree/NormalizeContainersArrangedTest.swift) covers Dwindle round trips through Master, Tabbed and Scrolling. [WorkspaceTabbedArrangementTest](../../Sources/AppBundleTests/command/WorkspaceTabbedArrangementTest.swift) covers saved tab selection and a return to Dwindle. [RestartWorkspaceTest](../../Sources/AppBundleTests/tree/RestartWorkspaceTest.swift) covers ambiguous titles, reused IDs, delayed windows and later metadata. [MonitorWorkspaceNavigationTest](../../Sources/AppBundleTests/command/MonitorWorkspaceNavigationTest.swift) covers selection, explicit movement, assignment and model disconnect/reconnect. [OverlappingRuntimeEventsTest](../../Sources/AppBundleTests/runtime/OverlappingRuntimeEventsTest.swift) holds observations across workspace changes and display topology changes.
 
-These tests do not establish all directed arrangement pairs with live membership, focus and nested-group assertions. They do not establish the horizontal receiver's behavior after every workspace or display change, or physical disconnect and gesture delivery. Extend these fixtures for a specific missing case rather than repeat an existing scenario.
+These tests do not establish all directed arrangement pairs with live membership, focus and nested-group assertions. [ScrollingReceiverLifecycleTest](../../Sources/AppBundleTests/ui/ScrollingReceiverLifecycleTest.swift) covers the horizontal receiver across arrangement and display-ownership changes. These tests do not establish physical disconnect or gesture delivery. Extend these fixtures for a specific missing case rather than repeat an existing scenario.
 
 ## Backlog
 

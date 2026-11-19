@@ -6,7 +6,7 @@ Observed: WinMuxX keeps a live model, but other apps own their windows. WinMuxX 
 
 ## Architectural rules
 
-Existing: preferences belong to TOML; state snapshots and recovery data are separate. Existing code rejects ambiguous restart matches and validates a saved Scrolling offset before applying it. Proposed: every new state field SHOULD name its owner, lifetime, reconstruction rule and persistence policy; native failures MUST NOT be described as successfully applied.
+Existing: preferences belong to TOML; state snapshots and recovery data are separate. Existing code rejects ambiguous restart matches and validates a saved Scrolling offset before applying it. Proposed: every new state field SHOULD name its owner, lifetime, reconstruction rule and persistence policy; native failures SHOULD NOT be described as successfully applied.
 
 ## Technical reference
 

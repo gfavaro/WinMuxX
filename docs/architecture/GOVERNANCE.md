@@ -15,7 +15,7 @@ For nontrivial work an agent MUST:
 5. Explain potential regressions.
 6. Implement the smallest reasonable solution.
 7. Run relevant verification.
-8. Update affected architecture documents.
+8. Update affected architecture documents. Search `docs/architecture/` for the changed type, function and file names, and link new tests from the claims they settle.
 9. Report results.
 
 Agents make ordinary decisions autonomously within existing contracts.
