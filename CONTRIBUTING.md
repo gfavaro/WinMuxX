@@ -30,7 +30,7 @@ rules. Consult the architecture section in HACKING for other subsystems.
 
 Describe the user-visible trigger and intended outcome. Preserve existing state
 owners and keep behavior fixes separate from broad refactors. When borrowing from
-Dinky or another window manager, compare workspace models, platform requirements
+another window manager, compare workspace models, platform requirements
 and license obligations before adapting the implementation.
 
 ## Validate and describe the result

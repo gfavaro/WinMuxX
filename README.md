@@ -104,6 +104,21 @@ fork config exists, without modifying the source. With neither, AeroSpace import
 is offered; otherwise a starter config is generated. `--config-path` selects an
 explicit file. See [configuration ownership](docs/FORK.md#app-isolation).
 
+## Known limits
+
+- **Accessibility access is required.** macOS asks on first launch. Without it,
+  WinMuxX cannot read or move windows.
+- **Not notarized.** Fork builds are signed locally. macOS may show a warning on
+  first launch; right-click → Open to bypass it.
+- **Not a compositor.** WinMuxX moves ordinary windows through the Accessibility
+  API. It cannot draw inside them or composite their contents.
+- **Private APIs for borders and swipes.** Window borders use a private
+  WindowServer renderer when available, with an AppKit fallback. Three-finger
+  workspace swipes use a private dock-swipe gesture receiver. Both can break on
+  future macOS versions.
+- **No multi-space support.** WinMuxX manages windows on the current macOS
+  desktop (Space). It does not create or switch Spaces.
+
 ## Guides
 
 | Learn | Configure | Contribute |
