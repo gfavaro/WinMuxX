@@ -7,6 +7,29 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarAppearanceTest: XCTestCase {
+    func testCornerBackingUsesOnlyOpaqueSidebarColors() {
+        var reduced = false
+        let container = WorkspaceSidebarMaterialContainer(frame: .zero, reduceTransparency: { reduced })
+        var configuration = WorkspaceSidebarConfiguration.empty
+        configuration.appearance = .system
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertNil(container.cornerBackingColor)
+        reduced = true
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertEqual(container.cornerBackingColor?.alphaComponent, 1)
+
+        reduced = false
+        configuration.appearance = .custom
+        configuration.chromeStyle = .solid
+        configuration.solidChromeColor = .yellow
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertEqual(container.cornerBackingColor?.usingColorSpace(.sRGB),
+                       NSColor(configuration.resolvedSolidChromeColor).usingColorSpace(.sRGB))
+        configuration.chromeStyle = .liquidGlass
+        container.configure(configuration: configuration, visibleWidth: 44)
+        XCTAssertNil(container.cornerBackingColor)
+    }
+
     func testReduceTransparencyOverridesBothBackgroundToggleStates() {
         for enabled in [false, true] {
             XCTAssertEqual(WorkspaceSidebarSystemBackground.resolve(showBackground: enabled, reduceTransparency: true), .opaque)

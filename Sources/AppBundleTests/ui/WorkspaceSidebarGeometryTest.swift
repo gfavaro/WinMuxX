@@ -4,6 +4,26 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarGeometryTest: XCTestCase {
+    func testFixedCornerWingsLeaveTheWindowAndMiddleEdgeClear() {
+        let bounds = CGRect(x: 0, y: 0, width: 17, height: 500)
+        for side in WorkspaceSidebarPosition.allCases {
+            let path = workspaceSidebarCornerWingPath(bounds: bounds, radius: 16, position: side)
+            let nearRail: CGFloat = side == .left ? 0.5 : 16.5
+            XCTAssertTrue(path.contains(CGPoint(x: nearRail, y: 0.5), using: .evenOdd))
+            XCTAssertTrue(path.contains(CGPoint(x: nearRail, y: 499.5), using: .evenOdd))
+            XCTAssertFalse(path.contains(CGPoint(x: 8, y: 250), using: .evenOdd))
+            XCTAssertFalse(path.contains(CGPoint(x: 8, y: 20), using: .evenOdd))
+        }
+    }
+
+    func testCornerBackingExtendsBehindEitherSidebarEdge() {
+        let panel = CGRect(x: -1000, y: -200, width: 300, height: 900)
+        XCTAssertEqual(workspaceSidebarCornerBackingFrame(panel: panel, inset: 44, radius: 12, position: .left),
+                       CGRect(x: -957, y: -200, width: 13, height: 900))
+        XCTAssertEqual(workspaceSidebarCornerBackingFrame(panel: panel, inset: 44, radius: 12, position: .right),
+                       CGRect(x: -756, y: -200, width: 13, height: 900))
+    }
+
     func testCenteredSidebarUsesWindowRadiusAtBothWidthsAndOnBothEdges() {
         var configuration = WorkspaceSidebarConfiguration.empty
         configuration.heightMode = .centered

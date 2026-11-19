@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// Room kept for the menu bar above a standard-height sidebar, in points.
 let workspaceSidebarMenuBarReserveHeight: CGFloat = 28
@@ -28,6 +29,29 @@ func workspaceSidebarPanelFrame(
 func workspaceSidebarVisibleFrame(panel: CGRect, width: CGFloat, position: WorkspaceSidebarPosition) -> CGRect {
     let width = max(0, min(width, panel.width))
     return CGRect(x: position == .left ? panel.minX : panel.maxX - width, y: panel.minY, width: width, height: panel.height)
+}
+
+/// Space for the fixed inward curves adjoining an opaque sidebar.
+func workspaceSidebarCornerBackingFrame(panel: CGRect, inset: CGFloat, radius: CGFloat,
+                                        position: WorkspaceSidebarPosition) -> CGRect {
+    let x = position == .left ? panel.minX + inset - 1 : panel.maxX - inset - radius
+    return CGRect(x: x, y: panel.minY, width: radius + 1, height: panel.height)
+}
+
+/// The negative of a fixed window-shaped corner. The small clearance keeps the
+/// curves away from a maximized window's outline; no window geometry is queried.
+func workspaceSidebarCornerWingPath(bounds: CGRect, radius: CGFloat,
+                                    position: WorkspaceSidebarPosition) -> CGPath {
+    let clearance: CGFloat = 2
+    let width = max(radius * 8, bounds.width * 2)
+    let edge = position == .left ? bounds.minX + 1 - clearance : bounds.maxX - 1 + clearance
+    let window = CGRect(x: position == .left ? edge : edge - width,
+                        y: bounds.minY - clearance, width: width,
+                        height: bounds.height + 2 * clearance)
+    let path = CGMutablePath()
+    path.addRect(bounds)
+    path.addPath(RoundedRectangle(cornerRadius: radius + clearance, style: .continuous).path(in: window).cgPath)
+    return path
 }
 
 struct WorkspaceSidebarPanelLayout {

@@ -38,6 +38,8 @@ Existing project rule: MUST reuse workspace assignment policy for sidebar and co
 
 Observed: direct references run both between model and layout helpers, and commands branch on arrangement; this is coupling, not proof of a module import cycle. Runtime has broad composition responsibilities, but it is not the only process-wide owner. UI/drag and persistence logic span multiple files; quantify actual changes before calling them defects. Private APIs include `_AXUIElementGetWindow` and dynamically resolved WindowServer border symbols ([header](../../Sources/PrivateApi/include/private.h), [bridge](../../Sources/PrivateApi/border.m)); OS behavior and fallback are version-sensitive. Public AX/AppKit/CoreGraphics calls can fail or be delayed. See [reliability](../RELIABILITY.md).
 
+On macOS 27, an opaque full-height sidebar owns a separate click-through surface with fixed inward curves above normal application-window shadows. It follows the sidebar's lifetime and color; transparent and centered sidebars do not use it. The curves do not track windows and can be visible even when no window is adjacent.
+
 ## Failure modes
 
 An outdated observer or delayed task can change a later interaction. Generation checks, cancellation and cleanup exist on specific paths, but not universally. Failed AX registration and unresponsive apps have bounded retry/budget policy. Tests cited above do not establish OS support.

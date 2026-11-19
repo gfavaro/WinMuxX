@@ -58,6 +58,7 @@ extension WorkspaceSidebarPanel {
         }
         updateMousePassthrough()
         orderFrontRegardless()
+        updateCornerBacking()
         // Panel geometry may have just changed under a stationary cursor; hover is otherwise
         // event-driven from the pointer monitors.
         scheduleHoverRecheckSoon()
@@ -71,6 +72,7 @@ extension WorkspaceSidebarPanel {
         setWorkspaceSidebarDropPreviewIfChanged(nil)
         TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = nil
         state.visibleWidth = 0
+        cornerBacking.orderOut(nil)
         if isVisible {
             orderOut(nil)
         }
