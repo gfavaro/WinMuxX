@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check maintained contributor guides without third-party Python dependencies.
 
-Checks inline local file links (not anchors), explicit Sources/ paths in backticks,
+Checks inline local file links and <img> sources (not anchors), explicit Sources/ paths in backticks,
 and backticked XCTest class/method names. Not a general Markdown or web validator.
 """
 
@@ -24,7 +24,8 @@ GUIDES = (
 def check(root, guides=None):
     if guides is None:
         architecture = sorted(str(path.relative_to(root)) for path in (root / "docs/architecture").rglob("*.md"))
-        guides = (*GUIDES, *architecture)
+        user_guides = sorted(str(path.relative_to(root)) for path in (root / "docs").glob("*.md"))
+        guides = tuple(dict.fromkeys((*GUIDES, *user_guides, *architecture)))
     errors = []
     test_sources = list((root / "Sources/AppBundleTests").rglob("*.swift"))
     symbols = set()
@@ -36,7 +37,8 @@ def check(root, guides=None):
             errors.append(f"{name}: guide missing")
             continue
         source = path.read_text()
-        for target in re.findall(r"\[[^\]\n]*\]\(([^\s)]+)\)", source):
+        links = re.findall(r"\[[^\]\n]*\]\(([^\s)]+)\)", source) + re.findall(r'<img [^>]*src="([^"]+)"', source)
+        for target in links:
             parsed = urlsplit(target)
             if parsed.scheme or parsed.netloc or not parsed.path:
                 continue
@@ -57,4 +59,4 @@ if __name__ == "__main__":
     if problems:
         print("\n".join(problems), file=sys.stderr)
         sys.exit(1)
-    print("Contributor guidance and architecture: local links, source paths and XCTest symbols resolve.")
+    print("Guides, contributor guidance and architecture: local links, source paths and XCTest symbols resolve.")

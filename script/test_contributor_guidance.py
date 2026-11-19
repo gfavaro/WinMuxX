@@ -49,6 +49,20 @@ class ContributorGuidanceTest(unittest.TestCase):
         (architecture / "decision.md").write_text("[broken](missing.md)")
         self.assertTrue(any("missing local link" in error for error in check(self.root)))
 
+    def test_reports_missing_images_including_html_img(self):
+        errors = self.run_check('![Shot](missing.png) <img src="gone.jpg" alt="Hero">')
+        self.assertEqual(sorted(errors), ["docs/Guide.md: missing local link gone.jpg",
+                                          "docs/Guide.md: missing local link missing.png"])
+
+    def test_default_checks_user_guides(self):
+        from script.check_contributor_guidance import GUIDES
+        for name in GUIDES:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch()
+        (self.root / "docs/WINDOWS.md").write_text("![Tabs](../resources/screenshots/gone.png)")
+        self.assertIn("docs/WINDOWS.md: missing local link ../resources/screenshots/gone.png", check(self.root))
+
     def test_missing_guide_fails_instead_of_silently_skipping(self):
         self.assertEqual(check(self.root, ("absent.md",)), ["absent.md: guide missing"])
 
