@@ -4,24 +4,33 @@ import XCTest
 
 @MainActor
 final class WorkspaceSidebarGeometryTest: XCTestCase {
-    func testFixedCornerWingsLeaveTheWindowAndMiddleEdgeClear() {
-        let bounds = CGRect(x: 0, y: 0, width: 17, height: 500)
+    func testSidebarFillsTheCornersBesideTiledWindows() {
+        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16, topInset: 6, bottomInset: 6)
+        let rect = CGRect(x: 0, y: 0, width: 44 + edge.reach, height: 500)
         for side in WorkspaceSidebarPosition.allCases {
-            let path = workspaceSidebarCornerWingPath(bounds: bounds, radius: 16, position: side)
-            let nearRail: CGFloat = side == .left ? 0.5 : 16.5
-            XCTAssertTrue(path.contains(CGPoint(x: nearRail, y: 0.5), using: .evenOdd))
-            XCTAssertTrue(path.contains(CGPoint(x: nearRail, y: 499.5), using: .evenOdd))
-            XCTAssertFalse(path.contains(CGPoint(x: 8, y: 250), using: .evenOdd))
-            XCTAssertFalse(path.contains(CGPoint(x: 8, y: 20), using: .evenOdd))
+            let shape = WorkspaceSidebarPanelShape(rightCornerRadius: 0, position: side, windowEdge: edge)
+            let path = shape.path(in: rect)
+            func contains(_ x: CGFloat, _ y: CGFloat) -> Bool {
+                path.contains(CGPoint(x: side == .left ? x : rect.maxX - x, y: y), eoFill: false)
+            }
+            XCTAssertTrue(contains(20, 250), "the rail")
+            XCTAssertTrue(contains(50, 250), "the gap to the windows")
+            XCTAssertTrue(contains(52.5, 6.5), "the wedge at the top window corner")
+            XCTAssertTrue(contains(52.5, 493.5), "the wedge at the bottom window corner")
+            XCTAssertFalse(contains(60, 250), "the windows' own area stays clear")
+            XCTAssertFalse(contains(66, 8), "the window corner stays clear")
         }
     }
 
-    func testCornerBackingExtendsBehindEitherSidebarEdge() {
-        let panel = CGRect(x: -1000, y: -200, width: 300, height: 900)
-        XCTAssertEqual(workspaceSidebarCornerBackingFrame(panel: panel, inset: 44, radius: 12, position: .left),
-                       CGRect(x: -957, y: -200, width: 13, height: 900))
-        XCTAssertEqual(workspaceSidebarCornerBackingFrame(panel: panel, inset: 44, radius: 12, position: .right),
-                       CGRect(x: -756, y: -200, width: 13, height: 900))
+    func testSurfaceReachesTheWindowsOnlyWhenTheyAreBeside() {
+        let panel = CGRect(x: 0, y: 0, width: 400, height: 900)
+        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16, topInset: 0, bottomInset: 0)
+        XCTAssertEqual(workspaceSidebarSurfaceFrame(panel: panel, width: 44, position: .left, windowEdge: nil),
+                       CGRect(x: 0, y: 0, width: 44, height: 900))
+        XCTAssertEqual(workspaceSidebarSurfaceFrame(panel: panel, width: 44, position: .left, windowEdge: edge),
+                       CGRect(x: 0, y: 0, width: 68, height: 900))
+        XCTAssertEqual(workspaceSidebarSurfaceFrame(panel: panel, width: 44, position: .right, windowEdge: edge),
+                       CGRect(x: 332, y: 0, width: 68, height: 900))
     }
 
     func testCenteredSidebarUsesWindowRadiusAtBothWidthsAndOnBothEdges() {

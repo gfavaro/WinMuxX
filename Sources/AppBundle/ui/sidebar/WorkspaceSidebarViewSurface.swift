@@ -62,20 +62,31 @@ extension WorkspaceSidebarView {
 }
 
 @MainActor
-func workspaceSidebarPanelShape(configuration: WorkspaceSidebarConfiguration, visibleWidth: CGFloat) -> WorkspaceSidebarPanelShape {
+func workspaceSidebarPanelShape(configuration: WorkspaceSidebarConfiguration, visibleWidth: CGFloat,
+                                windowEdge: WorkspaceSidebarWindowEdge? = nil) -> WorkspaceSidebarPanelShape {
     let centered = configuration.heightMode == .centered
     let progress = configuration.transparentExpansionProgress(visibleWidth: visibleWidth)
     let radius = centered ? systemWindowCornerRadius()
         : (progress < workspaceSidebarRowsRevealProgress ? 0 : workspaceSidebarPanelRightCornerRadius)
-    return WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: configuration.position, roundAllCorners: centered)
+    return WorkspaceSidebarPanelShape(rightCornerRadius: radius, position: configuration.position, roundAllCorners: centered,
+                                      windowEdge: windowEdge)
 }
 
 struct WorkspaceSidebarPanelShape: Shape {
     let rightCornerRadius: CGFloat
     var position: WorkspaceSidebarPosition = .left
     var roundAllCorners = false
+    /// Set while the sidebar rests beside tiled windows; `rect` then includes its reach.
+    var windowEdge: WorkspaceSidebarWindowEdge?
 
     func path(in rect: CGRect) -> Path {
+        if let windowEdge {
+            let path = windowEdgePath(in: rect, edge: windowEdge)
+            if position == .right {
+                return path.applying(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.minX + rect.maxX, ty: 0))
+            }
+            return path
+        }
         if roundAllCorners {
             return RoundedRectangle(cornerRadius: rightCornerRadius, style: .continuous).path(in: rect)
         }
@@ -98,6 +109,28 @@ struct WorkspaceSidebarPanelShape: Shape {
         if position == .right {
             return path.applying(CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.minX + rect.maxX, ty: 0))
         }
+        return path
+    }
+
+    /// The rail out to the windows' edge, with a fillet in each corner where a window's
+    /// rounded corner meets it (drawn for a left sidebar; the right one is mirrored).
+    private func windowEdgePath(in rect: CGRect, edge: WorkspaceSidebarWindowEdge) -> Path {
+        let r = edge.radius
+        let body = rect.maxX - r
+        let top = rect.minY + edge.topInset
+        let bottom = rect.maxY - edge.bottomInset
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: body, y: rect.minY))
+        path.addLine(to: CGPoint(x: body, y: top))
+        path.addLine(to: CGPoint(x: rect.maxX, y: top))
+        path.addQuadCurve(to: CGPoint(x: body, y: top + r), control: CGPoint(x: body, y: top))
+        path.addLine(to: CGPoint(x: body, y: bottom - r))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: bottom), control: CGPoint(x: body, y: bottom))
+        path.addLine(to: CGPoint(x: body, y: bottom))
+        path.addLine(to: CGPoint(x: body, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
         return path
     }
 }

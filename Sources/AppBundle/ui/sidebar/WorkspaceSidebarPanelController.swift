@@ -12,9 +12,6 @@ final class WorkspaceSidebarPanel: NSPanelHud {
     let state: WorkspaceSidebarPanelState
     let hostingView: WorkspaceSidebarHostingView
     let materialContainer: WorkspaceSidebarMaterialContainer
-    /// Noninteractive fixed curves joining opaque sidebar edges to the screen corners.
-    let cornerBacking = NSPanelHud()
-    let cornerWings = WorkspaceSidebarCornerWingsView()
     let monitorScopeId: String
     private(set) var isRetired = false
     var pendingBackingResize: DispatchWorkItem?
@@ -73,10 +70,6 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         materialContainer = WorkspaceSidebarMaterialContainer()
         state.contentLoaded = !workspaceSidebarUnloadsWhenResting(config.workspaceSidebar)
         super.init()
-        cornerBacking.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        cornerBacking.hasShadow = false
-        cornerBacking.ignoresMouseEvents = true
-        cornerBacking.contentView = cornerWings
         identifier = NSUserInterfaceItemIdentifier("\(workspaceSidebarPanelId).\(monitorScopeId)")
         styleMask.remove(.nonactivatingPanel)
         titleVisibility = .hidden
@@ -151,7 +144,6 @@ final class WorkspaceSidebarPanel: NSPanelHud {
         // A search view may itself retain this panel. Drop the SwiftUI subtree
         // explicitly so removing the registry entry also breaks that ownership path.
         hostingView.rootView = nil
-        cornerBacking.close()
         state.isExpanded = false
         state.visibleWidth = 0
         ignoresMouseEvents = true
@@ -342,7 +334,6 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         updateOpaqueBackground()
-        (window as? WorkspaceSidebarPanel)?.updateCornerBacking()
     }
 
     private func updateOpaqueBackground() {
@@ -353,12 +344,21 @@ final class WorkspaceSidebarMaterialContainer: NSView {
     }
 
     private func updateGeometry() {
-        let rect = workspaceSidebarVisibleFrame(panel: bounds, width: visibleWidth, position: configuration.position)
+        let windowEdge = (window as? WorkspaceSidebarPanel)?.windowEdge(visibleWidth: visibleWidth)
+        let rect = workspaceSidebarSurfaceFrame(panel: bounds, width: visibleWidth, position: configuration.position,
+                                                windowEdge: windowEdge)
         let surface = activeSurface
+        // The mask path is drawn top-down; a layer that is not flipped is bottom-up.
+        let maskEdge = surface.isFlipped ? windowEdge : windowEdge.map { edge in
+            var flipped = edge
+            flipped.topInset = edge.bottomInset
+            flipped.bottomInset = edge.topInset
+            return flipped
+        }
         surface.frame = rect
         if surface === glassSurface { glassContent.frame = CGRect(origin: .zero, size: rect.size) }
         hostedContent?.frame = CGRect(x: -rect.minX, y: 0, width: bounds.width, height: bounds.height)
-        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: rect.width)
+        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth, windowEdge: maskEdge)
             .path(in: CGRect(origin: .zero, size: rect.size)).cgPath
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -366,59 +366,6 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         clippingLayer.path = path
         surface.layer?.mask = clippingLayer
         CATransaction.commit()
-        (window as? WorkspaceSidebarPanel)?.updateCornerBacking()
-    }
-
-    /// Only opaque surfaces can be continued without a visible material seam.
-    var cornerBackingColor: NSColor? {
-        if configuration.appearance == .custom {
-            guard configuration.chromeStyle == .solid else { return nil }
-            return NSColor(configuration.resolvedSolidChromeColor)
-        }
-        guard reduceTransparency() else { return nil }
-        let dark = effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
-        return workspaceSidebarOpaqueColor(dark: dark)
-    }
-}
-
-extension WorkspaceSidebarPanel {
-    func updateCornerBacking() {
-        let inset = workspaceSidebarRestingWidth(config.workspaceSidebar)
-        guard #available(macOS 27, *), isVisible, config.workspaceSidebar.heightMode != .centered,
-              state.visibleWidth > 0, inset > 0,
-              let color = materialContainer.cornerBackingColor else {
-            cornerBacking.orderOut(nil)
-            return
-        }
-        let radius = systemWindowCornerRadius()
-        let backingFrame = workspaceSidebarCornerBackingFrame(panel: frame, inset: inset,
-            radius: radius, position: config.workspaceSidebar.position)
-        if cornerBacking.frame != backingFrame {
-            cornerBacking.setFrame(backingFrame, display: true)
-        }
-        cornerWings.configure(color: color, radius: radius, position: config.workspaceSidebar.position)
-        if !cornerBacking.isVisible { cornerBacking.orderFrontRegardless() }
-    }
-}
-
-final class WorkspaceSidebarCornerWingsView: NSView {
-    private var color = NSColor.clear
-    private var radius: CGFloat = 0
-    private var position: WorkspaceSidebarPosition = .left
-
-    func configure(color: NSColor, radius: CGFloat, position: WorkspaceSidebarPosition) {
-        guard self.color != color || self.radius != radius || self.position != position else { return }
-        self.color = color
-        self.radius = radius
-        self.position = position
-        needsDisplay = true
-    }
-
-    override func draw(_ dirtyRect: NSRect) {
-        guard let context = NSGraphicsContext.current?.cgContext else { return }
-        context.setFillColor(color.cgColor)
-        context.addPath(workspaceSidebarCornerWingPath(bounds: bounds, radius: radius, position: position))
-        context.drawPath(using: .eoFill)
     }
 }
 
@@ -439,6 +386,21 @@ enum WorkspaceSidebarCollapse {
 }
 
 extension WorkspaceSidebarPanel {
+    /// Set while a resting rail sits beside tiled windows (not centered, not an expanded overlay), so the
+    /// sidebar can continue over the outer gap and around the windows' rounded corners.
+    func windowEdge(visibleWidth: CGFloat) -> WorkspaceSidebarWindowEdge? {
+        let sidebar = config.workspaceSidebar
+        let resting = workspaceSidebarRestingWidth(sidebar)
+        guard #available(macOS 27, *), sidebar.heightMode != .centered, resting > 0,
+              abs(visibleWidth - resting) < 1,
+              let monitor = workspaceSidebarMonitor(forScopeId: monitorScopeId) else { return nil }
+        let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
+        return WorkspaceSidebarWindowEdge(
+            gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),
+            radius: systemWindowCornerRadius(),
+            topInset: CGFloat(outer.top), bottomInset: CGFloat(outer.bottom))
+    }
+
     func cancelCollapse() {
         pendingCollapseWork?.cancel()
         pendingCollapseWork = nil
