@@ -438,8 +438,10 @@ func workspaceSidebarWindowEdge(on monitor: Monitor) -> WorkspaceSidebarWindowEd
     guard #available(macOS 27, *), sidebar.heightMode != .centered,
           workspaceSidebarRestingWidth(sidebar) > 0 else { return nil }
     let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
+    // A window's border is drawn outside its frame, so the fill stops short of it.
+    let border = config.windowBorders.enabled ? CGFloat(config.windowBorders.width) : 0
     return WorkspaceSidebarWindowEdge(
-        gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),
+        gap: max(0, CGFloat(sidebar.position == .left ? outer.left : outer.right) - border),
         radius: systemWindowCornerRadius())
 }
 

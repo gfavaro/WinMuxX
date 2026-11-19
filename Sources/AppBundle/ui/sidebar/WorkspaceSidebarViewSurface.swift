@@ -7,6 +7,13 @@ extension WorkspaceSidebarView {
         workspaceSidebarPanelShape(configuration: snapshot.configuration, visibleWidth: snapshot.visibleWidth)
     }
 
+    /// Matches when the panel draws the solid fill over the gap to the windows.
+    var restingSolidRailJoinsWindows: Bool {
+        let configuration = snapshot.configuration
+        let expanded = !configuration.alwaysExpanded && snapshot.visibleWidth > configuration.collapsedWidth + 8
+        return configuration.chromeStyle == .solid && configuration.heightMode != .centered && !expanded
+    }
+
     @ViewBuilder
     func sidebarSurface<S: Shape>(in shape: S) -> some View {
         // The sidebar meets the display edge, so an outline around all four sides reads as a
