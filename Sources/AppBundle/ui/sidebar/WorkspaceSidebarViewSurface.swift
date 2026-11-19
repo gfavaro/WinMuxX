@@ -112,23 +112,17 @@ struct WorkspaceSidebarPanelShape: Shape {
         return path
     }
 
-    /// The rail out to the windows' edge, with a fillet in each corner where a window's
-    /// rounded corner meets it (drawn for a left sidebar; the right one is mirrored).
+    /// The rail out to the windows' edge, flaring at the sidebar's top and bottom edges into a
+    /// fillet that follows a window's rounded corner (drawn for a left sidebar; the right one is mirrored).
     private func windowEdgePath(in rect: CGRect, edge: WorkspaceSidebarWindowEdge) -> Path {
-        let r = edge.radius
-        let body = rect.maxX - r
-        let top = rect.minY + edge.topInset
-        let bottom = rect.maxY - edge.bottomInset
+        let r = min(edge.radius, rect.height / 2)
+        let body = rect.maxX - edge.radius
         var path = Path()
         path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: body, y: rect.minY))
-        path.addLine(to: CGPoint(x: body, y: top))
-        path.addLine(to: CGPoint(x: rect.maxX, y: top))
-        path.addQuadCurve(to: CGPoint(x: body, y: top + r), control: CGPoint(x: body, y: top))
-        path.addLine(to: CGPoint(x: body, y: bottom - r))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: bottom), control: CGPoint(x: body, y: bottom))
-        path.addLine(to: CGPoint(x: body, y: bottom))
-        path.addLine(to: CGPoint(x: body, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: body, y: rect.minY + r), control: CGPoint(x: body, y: rect.minY))
+        path.addLine(to: CGPoint(x: body, y: rect.maxY - r))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY), control: CGPoint(x: body, y: rect.maxY))
         path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
         path.closeSubpath()
         return path

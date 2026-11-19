@@ -26,17 +26,14 @@ func workspaceSidebarPanelFrame(
     )
 }
 
-/// Where tiled windows begin beside a resting sidebar. The sidebar continues over the
-/// outer gap and fills the corner wedges left by the windows' rounded corners, so
-/// it reads as one surface with them.
+/// How a resting sidebar meets the tiled windows beside it. The surface continues over the
+/// outer gap, and its inner edge flares out at the top and bottom of the sidebar to follow
+/// the windows' rounded corners, so the sidebar reads as one surface with them.
 struct WorkspaceSidebarWindowEdge: Equatable {
     /// Outer gap between the sidebar rail and the tiled windows.
     var gap: CGFloat
     /// Corner radius of the windows meeting the sidebar.
     var radius: CGFloat
-    /// Outer gaps above and below the windows, measured from the panel edges.
-    var topInset: CGFloat
-    var bottomInset: CGFloat
 
     /// How far the sidebar surface reaches past the rail.
     var reach: CGFloat { gap + radius }

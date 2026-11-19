@@ -348,17 +348,10 @@ final class WorkspaceSidebarMaterialContainer: NSView {
         let rect = workspaceSidebarSurfaceFrame(panel: bounds, width: visibleWidth, position: configuration.position,
                                                 windowEdge: windowEdge)
         let surface = activeSurface
-        // The mask path is drawn top-down; a layer that is not flipped is bottom-up.
-        let maskEdge = surface.isFlipped ? windowEdge : windowEdge.map { edge in
-            var flipped = edge
-            flipped.topInset = edge.bottomInset
-            flipped.bottomInset = edge.topInset
-            return flipped
-        }
         surface.frame = rect
         if surface === glassSurface { glassContent.frame = CGRect(origin: .zero, size: rect.size) }
         hostedContent?.frame = CGRect(x: -rect.minX, y: 0, width: bounds.width, height: bounds.height)
-        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth, windowEdge: maskEdge)
+        let path = workspaceSidebarPanelShape(configuration: configuration, visibleWidth: visibleWidth, windowEdge: windowEdge)
             .path(in: CGRect(origin: .zero, size: rect.size)).cgPath
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -401,18 +394,16 @@ extension WorkspaceSidebarPanel {
 }
 
 /// Where tiled windows begin beside this display's resting sidebar, if it has one (macOS 27, not centered).
-/// A Scrolling workspace has no such edge: its columns scroll under and past the sidebar.
+/// The same for every arrangement, so the sidebar looks alike whichever layout a workspace uses.
 @MainActor
 func workspaceSidebarWindowEdge(on monitor: Monitor) -> WorkspaceSidebarWindowEdge? {
     let sidebar = config.workspaceSidebar
     guard #available(macOS 27, *), sidebar.heightMode != .centered,
-          workspaceSidebarRestingWidth(sidebar) > 0,
-          monitor.activeWorkspace.arrangement != .scrolling else { return nil }
+          workspaceSidebarRestingWidth(sidebar) > 0 else { return nil }
     let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
     return WorkspaceSidebarWindowEdge(
         gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),
-        radius: systemWindowCornerRadius(),
-        topInset: CGFloat(outer.top), bottomInset: CGFloat(outer.bottom))
+        radius: systemWindowCornerRadius())
 }
 
 /// Whether the Scrolling workspace shown on `monitor` has a window laid out under its sidebar.

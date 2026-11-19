@@ -5,7 +5,7 @@ import XCTest
 @MainActor
 final class WorkspaceSidebarGeometryTest: XCTestCase {
     func testSidebarFillsTheCornersBesideTiledWindows() {
-        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16, topInset: 6, bottomInset: 6)
+        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16)
         let rect = CGRect(x: 0, y: 0, width: 44 + edge.reach, height: 500)
         for side in WorkspaceSidebarPosition.allCases {
             let shape = WorkspaceSidebarPanelShape(rightCornerRadius: 0, position: side, windowEdge: edge)
@@ -15,10 +15,10 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
             }
             XCTAssertTrue(contains(20, 250), "the rail")
             XCTAssertTrue(contains(50, 250), "the gap to the windows")
-            XCTAssertTrue(contains(52.5, 6.5), "the wedge at the top window corner")
-            XCTAssertTrue(contains(52.5, 493.5), "the wedge at the bottom window corner")
+            XCTAssertTrue(contains(52.5, 0.5), "the fillet at the top end of the sidebar")
+            XCTAssertTrue(contains(52.5, 499.5), "the fillet at the bottom end of the sidebar")
             XCTAssertFalse(contains(60, 250), "the windows' own area stays clear")
-            XCTAssertFalse(contains(66, 8), "the window corner stays clear")
+            XCTAssertFalse(contains(66, 3), "the area beyond the fillet stays clear")
         }
     }
 
@@ -33,7 +33,7 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
 
     func testSurfaceReachesTheWindowsOnlyWhenTheyAreBeside() {
         let panel = CGRect(x: 0, y: 0, width: 400, height: 900)
-        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16, topInset: 0, bottomInset: 0)
+        let edge = WorkspaceSidebarWindowEdge(gap: 8, radius: 16)
         XCTAssertEqual(workspaceSidebarSurfaceFrame(panel: panel, width: 44, position: .left, windowEdge: nil),
                        CGRect(x: 0, y: 0, width: 44, height: 900))
         XCTAssertEqual(workspaceSidebarSurfaceFrame(panel: panel, width: 44, position: .left, windowEdge: edge),
