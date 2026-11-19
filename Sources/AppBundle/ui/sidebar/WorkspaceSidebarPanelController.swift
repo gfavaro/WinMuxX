@@ -401,11 +401,13 @@ extension WorkspaceSidebarPanel {
 }
 
 /// Where tiled windows begin beside this display's resting sidebar, if it has one (macOS 27, not centered).
+/// A Scrolling workspace has no such edge: its columns scroll under and past the sidebar.
 @MainActor
 func workspaceSidebarWindowEdge(on monitor: Monitor) -> WorkspaceSidebarWindowEdge? {
     let sidebar = config.workspaceSidebar
     guard #available(macOS 27, *), sidebar.heightMode != .centered,
-          workspaceSidebarRestingWidth(sidebar) > 0 else { return nil }
+          workspaceSidebarRestingWidth(sidebar) > 0,
+          monitor.activeWorkspace.arrangement != .scrolling else { return nil }
     let outer = ResolvedGaps(gaps: config.gaps, monitor: monitor).outer
     return WorkspaceSidebarWindowEdge(
         gap: CGFloat(sidebar.position == .left ? outer.left : outer.right),

@@ -155,7 +155,7 @@ struct SettingsDisplaysView: View {
                     }
                 }
                 assignmentEditor
-                SettingsDescription("An assigned workspace always shows on its display while that display is connected, as in AeroSpace. Moving it elsewhere is refused, and one showing elsewhere moves back. When WinMuxX starts without a saved arrangement, or with Start workspaces on main display, each secondary display shows its first assigned workspace.")
+                SettingsDescription("An assigned workspace always shows on its display while that display is connected. Moving it elsewhere is refused, and one showing elsewhere moves back. When WinMuxX starts without a saved arrangement, or with Start workspaces on main display, each secondary display shows its first assigned workspace.")
                 Button("Startup options…", action: onGeneral)
             }
             if let error { Text(error).foregroundStyle(.red).textSelection(.enabled) }
