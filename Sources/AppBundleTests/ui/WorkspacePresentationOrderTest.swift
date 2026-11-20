@@ -37,6 +37,28 @@ final class WorkspacePresentationOrderTest: WorkspaceTestCase {
         await assertLiveOrderAfterRemoval()
     }
 
+    // After a restart the live order can differ from the restored numbers; removing an
+    // empty workspace must not renumber the others.
+    func testRemovingEmptyWorkspaceKeepsRestoredNumbersWhenLiveOrderDiffers() {
+        let project = createWorkspaceProject()
+        let spaces = [("restored-second", 2), ("restored-first", 1)].map { name, index in
+            let workspace = Workspace.get(byName: name)
+            workspace.assignProject(project.id)
+            workspace.markAsAutomaticallyNamed()
+            workspace.restoredDisplayIndex = index
+            _ = TestWindow.new(id: UInt32(9950 + index), parent: workspace.rootTilingContainer)
+            return workspace
+        }
+        let ids = Set(spaces.map(\.id))
+        let expected = [spaces[1], spaces[0]].map(\.id)
+        XCTAssertEqual(orderedWorkspaces(in: project.id).filter { ids.contains($0.id) }.map(\.id), expected)
+        let spare = Workspace.get(byName: "empty-spare")
+        spare.assignProject(project.id)
+        removeWorkspaceFromRegistry(spare, forgetLabel: false)
+        XCTAssertTrue(spaces.allSatisfy { $0.restoredDisplayIndex == nil })
+        XCTAssertEqual(orderedWorkspaces(in: project.id).filter { ids.contains($0.id) }.map(\.id), expected)
+    }
+
     private func assertLiveOrderAfterRemoval() async {
         let project = createWorkspaceProject()
         let names = ["live-one", "live-three", "live-four", "2", "live-five"]

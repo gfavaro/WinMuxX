@@ -198,6 +198,15 @@ struct WinMuxWorkspaceState {
         }
     }
 
+    /// Puts `leading` first in the project's order; workspaces it leaves out keep their relative order after it.
+    mutating func reorderProjectWorkspaces(_ projectId: WorkspaceProjectId, leading: [WorkspaceId]) {
+        guard var project = projectsById[projectId] else { return }
+        let leadingSet = Set(leading)
+        project.workspaceOrder = leading.filter { project.workspaceOrder.contains($0) }
+            + project.workspaceOrder.filter { !leadingSet.contains($0) }
+        projectsById[projectId] = project
+    }
+
     private mutating func insertWorkspace(_ workspaceId: WorkspaceId, intoProject projectId: WorkspaceProjectId) {
         var project = projectsById[projectId].orDie()
         if !project.workspaceOrder.contains(workspaceId) {

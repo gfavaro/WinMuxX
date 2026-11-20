@@ -148,7 +148,10 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace, forgetLabel: Bool) {
     if forgetLabel || isSidebarDraftWorkspaceName(workspace.name) { clearWorkspaceSidebarLabelIfNeeded(workspace.name) }
     _ = runtime.workspaces.removeWorkspace(workspace)
     // Restored numbers preserve the session while its workspaces are rebuilt.
-    // Once a slot disappears, presentation must follow the live project order.
+    // Once a slot disappears, presentation must follow the live project order, so the
+    // live order first adopts the restored one: no workspace changes number.
+    runtime.workspaces.reorderProjectWorkspaces(workspace.projectId,
+        leading: workspacesInRestorationOrder(in: WorkspaceScope(projectId: workspace.projectId)).map(\.id))
     for survivor in projectWorkspaces(projectId: workspace.projectId)
     where survivor.usesAutomaticDisplayName && !survivor.isConfiguredPersistent {
         survivor.restoredDisplayIndex = nil
