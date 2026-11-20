@@ -20,7 +20,11 @@ AeroSpace: selection shows it there and moves elsewhere are refused.
 Read [workspace behavior examples](../../../docs/WORKSPACE_BEHAVIOR.md) for concrete
 selection, movement, rejection and topology cases. These describe today's behavior,
 not a prohibition on an explicitly requested change. Bring Here already exists;
-check the code before assuming a new action is needed. The
+check the code before assuming a new action is needed. Workspace order within a
+project is user-editable (sidebar header drag, `move-workspace-order`,
+`moveWorkspaceInOrder` in `tree/WorkspaceLifecycle.swift`); automatic numbers follow
+it, and `adoptPresentedWorkspaceOrder` keeps numbers stable when restored numbers
+are dropped. The
 [task map](../../../docs/CONTRIBUTOR_TASKS.md) identifies entry points, completion
 criteria, examples and how to handle failures.
 

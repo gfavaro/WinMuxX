@@ -6,6 +6,7 @@ struct WorkspaceSidebarWorkspaceSection: View {
     @SidebarColors var sidebarColors: WorkspaceSidebarPalette
     let workspace: WorkspaceSidebarWorkspaceViewModel
     let dragPreview: WorkspaceSidebarDropPreviewViewModel?
+    var reorderPreview: WorkspaceSidebarReorderPreview? = nil
     let expansionProgress: CGFloat
     let layout: WorkspaceSidebarConfiguration
     let emitsDropTarget: Bool
@@ -147,6 +148,16 @@ struct WorkspaceSidebarWorkspaceSection: View {
                 // moving from the workspace button to Override does not cancel it.
                 if !hover, isShowingInUseOverlay {
                     activeInUseOverrideWorkspaceName = nil
+                }
+            }
+            .overlay(alignment: reorderPreview?.placeAfter == true ? .bottom : .top) {
+                if reorderPreview?.targetWorkspaceName == workspace.name {
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(height: 3)
+                        .padding(.horizontal, 6)
+                        .offset(y: reorderPreview?.placeAfter == true ? 4 : -4)
+                        .allowsHitTesting(false)
                 }
             }
             .shadow(
@@ -378,6 +389,12 @@ extension WorkspaceSidebarWorkspaceSection {
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
+        // Dragging the header reorders the workspace within its project.
+        .modifier(WorkspaceSidebarOptionalDragModifier(
+            isEnabled: !isRenamingWorkspace,
+            onChanged: { actions.workspaceDragChanged(workspace.name, $0) },
+            onEnded: { actions.workspaceDragEnded(workspace.name, $0) },
+        ))
     }
 
     var header: some View {

@@ -87,6 +87,12 @@ func buildShortcutSections() -> [ShortcutSettingsModel.Section] {
                   shortcutAction(id: "tab-next", title: "Next Tab", command: "focus tab-next"),
                   shortcutAction(id: "tab-prev", title: "Previous Tab", command: "focus tab-prev"),
               ]),
+        .init(id: "managed-workspace-order", category: .managed, title: "Workspace Order",
+              summary: "Move the focused workspace up or down in the sidebar; its number follows.",
+              actions: [
+                  shortcutAction(id: "workspace-order-up", title: "Move Workspace Up", command: "move-workspace-order up"),
+                  shortcutAction(id: "workspace-order-down", title: "Move Workspace Down", command: "move-workspace-order down"),
+              ]),
         .init(id: "managed-swap", category: .managed, title: "Swap", summary: nil,
               actions: ["left", "down", "up", "right"].map {
                   shortcutAction(id: "swap-\($0)", title: "Swap \($0.capitalized)", command: "swap \($0)")

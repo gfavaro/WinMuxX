@@ -24,5 +24,6 @@ func workspaceSidebarSnapshot(shared: TrayMenuModel, panel: WorkspaceSidebarPane
         ),
         dropPreview: shared.workspaceSidebarDropPreview,
         configuration: panel.configuration,
+        reorderPreview: shared.workspaceSidebarReorderPreview,
     )
 }

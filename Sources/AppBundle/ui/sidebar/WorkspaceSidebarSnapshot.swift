@@ -12,6 +12,7 @@ struct WorkspaceSidebarSnapshot: Equatable {
     var hoveredWorkspaceName: String?
     var dropPreview: WorkspaceSidebarDropPreviewViewModel?
     var configuration: WorkspaceSidebarConfiguration
+    var reorderPreview: WorkspaceSidebarReorderPreview? = nil
 
     static let empty = WorkspaceSidebarSnapshot(
         workspaces: [],
@@ -114,6 +115,8 @@ struct WorkspaceSidebarActions {
     var windowDragEnded: @MainActor (UInt32, CGPoint) -> Void
     var tabGroupDragChanged: @MainActor (UInt32, CGPoint) -> Void
     var tabGroupDragEnded: @MainActor (UInt32, CGPoint) -> Void
+    var workspaceDragChanged: @MainActor (String, CGPoint) -> Void
+    var workspaceDragEnded: @MainActor (String, CGPoint) -> Void
 
     init(
         send: @escaping @MainActor (WorkspaceSidebarAction) -> Void = { _ in },
@@ -122,7 +125,9 @@ struct WorkspaceSidebarActions {
         windowDragChanged: @escaping @MainActor (UInt32, CGPoint) -> Void = { _, _ in },
         windowDragEnded: @escaping @MainActor (UInt32, CGPoint) -> Void = { _, _ in },
         tabGroupDragChanged: @escaping @MainActor (UInt32, CGPoint) -> Void = { _, _ in },
-        tabGroupDragEnded: @escaping @MainActor (UInt32, CGPoint) -> Void = { _, _ in }
+        tabGroupDragEnded: @escaping @MainActor (UInt32, CGPoint) -> Void = { _, _ in },
+        workspaceDragChanged: @escaping @MainActor (String, CGPoint) -> Void = { _, _ in },
+        workspaceDragEnded: @escaping @MainActor (String, CGPoint) -> Void = { _, _ in }
     ) {
         self.send = send
         self.setDropTargets = setDropTargets
@@ -131,5 +136,7 @@ struct WorkspaceSidebarActions {
         self.windowDragEnded = windowDragEnded
         self.tabGroupDragChanged = tabGroupDragChanged
         self.tabGroupDragEnded = tabGroupDragEnded
+        self.workspaceDragChanged = workspaceDragChanged
+        self.workspaceDragEnded = workspaceDragEnded
     }
 }

@@ -25,6 +25,7 @@ public final class TrayMenuModel {
     var workspaceSidebarFocusedMonitorScopeId: String = ""
     var workspaceSidebarShowsMonitorSelector: Bool = false
     var workspaceSidebarDropPreview: WorkspaceSidebarDropPreviewViewModel? = nil
+    var workspaceSidebarReorderPreview: WorkspaceSidebarReorderPreview? = nil
     var windowTabStrips: [WindowTabStripViewModel] = []
     var workspaceSidebarTopPadding: CGFloat = 12
     var workspaceSidebarHoveredWorkspaceName: String? = nil

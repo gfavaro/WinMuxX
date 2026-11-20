@@ -28,6 +28,12 @@ func makeWorkspaceSidebarActionsAdapter(state: WorkspaceSidebarPanelState) -> Wo
         tabGroupDragEnded: { _, pointer in
             finishSidebarWindowDrag(pointer: pointer)
         },
+        workspaceDragChanged: { name, pointer in
+            updateSidebarWorkspaceReorder(name, pointer: pointer)
+        },
+        workspaceDragEnded: { name, pointer in
+            finishSidebarWorkspaceReorder(name, pointer: pointer)
+        },
     )
 }
 

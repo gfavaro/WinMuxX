@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Reorder workspaces by dragging a workspace's header in the sidebar, or with `move-workspace-order up|down`; numbers follow the new order.
+- Keep workspace numbers when an empty workspace is removed after a restart, instead of swapping workspaces.
+
 ## 0.7.0
 
 - Return windows to their workspaces after an app quits and relaunches, and match the only window of a relaunched app even when its title changed.

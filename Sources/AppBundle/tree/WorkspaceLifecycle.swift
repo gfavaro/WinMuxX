@@ -148,14 +148,48 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace, forgetLabel: Bool) {
     if forgetLabel || isSidebarDraftWorkspaceName(workspace.name) { clearWorkspaceSidebarLabelIfNeeded(workspace.name) }
     _ = runtime.workspaces.removeWorkspace(workspace)
     // Restored numbers preserve the session while its workspaces are rebuilt.
-    // Once a slot disappears, presentation must follow the live project order, so the
-    // live order first adopts the restored one: no workspace changes number.
-    runtime.workspaces.reorderProjectWorkspaces(workspace.projectId,
-        leading: workspacesInRestorationOrder(in: WorkspaceScope(projectId: workspace.projectId)).map(\.id))
-    for survivor in projectWorkspaces(projectId: workspace.projectId)
+    // Once a slot disappears, presentation must follow the live project order.
+    adoptPresentedWorkspaceOrder(workspace.projectId)
+}
+
+/// Makes the live project order match the order shown, then drops the restored numbers,
+/// so no workspace changes number.
+@MainActor
+func adoptPresentedWorkspaceOrder(_ projectId: WorkspaceProjectId) {
+    runtime.workspaces.reorderProjectWorkspaces(projectId,
+        leading: workspacesInRestorationOrder(in: WorkspaceScope(projectId: projectId)).map(\.id))
+    for survivor in projectWorkspaces(projectId: projectId)
     where survivor.usesAutomaticDisplayName && !survivor.isConfiguredPersistent {
         survivor.restoredDisplayIndex = nil
     }
+}
+
+/// Moves `workspace` to just before `target` in its project's order, or to the end when
+/// `target` is nil. Configured persistent workspaces keep their fixed slots.
+@MainActor
+@discardableResult
+func moveWorkspaceInOrder(_ workspace: Workspace, before target: Workspace?) -> Bool {
+    let projectId = workspace.projectId
+    guard target !== workspace, !workspace.isConfiguredPersistent,
+          target.map({ $0.projectId == projectId && !$0.isArchived }) ?? true
+    else { return false }
+    adoptPresentedWorkspaceOrder(projectId)
+    var order = orderedWorkspaces(in: projectId).map(\.id).filter { $0 != workspace.id }
+    let index = target.flatMap { order.firstIndex(of: $0.id) } ?? order.endIndex
+    order.insert(workspace.id, at: index)
+    let before = orderedWorkspaces(in: projectId).map(\.id)
+    runtime.workspaces.reorderProjectWorkspaces(projectId, leading: order)
+    return orderedWorkspaces(in: projectId).map(\.id) != before
+}
+
+/// Swaps `workspace` with its neighbour among the workspaces the sidebar shows; false at either end.
+@MainActor
+@discardableResult
+func moveWorkspaceInOrder(_ workspace: Workspace, by offset: Int) -> Bool {
+    let shown = userFacingWorkspaces(orderedWorkspaces(in: workspace.projectId), focusedWorkspace: focus.workspace)
+    guard let index = shown.firstIndex(of: workspace), shown.indices.contains(index + offset) else { return false }
+    let targetIndex = offset < 0 ? index + offset : index + offset + 1
+    return moveWorkspaceInOrder(workspace, before: shown.indices.contains(targetIndex) ? shown[targetIndex] : nil)
 }
 
 @MainActor

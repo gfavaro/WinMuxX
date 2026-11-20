@@ -475,6 +475,7 @@ extension WorkspaceSidebarView {
         WorkspaceSidebarWorkspaceSection(
             workspace: workspace,
             dragPreview: snapshot.dropPreview,
+            reorderPreview: snapshot.reorderPreview,
             expansionProgress: expansionProgress,
             layout: snapshot.configuration,
             emitsDropTarget: emitsDropTarget,

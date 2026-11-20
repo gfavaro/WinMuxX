@@ -53,6 +53,16 @@ a visible temporary blank and active display/project requirements keep the
 workspaces that still need to exist. Numeric workspace arguments are display positions; use `workspace --name <name>` to
 select an internal workspace name directly.
 
+### Reordering workspaces
+
+Drag a workspace's header in the sidebar above or below another workspace of the
+same project; a line shows where it will land. `move-workspace-order up|down`
+does the same from the keyboard (Settings → Shortcuts → Workspace Order has no
+default keys). Numbers follow the new position: moving the second workspace to
+the top makes it workspace 1. Windows, the project and display ownership stay as
+they were, and the order is kept across restarts. Workspaces listed in
+`persistent-workspaces` keep their fixed slots.
+
 Workspace activation can target a monitor explicitly:
 
 ```shell
