@@ -389,12 +389,16 @@ extension WorkspaceSidebarWorkspaceSection {
         .frame(maxWidth: .infinity, alignment: isCompact ? .center : .leading)
         .contentShape(Rectangle())
         .frame(maxWidth: .infinity, alignment: .leading)
-        // Dragging the header reorders the workspace within its project.
-        .modifier(WorkspaceSidebarOptionalDragModifier(
+        .modifier(workspaceReorderDrag)
+    }
+
+    /// Dragging the header (or the compact badge) reorders the workspace within its project.
+    var workspaceReorderDrag: WorkspaceSidebarOptionalDragModifier {
+        WorkspaceSidebarOptionalDragModifier(
             isEnabled: !isRenamingWorkspace,
             onChanged: { actions.workspaceDragChanged(workspace.name, $0) },
             onEnded: { actions.workspaceDragEnded(workspace.name, $0) },
-        ))
+        )
     }
 
     var header: some View {
@@ -504,6 +508,7 @@ extension WorkspaceSidebarWorkspaceSection {
             .workspaceAccessibility(name: workspace.displayName, isFocused: workspace.isFocused, shownOn: shownOnDisplayName)
             .frame(maxWidth: .infinity, alignment: .center)
             .contentShape(sectionShape)
+            .modifier(workspaceReorderDrag)
         } else {
             sectionContent.contentShape(sectionShape)
         }
