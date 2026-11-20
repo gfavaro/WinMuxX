@@ -198,6 +198,10 @@ enum GlobalObserver {
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main, using: onNotif))
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main, using: onNotif))
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main, using: onNotif))
+        // Behind the lock screen apps report no windows, and screens wake before the unlock, so a
+        // WinMuxX launched while locked would leave every other app's windows unmanaged and parked.
+        notificationObserverTokens.append(DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main, using: onNotif))
         notificationObserverTokens.append(nc.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { _ in
             runOnMainActor { persistFrozenWorldBeforePowerOff() }
         })
