@@ -1,7 +1,5 @@
 import Foundation
 
-private let workspaceSidebarSectionHeader = "[workspace-sidebar]"
-
 func updateWorkspaceSidebarLabelConfig(
     in configText: String,
     workspaceName: String,

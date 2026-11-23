@@ -199,17 +199,9 @@ enum Ax {
         key: kAXDocumentAttribute,
         getter: { $0 as? String },
     )
-    // static let modalAttr = ReadableAttrImpl<Bool>(
-    //     key: kAXModalAttribute,
-    //     getter: { $0 as? Bool },
-    // )
     static let enabledAttr = ReadableAttrImpl<Bool>(
         key: kAXEnabledAttribute,
         getter: { $0 as? Bool },
-    )
-    static let childrenAttr = ReadableAttrImpl<[AXUIElement]>(
-        key: kAXChildrenAttribute,
-        getter: { $0 as? [AXUIElement] },
     )
     static let enhancedUserInterfaceAttr = WritableAttrImpl<Bool>(
         key: "AXEnhancedUserInterface",
