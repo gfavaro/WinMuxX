@@ -227,11 +227,20 @@ private func prepareRestartStateDirectory(_ url: URL) throws {
     }
 }
 
+/// While saved windows are still being restored, the live layout is half-restored. Writing it
+/// would replace their saved places in the file, so a second restart soon after launch would
+/// start from the collapsed layout. The file keeps the last complete save until restore ends.
+@MainActor
+var restartSaveWouldDropUnrestoredWindows: Bool {
+    recovery.lateRestartTreeDeadline != nil && pendingRestartWindowCount > 0
+}
+
 @MainActor
 func persistFrozenWorldForRestartIfPossible() {
     recovery.pendingRestartSave?.cancel()
     recovery.pendingRestartSave = nil
-    guard !isUnitTest, isWinMuxRuntimeReady, !recovery.savesHeldForPowerOff else { return }
+    guard !isUnitTest, isWinMuxRuntimeReady, !recovery.savesHeldForPowerOff,
+          !restartSaveWouldDropUnrestoredWindows else { return }
     do {
         let url = try persistedFrozenWorldUrl()
         try recovery.restartWriter.flush(makeRestartEnvelope(), to: url)
@@ -287,7 +296,7 @@ func persistFrozenWorldBeforePowerOff() {
 @MainActor
 func schedulePersistedFrozenWorldSave() {
     guard !isUnitTest, isWinMuxRuntimeReady, !recovery.savesHeldForPowerOff,
-          TrayMenuModel.shared.isEnabled,
+          !restartSaveWouldDropUnrestoredWindows, TrayMenuModel.shared.isEnabled,
           !isLockScreenApp(NSWorkspace.shared.frontmostApplication) else { return }
     // Capture current titles without adding AX round trips to every focus/layout event.
     guard recovery.pendingRestartSave == nil else { return }

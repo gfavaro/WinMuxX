@@ -290,6 +290,18 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertFalse(workspaceIsAwaitingRestoredWindows("4"))
     }
 
+    func testSavingWaitsWhileSavedWindowsAreStillBeingRestored() {
+        let workspace = Workspace.get(byName: "4")
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.restartIdentity = identity("First")
+        let envelope = makeRestartEnvelope()
+        window.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(envelope)
+        XCTAssertTrue(restartSaveWouldDropUnrestoredWindows)
+        runtime.recovery.lateRestartTreeDeadline = nil
+        XCTAssertFalse(restartSaveWouldDropUnrestoredWindows, "Saving resumes once the restore window ends")
+    }
+
     func testDelayedWindowDoesNotReplayTreeAfterUserLayoutEdit() async throws {
         try await assertDelayedDwindleRestoration(preserveEdit: true)
     }
