@@ -7,4 +7,4 @@ These records document observed implementation. They do not claim that a particu
 - [ADR-003: Workspace arrangement state](003-arrangement-state.md)
 - [ADR-004: Remember the Scrolling position across restarts](004-scrolling-offset-persistence.md)
 - [ADR-005: Refresh scheduling rules live in RefreshCoordinator](005-refresh-scheduling-owner.md)
-- [ADR-006: Use the last window frame to tell identical windows apart on restore](006-restart-frame-evidence.md) (proposed)
+- [ADR-006: Use the last window frame to tell identical windows apart on restore](006-restart-frame-evidence.md)

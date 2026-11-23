@@ -382,9 +382,10 @@ final class RestartWorkspaceTest: XCTestCase {
     }
 
     private func identity(_ title: String, pid: Int32 = 10, launch: TimeInterval = 10,
-                          app: String = "test.editor", document: String? = nil, identifier: String? = nil) -> RestartWindowIdentity {
+                          app: String = "test.editor", document: String? = nil, identifier: String? = nil,
+                          frame: CGRect? = nil) -> RestartWindowIdentity {
         RestartWindowIdentity(bundleId: app, pid: pid, launchDate: Date(timeIntervalSince1970: launch), title: title,
-            documentURL: document, accessibilityIdentifier: identifier)
+            documentURL: document, accessibilityIdentifier: identifier, frame: frame)
     }
 
     func testLatestPlacementRestoresBothTerminalsDespiteOlderSnapshotsAndChangedTitles() async throws {
@@ -473,6 +474,55 @@ final class RestartWorkspaceTest: XCTestCase {
         let restored = try await restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow: unrelated)
         XCTAssertFalse(restored)
         XCTAssertNotEqual(unrelated.nodeWorkspace?.name, "3")
+    }
+
+    /// Two windows of one app the other evidence cannot tell apart: saved ids 1 and 2 on
+    /// workspaces 3 and 5, reopened under ids 90 and 91 of a new process.
+    private func twoIdenticalSavedWindows(leftFrame: CGRect?, rightFrame: CGRect?) -> [FrozenWindow] {
+        let first = TestWindow.new(id: 1, parent: Workspace.get(byName: "3").rootTilingContainer)
+        let second = TestWindow.new(id: 2, parent: Workspace.get(byName: "5").rootTilingContainer)
+        first.restartIdentity = identity("Windows App", frame: leftFrame)
+        second.restartIdentity = identity("Windows App", frame: rightFrame)
+        return [FrozenWindow(first), FrozenWindow(second)]
+    }
+
+    func testIdenticalWindowsPairByFrameWhenTheyReopenInAnotherOrder() {
+        let left = CGRect(x: 0, y: 0, width: 800, height: 600), right = CGRect(x: 900, y: 0, width: 800, height: 600)
+        let saved = twoIdenticalSavedWindows(leftFrame: left, rightFrame: right)
+        // The window now at the right edge is the lower id, so creation order alone would swap them.
+        let nowRight = identity("Windows App", pid: 20, launch: 20, frame: right.offsetBy(dx: 3, dy: -2))
+        let nowLeft = identity("Windows App", pid: 20, launch: 20, frame: left.offsetBy(dx: -4, dy: 1))
+        let live = [(90 as UInt32, nowRight), (91 as UInt32, nowLeft)]
+        XCTAssertEqual(matchRestartWindow(id: 90, identity: nowRight, saved: saved, live: live), 2)
+        XCTAssertEqual(matchRestartWindow(id: 91, identity: nowLeft, saved: saved, live: live), 1)
+    }
+
+    func testIdenticalWindowsPairInCreationOrderWhenFramesDoNotDecide() {
+        let saved = twoIdenticalSavedWindows(leftFrame: nil, rightFrame: nil)
+        let live = [(90 as UInt32, identity("Windows App", pid: 20, launch: 20)),
+                    (91 as UInt32, identity("Windows App", pid: 20, launch: 20))]
+        XCTAssertEqual(matchRestartWindow(id: 90, identity: live[0].1, saved: saved, live: live), 1)
+        XCTAssertEqual(matchRestartWindow(id: 91, identity: live[1].1, saved: saved, live: live), 2)
+    }
+
+    func testIdenticalWindowsWaitUntilEveryLiveWindowIsSeenAndSkipClaimedOnes() {
+        let saved = twoIdenticalSavedWindows(leftFrame: nil, rightFrame: nil)
+        let only = identity("Windows App", pid: 20, launch: 20)
+        XCTAssertNil(matchRestartWindow(id: 90, identity: only, saved: saved, live: [(90, only)]),
+            "One live window of two saved is not enough to pair")
+        // Window 90 already took saved 1; the remaining saved window is the sole candidate again.
+        let remaining = [saved[1]]
+        XCTAssertEqual(matchRestartWindowIndex(id: 91, identity: only, saved: remaining,
+            live: [(90, only), (91, only)], claimed: [90]).map { remaining[$0].id }, 2)
+    }
+
+    func testSavedFrameFieldIsOptionalWhenLoadingOlderFiles() throws {
+        let old = #"{"bundleId":"a","pid":1,"title":"T"}"#
+        let decoded = try JSONDecoder().decode(RestartWindowIdentity.self, from: Data(old.utf8))
+        XCTAssertNil(decoded.frame)
+        let withFrame = identity("T", frame: CGRect(x: 1, y: 2, width: 3, height: 4))
+        let roundTrip = try JSONDecoder().decode(RestartWindowIdentity.self, from: JSONEncoder().encode(withFrame))
+        XCTAssertEqual(roundTrip.frame, withFrame.frame)
     }
 
     func testAmbiguousSavedOrLiveTitlesAreNotGuessed() {

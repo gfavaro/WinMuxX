@@ -381,7 +381,7 @@ final class MacApp: AbstractApp {
                 (id, RestartWindowIdentity(bundleId: bundleId, pid: pid,
                     launchDate: launchDate, title: window.get(Ax.titleAttr) ?? "",
                     documentURL: window.get(Ax.documentAttr),
-                    accessibilityIdentifier: window.get(Ax.identifierAttr)))
+                    accessibilityIdentifier: window.get(Ax.identifierAttr), frame: axFrame(of: window)))
             }
         }
     }
@@ -393,7 +393,7 @@ final class MacApp: AbstractApp {
         return try await withWindow(windowId) { window, _ in
             RestartWindowIdentity(bundleId: bundleId, pid: pid, launchDate: launchDate,
                 title: window.get(Ax.titleAttr) ?? "", documentURL: window.get(Ax.documentAttr),
-                accessibilityIdentifier: window.get(Ax.identifierAttr))
+                accessibilityIdentifier: window.get(Ax.identifierAttr), frame: axFrame(of: window))
         }
     }
 
@@ -775,4 +775,10 @@ private func diagnosticProbe(_ element: AXUIElement, _ source: String) throws ->
     return AxWindowProbe(source: source, windowId: windowId, idError: windowId == nil ? error.repr : nil,
         frame: origin.flatMap { origin in size.map { CGRect(origin: origin, size: $0) } },
         role: try attribute(kAXRoleAttribute) as? String, subrole: try attribute(kAXSubroleAttribute) as? String)
+}
+
+/// Not isolated to the app: it runs on the app's Accessibility thread.
+private func axFrame(of window: any AxUiElementMock) -> CGRect? {
+    guard let origin = window.get(Ax.topLeftCornerAttr), let size = window.get(Ax.sizeAttr) else { return nil }
+    return CGRect(origin: origin, size: size)
 }

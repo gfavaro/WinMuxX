@@ -1,6 +1,6 @@
 # ADR-006: Use the last window frame to tell identical windows apart on restore
 
-- Status: Proposed (awaiting Product Manager approval)
+- Status: Accepted by the Product Manager (2026-11-23)
 - Date: 2026-11-23
 
 ## Context
@@ -14,6 +14,7 @@ Add an optional `frame` (the window's last known position and size) to the saved
 - Step 1: pick the saved window whose frame is within 8 points of the live window's frame on every edge, if exactly one is.
 - Step 2: if frames do not decide, and the number of tied saved windows equals the number of unmatched live windows of that app, pair them in window-id order (creation order).
 - Anything still ambiguous stays unmatched, as today.
+- Live windows already matched to a saved window no longer count as competitors, so the second of two identical windows can be restored once the first has been.
 
 ## Why this approach
 A frame is already known when the state is written, and apps normally reopen windows where they were. The rule only acts where today's answer is "refuse", so it cannot override a match the current evidence makes.

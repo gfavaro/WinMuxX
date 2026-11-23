@@ -566,8 +566,9 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
             return ($0.windowId, identity)
         }
     }
+    let claimed = Set(recovery.restartSnapshots.flatMap { $0.matchedWindows.values.map(\.windowId) })
     guard let candidateIndex = matchRestartWindowIndex(id: window.windowId, identity: identity,
-        saved: saved, live: live), Window.get(byId: window.windowId) === window,
+        saved: saved, live: live, claimed: claimed), Window.get(byId: window.windowId) === window,
         window.bindingGeneration == generation, allowsSavedPlacement(identity) else {
         return logRestartMiss(window, "no match among \(saved.count) saved, \(live.count) live")
     }

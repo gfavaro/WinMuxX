@@ -11,6 +11,7 @@
 - Find far more controls with Settings search; a test now fails when a setting is added without a searchable control.
 - Show collapsed sidebar tile hover from the pointer position, on the display under the pointer only, so it no longer lags or sticks.
 - Log why a saved window was not restored after a restart, and list the windows still waiting, by workspace and app, in the diagnostics report.
+- Tell apart identical windows of one app when restoring after a restart, using where each window was, then the order they were opened.
 - Keep a workspace until its saved windows have come back, so apps that are slow to appear after a restart no longer lose their place, and keep the saved layout until the restore finishes.
 
 ## 0.7.0
