@@ -303,8 +303,10 @@ extension WorkspaceSidebarPanel {
     /// hover only starts once the panel accepts mouse events, which can be after a quick entry.
     private func updateHoveredWorkspaceFromMousePosition() {
         let pointer = mouseLocation
+        let inside = isMouseInsideVisibleRegion()
+        if state.pointerIsInside != inside { state.pointerIsInside = inside }
         let name: String?
-        if isMouseInsideVisibleRegion() {
+        if inside {
             if case .workspace(let workspaceName)? = workspaceSidebarDropTarget(at: pointer)?.kind {
                 name = workspaceName
             } else {

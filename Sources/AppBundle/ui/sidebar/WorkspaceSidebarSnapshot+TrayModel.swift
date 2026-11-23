@@ -17,11 +17,11 @@ func workspaceSidebarSnapshot(shared: TrayMenuModel, panel: WorkspaceSidebarPane
         targetMonitorScopeId: panel.targetMonitorScopeId,
         focusedMonitorScopeId: shared.workspaceSidebarFocusedMonitorScopeId,
         visibleWidth: panel.visibleWidth,
-        // Hover is shared; a panel shows it only on a workspace it lists.
-        hoveredWorkspaceName: sanitizedWorkspaceSidebarHoveredWorkspaceName(
+        // Hover is shared; the panel under the pointer shows it, on a workspace it lists.
+        hoveredWorkspaceName: panel.pointerIsInside ? sanitizedWorkspaceSidebarHoveredWorkspaceName(
             visibleWorkspaceNames: visibleWorkspaceNames,
             hoveredWorkspaceName: shared.workspaceSidebarHoveredWorkspaceName,
-        ),
+        ) : nil,
         dropPreview: shared.workspaceSidebarDropPreview,
         configuration: panel.configuration,
         reorderPreview: shared.workspaceSidebarReorderPreview,

@@ -15,6 +15,8 @@ final class WorkspaceSidebarPanelState {
         didSet { if oldValue != isExpanded { requestPublicStateUpdate() } }
     }
     var visibleWidth: CGFloat = 0
+    /// Whether the pointer is over this display's sidebar; hover is shared, so only this panel shows it.
+    var pointerIsInside = false
     /// Whether the sidebar's view tree exists. See WorkspaceSidebarPanel.loadContent.
     var contentLoaded = true
     /// The configuration as this display shows it (frosted over a Scrolling workspace).

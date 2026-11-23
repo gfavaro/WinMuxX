@@ -524,7 +524,7 @@ func finishSidebarWindowDrag(pointer: CGPoint? = nil) {
 func finishWorkspaceSidebarDragAfterGlobalMouseUp() {
     let hasSidebarDragState = currentActiveWorkspaceSidebarDrag() != nil || isWorkspaceSidebarItemDragActive()
     let hasCursorProxy = WindowDragCursorProxyPanel.shared.currentContent != nil || WindowDragCursorProxyPanel.shared.isVisible
-    TrayMenuModel.shared.workspaceSidebarReorderPreview = nil
+    if TrayMenuModel.shared.workspaceSidebarReorderPreview != nil { TrayMenuModel.shared.workspaceSidebarReorderPreview = nil }
     guard hasSidebarDragState || hasCursorProxy else { return }
     finishSidebarWindowDrag()
     resetWorkspaceSidebarItemDrag()

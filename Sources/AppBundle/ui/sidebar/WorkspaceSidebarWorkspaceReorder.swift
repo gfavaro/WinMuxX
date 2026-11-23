@@ -20,7 +20,7 @@ func workspaceSidebarReorderPreview(_ workspaceName: String, pointer: CGPoint) -
           let rect = workspaceSidebarDropTarget(at: pointer)?.rect
     else { return nil }
     let placeAfter = pointer.y >= rect.center.y
-    let shown = orderedWorkspaces(in: source.projectId)
+    let shown = userFacingWorkspaces(orderedWorkspaces(in: source.projectId), focusedWorkspace: focus.workspace)
     guard let sourceIndex = shown.firstIndex(of: source), let targetIndex = shown.firstIndex(of: target) else { return nil }
     let landingIndex = placeAfter ? targetIndex + 1 : targetIndex
     if landingIndex == sourceIndex || landingIndex == sourceIndex + 1 { return nil }
@@ -42,7 +42,7 @@ func finishSidebarWorkspaceReorder(_ workspaceName: String, pointer: CGPoint) {
     guard let preview, let source = Workspace.existing(byName: preview.workspaceName),
           let target = Workspace.existing(byName: preview.targetWorkspaceName)
     else { return }
-    let shown = orderedWorkspaces(in: source.projectId)
+    let shown = userFacingWorkspaces(orderedWorkspaces(in: source.projectId), focusedWorkspace: focus.workspace)
     guard let targetIndex = shown.firstIndex(of: target) else { return }
     let before = preview.placeAfter ? shown.dropFirst(targetIndex + 1).first : target
     if moveWorkspaceInOrder(source, before: before) {
