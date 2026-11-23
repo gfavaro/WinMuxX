@@ -279,11 +279,7 @@ final class MacApp: AbstractApp {
         // (important for apps which are slow at responding even such basic AX requests. E.g. Godot)
         // Beware of the macOS bug: https://github.com/nikitabobko/AeroSpace/issues/101
         let useActivationOnly = !forceRaise && (!NSScreen.screensHaveSeparateSpaces || monitors.count == 1) &&
-            shouldUseActivationOnlyForNativeFocus(
-                targetWindowId: windowId,
-                lastNativeFocusedWindowId: lastNativeFocusedWindowId,
-                logicalWindowsCount: logicalWindowCount,
-            )
+            shouldUseActivationOnlyForNativeFocus(logicalWindowsCount: logicalWindowCount)
         debugLog(.focus, "MacApp.nativeFocus app=\(nsApp.localizedName ?? rawAppBundleId ?? String(pid)) target=\(windowId) lastNative=\(lastNativeFocusedWindowId?.description ?? "nil") logicalWindowsCount=\(logicalWindowCount) windowsCount=\(windowsCount) strategy=\(useActivationOnly ? "activate" : "ax-focus")"
         )
         if useActivationOnly
@@ -724,12 +720,11 @@ func isDestroyedWindowElement(_ destroyed: AXUIElement?, _ discovered: AXUIEleme
     destroyed.map { CFEqual($0, discovered) } ?? false
 }
 
-func shouldUseActivationOnlyForNativeFocus(
-    targetWindowId: UInt32,
-    lastNativeFocusedWindowId: UInt32?,
-    logicalWindowsCount: Int,
-) -> Bool {
-    lastNativeFocusedWindowId == targetWindowId || logicalWindowsCount == 1
+func shouldUseActivationOnlyForNativeFocus(logicalWindowsCount: Int) -> Bool {
+    // `activate()` brings whichever window macOS holds as the app's main one, so it can only
+    // stand for the requested window when the app has no other. The last window observed as
+    // focused is no evidence: apps reorder their own windows.
+    logicalWindowsCount == 1
 }
 
 enum AppRegistrationDecision: Equatable {

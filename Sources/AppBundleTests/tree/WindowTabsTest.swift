@@ -386,11 +386,8 @@ final class WindowTabsTest: XCTestCase {
     }
 
     func testNativeFocusShortcutIsDisabledForTabbedLogicalWindows() {
-        XCTAssertFalse(shouldUseActivationOnlyForNativeFocus(
-            targetWindowId: 4,
-            lastNativeFocusedWindowId: 1,
-            logicalWindowsCount: 4,
-        ))
+        XCTAssertFalse(shouldUseActivationOnlyForNativeFocus(logicalWindowsCount: 4))
+        XCTAssertTrue(shouldUseActivationOnlyForNativeFocus(logicalWindowsCount: 1))
     }
 
     @MainActor

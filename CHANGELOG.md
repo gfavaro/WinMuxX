@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Focus the window you asked for in an app with several windows, instead of whichever one macOS had as its main window.
 - Reorder workspaces by dragging a workspace's header in the sidebar, or with `move-workspace-order up|down`; numbers follow the new order.
 - Keep workspace numbers when an empty workspace is removed after a restart, instead of swapping workspaces.
 - Look for windows again when the screen unlocks, so a start while the screen was locked no longer leaves windows unmanaged.
