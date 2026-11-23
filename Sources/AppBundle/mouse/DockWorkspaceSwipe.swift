@@ -436,10 +436,3 @@ func macTrackpadGesture(_ key: String) -> Int {
         return CFPreferencesCopyAppValue(key as CFString, $0 as CFString) as? Int
     }.max() ?? 0
 }
-
-/// "Natural scrolling", unset meaning on. The cache is flushed first: a change made in
-/// System Settings does not invalidate this process's copy.
-func naturalScrollingEnabled() -> Bool {
-    CFPreferencesSynchronize(kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesCurrentHost)
-    return CFPreferencesCopyAppValue("com.apple.swipescrolldirection" as CFString, kCFPreferencesAnyApplication) as? Bool ?? true
-}

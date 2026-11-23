@@ -305,19 +305,6 @@ final class MacApp: AbstractApp {
         }
     }
 
-    /// Restack a window without setting main/focused attributes or activating its app.
-    @MainActor func raiseWithoutActivating(_ windowId: UInt32) async throws {
-        try await withWindow(windowId) { window, job in
-            try job.checkCancellation()
-            let error = measuredAXOperation(.axAction) { AXUIElementPerformAction(window, kAXRaiseAction as CFString) }
-            AXWindowOperation.current?.record(error, from: ObjectIdentifier(window))
-        }
-    }
-
-    @MainActor func cancelFrameWrite(_ windowId: UInt32) {
-        setFrameJobs.removeValue(forKey: windowId)?.cancel()
-    }
-
     @MainActor static func cancelPendingFocus() {
         focusJob?.cancel()
         focusJob = nil

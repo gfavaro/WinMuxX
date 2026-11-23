@@ -154,11 +154,6 @@ private func workspaceSidebarConfigKey(in line: String) -> String? {
     return String(key)
 }
 
-private func trailingTomlComment(in line: String) -> String? {
-    guard let hashIndex = line.firstIndex(of: "#") else { return nil }
-    return String(line[hashIndex...]).trimmingCharacters(in: .whitespaces)
-}
-
 private func tomlWorkspaceSidebarKeyValueLine(key: String, value: String) -> String {
     "\"\(tomlEscape(key))\" = \"\(tomlEscape(value))\""
 }

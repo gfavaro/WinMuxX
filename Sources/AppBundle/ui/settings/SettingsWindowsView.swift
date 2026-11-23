@@ -260,7 +260,6 @@ struct ShortcutBehaviorSettingsView: View {
     }
 
     private func persistRootString(_ key: String, _ value: String) { persistConfig(section: nil, key: key, value: "'\(value)'") }
-    private func persistRootInt(_ key: String, _ value: Int) { persistConfig(section: nil, key: key, value: "\(value)") }
     private func persistConfig(section: String?, key: String, value: String) {
         persistSettingsConfig(section: section, key: key, renderedValue: value, model: model)
     }

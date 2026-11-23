@@ -80,7 +80,6 @@ struct Config: ConvenienceCopyable {
     var execConfig: ExecConfig = ExecConfig()
 
     var onFocusChanged: [any Command] = []
-    // var onFocusedWorkspaceChanged: [any Command] = []
     var onFocusedMonitorChanged: [any Command] = []
     var onDisplayChanged: [any Command] = []
 

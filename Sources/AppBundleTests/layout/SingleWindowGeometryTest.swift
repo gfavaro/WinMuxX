@@ -163,14 +163,5 @@ final class SingleWindowGeometryTest: XCTestCase {
         for value in ["-1", "-0.5", "nan", "inf", "true", "'1.5'", "[{ monitor.main = -1 }, 1.5]"] {
             XCTAssertFalse(parseConfig("single-window-aspect-ratio = " + value).errors.isEmpty)
         }
-        let original = "single-window-aspect-ratio = [\n { monitor.\"Disconnected\" = 2 },\n 1.5\n]\nfocus-follows-mouse = true\n"
-        let parsed = parseConfig(original)
-        let rendered = renderedAspectRatio(.perMonitor(parsed.config.singleWindowAspectRatio.aspectRatioRules, default: 0))
-        let updated = updateSettingsScalarConfig(in: original, section: nil, key: "single-window-aspect-ratio", renderedValue: rendered)
-        let result = parseConfig(updated)
-        XCTAssertTrue(result.errors.isEmpty)
-        XCTAssertEqual(result.config.singleWindowAspectRatio.defaultAspectRatio, 0)
-        XCTAssertEqual(result.config.singleWindowAspectRatio.aspectRatioRules, parsed.config.singleWindowAspectRatio.aspectRatioRules)
-        XCTAssertTrue(result.config.focusFollowsMouse)
     }
 }

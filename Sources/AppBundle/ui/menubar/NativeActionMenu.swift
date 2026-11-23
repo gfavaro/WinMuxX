@@ -29,8 +29,8 @@ func normalizeActionMenuSeparators(_ menu: NSMenu) {
 }
 
 @MainActor
-public func installNativeMenuBar(checkForUpdates: (() -> Void)? = nil) {
-    NativeActionMenu.shared.install(checkForUpdates: checkForUpdates)
+public func installNativeMenuBar() {
+    NativeActionMenu.shared.install()
 }
 
 @MainActor
@@ -39,16 +39,14 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem?
     private var accessibilityObservation: NSObjectProtocol?
     private var appearanceObservation: NSKeyValueObservation?
-    private var checkForUpdates: (() -> Void)?
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
     private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
     private var capturedRuleTarget: QuickFloatingRuleTarget?
 
-    func install(checkForUpdates: (() -> Void)?) {
+    func install() {
         guard statusItem == nil else { return }
-        self.checkForUpdates = checkForUpdates
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         let menu = NSMenu()
         menu.delegate = self
@@ -515,7 +513,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         alert.informativeText = details
         alert.runModal()
     }
-    @objc private func copyVersion() { "\(winMuxAppName) v\(winMuxAppVersion) \(gitHash)".copyToClipboard() }
     @objc private func openConfig() {
         NSWorkspace.shared.open(findCustomConfigUrl().urlOrNil ?? ((try? ensureBootstrapConfigExistsIfNeeded()) ?? preferredEditableConfigUrl()))
     }
@@ -545,9 +542,6 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             MessageModel.shared.message = Message(description: "Window Recovery", body: report)
         }
     }
-    @objc private func checkUpdates() { checkForUpdates?() }
-    @objc private func openRepository() { NSWorkspace.shared.open(URL(string: forkRepositoryURL)!) }
-    @objc private func openIssue() { NSWorkspace.shared.open(URL(string: forkRepositoryURL + "/issues/new")!) }
     @objc private func quit() { terminateApp() }
 
 }
