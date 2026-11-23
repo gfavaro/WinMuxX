@@ -9,7 +9,6 @@ Choose a share of the available width for a lone tiled window and WinMuxX's
 
 ```toml
 fullscreen-width = 0.70
-single-window-alignment = 'center' # center | left | right
 ```
 
 `fullscreen-width` accepts `0.1` to `1.0`; the default is `1.0`. Width is measured
@@ -20,8 +19,9 @@ macOS native fullscreen is unaffected.
 A second tiled window restores the usual full-width layout. Floating windows,
 minimized windows, hidden apps and popups do not count toward the lone tile.
 Settings → Windows exposes the global width percentage and shows
-the current workspace's resolved values. Display and workspace overrides use
-tables; omitted keys inherit independently:
+the current workspace's resolved values; Settings → Displays sets a width for
+each connected display. Display and workspace overrides use tables; omitted keys
+inherit independently:
 
 ```toml
 [display.'Built-in']
@@ -49,9 +49,9 @@ changes are ignored.
 The old `single-window-aspect-ratio` setting remains readable for compatibility
 when no explicit width applies. New configs use `fullscreen-width`; an explicit
 width, including `1.0`, takes priority over the old setting. To migrate, replace the root
-`single-window-aspect-ratio` line with `fullscreen-width` and
-`single-window-alignment`; 70% is a new preference, not an exact conversion of a
-3:2 ratio.
+`single-window-aspect-ratio` line with `fullscreen-width`; 70% is a new
+preference, not an exact conversion of a 3:2 ratio. The retired
+`single-window-alignment` is removed by the config migration.
 
 ## Layout for the next window
 

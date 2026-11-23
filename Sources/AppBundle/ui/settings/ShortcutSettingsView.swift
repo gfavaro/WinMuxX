@@ -124,7 +124,7 @@ enum SettingsSidebarItem: String, Hashable, Identifiable, CaseIterable {
     var searchAliases: [String] {
         switch self {
             case .shortcuts: ["keyboard hotkeys bindings presets modifier keys"]
-            case .displays: ["monitor display assignment workspace resolution connected screen"]
+            case .displays: ["monitor display assignment workspace resolution connected screen lone window width fullscreen per display"]
             case .windows: ["mouse trackpad gestures drag swipe hover"]
             default: []
         }
