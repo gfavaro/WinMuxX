@@ -416,6 +416,20 @@ func discardPendingRestartWindows(forWorkspace name: String) {
     compactPendingRestartSnapshots()
 }
 
+/// Saved windows still waiting for a match, as "workspace: app × count". No titles.
+@MainActor
+func pendingRestartSummaryLines() -> [String] {
+    var counts: [String: Int] = [:]
+    for entry in recovery.restartSnapshots {
+        for workspace in entry.snapshot.world.workspaces {
+            for (id, window) in collectFrozenWindows(workspace) where entry.snapshot.remainingWindowIds.contains(id) {
+                counts["\(workspace.name): \(window.restartIdentity?.bundleId ?? "unknown app")", default: 0] += 1
+            }
+        }
+    }
+    return counts.sorted { $0.key < $1.key }.map { "    \($0.key) × \($0.value)" }
+}
+
 @MainActor
 var pendingRestartWindowCount: Int {
     recovery.restartSnapshots.reduce(0) { $0 + $1.snapshot.remainingWindowIds.count }

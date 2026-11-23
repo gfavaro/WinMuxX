@@ -290,6 +290,19 @@ final class RestartWorkspaceTest: XCTestCase {
         XCTAssertFalse(workspaceIsAwaitingRestoredWindows("4"))
     }
 
+    func testPendingRestartSummaryNamesWorkspaceAndAppWithoutTitles() {
+        let workspace = Workspace.get(byName: "4")
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.restartIdentity = identity("Secret title")
+        let envelope = makeRestartEnvelope()
+        window.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(envelope)
+        let lines = pendingRestartSummaryLines()
+        XCTAssertEqual(lines.count, 1)
+        XCTAssertTrue(lines[0].contains("4:") && lines[0].hasSuffix("× 1"), lines[0])
+        XCTAssertFalse(lines.joined().contains("Secret"))
+    }
+
     func testSavingWaitsWhileSavedWindowsAreStillBeingRestored() {
         let workspace = Workspace.get(byName: "4")
         let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
