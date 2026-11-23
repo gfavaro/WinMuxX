@@ -618,7 +618,16 @@ func resetPersistedFrozenWorldForTests() {
 @MainActor
 @discardableResult
 private func logRestartMiss(_ window: Window, _ reason: String) -> Bool {
-    if recovery.lateRestartTreeDeadline != nil {
+    let bundleId = window.restartIdentity?.bundleId
+    let hasSavedCounterpart = recovery.restartSnapshots.contains { entry in
+        let remaining = entry.snapshot.remainingWindowIds
+        return entry.snapshot.world.workspaces.contains { workspace in
+            collectFrozenWindows(workspace).values.contains { saved in
+                remaining.contains(saved.id) && (bundleId == nil || saved.restartIdentity?.bundleId == bundleId)
+            }
+        }
+    }
+    if recovery.lateRestartTreeDeadline != nil, hasSavedCounterpart {
         NSLog("WinMuxX restore: window %u not restored: %@", window.windowId, reason)
     }
     return false
