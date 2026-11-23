@@ -80,6 +80,7 @@ check:
 	source ./script/setup.sh && \
 	mkdir -p .build && \
 	python3 script/check_contributor_guidance.py && \
+	python3 script/check_file_size.py && \
 	python3 -m unittest script/test_contributor_guidance.py && \
 	./.deps/config-schema/bin/python script/test_config_schema.py && \
 	swift test --force-resolved-versions --no-parallel 2>&1 | tee .build/test-output.log && \

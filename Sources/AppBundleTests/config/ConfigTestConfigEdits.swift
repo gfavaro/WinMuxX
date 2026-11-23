@@ -3,112 +3,63 @@ import AppKit
 import Common
 import XCTest
 
+/// The sidebar writes labels and colors through the same TOML editor as Settings; these check that
+/// what it writes parses back to the same entries and leaves everything else alone.
 extension ConfigTest {
-    func testUpdateWorkspaceSidebarLabelConfigAddsSectionWhenMissing() {
-        let updated = updateWorkspaceSidebarLabelConfig(
-            in: """
-            [mode.main.binding]
-                alt-h = 'focus left'
-            """,
-            workspaceName: "1",
-            label: "Code",
-        )
-
-        XCTAssertTrue(updated.contains("[workspace-sidebar.workspace-labels]"))
-        XCTAssertTrue(updated.contains("\"1\" = \"Code\""))
+    private func edited(_ text: String, _ edit: SettingsConfigEdit) -> (text: String, sidebar: WorkspaceSidebarConfig) {
+        let updated = applyingSettingsConfigEdits([edit], to: text)
+        let result = parseConfig("config-version = 2\n" + updated)
+        XCTAssertTrue(result.errors.isEmpty, "\(result.errors)\n\(updated)")
+        return (updated, result.config.workspaceSidebar)
     }
 
-    func testUpdateWorkspaceSidebarLabelConfigReplacesExistingLabel() {
-        let updated = updateWorkspaceSidebarLabelConfig(
-            in: """
-            [workspace-sidebar.workspace-labels]
-            "1" = "Old"
-            "2" = "Web"
-            """,
-            workspaceName: "1",
-            label: "Code",
-        )
-
-        XCTAssertTrue(updated.contains("\"1\" = \"Code\""))
-        XCTAssertFalse(updated.contains("\"1\" = \"Old\""))
-        XCTAssertTrue(updated.contains("\"2\" = \"Web\""))
+    func testSidebarLabelIsAddedWhenNoTableExists() {
+        let (text, sidebar) = edited("[mode.main.binding]\n    alt-h = 'focus left'", workspaceSidebarLabelEdit(workspaceName: "1", label: "Code"))
+        XCTAssertEqual(sidebar.workspaceLabels["1"], "Code")
+        XCTAssertTrue(text.contains("alt-h = 'focus left'"))
     }
 
-    func testUpdateWorkspaceSidebarLabelConfigAddsNewLabelWithoutExtraBlankLine() {
-        let updated = updateWorkspaceSidebarLabelConfig(
-            in: """
-            [workspace-sidebar.workspace-labels]
-            "1" = "Code"
-            """,
-            workspaceName: "2",
-            label: "Web",
+    func testSidebarLabelReplacesTheExistingOneAndKeepsTheOthers() {
+        let (_, sidebar) = edited(
+            "[workspace-sidebar.workspace-labels]\n\"1\" = \"Old\"\n\"2\" = \"Web\"",
+            workspaceSidebarLabelEdit(workspaceName: "1", label: "Code"),
         )
-
-        XCTAssertEqual(
-            updated,
-            """
-            [workspace-sidebar.workspace-labels]
-            "1" = "Code"
-            "2" = "Web"
-            """,
-        )
+        XCTAssertEqual(sidebar.workspaceLabels, ["1": "Code", "2": "Web"])
     }
 
-    func testUpdateWorkspaceSidebarLabelConfigRemovesLastLabelSection() {
-        let updated = updateWorkspaceSidebarLabelConfig(
-            in: """
-            [workspace-sidebar.workspace-labels]
-            "1" = "Code"
-
-            [mode.main.binding]
-                alt-h = 'focus left'
-            """,
-            workspaceName: "1",
-            label: nil,
+    func testSidebarLabelIsAppendedToTheExistingTable() {
+        let (text, sidebar) = edited(
+            "[workspace-sidebar.workspace-labels]\n\"1\" = \"Code\"",
+            workspaceSidebarLabelEdit(workspaceName: "2", label: "Web"),
         )
-
-        XCTAssertFalse(updated.contains("[workspace-sidebar.workspace-labels]"))
-        XCTAssertTrue(updated.contains("[mode.main.binding]"))
+        XCTAssertEqual(sidebar.workspaceLabels, ["1": "Code", "2": "Web"])
+        XCTAssertFalse(text.contains("\n\n"), "No blank line is added inside the table")
     }
 
-    func testUpdateWorkspaceSidebarProjectColorConfigAddsAndReplacesColor() {
-        let added = updateWorkspaceSidebarProjectColorConfig(
-            in: """
-            [workspace-sidebar]
-                enabled = true
-            """,
-            projectId: "project-1",
-            colorHex: "#60A5FA",
+    func testRemovingTheLastSidebarLabelLeavesOtherSettingsAlone() {
+        let (text, sidebar) = edited(
+            "[workspace-sidebar.workspace-labels]\n\"1\" = \"Code\"\n\n[mode.main.binding]\n    alt-h = 'focus left'",
+            workspaceSidebarLabelEdit(workspaceName: "1", label: nil),
         )
-
-        XCTAssertTrue(added.contains("[workspace-sidebar.project-colors]"))
-        XCTAssertTrue(added.contains("\"project-1\" = \"#60A5FA\""))
-
-        let replaced = updateWorkspaceSidebarProjectColorConfig(
-            in: added,
-            projectId: "project-1",
-            colorHex: "#F87171",
-        )
-
-        XCTAssertTrue(replaced.contains("\"project-1\" = \"#F87171\""))
-        XCTAssertFalse(replaced.contains("\"project-1\" = \"#60A5FA\""))
+        XCTAssertTrue(sidebar.workspaceLabels.isEmpty)
+        XCTAssertTrue(text.contains("[mode.main.binding]"))
+        XCTAssertTrue(text.contains("alt-h = 'focus left'"))
     }
 
-    func testUpdateWorkspaceSidebarProjectColorConfigRemovesLastColorSection() {
-        let updated = updateWorkspaceSidebarProjectColorConfig(
-            in: """
-            [workspace-sidebar.project-colors]
-            "project-1" = "#60A5FA"
-
-            [mode.main.binding]
-                alt-h = 'focus left'
-            """,
-            projectId: "project-1",
-            colorHex: nil,
-        )
-
-        XCTAssertFalse(updated.contains("[workspace-sidebar.project-colors]"))
-        XCTAssertTrue(updated.contains("[mode.main.binding]"))
+    func testSidebarKeysWithDotsStayOneKey() {
+        let (_, sidebar) = edited("", workspaceSidebarProjectLabelEdit(projectId: "my.project", label: "Mine"))
+        XCTAssertEqual(sidebar.projectLabels["my.project"], "Mine")
     }
 
+    func testSidebarProjectColorIsAddedReplacedAndRemoved() {
+        let (added, afterAdd) = edited("[workspace-sidebar]\n    enabled = true", workspaceSidebarProjectColorEdit(projectId: "project-1", colorHex: "#60A5FA"))
+        XCTAssertEqual(afterAdd.projectColors["project-1"], "#60A5FA")
+        XCTAssertTrue(afterAdd.enabled)
+
+        let (replaced, afterReplace) = edited(added, workspaceSidebarProjectColorEdit(projectId: "project-1", colorHex: "#F87171"))
+        XCTAssertEqual(afterReplace.projectColors["project-1"], "#F87171")
+
+        let (_, afterRemove) = edited(replaced, workspaceSidebarProjectColorEdit(projectId: "project-1", colorHex: nil))
+        XCTAssertTrue(afterRemove.projectColors.isEmpty)
+    }
 }
