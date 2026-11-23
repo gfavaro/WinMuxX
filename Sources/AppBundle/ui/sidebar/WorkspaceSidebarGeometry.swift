@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 /// Room kept for the menu bar above a standard-height sidebar, in points.
-let workspaceSidebarMenuBarReserveHeight: CGFloat = 28
+let workspaceSidebarMenuBarReserveHeight: CGFloat = 32
 
 /// All modes retain the menu-bar reveal area, including when macOS auto-hides it.
 func workspaceSidebarPanelFrame(
