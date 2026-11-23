@@ -157,10 +157,11 @@ final class WorkspaceSidebarGeometryTest: XCTestCase {
         }
     }
 
-    func testStandardModeKeepsTheFixedMenuBarReservationAndOtherModesUseSystemHeight() {
+    func testSidebarStartsBelowTheMeasuredMenuBarAndKeepsARevealAreaWhenItIsHidden() {
         var config = WorkspaceSidebarConfig()
         let screen = CGRect(x: 0, y: 0, width: 1200, height: 900)
-        XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 20, config: config, contentHeight: 0).maxY, 868)
+        XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 20, config: config, contentHeight: 0).maxY, 880)
+        XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 0, config: config, contentHeight: 0).maxY, 872, "An auto-hidden menu bar keeps its reveal area")
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
         config.heightMode = .full
         XCTAssertEqual(workspaceSidebarPanelFrame(screen: screen, menuBarHeight: 38, config: config, contentHeight: 0).maxY, 862)
