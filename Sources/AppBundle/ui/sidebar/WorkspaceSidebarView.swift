@@ -504,6 +504,7 @@ extension WorkspaceSidebarView {
             isSearchFiltering: !searchText.isEmpty,
             activeInUseOverrideWorkspaceName: $activeInUseOverrideWorkspaceName,
             actions: actions,
+            hoveredWorkspaceName: snapshot.hoveredWorkspaceName,
         )
     }
 

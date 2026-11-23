@@ -295,6 +295,28 @@ extension WorkspaceSidebarPanel {
     func updateHoverStateFromMousePosition() {
         guard isVisible else { return }
         updateMousePassthrough()
+        updateHoveredWorkspaceFromMousePosition()
         setHovering(isMouseInsideHoverRegion())
+    }
+
+    /// The tile under the pointer, from the pointer position like the rest of hover. SwiftUI's own
+    /// hover only starts once the panel accepts mouse events, which can be after a quick entry.
+    private func updateHoveredWorkspaceFromMousePosition() {
+        let pointer = mouseLocation
+        let name: String?
+        if isMouseInsideVisibleRegion() {
+            if case .workspace(let workspaceName)? = workspaceSidebarDropTarget(at: pointer)?.kind {
+                name = workspaceName
+            } else {
+                name = nil
+            }
+        } else if WorkspaceSidebarPanel.panel(containing: pointer) == nil {
+            name = nil
+        } else {
+            return // The pointer is on another display's sidebar, which sets the value.
+        }
+        if TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName != name {
+            TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = name
+        }
     }
 }

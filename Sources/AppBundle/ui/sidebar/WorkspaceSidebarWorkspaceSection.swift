@@ -30,7 +30,10 @@ struct WorkspaceSidebarWorkspaceSection: View {
     @Binding var activeInUseOverrideWorkspaceName: String?
     let actions: WorkspaceSidebarActions
 
-    @State var isHovered = false
+    /// The workspace under the pointer. The panel sets it from the pointer position, so it does not
+    /// depend on SwiftUI having been told the pointer entered the tile.
+    var hoveredWorkspaceName: String? = nil
+    var isHovered: Bool { hoveredWorkspaceName == workspace.name }
     @State var hoveredWindowId: UInt32? = nil
     @State var hoveredTabGroupId: UInt32? = nil
     @State var isDropTargeted = false
@@ -142,7 +145,6 @@ struct WorkspaceSidebarWorkspaceSection: View {
                     .zIndex(5)
             }
             .onHover { hover in
-                isHovered = hover
                 actions.hoverWorkspace(workspace.name, hover)
                 // Track the whole section, including its confirmation overlay, so
                 // moving from the workspace button to Override does not cancel it.
