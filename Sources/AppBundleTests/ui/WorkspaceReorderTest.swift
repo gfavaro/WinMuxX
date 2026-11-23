@@ -77,4 +77,36 @@ final class WorkspaceReorderTest: WorkspaceTestCase {
         XCTAssertEqual(shown(projectId, s), [s[1], s[0]].map(\.id))
         XCTAssertNotNil(parseCommand("move-workspace-order sideways").errorOrNil)
     }
+
+    // A new workspace takes the gap in restored numbers (1, new = 2, 3). Adopting the shown order
+    // must keep every number where it is.
+    func testAdoptingTheShownOrderKeepsANewWorkspaceInTheGapOfRestoredNumbers() {
+        let (projectId, s) = makeWorkspaces(3)
+        s[0].restoredDisplayIndex = 1
+        s[1].restoredDisplayIndex = 3
+        let before = automaticWorkspaceDisplayIndices(in: projectId)
+        XCTAssertEqual([s[0], s[2], s[1]].map { before[$0.id] }, [1, 2, 3])
+        adoptPresentedWorkspaceOrder(projectId)
+        XCTAssertEqual(automaticWorkspaceDisplayIndices(in: projectId), before)
+        XCTAssertEqual(shown(projectId, s), [s[0], s[2], s[1]].map(\.id))
+    }
+
+    // A move that changes nothing must leave the project's order and numbers alone.
+    func testAMoveThatChangesNothingKeepsRestoredNumbers() {
+        let (projectId, s) = makeWorkspaces(3, restored: true)
+        let before = automaticWorkspaceDisplayIndices(in: projectId)
+        // s[0] holds the last restored number, so moving it to the end changes nothing.
+        XCTAssertFalse(moveWorkspaceInOrder(s[0], before: nil))
+        XCTAssertEqual(automaticWorkspaceDisplayIndices(in: projectId), before)
+        XCTAssertTrue(s.allSatisfy { $0.restoredDisplayIndex != nil })
+    }
+
+    // Persistent workspaces keep their slots, so a step past one is a step over it.
+    func testMovingStepsOverConfiguredPersistentWorkspaces() {
+        config.persistentWorkspaces = ["reorder-0"]
+        let (projectId, s) = makeWorkspaces(3)
+        XCTAssertTrue(moveWorkspaceInOrder(s[2], by: -1))
+        XCTAssertEqual(shown(projectId, s).filter { $0 != s[0].id }, [s[2], s[1]].map(\.id))
+        XCTAssertFalse(moveWorkspaceInOrder(s[2], by: -1), "Nothing movable is above it")
+    }
 }

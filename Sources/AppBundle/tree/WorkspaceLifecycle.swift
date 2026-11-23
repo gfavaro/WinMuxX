@@ -157,7 +157,7 @@ func removeWorkspaceFromRegistry(_ workspace: Workspace, forgetLabel: Bool) {
 @MainActor
 func adoptPresentedWorkspaceOrder(_ projectId: WorkspaceProjectId) {
     runtime.workspaces.reorderProjectWorkspaces(projectId,
-        leading: workspacesInRestorationOrder(in: WorkspaceScope(projectId: projectId)).map(\.id))
+        leading: orderedWorkspaces(in: projectId).map(\.id))
     for survivor in projectWorkspaces(projectId: projectId)
     where survivor.usesAutomaticDisplayName && !survivor.isConfiguredPersistent {
         survivor.restoredDisplayIndex = nil
@@ -173,20 +173,24 @@ func moveWorkspaceInOrder(_ workspace: Workspace, before target: Workspace?) -> 
     guard target !== workspace, !workspace.isConfiguredPersistent,
           target.map({ $0.projectId == projectId && !$0.isArchived }) ?? true
     else { return false }
-    adoptPresentedWorkspaceOrder(projectId)
-    var order = orderedWorkspaces(in: projectId).map(\.id).filter { $0 != workspace.id }
+    let before = orderedWorkspaces(in: projectId).map(\.id)
+    var order = before.filter { $0 != workspace.id }
     let index = target.flatMap { order.firstIndex(of: $0.id) } ?? order.endIndex
     order.insert(workspace.id, at: index)
-    let before = orderedWorkspaces(in: projectId).map(\.id)
+    // A move that changes nothing must not renumber anything.
+    guard order != before else { return false }
+    adoptPresentedWorkspaceOrder(projectId)
     runtime.workspaces.reorderProjectWorkspaces(projectId, leading: order)
     return orderedWorkspaces(in: projectId).map(\.id) != before
 }
 
-/// Swaps `workspace` with its neighbour among the workspaces the sidebar shows; false at either end.
+/// Swaps `workspace` with its neighbour among the movable workspaces the sidebar shows; false at either end.
 @MainActor
 @discardableResult
 func moveWorkspaceInOrder(_ workspace: Workspace, by offset: Int) -> Bool {
+    // Configured persistent workspaces keep their slots, so they are not neighbours.
     let shown = userFacingWorkspaces(orderedWorkspaces(in: workspace.projectId), focusedWorkspace: focus.workspace)
+        .filter { !$0.isConfiguredPersistent }
     guard let index = shown.firstIndex(of: workspace), shown.indices.contains(index + offset) else { return false }
     let targetIndex = offset < 0 ? index + offset : index + offset + 1
     return moveWorkspaceInOrder(workspace, before: shown.indices.contains(targetIndex) ? shown[targetIndex] : nil)
