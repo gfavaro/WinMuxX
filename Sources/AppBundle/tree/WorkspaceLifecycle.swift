@@ -243,7 +243,7 @@ func workspaceShouldSurviveReconciliation(
 ) -> Bool {
     guard !workspace.isArchived else { return false }
     return workspace.isVisible || workspaceHasLifecycleWindows(workspace) || workspace.isConfiguredPersistent ||
-        (!isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
+        workspaceIsAwaitingRestoredWindows(workspace.name) ||
         projectWorkspaces(projectId: workspace.projectId).filter { !$0.isArchived }.count == 1 ||
         retainedEmptyWorkspaceIds[WorkspaceScope(projectId: workspace.projectId)] == workspace.id
 }

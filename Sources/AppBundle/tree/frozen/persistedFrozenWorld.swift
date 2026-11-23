@@ -379,6 +379,13 @@ func expireLateRestartTreeRestoration() {
     compactPendingRestartSnapshots()
 }
 
+/// A workspace waiting for a saved window must outlive the refreshes that run while the
+/// apps are still exposing their windows: startup, then the late-restore window after it.
+@MainActor
+func workspaceIsAwaitingRestoredWindows(_ name: String) -> Bool {
+    (!isWinMuxRuntimeReady || recovery.lateRestartTreeDeadline != nil) && workspaceHasPendingRestartWindows(name)
+}
+
 @MainActor
 func workspaceHasPendingRestartWindows(_ name: String) -> Bool {
     recovery.restartSnapshots.contains { entry in

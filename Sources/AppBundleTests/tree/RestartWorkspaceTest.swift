@@ -270,6 +270,26 @@ final class RestartWorkspaceTest: XCTestCase {
         try await assertDelayedDwindleRestoration(preserveEdit: false)
     }
 
+    func testAWorkspaceAwaitingASavedWindowSurvivesUntilTheLateRestoreWindowEnds() {
+        let previousReady = isWinMuxRuntimeReady
+        defer { isWinMuxRuntimeReady = previousReady }
+        let workspace = Workspace.get(byName: "4")
+        let window = TestWindow.new(id: 1, parent: workspace.rootTilingContainer)
+        window.restartIdentity = identity("First")
+        let envelope = makeRestartEnvelope()
+        window.unbindFromParent()
+        preparePersistedFrozenWorldForStartup(envelope)
+        XCTAssertTrue(workspaceHasPendingRestartWindows("4"))
+
+        isWinMuxRuntimeReady = false
+        XCTAssertTrue(workspaceIsAwaitingRestoredWindows("4"))
+        isWinMuxRuntimeReady = true
+        runtime.recovery.lateRestartTreeDeadline = .now.addingTimeInterval(30)
+        XCTAssertTrue(workspaceIsAwaitingRestoredWindows("4"), "Refreshes after startup must not prune it")
+        runtime.recovery.lateRestartTreeDeadline = nil
+        XCTAssertFalse(workspaceIsAwaitingRestoredWindows("4"))
+    }
+
     func testDelayedWindowDoesNotReplayTreeAfterUserLayoutEdit() async throws {
         try await assertDelayedDwindleRestoration(preserveEdit: true)
     }

@@ -36,7 +36,7 @@ func isUserFacingWorkspace(_ workspace: Workspace, focusedWorkspace: Workspace? 
             workspaceHasSidebarVisibleWindows(workspace) ||
                 workspace.isVisible ||
                 workspace.isConfiguredPersistent ||
-                (!isWinMuxRuntimeReady && workspaceHasPendingRestartWindows(workspace.name)) ||
+                workspaceIsAwaitingRestoredWindows(workspace.name) ||
                 !workspaceOwnedMinimizedWindows(workspace).isEmpty ||
                 workspaceIsRetainedEmptySlot(workspace)
         )

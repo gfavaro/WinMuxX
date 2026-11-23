@@ -85,6 +85,12 @@ final class WorkspaceRetentionTest: WorkspaceTestCase {
         preparePersistedFrozenWorldForStartup(PersistedFrozenWorldEnvelope(version: 2, world: world, pending: nil))
         isWinMuxRuntimeReady = true
         XCTAssertTrue(workspaceHasPendingRestartWindows(stale.name))
+        // While apps are still exposing their windows, the workspace waits for its saved one.
+        runtime.recovery.lateRestartTreeDeadline = .now.addingTimeInterval(30)
+        Workspace.reconcileWorkspaceState()
+        XCTAssertTrue(workspaceHasPendingRestartWindows(stale.name))
+        // Once that window has closed, it no longer keeps an extra empty workspace.
+        runtime.recovery.lateRestartTreeDeadline = nil
         Workspace.reconcileWorkspaceState()
         XCTAssertEqual(Workspace.all, [occupied])
         XCTAssertFalse(workspaceHasPendingRestartWindows(stale.name))
