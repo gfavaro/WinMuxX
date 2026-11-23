@@ -1,6 +1,7 @@
 import AppKit
 
-struct WorkspaceSidebarModelState {
+/// Everything the sidebars show that comes from the workspaces and displays, as one comparable value.
+struct WorkspaceSidebarModelState: Equatable {
     let workspaces: [WorkspaceSidebarWorkspaceViewModel]
     let projects: [WorkspaceSidebarProjectViewModel]
     let activeProjectId: WorkspaceProjectId
@@ -8,5 +9,4 @@ struct WorkspaceSidebarModelState {
     let focusedMonitorScopeId: String
     let showsMonitorSelector: Bool
     let topPadding: CGFloat
-    let hoveredWorkspaceName: String?
 }

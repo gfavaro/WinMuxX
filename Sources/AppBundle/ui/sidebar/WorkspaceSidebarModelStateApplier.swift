@@ -10,39 +10,38 @@ func clearWorkspaceSidebarModelState() {
 }
 
 @MainActor
-func applyWorkspaceSidebarModelState(_ state: WorkspaceSidebarModelState, previousTopPadding: CGFloat) {
-    let didMonitorScopeChange =
-        TrayMenuModel.shared.workspaceSidebarMonitorScopes != state.monitorScopes ||
-        TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId != state.focusedMonitorScopeId ||
-        TrayMenuModel.shared.workspaceSidebarShowsMonitorSelector != state.showsMonitorSelector
-    let didProjectChange =
-        TrayMenuModel.shared.workspaceSidebarProjects != state.projects ||
-        TrayMenuModel.shared.workspaceSidebarActiveProjectId != state.activeProjectId
-
-    updateWorkspaceSidebarTrayModel(with: state)
+func applyWorkspaceSidebarModelState(_ state: WorkspaceSidebarModelState) {
+    let changed = TrayMenuModel.shared.workspaceSidebarModelState != state
+    TrayMenuModel.shared.workspaceSidebarModelState = state
     WorkspaceSidebarPanel.syncVisiblePanelModelsFromShared()
-    let didWorkspaceChange = TrayMenuModel.shared.workspaceSidebarWorkspaces != state.workspaces
-    if didWorkspaceChange {
-        TrayMenuModel.shared.workspaceSidebarWorkspaces = state.workspaces
-        WorkspaceSidebarPanel.syncVisiblePanelModelsFromShared()
-    }
-    if didWorkspaceChange ||
-        state.topPadding != previousTopPadding ||
-        didMonitorScopeChange ||
-        didProjectChange ||
-        WorkspaceSidebarPanel.visiblePanels.isEmpty
-    {
+    if changed || WorkspaceSidebarPanel.visiblePanels.isEmpty {
         WorkspaceSidebarPanel.refreshAll()
     }
 }
 
-@MainActor
-private func updateWorkspaceSidebarTrayModel(with state: WorkspaceSidebarModelState) {
-    TrayMenuModel.shared.workspaceSidebarTopPadding = state.topPadding
-    TrayMenuModel.shared.workspaceSidebarHoveredWorkspaceName = state.hoveredWorkspaceName
-    TrayMenuModel.shared.workspaceSidebarProjects = state.projects
-    TrayMenuModel.shared.workspaceSidebarActiveProjectId = state.activeProjectId
-    TrayMenuModel.shared.workspaceSidebarMonitorScopes = state.monitorScopes
-    TrayMenuModel.shared.workspaceSidebarFocusedMonitorScopeId = state.focusedMonitorScopeId
-    TrayMenuModel.shared.workspaceSidebarShowsMonitorSelector = state.showsMonitorSelector
+extension TrayMenuModel {
+    /// The sidebar's shared state as one value. Each field is written only when it differs, so
+    /// views observing one field are not redrawn by a change to another.
+    var workspaceSidebarModelState: WorkspaceSidebarModelState {
+        get {
+            WorkspaceSidebarModelState(
+                workspaces: workspaceSidebarWorkspaces,
+                projects: workspaceSidebarProjects,
+                activeProjectId: workspaceSidebarActiveProjectId,
+                monitorScopes: workspaceSidebarMonitorScopes,
+                focusedMonitorScopeId: workspaceSidebarFocusedMonitorScopeId,
+                showsMonitorSelector: workspaceSidebarShowsMonitorSelector,
+                topPadding: workspaceSidebarTopPadding,
+            )
+        }
+        set {
+            if workspaceSidebarWorkspaces != newValue.workspaces { workspaceSidebarWorkspaces = newValue.workspaces }
+            if workspaceSidebarProjects != newValue.projects { workspaceSidebarProjects = newValue.projects }
+            if workspaceSidebarActiveProjectId != newValue.activeProjectId { workspaceSidebarActiveProjectId = newValue.activeProjectId }
+            if workspaceSidebarMonitorScopes != newValue.monitorScopes { workspaceSidebarMonitorScopes = newValue.monitorScopes }
+            if workspaceSidebarFocusedMonitorScopeId != newValue.focusedMonitorScopeId { workspaceSidebarFocusedMonitorScopeId = newValue.focusedMonitorScopeId }
+            if workspaceSidebarShowsMonitorSelector != newValue.showsMonitorSelector { workspaceSidebarShowsMonitorSelector = newValue.showsMonitorSelector }
+            if workspaceSidebarTopPadding != newValue.topPadding { workspaceSidebarTopPadding = newValue.topPadding }
+        }
+    }
 }

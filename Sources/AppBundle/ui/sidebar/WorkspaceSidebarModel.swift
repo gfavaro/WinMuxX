@@ -7,8 +7,7 @@ func updateWorkspaceSidebarModel() async {
         return
     }
 
-    let previousTopPadding = TrayMenuModel.shared.workspaceSidebarTopPadding
     pruneCachedWindowTitles()
     let state = await buildWorkspaceSidebarModelState()
-    applyWorkspaceSidebarModelState(state, previousTopPadding: previousTopPadding)
+    applyWorkspaceSidebarModelState(state)
 }
