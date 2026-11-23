@@ -31,8 +31,10 @@ struct SettingsDisplayWidthRow: View {
     }
 
     private func load() {
-        let width = sortedMonitors.first { $0.displayUUID == row.uuid }
-            .flatMap { matchingWindowSettings(config.displayWindowSettings, on: $0)?.fullscreenWidth }
+        // The rule this control writes. A hand-written selector for the same display is overridden by it.
+        let width = selector.flatMap { selector in
+            config.displayWindowSettings.first { $0.selector.selector == selector }?.settings.fullscreenWidth
+        }
         hasOwnWidth = width != nil
         percent = Int(((width ?? config.fullscreenWidth ?? 1.0) * 100).rounded())
     }

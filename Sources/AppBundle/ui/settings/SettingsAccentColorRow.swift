@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsAccentColorRow: View {
     var model: ShortcutSettingsModel
     @SettingsDraft("accent-color", load: { config.accentColor ?? "" }) private var hex: String
+    @State private var pendingSave: Task<Void, Never>?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -20,7 +21,13 @@ struct SettingsAccentColorRow: View {
                     set: { color in
                         hex = "#" + NSColor(color).hexRGB
                         ShortcutSettingsModel.shared.activeSettingTitle = "Accent color"
-                        save()
+                        // The color panel reports every step of a drag; write once it settles.
+                        pendingSave?.cancel()
+                        pendingSave = Task {
+                            try? await Task.sleep(for: .milliseconds(400))
+                            guard !Task.isCancelled else { return }
+                            save()
+                        }
                     }), supportsOpacity: false)
             }
         }
