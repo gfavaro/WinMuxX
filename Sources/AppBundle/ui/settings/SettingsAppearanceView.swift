@@ -53,6 +53,9 @@ struct ShortcutAppearanceSettingsView: View {
                 }
 
             }
+            SettingsSection("Accent") {
+                SettingsAccentColorRow(model: model)
+            }
             SettingsSection("Menu bar") {
                 SettingsPicker(.menuBarIndicator, selection: $menuBarIndicator,
                                help: "Workspace follows the focused display: label initial when named, workspace number otherwise.") {

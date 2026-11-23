@@ -61,6 +61,30 @@ enum SettingsControl: String, CaseIterable, Identifiable {
     case followAppActivation = "follow-app-activation.enabled"
     case tabEnabled = "window-tabs.enabled"
     case shakeToToggleTiling = "enable-shake-to-toggle-tiling"
+    case sidebarMenuBarBackground = "workspace-sidebar.menu-bar-background"
+    case sidebarFocusFilter = "workspace-sidebar.enable-focus"
+    case sidebarWidth = "workspace-sidebar.width"
+    case sidebarCollapsedWidth = "workspace-sidebar.collapsed-width"
+    case sidebarHeightMode = "workspace-sidebar.height-mode"
+    case followAppActivationExcluded = "follow-app-activation.exclude-apps"
+    case tabHeight = "window-tabs.height"
+    case doubleSidedWindows = "window-tabs.double-sided-windows"
+    case scrollingColumnWidth = "scrolling.column-width"
+    case scrollingWidthPresets = "scrolling.width-presets"
+    case scrollingEdgePreview = "scrolling.edge-preview"
+    case scrollingCenter = "scrolling.center-focused-column"
+    case scrollingMinimap = "scrolling.minimap-enabled"
+    case masterSize = "master.size"
+    case masterSide = "master.side"
+    case menuBarIconAppearance = "menu-bar.icon-appearance"
+    case inactiveBorderColor = "borders.inactive-color"
+    case accentColor = "accent-color"
+    case gapInnerHorizontal = "gaps.inner.horizontal"
+    case gapInnerVertical = "gaps.inner.vertical"
+    case gapOuterLeft = "gaps.outer.left"
+    case gapOuterRight = "gaps.outer.right"
+    case gapOuterTop = "gaps.outer.top"
+    case gapOuterBottom = "gaps.outer.bottom"
 
     var id: String { rawValue }
 
@@ -95,6 +119,30 @@ enum SettingsControl: String, CaseIterable, Identifiable {
             case .followAppActivation: "Follow app activation"
             case .tabEnabled: "Show tab strips"
             case .shakeToToggleTiling: "Shake to toggle tiling"
+            case .sidebarMenuBarBackground: "Show background"
+            case .sidebarFocusFilter: "Show focused-display filter"
+            case .sidebarWidth: "Expanded sidebar size"
+            case .sidebarCollapsedWidth: "Collapsed sidebar size"
+            case .sidebarHeightMode: "Sidebar height"
+            case .followAppActivationExcluded: "Apps not followed"
+            case .tabHeight: "Tab strip height"
+            case .doubleSidedWindows: "Double-sided windows"
+            case .scrollingColumnWidth: "New column width"
+            case .scrollingWidthPresets: "Width presets"
+            case .scrollingEdgePreview: "Edge preview"
+            case .scrollingCenter: "Scroll to focus"
+            case .scrollingMinimap: "Show the strip map"
+            case .masterSize: "Main window size"
+            case .masterSide: "Main window side"
+            case .menuBarIconAppearance: "Icon appearance"
+            case .inactiveBorderColor: "Other window color"
+            case .accentColor: "Accent color"
+            case .gapInnerHorizontal: "Inner horizontal gap"
+            case .gapInnerVertical: "Inner vertical gap"
+            case .gapOuterLeft: "Outer left gap"
+            case .gapOuterRight: "Outer right gap"
+            case .gapOuterTop: "Outer top gap"
+            case .gapOuterBottom: "Outer bottom gap"
         }
     }
 
@@ -104,6 +152,9 @@ enum SettingsControl: String, CaseIterable, Identifiable {
             case .appearance, .chromeStyle, .menuBarIndicator, .glideEnabled, .glideDuration, .bordersEnabled, .borderOrder, .dimInactive: .appearance
             case .sidebarEnabled, .sidebarDisplayMode, .sidebarPosition, .showClock, .showSeconds, .showDate, .showWeekday: .sidebar
             case .automaticallyTileNewWindows, .autoAddNewWindowsToTabGroup, .automaticallyUnhideApps, .defaultLayout, .defaultOrientation, .fullscreenWidth, .workspaceSwipes, .focusFollowsMouse, .followAppActivation, .tabEnabled, .shakeToToggleTiling: .windows
+            case .sidebarMenuBarBackground, .sidebarFocusFilter, .sidebarWidth, .sidebarCollapsedWidth, .sidebarHeightMode: .sidebar
+            case .followAppActivationExcluded, .tabHeight, .doubleSidedWindows, .scrollingColumnWidth, .scrollingWidthPresets, .scrollingEdgePreview, .scrollingCenter, .scrollingMinimap, .masterSize, .masterSide: .windows
+            case .menuBarIconAppearance, .inactiveBorderColor, .accentColor, .gapInnerHorizontal, .gapInnerVertical, .gapOuterLeft, .gapOuterRight, .gapOuterTop, .gapOuterBottom: .appearance
         }
     }
 }
