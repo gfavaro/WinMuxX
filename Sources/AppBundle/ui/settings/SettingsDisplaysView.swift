@@ -117,6 +117,7 @@ struct SettingsDisplaysView: View {
                                 }
                             }
                         }
+                        SettingsDisplayWidthRow(row: row, model: model)
                     }.padding(.vertical, 6)
                 }
             }

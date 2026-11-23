@@ -4,6 +4,9 @@
 
 - Reorder workspaces by dragging a workspace's header in the sidebar, or with `move-workspace-order up|down`; numbers follow the new order.
 - Keep workspace numbers when an empty workspace is removed after a restart, instead of swapping workspaces.
+- Look for windows again when the screen unlocks, so a start while the screen was locked no longer leaves windows unmanaged.
+- Leave a little more room between the sidebar and the menu bar on displays without a notch.
+- Set a lone-window width per display in Settings → Displays.
 
 ## 0.7.0
 

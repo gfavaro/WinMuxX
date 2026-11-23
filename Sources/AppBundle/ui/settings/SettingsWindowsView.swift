@@ -66,10 +66,10 @@ struct ShortcutBehaviorSettingsView: View {
                 SettingsStepper(.fullscreenWidth, value: Binding(
                     get: { Int((fullscreenWidth * 100).rounded()) },
                     set: { fullscreenWidth = Double($0) / 100 }), range: 10...100,
-                    help: "Share of the available width for a lone tiled window or WinMuxX fullscreen. Display and workspace overrides take priority.", unit: "%") {
-                    persistConfig(section: nil, key: "fullscreen-width", value: String(fullscreenWidth))
+                    help: "Share of the available width for a lone tiled window or WinMuxX fullscreen. A display can use its own width on the Displays page, and that takes priority.", unit: "%") {
+                    persistConfig(section: nil, key: "fullscreen-width", value: String(format: "%.2f", fullscreenWidth))
                 }
-                Text("Applies after sidebar and outer gaps on any display. Fullscreen stays centered; alignment below applies to lone tiled windows.")
+                Text("Applies after sidebar and outer gaps. Lone windows and fullscreen stay centered.")
                     .font(.callout).foregroundStyle(.secondary)
                 if let width = focus.workspace.windowWidthSettings.fullscreenWidth {
                     Text("Current workspace: \(Int((width * 100).rounded()))% · \(focus.workspace.workspaceMonitor.name)")

@@ -45,14 +45,15 @@ display. No UUID-to-hardware fallback or reconnect movement is introduced.
 
 ## Width and lone-window placement
 
-Settings → Windows edits the global `fullscreen-width` percentage and
-`single-window-alignment` (center, left or right), and displays the current
-workspace's resolved width/alignment and monitor. Width applies to lone tiles and
-WinMuxX fullscreen; fullscreen stays centered. The available width excludes
-sidebar space and outer gaps. These values also support `[display.<selector>]`,
-`[workspace.<internal-name>]` and nested workspace/display tables. Omitted keys
-inherit through workspace/display → workspace → display → global. Changing the
-global controls preserves override tables.
+Settings → Windows edits the global `fullscreen-width` percentage and shows the
+current workspace's resolved width and monitor. Settings → Displays can give each
+connected display its own width, written as `[display."uuid:<UUID>"]`
+`fullscreen-width`. Width applies to lone tiles and WinMuxX fullscreen, which stay
+centered. The available width excludes sidebar space and outer gaps. Hand-written
+`[display.<selector>]`, `[workspace.<internal-name>]` and nested workspace/display
+tables also work. Omitted keys inherit through workspace/display → workspace →
+display → global. Changing the global control preserves override tables.
+`single-window-alignment` is retired and removed by the config migration.
 
 ## Window rules
 
