@@ -5,8 +5,12 @@
 - Reorder workspaces by dragging a workspace's header in the sidebar, or with `move-workspace-order up|down`; numbers follow the new order.
 - Keep workspace numbers when an empty workspace is removed after a restart, instead of swapping workspaces.
 - Look for windows again when the screen unlocks, so a start while the screen was locked no longer leaves windows unmanaged.
-- Leave a little more room between the sidebar and the menu bar on displays without a notch.
+- Start the sidebar right below the menu bar on every display, using its measured height, so no gap shows on displays without a notch.
 - Set a lone-window width per display in Settings → Displays.
+- Set the accent color in Settings → Appearance.
+- Find far more controls with Settings search; a test now fails when a setting is added without a searchable control.
+- Show collapsed sidebar tile hover from the pointer position, on the display under the pointer only, so it no longer lags or sticks.
+- Log why a saved window was not restored after a restart, to help diagnose layouts that do not come back.
 
 ## 0.7.0
 
