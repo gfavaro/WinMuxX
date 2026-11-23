@@ -371,6 +371,8 @@ func preparePersistedFrozenWorldForStartup(_ envelope: PersistedFrozenWorldEnvel
 /// Shared expiry transition; tests can exercise it without waiting on a wall clock.
 @MainActor
 func expireLateRestartTreeRestoration() {
+    let unmatched = recovery.restartSnapshots.flatMap { $0.snapshot.remainingWindowIds }
+    if !unmatched.isEmpty { NSLog("WinMuxX restore: gave up on saved windows %@", unmatched.sorted().map(String.init).joined(separator: ",")) }
     recovery.lateRestartTreeDeadline = nil
     for index in recovery.restartSnapshots.indices { recovery.restartSnapshots[index].matchedWindows.removeAll() }
     recovery.lateRestartTreeExpiry = nil
@@ -511,7 +513,8 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
         recovery.restartRestorationsInFlight -= 1
         compactPendingRestartSnapshots()
     }
-    guard let identity = window.restartIdentity, allowsSavedPlacement(identity) else { return false }
+    guard let identity = window.restartIdentity else { return logRestartMiss(window, "no identity") }
+    guard allowsSavedPlacement(identity) else { return logRestartMiss(window, "placement not allowed") }
     let generation = window.bindingGeneration
     let candidates = recovery.restartSnapshots.indices.flatMap { index in
         recovery.restartSnapshots[index].snapshot.world.workspaces.flatMap { workspace in
@@ -535,7 +538,9 @@ func restorePersistedFrozenWorldIfNeeded(newlyDetectedWindow window: Window) asy
     }
     guard let candidateIndex = matchRestartWindowIndex(id: window.windowId, identity: identity,
         saved: saved, live: live), Window.get(byId: window.windowId) === window,
-        window.bindingGeneration == generation, allowsSavedPlacement(identity) else { return false }
+        window.bindingGeneration == generation, allowsSavedPlacement(identity) else {
+        return logRestartMiss(window, "no match among \(saved.count) saved, \(live.count) live")
+    }
     let candidate = candidates[candidateIndex]
     let index = candidate.snapshotIndex
     let frozen = candidate.window
@@ -606,4 +611,15 @@ func finalizePersistedFrozenWorldAfterRefresh(aliveWindowIds: Set<UInt32>) async
 @MainActor
 func resetPersistedFrozenWorldForTests() {
     runtime.recovery.reset()
+}
+
+/// Startup restoration has no other trace once its 30 seconds pass, so a window left in the wrong
+/// workspace would otherwise be unexplained.
+@MainActor
+@discardableResult
+private func logRestartMiss(_ window: Window, _ reason: String) -> Bool {
+    if recovery.lateRestartTreeDeadline != nil {
+        NSLog("WinMuxX restore: window %u not restored: %@", window.windowId, reason)
+    }
+    return false
 }
