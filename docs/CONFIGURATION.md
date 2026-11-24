@@ -90,8 +90,8 @@ symbols stay fixed as windows, nested layouts, or master orientation change.
 Color uses the macOS system accent; monochrome is a template icon that follows
 the menu bar. An active keyboard mode tints either icon. The workspace text
 indicator remains the workspace label or number. `all-displays` lists the workspace each display
-shows, left to right as the displays are arranged, with the focused display's in bold (for
-example `3 · 5`); with one display it matches `workspace`.
+shows, the main display first and the others left to right as they are arranged, with the focused
+display's in bold (for example `3 · 5`); with one display it matches `workspace`.
 
 ## Migration and backups
 

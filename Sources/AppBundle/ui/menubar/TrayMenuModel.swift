@@ -50,7 +50,8 @@ public final class TrayMenuModel {
     let focus = focus
     let workspace = focus.workspace
     TrayMenuModel.shared.menuBarWorkspaceIndicator = menuBarIndicatorText(for: workspace, focusedWorkspace: workspace)
-    TrayMenuModel.shared.menuBarDisplayIndicators = sortedMonitors.map {
+    let mainPoint = mainMonitor.rect.topLeftCorner
+    TrayMenuModel.shared.menuBarDisplayIndicators = mainDisplayFirst(sortedMonitors) { $0.rect.topLeftCorner == mainPoint }.map {
         MenuBarDisplayIndicator(text: menuBarIndicatorText(for: $0.activeWorkspace, focusedWorkspace: workspace),
                                 isFocused: $0.activeWorkspace == workspace)
     }

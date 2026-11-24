@@ -101,7 +101,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             statusItem?.button?.image = nil
             let title = NSMutableAttributedString()
             if state.indicator == .allDisplays, state.displays.count > 1 {
-                // Left to right as the displays are arranged; the focused one stands out.
+                // The main display first, then the others as arranged; the focused one stands out.
                 for (index, display) in state.displays.enumerated() {
                     if index > 0 { title.append(NSAttributedString(string: " · ", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
                     title.append(NSAttributedString(string: display.text, attributes: [

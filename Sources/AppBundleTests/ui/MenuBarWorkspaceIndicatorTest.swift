@@ -21,4 +21,10 @@ final class MenuBarWorkspaceIndicatorTest: XCTestCase {
         XCTAssertEqual(parsed.config.menuBar.indicator, .allDisplays)
         XCTAssertFalse(parseConfig("[menu-bar]\nindicator = 'everything'").errors.isEmpty)
     }
+
+    func testTheMainDisplayComesFirstThenTheOthersInOrder() {
+        XCTAssertEqual(mainDisplayFirst([1, 2, 3, 4], isMain: { $0 == 3 }), [3, 1, 2, 4])
+        XCTAssertEqual(mainDisplayFirst([1, 2], isMain: { $0 == 1 }), [1, 2])
+        XCTAssertEqual(mainDisplayFirst([7], isMain: { _ in false }), [7])
+    }
 }

@@ -22,7 +22,7 @@ enum MenuBarIconAppearance: String, CaseIterable, Identifiable, Equatable, Hasha
 
 enum MenuBarIndicator: String, CaseIterable, Identifiable, Sendable {
     case icon, workspace
-    /// The workspace of every display, left to right, with the focused display's in bold.
+    /// The workspace of every display, the main one first, with the focused display's in bold.
     case allDisplays = "all-displays"
     var id: String { rawValue }
     var title: String {
@@ -43,4 +43,10 @@ struct MenuBarDisplayIndicator: Equatable {
 func menuBarWorkspaceIndicator(label: String?, number: Int) -> String {
     let label = label?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     return label.first.map { String($0).uppercased() } ?? String(number)
+}
+
+/// The main display first, then the others in their given order, so the main display's
+/// number never moves in the menu bar.
+func mainDisplayFirst<T>(_ displays: [T], isMain: (T) -> Bool) -> [T] {
+    displays.filter(isMain) + displays.filter { !isMain($0) }
 }
