@@ -102,7 +102,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
                 // The layout glyph of the focused workspace stays beside the numbers.
                 let glyph = menuBarIconImage(enabled: true, arrangement: state.arrangement,
                                              appearance: model.menuBarConfiguration.iconAppearance, keyboardTint: color)
-                glyph?.size = NSSize(width: 20, height: 20)
+                glyph?.size = NSSize(width: 18, height: 18)
                 statusItem?.button?.image = glyph
                 statusItem?.button?.imagePosition = .imageLeading
                 statusItem?.button?.imageHugsTitle = true
