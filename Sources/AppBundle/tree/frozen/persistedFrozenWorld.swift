@@ -253,7 +253,7 @@ func persistFrozenWorldForRestartIfPossible() {
 func makeRestartEnvelope() -> PersistedFrozenWorldEnvelope {
     compactPendingRestartSnapshots()
     let world = FrozenWorld(workspaces: orderedWorkspacesForPresentation().filter { !$0.isArchived }.map { FrozenWorkspace($0) },
-        monitors: monitors.map(FrozenMonitor.init),
+        monitors: monitors.map(FrozenMonitor.init) + FrozenMonitor.awayDisplays(),
         windowIds: Workspace.all.flatMap { collectAllWindowIds(workspace: $0) }.toSet())
     let snapshots = discardSupersededRestartAssignments(recovery.restartSnapshots.map(\.snapshot) +
         [PendingRestartSnapshot(world: world, remainingWindowIds: world.windowIds)])

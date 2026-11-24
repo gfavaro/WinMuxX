@@ -12,6 +12,22 @@ struct FrozenMonitor: Codable, Equatable, Sendable {
         visibleWorkspace = monitor.activeWorkspace.name
     }
 
+    init(displayUUID: String, topLeftCorner: CGPoint, visibleWorkspace: String) {
+        self.displayUUID = displayUUID
+        self.topLeftCorner = topLeftCorner
+        self.visibleWorkspace = visibleWorkspace
+    }
+
+    /// Displays that are away (asleep, unplugged, still waking), with the workspace each showed.
+    /// They stay in the saved file, so a restart while a display is away does not forget them (ADR-007).
+    @MainActor static func awayDisplays() -> [FrozenMonitor] {
+        runtime.workspaces.disconnectedViewportsByDisplay.compactMap { uuid, viewport in
+            guard let workspace = viewport.activeWorkspaceId.flatMap({ runtime.workspaces.workspaceById[$0] }),
+                  !workspace.isVisible else { return nil }
+            return FrozenMonitor(displayUUID: uuid, topLeftCorner: viewport.id.topLeftCorner, visibleWorkspace: workspace.name)
+        }.sorted { ($0.displayUUID ?? "") < ($1.displayUUID ?? "") }
+    }
+
     func resolve(in monitors: [Monitor]) -> Monitor? {
         if let displayUUID {
             return monitors.filter { $0.displayUUID == displayUUID }.singleOrNil()
@@ -262,7 +278,16 @@ func restoreFrozenWorldIfNeeded(_ frozenWorld: FrozenWorld, newlyDetectedWindow:
     }
 
     for monitor in restoreVisibleWorkspaces ? frozenWorld.monitors : [] {
-        guard let targetMonitor = monitor.resolve(in: monitors) else { continue }
+        guard let targetMonitor = monitor.resolve(in: monitors) else {
+            // The display is away: remember what it showed, and it shows that when it returns.
+            if let uuid = monitor.displayUUID, let workspace = Workspace.existing(byName: monitor.visibleWorkspace),
+               restoredWorkspaceNames.contains(workspace.name), !workspace.isVisible,
+               runtime.workspaces.disconnectedViewportsByDisplay[uuid] == nil {
+                runtime.workspaces.disconnectedViewportsByDisplay[uuid] = MonitorViewport(
+                    id: MonitorViewportId(topLeftCorner: monitor.topLeftCorner), activeWorkspaceId: workspace.id, displayUUID: uuid)
+            }
+            continue
+        }
         let targetWorkspace: Workspace
         if let existingVisibleWorkspace = Workspace.existing(byName: monitor.visibleWorkspace),
            restoredWorkspaceNames.contains(existingVisibleWorkspace.name)

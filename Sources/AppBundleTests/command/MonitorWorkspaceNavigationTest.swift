@@ -654,6 +654,25 @@ final class MonitorWorkspaceNavigationTest: XCTestCase {
         }
     }
 
+    func testASaveWhileADisplayIsAwayKeepsWhatItShowed() {
+        let connected = identifiedDisplays()
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        let awayUUID = connected[1].displayUUID
+        let shown = spaces[1].name
+        setMonitorsForTests([connected[0], connected[2]])
+        retireDisconnectedViewports()
+        rearrangeWorkspacesOnMonitors()
+        XCTAssertFalse(spaces[1].isVisible)
+        let saved = makeRestartEnvelope().world.monitors
+        XCTAssertEqual(saved.first { $0.displayUUID == awayUUID }?.visibleWorkspace, shown)
+        XCTAssertEqual(saved.count, 3, "Two connected displays and the one that is away")
+        setMonitorsForTests(connected)
+        rearrangeWorkspacesOnMonitors()
+        XCTAssertEqual(makeRestartEnvelope().world.monitors.count, 3, "Back: no entry twice")
+        XCTAssertEqual(connected[1].activeWorkspace.name, shown)
+    }
+
     func testSwipeRightAfterUnplugCanShowTheDisplaysWorkspaceWhichThenStaysAndTheStaleDeadlineDoesNothing() async throws {
         @MainActor final class Deadlines { var waiting: [CheckedContinuation<Void, Never>] = [] }
         let deadlines = Deadlines()
