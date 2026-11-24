@@ -32,15 +32,35 @@ final class WindowHoverBarTest: WorkspaceTestCase {
         let workspace = focus.workspace
         let a = TestWindow.new(id: 9601, parent: workspace.rootTilingContainer)
         _ = TestWindow.new(id: 9602, parent: workspace.rootTilingContainer)
-        XCTAssertEqual(WindowHoverBar.actions(for: a).map(\.title), ["Focus", "Float"])
-        XCTAssertEqual(WindowHoverBar.actions(for: a).map(\.command), ["fullscreen --window-id 9601", "layout floating tiling --window-id 9601"])
+        XCTAssertEqual(WindowHoverBar.actions(for: a).map(\.title), ["Focus", "Float", "Send to"])
+        XCTAssertEqual(WindowHoverBar.actions(for: a).dropLast().map(\.command), ["fullscreen --window-id 9601", "layout floating tiling --window-id 9601"])
         workspace.arrangement = .master
         XCTAssertEqual(WindowHoverBar.actions(for: a).first?.command, "swap-with-master --window-id 9601")
         let floating = TestWindow.new(id: 9603, parent: workspace)
-        XCTAssertEqual(WindowHoverBar.actions(for: floating).map(\.command), ["layout tiling --window-id 9603"],
+        XCTAssertEqual(WindowHoverBar.actions(for: floating).dropLast().map(\.command), ["layout tiling --window-id 9603"],
                        "A floated window offers Tile, so Float can be undone from the bar")
-        for action in WindowHoverBar.actions(for: a) {
+        for action in WindowHoverBar.actions(for: a) where action.choices.isEmpty {
             guard case .cmd = parseCommand(action.command) else { return XCTFail(action.command) }
+        }
+    }
+
+    func testSendToListsTheWorkspacesAndTilesAFloatingWindowWhereItLands() async throws {
+        let workspace = focus.workspace
+        let tiled = TestWindow.new(id: 9621, parent: workspace.rootTilingContainer)
+        let floating = TestWindow.new(id: 9622, parent: workspace)
+        _ = TestWindow.new(id: 9623, parent: Workspace.get(byName: "send-target").rootTilingContainer)
+        let tiledChoices = WindowHoverBar.sendToAction(for: tiled).choices.filter { !$0.isSeparator }
+        let target = try XCTUnwrap(tiledChoices.first { $0.title == menuWorkspaceTitle(Workspace.get(byName: "send-target")) })
+        XCTAssertEqual(target.commands, ["move-node-to-workspace --window-id 9621 \"send-target\""], "A tiled window is only moved")
+        XCTAssertTrue(try XCTUnwrap(tiledChoices.first { $0.title == menuWorkspaceTitle(workspace) }).isCurrent, "Its own workspace is marked")
+        let floatingTarget = try XCTUnwrap(WindowHoverBar.sendToAction(for: floating).choices
+            .first { $0.title == menuWorkspaceTitle(Workspace.get(byName: "send-target")) })
+        XCTAssertEqual(floatingTarget.commands, ["move-node-to-workspace --window-id 9622 \"send-target\"", "layout tiling --window-id 9622"],
+                       "A floating window is tiled where it lands")
+        for choice in WindowHoverBar.sendToAction(for: floating).choices where !choice.isSeparator {
+            for command in choice.commands {
+                guard case .cmd = parseCommand(command) else { return XCTFail(command) }
+            }
         }
     }
 

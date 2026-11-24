@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add Send to… to the hover bar: a menu of workspaces and displays to move the window to; a floating window is tiled where it lands.
 - Add a map in Settings → Automation: drop an app on a workspace to open its windows there; the workspaces up to it are kept so Option-number reaches them.
 - Keep the workspace a display showed while that display is away (asleep, still waking, unplugged) across a restart, so it comes back to the display instead of moving to the main one.
 - Bring Finder windows back on quit; Finder reports no launch date, so its windows were never recorded.

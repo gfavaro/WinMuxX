@@ -9,7 +9,10 @@ final class HoverBarPanel: NSPanelHud {
     private let effectView = NSVisualEffectView()
     /// Deepens the material so the bar stays dark over light windows.
     private let tint = NSView()
-    private var run: ((String) -> Void)?
+    private var run: (([String]) -> Void)?
+    /// Choices of the buttons that open a menu, by button; a menu open keeps the bar on screen.
+    private var choicesByButton: [ObjectIdentifier: [HoverBarChoice]] = [:]
+    private(set) var isMenuOpen = false
     static let cornerRadius: CGFloat = 12
 
     override init() {
@@ -55,8 +58,9 @@ final class HoverBarPanel: NSPanelHud {
     /// Lays out one button per action, each with its configured shortcut beneath, and returns
     /// the bar's size.
     func configure(_ actions: [HoverBarAction], hints: [String?] = [],
-                   run: @escaping (String) -> Void) -> CGSize {
+                   run: @escaping ([String]) -> Void) -> CGSize {
         self.run = run
+        choicesByButton = [:]
         let increasedContrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast
         // Dark, with a touch of the accent in the wash and the border.
         let accent = Self.accentColor
@@ -72,6 +76,7 @@ final class HoverBarPanel: NSPanelHud {
                 .withSymbolConfiguration(.init(pointSize: 12, weight: .medium))
             let button = HoverBarButton.make(title: action.title, image: symbol, command: action.command, target: self, action: #selector(pressed(_:)))
             button.font = .systemFont(ofSize: 13, weight: .medium)
+            if !action.choices.isEmpty { choicesByButton[ObjectIdentifier(button)] = action.choices }
             let column = NSStackView(views: [button])
             column.orientation = .vertical
             column.alignment = .centerX
@@ -121,8 +126,33 @@ final class HoverBarPanel: NSPanelHud {
     }
 
     @objc private func pressed(_ sender: NSButton) {
+        if let choices = choicesByButton[ObjectIdentifier(sender)] { return showMenu(choices, from: sender) }
         guard let command = sender.identifier?.rawValue else { return }
-        run?(command)
+        run?([command])
+    }
+
+    /// A native menu under the button. Choosing runs the choice's commands for the window;
+    /// closing it without a choice leaves the bar as it was.
+    private func showMenu(_ choices: [HoverBarChoice], from button: NSButton) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for choice in choices {
+            guard !choice.isSeparator else { menu.addItem(.separator()); continue }
+            let item = NSMenuItem(title: choice.title, action: #selector(chose(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = choice.commands
+            item.state = choice.isCurrent ? .on : .off
+            item.isEnabled = !choice.isCurrent
+            menu.addItem(item)
+        }
+        isMenuOpen = true
+        defer { isMenuOpen = false }
+        menu.popUp(positioning: nil, at: NSPoint(x: 0, y: button.bounds.height + 4), in: button)
+    }
+
+    @objc private func chose(_ sender: NSMenuItem) {
+        guard let commands = sender.representedObject as? [String] else { return }
+        run?(commands)
     }
 }
 
@@ -132,6 +162,16 @@ struct HoverBarAction: Equatable {
     let command: String
     /// The command a key binding would run for this action, without a window id.
     let shortcut: String
+    /// When not empty the button opens a menu of these instead of running `command`.
+    var choices: [HoverBarChoice] = []
+}
+
+struct HoverBarChoice: Equatable {
+    let title: String
+    let commands: [String]
+    var isCurrent = false
+    var isSeparator = false
+    static let separator = HoverBarChoice(title: "", commands: [], isSeparator: true)
 }
 
 /// A borderless item with a rounded highlight under the pointer; the current tab keeps it.

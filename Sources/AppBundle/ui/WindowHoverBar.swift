@@ -50,7 +50,8 @@ final class WindowHoverBar {
             return [HoverBarAction(title: "Unfocus", symbol: "arrow.down.right.and.arrow.up.left", command: "fullscreen off --window-id \(id)", shortcut: "fullscreen")]
         }
         if window.parent is Workspace {
-            return [HoverBarAction(title: "Tile", symbol: "rectangle.split.2x1", command: "layout tiling --window-id \(id)", shortcut: "layout floating tiling")]
+            return [HoverBarAction(title: "Tile", symbol: "rectangle.split.2x1", command: "layout tiling --window-id \(id)", shortcut: "layout floating tiling"),
+                    sendToAction(for: window)]
         }
         var actions: [HoverBarAction] = []
         if window.nodeWorkspace?.arrangement == .master {
@@ -58,7 +59,29 @@ final class WindowHoverBar {
         }
         actions.append(HoverBarAction(title: "Focus", symbol: "arrow.up.left.and.arrow.down.right", command: "fullscreen --window-id \(id)", shortcut: "fullscreen"))
         actions.append(HoverBarAction(title: "Float", symbol: "macwindow.on.rectangle", command: "layout floating tiling --window-id \(id)", shortcut: "layout floating tiling"))
+        actions.append(sendToAction(for: window))
         return actions
+    }
+
+    /// A menu of the workspaces, and the other displays, to send the window to. A floating
+    /// window is tiled where it lands, so it joins the layout there.
+    static func sendToAction(for window: Window) -> HoverBarAction {
+        let id = window.windowId
+        let tile = window.parent is Workspace ? ["layout tiling --window-id \(id)"] : []
+        var choices = menuWorkspaceTargets().map { workspace, target in
+            HoverBarChoice(title: menuWorkspaceTitle(workspace),
+                           commands: ["move-node-to-workspace --window-id \(id) \(settingsQuotedString(target))"] + tile,
+                           isCurrent: workspace == window.nodeWorkspace)
+        }
+        let here = window.nodeWorkspace?.workspaceMonitor
+        let others = sortedMonitors.enumerated().filter { $0.element.rect.topLeftCorner != here?.rect.topLeftCorner }
+        if !others.isEmpty {
+            choices.append(.separator)
+            choices += others.map { index, monitor in
+                HoverBarChoice(title: monitor.name, commands: ["move-node-to-monitor --window-id \(id) \(index + 1)"] + tile)
+            }
+        }
+        return HoverBarAction(title: "Send to", symbol: "arrow.right.square", command: "", shortcut: "move-node-to-workspace", choices: choices)
     }
 
     /// The configured keys for an action in the current mode, as macOS menus print them.
@@ -85,6 +108,8 @@ final class WindowHoverBar {
     }
 
     func pointerMoved(_ point: CGPoint) {
+        // The pointer is on a menu this bar opened: leave the bar until the menu closes.
+        if panel.isMenuOpen { return }
         // Over the bar, a press is a click on it.
         if shown != nil, panelRect.insetBy(dx: -12, dy: -12).contains(point) { return }
         guard TrayMenuModel.shared.isEnabled, !isLeftMouseButtonDown, !isMouseManipulationActive else { return hide() }
@@ -115,15 +140,19 @@ final class WindowHoverBar {
         guard let frame = Self.frame(of: window) else { return }
         let id = window.windowId
         let actions = Self.actions(for: window)
-        let size = panel.configure(actions, hints: actions.map(Self.shortcutHint)) { [weak self] command in
+        let size = panel.configure(actions, hints: actions.map(Self.shortcutHint)) { [weak self] commands in
             self?.hide()
             // Act as a click on the window would: focus (and raise) it first, so a window
             // floated from the bar is not left behind the tiles it came from.
-            guard let token: RunSessionGuard = .isServerEnabled, case .cmd(let parsed) = parseCommand(command),
+            guard let token: RunSessionGuard = .isServerEnabled,
                   case .cmd(let raise) = parseCommand(["focus", "--window-id", String(id)]) else { return }
+            let parsed = commands.compactMap { command -> (any Command)? in
+                if case .cmd(let parsed) = parseCommand(command) { parsed } else { nil }
+            }
+            guard parsed.count == commands.count else { return }
             Task { @MainActor in
                 await runUnattendedLightSession(.menuBarButton, token, shouldSchedulePostRefresh: true) {
-                    let result = try await [raise, parsed].runCmdSeq(.defaultEnv, .emptyStdin)
+                    let result = try await ([raise] + parsed).runCmdSeq(.defaultEnv, .emptyStdin)
                     showShortcutFailure("Hover bar", result)
                 }
             }
