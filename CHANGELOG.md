@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Keep the workspace a display showed while that display is away (asleep, still waking, unplugged) across a restart, so it comes back to the display instead of moving to the main one.
+- Bring Finder windows back on quit; Finder reports no launch date, so its windows were never recorded.
+- Bring parked windows back into view on quit even when they were first seen parked in the corner.
 - Focus the window you asked for in an app with several windows, instead of whichever one macOS had as its main window.
 - Reorder workspaces by dragging a workspace's header in the sidebar, or with `move-workspace-order up|down`; numbers follow the new order.
 - Keep workspace numbers when an empty workspace is removed after a restart, instead of swapping workspaces.

@@ -1,6 +1,6 @@
 # ADR-007: Keep a workspace's display while that display is away
 
-- Status: Proposed
+- Status: Accepted by the Product Manager (2026-11-24)
 - Date: 2026-11-24
 
 ## Context
