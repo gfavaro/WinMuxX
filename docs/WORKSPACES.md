@@ -33,7 +33,7 @@ internal names or shortcut targets.
 
 Settings → Advanced → Automation → Map shows workspaces 1 to N as tiles, each with the apps
 whose windows open there. Drop an app icon on a tile (or use its plus menu to pick a running
-app) and WinMuxX saves a rule that moves the app's windows to that workspace. Drag an icon to
+app) and WinMuxX saves a rule that moves the app's new windows to that workspace. Windows already open, and windows WinMuxX remembers from before, keep their place. Drag an icon to
 another tile to move it; right-click it to stop. The last tile, "New", adds the next number.
 
 Mapping an app to workspace N also keeps workspaces 1 to N in `persistent-workspaces`, so

@@ -55,7 +55,7 @@ struct SettingsWorkspaceMapView: View {
     var body: some View {
         SettingsScrollView {
             SettingsSection("Where apps open") {
-                Text("Drop an app on a workspace and its windows open there. Workspaces 1 to the highest one used are kept, so Option-number always reaches them.")
+                Text("Drop an app on a workspace and its new windows open there; windows already open stay where they are. Workspaces 1 to the highest one used are kept, so Option-number always reaches them.")
                     .font(.callout).foregroundStyle(.secondary)
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
                     ForEach(1...map.tileCount, id: \.self) { tile($0) }
@@ -74,7 +74,7 @@ struct SettingsWorkspaceMapView: View {
         let isPinned = map.pinned.contains(number)
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(isNew ? "New" : String(number)).font(.headline)
+                Text(isNew ? "\(number) · New" : String(number)).font(.headline)
                 Spacer()
                 if isPinned {
                     Button { map.unpin(number, using: model) } label: { Image(systemName: "pin.fill") }
@@ -105,7 +105,7 @@ struct SettingsWorkspaceMapView: View {
             return true
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(isNew ? "New workspace" : "Workspace \(number)")
+        .accessibilityLabel(isNew ? "New workspace \(number)" : "Workspace \(number)")
     }
 
     private func addMenu(_ number: Int) -> some View {

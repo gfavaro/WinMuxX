@@ -56,8 +56,8 @@ enum WorkspaceMapDocument {
 
     /// Lets a workspace go again. Refused while an app is routed to it, or to a later one.
     static func unpinning(workspace: Int, in text: String) throws -> String {
-        if routes(in: text).contains(where: { $0.workspace >= workspace }) {
-            throw WorkspaceMapError(errorDescription: "Apps are routed to this workspace or a later one.")
+        if let blocking = routes(in: text).filter({ $0.workspace >= workspace }).map(\.workspace).max() {
+            throw WorkspaceMapError(errorDescription: "An app opens in workspace \(blocking), so workspaces up to it stay.")
         }
         let names = persistentNames(in: text).filter { Int($0) != workspace }
         return applyingSettingsConfigEdits([persistentEdit(names)], to: text)
