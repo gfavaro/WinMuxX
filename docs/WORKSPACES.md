@@ -29,6 +29,20 @@ entries such as `"Code"` keep their name; use `workspace --name Code` to select 
 internal name explicitly. Custom labels override display names without changing
 internal names or shortcut targets.
 
+## Where apps open
+
+Settings → Advanced → Automation → Map shows workspaces 1 to N as tiles, each with the apps
+whose windows open there. Drop an app icon on a tile (or use its plus menu to pick a running
+app) and WinMuxX saves a rule that moves the app's windows to that workspace. Drag an icon to
+another tile to move it; right-click it to stop. The last tile, "New", adds the next number.
+
+Mapping an app to workspace N also keeps workspaces 1 to N in `persistent-workspaces`, so
+Option-N always reaches it, even when workspace 2 is empty. Stopping an app does not unpin the
+workspace; click its pin to let it go (refused while an app is mapped there or to a later one).
+The map shows only rules that match one app by its bundle ID and only move it to a numbered
+workspace; every other rule stays in Rules. If an earlier rule already handles the app, the map
+says so instead of adding a rule that would never run.
+
 `minimum-workspace-count` is removed. Startup converts an older count to explicit
 persistent names and saves a backup. Existing names and their order are preserved;
 missing slots receive the first unused positive numeric names. There is no ongoing

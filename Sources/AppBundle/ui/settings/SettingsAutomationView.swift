@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum SettingsAutomationSection: String, CaseIterable {
-    case rules, events
+    case rules, map, events
     static func restored(_ value: String) -> Self { Self(rawValue: value) ?? .rules }
 }
 
@@ -21,11 +21,14 @@ struct ShortcutAutomationSettingsView: View {
         VStack(spacing: 12) {
             Picker("Automation section", selection: Binding(get: { SettingsAutomationSection.restored(storedSection) }, set: { storedSection = $0.rawValue })) {
                 Text("Rules").tag(SettingsAutomationSection.rules)
+                Text("Map").tag(SettingsAutomationSection.map)
                 Text("Events").tag(SettingsAutomationSection.events)
             }.pickerStyle(.segmented).padding(.horizontal, 20)
-            if SettingsAutomationSection.restored(storedSection) == .rules {
-                SettingsWindowRulesView(model: model, rules: rules, onRawEditor: onRawEditor)
-            } else { events }
+            switch SettingsAutomationSection.restored(storedSection) {
+                case .rules: SettingsWindowRulesView(model: model, rules: rules, onRawEditor: onRawEditor)
+                case .map: SettingsWorkspaceMapView(model: model)
+                case .events: events
+            }
         }
         .navigationTitle("Automation")
     }
