@@ -98,7 +98,17 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let arrangementDescription = " · \(arrangementName) layout"
         if model.isEnabled && state.indicator != .icon {
             statusItem?.length = NSStatusItem.variableLength
-            statusItem?.button?.image = nil
+            if state.indicator == .allDisplays {
+                // The layout glyph of the focused workspace stays beside the numbers.
+                let glyph = menuBarIconImage(enabled: true, arrangement: state.arrangement,
+                                             appearance: model.menuBarConfiguration.iconAppearance, keyboardTint: color)
+                glyph?.size = NSSize(width: 14, height: 14)
+                statusItem?.button?.image = glyph
+                statusItem?.button?.imagePosition = .imageLeading
+                statusItem?.button?.imageHugsTitle = true
+            } else {
+                statusItem?.button?.image = nil
+            }
             let title = NSMutableAttributedString()
             if state.indicator == .allDisplays, state.displays.count > 1 {
                 // The main display first, then the others as arranged. Compact, to take little of the
@@ -132,6 +142,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             return
         }
         statusItem?.length = NSStatusItem.squareLength
+        statusItem?.button?.imagePosition = .imageOnly
         statusItem?.button?.attributedTitle = NSAttributedString(string: "")
         statusItem?.button?.setAccessibilityLabel(model.isEnabled ? "WinMux, \(arrangementName) layout" + modeDescription : "WinMux disabled")
         let image = menuBarIconImage(

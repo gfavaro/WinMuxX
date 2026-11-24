@@ -91,7 +91,8 @@ Color uses the macOS system accent; monochrome is a template icon that follows
 the menu bar. An active keyboard mode tints either icon. The workspace text
 indicator remains the workspace label or number. `all-displays` lists the workspace each display
 shows, the main display first and the others left to right as they are arranged, with the focused
-display's in bold (for example `3 · 5`); with one display it matches `workspace`.
+display's in bold (for example `3 · 5`), after the layout icon of the focused workspace; with one
+display it shows the icon and that workspace's number.
 
 ## Migration and backups
 

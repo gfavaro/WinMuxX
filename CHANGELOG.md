@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Add an `all-displays` menu-bar indicator that lists the workspace each display shows, the main display first, with the focused one in bold.
+- Add an `all-displays` menu-bar indicator that lists the workspace each display shows, the main display first, with the focused one in bold, beside the focused workspace's layout icon.
 - Add Send to… to the hover bar: a menu of workspaces and displays to move the window to; a floating window is tiled where it lands.
 - Add a map in Settings → Automation: drop an app on a workspace to open its windows there; the workspaces up to it are kept so Option-number reaches them.
 - Keep the workspace a display showed while that display is away (asleep, still waking, unplugged) across a restart, so it comes back to the display instead of moving to the main one.
