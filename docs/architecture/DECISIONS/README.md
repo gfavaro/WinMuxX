@@ -8,3 +8,4 @@ These records document observed implementation. They do not claim that a particu
 - [ADR-004: Remember the Scrolling position across restarts](004-scrolling-offset-persistence.md)
 - [ADR-005: Refresh scheduling rules live in RefreshCoordinator](005-refresh-scheduling-owner.md)
 - [ADR-006: Use the last window frame to tell identical windows apart on restore](006-restart-frame-evidence.md)
+- [ADR-007: Keep a workspace's display while that display is away](007-remember-absent-display.md)
