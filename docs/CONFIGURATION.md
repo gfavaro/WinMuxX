@@ -69,7 +69,7 @@ replace larger old counts with an explicit list.
 
 ```toml
 [menu-bar]
-indicator = 'icon'          # icon or workspace
+indicator = 'icon'          # icon, workspace or all-displays
 icon-appearance = 'color'  # color or monochrome
 
 [window-tabs]
@@ -89,7 +89,9 @@ right. The
 symbols stay fixed as windows, nested layouts, or master orientation change.
 Color uses the macOS system accent; monochrome is a template icon that follows
 the menu bar. An active keyboard mode tints either icon. The workspace text
-indicator remains the workspace label or number.
+indicator remains the workspace label or number. `all-displays` lists the workspace each display
+shows, left to right as the displays are arranged, with the focused display's in bold (for
+example `3 · 5`); with one display it matches `workspace`.
 
 ## Migration and backups
 

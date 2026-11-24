@@ -5,7 +5,7 @@ func parseMenuBar(_ raw: TOMLValueConvertible, _ backtrace: TomlBacktrace,
     parseTable(raw, MenuBarConfig(), [
         "indicator": Parser(\.indicator) { raw, trace in
             parseString(raw, trace).flatMap {
-                MenuBarIndicator(rawValue: $0).orFailure(.semantic(trace, "Expected icon or workspace"))
+                MenuBarIndicator(rawValue: $0).orFailure(.semantic(trace, "Expected icon, workspace or all-displays"))
             }
         },
         "icon-appearance": Parser(\.iconAppearance) { raw, trace in

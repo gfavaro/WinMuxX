@@ -12,6 +12,7 @@ public final class TrayMenuModel {
 
     var modePresentation: ModePresentation?
     var menuBarWorkspaceIndicator: String = "1"
+    var menuBarDisplayIndicators: [MenuBarDisplayIndicator] = []
     var menuBarWorkspaceName: String = ""
     var menuBarWorkspaceArrangement: WorkspaceLayoutName = .dwindle
     /// Is "layouting" enabled
@@ -34,16 +35,25 @@ public final class TrayMenuModel {
     var wallpaperRefreshGeneration: UInt64 = 0
 }
 
-@MainActor func updateTrayText() {
-    let focus = focus
-    let workspace = focus.workspace
-    let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: workspace)
+/// What the menu bar shows for a workspace: its label's initial, else its number.
+@MainActor private func menuBarIndicatorText(for workspace: Workspace, focusedWorkspace: Workspace) -> String {
+    let number = automaticWorkspaceDisplayIndex(workspace, focusedWorkspace: focusedWorkspace)
         ?? Int(workspace.name)
-        ?? userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: workspace)
+        ?? userFacingWorkspaces(orderedWorkspacesForPresentation(), focusedWorkspace: focusedWorkspace)
             .filter { $0.projectId == workspace.projectId }.firstIndex(of: workspace).map { $0 + 1 }
         ?? 1
     let persistentLabel = workspace.isConfiguredPersistent && parsePositiveWorkspaceDisplayIndex(workspace.name) == nil ? workspace.name : nil
-    TrayMenuModel.shared.menuBarWorkspaceIndicator = menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name] ?? persistentLabel, number: number)
+    return menuBarWorkspaceIndicator(label: config.workspaceSidebar.workspaceLabels[workspace.name] ?? persistentLabel, number: number)
+}
+
+@MainActor func updateTrayText() {
+    let focus = focus
+    let workspace = focus.workspace
+    TrayMenuModel.shared.menuBarWorkspaceIndicator = menuBarIndicatorText(for: workspace, focusedWorkspace: workspace)
+    TrayMenuModel.shared.menuBarDisplayIndicators = sortedMonitors.map {
+        MenuBarDisplayIndicator(text: menuBarIndicatorText(for: $0.activeWorkspace, focusedWorkspace: workspace),
+                                isFocused: $0.activeWorkspace == workspace)
+    }
     TrayMenuModel.shared.menuBarWorkspaceName = workspaceDisplayName(workspace.name)
     TrayMenuModel.shared.menuBarWorkspaceArrangement = workspace.arrangement
     let workspaces = userFacingWorkspaces(Workspace.all, focusedWorkspace: focus.workspace).filter {

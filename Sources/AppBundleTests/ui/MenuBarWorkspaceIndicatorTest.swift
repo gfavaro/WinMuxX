@@ -1,6 +1,7 @@
 @testable import AppBundle
 import XCTest
 
+@MainActor
 final class MenuBarWorkspaceIndicatorTest: XCTestCase {
     func testUnlabeledWorkspaceUsesEntireNumber() {
         XCTAssertEqual(menuBarWorkspaceIndicator(label: nil, number: 1), "1")
@@ -12,5 +13,12 @@ final class MenuBarWorkspaceIndicatorTest: XCTestCase {
         XCTAssertEqual(menuBarWorkspaceIndicator(label: " desenvolvimento ", number: 2), "D")
         XCTAssertEqual(menuBarWorkspaceIndicator(label: "área de trabalho", number: 2), "Á")
         XCTAssertEqual(menuBarWorkspaceIndicator(label: "👩🏽‍💻 Trabalho", number: 2), "👩🏽‍💻")
+    }
+
+    func testAllDisplaysIsAValidIndicator() {
+        let parsed = parseConfig("[menu-bar]\nindicator = 'all-displays'")
+        XCTAssertTrue(parsed.errors.isEmpty)
+        XCTAssertEqual(parsed.config.menuBar.indicator, .allDisplays)
+        XCTAssertFalse(parseConfig("[menu-bar]\nindicator = 'everything'").errors.isEmpty)
     }
 }

@@ -42,7 +42,7 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
     private var bindings = ActionMenuBindings(mode: nil)
     private var appearanceGate = MenuBarAppearanceGate()
     private var lastModePresentation: ModePresentation?
-    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, name: String, arrangement: WorkspaceLayoutName)?
+    private var lastIconState: (enabled: Bool, appearance: MenuBarIconAppearance, indicator: MenuBarIndicator, text: String, displays: [MenuBarDisplayIndicator], name: String, arrangement: WorkspaceLayoutName)?
     private var capturedRuleTarget: QuickFloatingRuleTarget?
 
     func install() {
@@ -86,8 +86,8 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
 
     private func updateIcon() {
         let model = TrayMenuModel.shared
-        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
-        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
+        let state = (enabled: model.isEnabled, appearance: model.menuBarConfiguration.iconAppearance, indicator: model.menuBarConfiguration.indicator, text: model.menuBarWorkspaceIndicator, displays: model.menuBarDisplayIndicators, name: model.menuBarWorkspaceName, arrangement: model.menuBarWorkspaceArrangement)
+        if let previous = lastIconState, previous.enabled == state.enabled, previous.appearance == state.appearance, previous.indicator == state.indicator, previous.text == state.text, previous.displays == state.displays, previous.name == state.name, previous.arrangement == state.arrangement, lastModePresentation == model.modePresentation { return }
         lastIconState = state
         lastModePresentation = model.modePresentation
         let mode = model.isEnabled ? model.modePresentation : nil
@@ -96,13 +96,31 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
         let modeDescription = mode.map { " · Mode: \($0.name)" + ($0.escapeReturnsToMain ? " · Esc to exit" : "") } ?? ""
         let arrangementName = state.arrangement.rawValue.capitalized
         let arrangementDescription = " · \(arrangementName) layout"
-        if model.isEnabled && state.indicator == .workspace {
+        if model.isEnabled && state.indicator != .icon {
             statusItem?.length = NSStatusItem.variableLength
             statusItem?.button?.image = nil
-            let title = NSMutableAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor])
+            let title = NSMutableAttributedString()
+            if state.indicator == .allDisplays, state.displays.count > 1 {
+                // Left to right as the displays are arranged; the focused one stands out.
+                for (index, display) in state.displays.enumerated() {
+                    if index > 0 { title.append(NSAttributedString(string: " · ", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
+                    title.append(NSAttributedString(string: display.text, attributes: [
+                        .foregroundColor: display.isFocused ? NSColor.labelColor : NSColor.secondaryLabelColor,
+                        .font: NSFont.monospacedDigitSystemFont(ofSize: 14, weight: display.isFocused ? .bold : .regular),
+                    ]))
+                }
+            } else {
+                title.append(NSAttributedString(string: state.text, attributes: [.foregroundColor: NSColor.labelColor]))
+            }
             if let mode, let color { title.append(NSAttributedString(string: " | \(mode.initial)", attributes: [.foregroundColor: color])) }
             statusItem?.button?.attributedTitle = title
             statusItem?.button?.font = .monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+            if state.indicator == .allDisplays, state.displays.count > 1 {
+                let shown = state.displays.map(\.text).joined(separator: ", ")
+                statusItem?.button?.toolTip = "WinMux · Workspaces \(shown) · Focused \(state.name)" + arrangementDescription + modeDescription
+                statusItem?.button?.setAccessibilityLabel("WinMux, workspaces \(shown), focused \(state.name), \(arrangementName) layout" + modeDescription)
+                return
+            }
             statusItem?.button?.toolTip = "WinMux · \(state.name) · Focused display" + arrangementDescription + modeDescription
             statusItem?.button?.setAccessibilityLabel("WinMux, workspace \(state.name), focused display, \(arrangementName) layout" + modeDescription)
             return

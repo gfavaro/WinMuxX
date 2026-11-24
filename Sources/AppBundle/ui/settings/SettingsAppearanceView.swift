@@ -58,9 +58,10 @@ struct ShortcutAppearanceSettingsView: View {
             }
             SettingsSection("Menu bar") {
                 SettingsPicker(.menuBarIndicator, selection: $menuBarIndicator,
-                               help: "Workspace follows the focused display: label initial when named, workspace number otherwise.") {
+                               help: "Workspace follows the focused display: label initial when named, workspace number otherwise. All displays lists every display's workspace, left to right, with the focused one in bold.") {
                     Text("Icon").tag(MenuBarIndicator.icon)
                     Text("Workspace").tag(MenuBarIndicator.workspace)
+                    Text("All displays").tag(MenuBarIndicator.allDisplays)
                 } onChange: {
                     persist("menu-bar", "indicator", "'\(menuBarIndicator.rawValue)'")
                 }
