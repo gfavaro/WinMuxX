@@ -50,7 +50,9 @@ final class WindowRecoveryController {
     }
 
     func identity(for window: MacWindow) -> RecoveryWindowIdentity? {
-        guard let launchDate = window.macApp.launchDate else { return nil }
+        // Finder and other system apps report no launch date; the process birth time stands in,
+        // or their windows would never be recorded and never be brought back on quit.
+        guard let launchDate = window.macApp.launchDate ?? recoveryProcessLaunchDate(window.macApp.pid) else { return nil }
         return RecoveryWindowIdentity(windowId: window.windowId, pid: window.macApp.pid,
                                       bundleId: window.macApp.rawAppBundleId, applicationLaunchDate: launchDate)
     }
