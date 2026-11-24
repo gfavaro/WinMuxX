@@ -60,8 +60,11 @@ final class WindowRecoveryController {
               let rect = originalRect, let identity = identity(for: window) else { return }
         guard journal?.entries[window.windowId]?.identity != identity else { return }
         guard stagedOriginals[window.windowId]?.identity != identity else { return }
-        stagedOriginals[window.windowId] = RecoveryWindowEntry(identity: identity,
-            originalFrame: CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height))
+        let frame = CGRect(x: rect.minX, y: rect.minY, width: rect.width, height: rect.height)
+        // A window found already parked in the corner has no original place to remember.
+        guard recoveryFrameIntersectsDisplay(frame, displays: sortedMonitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) })
+        else { return }
+        stagedOriginals[window.windowId] = RecoveryWindowEntry(identity: identity, originalFrame: frame)
     }
 
     func recordBeforeMutation(_ window: MacWindow, originalRect: Rect?) {
@@ -126,7 +129,11 @@ final class WindowRecoveryController {
             let failedIds = await restoreTerminationWindows(windowIds) { windowId in
                 guard let window = MacWindow.allWindowsMap[windowId],
                       let identity = identity(for: window), managedIdentities[window.windowId] == identity else { return }
-                let original = journal?.entries[window.windowId].flatMap { $0.identity == identity ? $0 : nil }
+                let displays = sortedMonitors.map { CGRect(origin: $0.rect.topLeftCorner, size: $0.rect.size) }
+                // A saved frame in the parking corner is not a place to go back to: use the fallback.
+                let original = journal?.entries[window.windowId].flatMap {
+                    $0.identity == identity && recoveryFrameIntersectsDisplay($0.originalFrame, displays: displays) ? $0 : nil
+                }
                 let fallback = window.isHiddenInCorner ? window.fallbackFrameForRecovery() : nil
                 guard let frame = original?.originalFrame ?? fallback else { return }
                 let entry = original ?? RecoveryWindowEntry(identity: identity, originalFrame: frame)
@@ -219,8 +226,14 @@ final class WindowRecoveryController {
     }
 }
 
+/// Whether a person could reach the window at `frame`: enough of it, at least 100 points each
+/// way (or all of a smaller window), lies on a display. The strip of a window parked in the
+/// corner does not count, or "restoring" it would put it back there.
 func recoveryFrameIntersectsDisplay(_ frame: CGRect, displays: [CGRect]) -> Bool {
-    displays.contains { $0.intersects(frame) }
+    displays.contains { display in
+        let visible = display.intersection(frame)
+        return !visible.isNull && visible.width >= min(100, frame.width) && visible.height >= min(100, frame.height)
+    }
 }
 
 func recoveryFrameMatches(actual: CGRect, expected: CGRect) -> Bool {

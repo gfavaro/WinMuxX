@@ -150,6 +150,14 @@ final class WindowRecoveryJournalTest: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
     }
 
+    func testAFrameParkedInTheCornerIsNotAPlaceToRestoreTo() {
+        let display = [CGRect(x: 0, y: 0, width: 1710, height: 1112)]
+        XCTAssertFalse(recoveryFrameIntersectsDisplay(CGRect(x: 1709, y: 1066, width: 1662, height: 1069), displays: display))
+        XCTAssertFalse(recoveryFrameIntersectsDisplay(CGRect(x: 1709, y: 1080, width: 827, height: 1069), displays: display))
+        XCTAssertTrue(recoveryFrameIntersectsDisplay(CGRect(x: -606, y: 40, width: 807, height: 1070), displays: display))
+        XCTAssertTrue(recoveryFrameIntersectsDisplay(CGRect(x: 100, y: 880, width: 100, height: 60), displays: display))
+    }
+
     func testDisconnectedDisplayIsSkippedWithoutChangingOriginalGeometry() {
         let original = CGRect(x: -1800, y: 50, width: 800, height: 600)
         XCTAssertFalse(recoveryFrameIntersectsDisplay(original, displays: [CGRect(x: 0, y: 0, width: 1920, height: 1080)]))
