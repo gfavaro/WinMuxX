@@ -101,12 +101,18 @@ final class NativeActionMenu: NSObject, NSMenuDelegate {
             statusItem?.button?.image = nil
             let title = NSMutableAttributedString()
             if state.indicator == .allDisplays, state.displays.count > 1 {
-                // The main display first, then the others as arranged; the focused one stands out.
+                // The main display first, then the others as arranged. Compact, to take little of the
+                // menu bar: the focused one larger and bold, the rest smaller, a thin dot between.
                 for (index, display) in state.displays.enumerated() {
-                    if index > 0 { title.append(NSAttributedString(string: " · ", attributes: [.foregroundColor: NSColor.secondaryLabelColor])) }
+                    if index > 0 {
+                        title.append(NSAttributedString(string: "\u{2009}·\u{2009}", attributes: [
+                            .foregroundColor: NSColor.secondaryLabelColor,
+                            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
+                        ]))
+                    }
                     title.append(NSAttributedString(string: display.text, attributes: [
                         .foregroundColor: display.isFocused ? NSColor.labelColor : NSColor.secondaryLabelColor,
-                        .font: NSFont.monospacedDigitSystemFont(ofSize: 14, weight: display.isFocused ? .bold : .regular),
+                        .font: NSFont.monospacedDigitSystemFont(ofSize: display.isFocused ? 13 : 11, weight: display.isFocused ? .bold : .regular),
                     ]))
                 }
             } else {
