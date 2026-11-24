@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Skip a tile whose window closed while the workspace was being laid out, instead of crashing with "Can't change weight if TreeNode doesn't have parent".
 - Add an `all-displays` menu-bar indicator that lists the workspace each display shows, the main display first, with the focused one in bold, beside the focused workspace's layout icon.
 - Add Send to… to the hover bar: a menu of workspaces and displays to move the window to; a floating window is tiled where it lands.
 - Add a map in Settings → Automation: drop an app on a workspace to open its windows there; the workspaces up to it are kept so Option-number reaches them.

@@ -263,6 +263,9 @@ extension TilingContainer {
             masterRatio = frames[0].weight / rect.getDimension(orientation)
         }
         for (child, frame) in zip(children, frames) {
+            // Laying out a sibling awaits, and the tree can change meanwhile (a window closes).
+            // A child that left this container has nothing to lay out; the next refresh redoes it.
+            guard child.parent === self else { continue }
             child.setWeight(orientation, frame.weight)
             let childVirtual = Rect(
                 topLeftX: frame.virtual.topLeftX + virtual.topLeftX - point.x,
