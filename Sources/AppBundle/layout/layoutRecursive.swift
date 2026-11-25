@@ -281,6 +281,7 @@ extension TilingContainer {
         let rect = Rect(topLeftX: point.x, topLeftY: point.y, width: width, height: height)
         let frames = dwindleChildFrames(in: rect, gaps: context.resolvedGaps)
         for (child, frame) in zip(children, frames) {
+            guard child.parent === self else { continue } // left while a sibling was laid out
             let childVirtual = Rect(
                 topLeftX: virtual.topLeftX + frame.topLeftX - point.x,
                 topLeftY: virtual.topLeftY + frame.topLeftY - point.y,
@@ -315,7 +316,7 @@ extension TilingContainer {
                 virtual: contentVirtual,
                 context,
             )
-            for child in children where child != activeChild {
+            for child in children where child != activeChild && child.parent === self {
                 try await child.hideTabbedWindows(context.workspace)
             }
             return
@@ -323,6 +324,7 @@ extension TilingContainer {
 
         guard let mruIndex: Int = mostRecentChild?.ownIndex else { return }
         for (index, child) in children.enumerated() {
+            guard child.parent === self else { continue } // left while a sibling was laid out
             let extent = orientation == .h ? width : height
             let padding = min(tabGroupPadding, max(extent - 1, 0) / 2)
             let (lPadding, rPadding): (CGFloat, CGFloat) = switch index {
@@ -396,7 +398,7 @@ extension TreeNode {
             case .window(let window):
                 try await window.parkHiddenLayoutWindow()
             case .tilingContainer(let container):
-                for child in container.children {
+                for child in container.children where child.parent === container {
                     try await child.hideTabbedWindows(workspace)
                 }
             case .workspace, .macosMinimizedWindowsContainer, .macosFullscreenWindowsContainer,
@@ -413,7 +415,7 @@ extension TreeNode {
             case .window(let window):
                 try await window.parkHiddenLayoutWindow()
             case .tilingContainer(let container):
-                for child in container.children {
+                for child in container.children where child.parent === container {
                     try await child.hideAllWindowsExcept(targetNode)
                 }
             case .workspace(let workspace):
